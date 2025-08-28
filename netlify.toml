@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  # CRA 在 CI=true 时会把 warning 当 error；这里关闭以避免因第三方 sourcemap 警告导致构建失败
+  CI = "false"
+
+[functions]
+  directory = "netlify/functions"
+
+# 确保前端路由回退到 index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
