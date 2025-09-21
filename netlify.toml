@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+# 确保前端路由回退到 index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

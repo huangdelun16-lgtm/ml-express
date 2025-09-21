@@ -1,0 +1,49 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1976d2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#03dac4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="1024" height="1024" rx="200" fill="url(#gradient)"/>
+  
+  <!-- 主图标 - 快递卡车 -->
+  <g transform="translate(256, 256)">
+    <!-- 卡车主体 -->
+    <rect x="50" y="150" width="300" height="120" rx="20" fill="white"/>
+    <rect x="350" y="180" width="150" height="90" rx="15" fill="white"/>
+    
+    <!-- 车轮 -->
+    <circle cx="150" cy="320" r="40" fill="#333"/>
+    <circle cx="400" cy="320" r="40" fill="#333"/>
+    <circle cx="150" cy="320" r="25" fill="white"/>
+    <circle cx="400" cy="320" r="25" fill="white"/>
+    
+    <!-- 车窗 -->
+    <rect x="360" y="200" width="80" height="50" rx="5" fill="#87ceeb"/>
+    
+    <!-- 装饰线条 -->
+    <rect x="70" y="170" width="260" height="8" rx="4" fill="#1976d2"/>
+    <rect x="70" y="190" width="200" height="6" rx="3" fill="#1976d2"/>
+    
+    <!-- 文字 ML -->
+    <text x="160" y="230" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="#1976d2" text-anchor="middle">ML</text>
+  </g>
+  
+  <!-- 装饰元素 - 包裹 -->
+  <g transform="translate(650, 200)">
+    <rect x="0" y="0" width="80" height="80" rx="10" fill="white" opacity="0.9"/>
+    <rect x="10" y="10" width="60" height="60" rx="5" fill="#ff9800" opacity="0.8"/>
+    <rect x="35" y="5" width="10" height="70" fill="white"/>
+    <rect x="5" y="35" width="70" height="10" fill="white"/>
+  </g>
+  
+  <!-- 装饰元素 - 位置标记 -->
+  <g transform="translate(150, 180)">
+    <circle cx="0" cy="0" r="30" fill="white" opacity="0.9"/>
+    <path d="M0,-20 C10,-20 20,-10 20,0 C20,10 0,20 0,20 C0,20 -20,10 -20,0 C-20,-10 -10,-20 0,-20 Z" fill="#f44336"/>
+    <circle cx="0" cy="-5" r="8" fill="white"/>
+  </g>
+</svg>

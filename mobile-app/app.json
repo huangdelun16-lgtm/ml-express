@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "ML Express",
+    "slug": "ml-express-mobile", 
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#1976d2",
+    "primaryColor": "#1976d2",
+    "splash": {
+      "backgroundColor": "#1976d2",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mlexpress.mobile"
+    },
+    "android": {
+      "package": "com.mlexpress.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION", 
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "INTERNET"
+      ]
+    }
+  }
+}

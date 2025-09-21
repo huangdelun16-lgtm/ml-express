@@ -1,0 +1,28 @@
+{
+  "short_name": "MARKETLINK",
+  "name": "MARKETLINK EXPRESS - 缅甸专业快递服务",
+  "description": "提供国内快递、国际快递、同城快递、铁路运输等服务",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "categories": ["business", "shopping", "travel"],
+  "lang": "zh-CN"
+}
