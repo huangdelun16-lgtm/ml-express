@@ -267,11 +267,24 @@ export const handler: Handler = async (event) => {
         
         // 🔥 核心修复：同时更新包裹状态和财务状态
         // 1) 更新包裹状态为"待签收"
+        let packageUpdateCount = 0;
         try { 
-          await (client as any).from('packages').update({ status: '待签收' }).in('tracking_no', arr); 
-          console.log(`✅ 已更新 ${arr.length} 个包裹状态为"待签收"`);
+          const { data: packageUpdates, error: packageUpdateError } = await (client as any)
+            .from('packages')
+            .update({ status: '待签收' })
+            .in('tracking_no', arr)
+            .select('tracking_no, status');
+          
+          if (packageUpdateError) {
+            console.error('更新包裹状态失败:', packageUpdateError);
+            throw new Error(`包裹状态更新失败: ${packageUpdateError.message}`);
+          }
+          
+          packageUpdateCount = packageUpdates ? packageUpdates.length : 0;
+          console.log(`✅ 已更新 ${packageUpdateCount}/${arr.length} 个包裹状态为"待签收"`, packageUpdates?.map(p => p.tracking_no));
         } catch (e) {
-          console.error('更新包裹状态失败:', e);
+          console.error('更新包裹状态异常:', e);
+          return json(500, { message: `包裹状态更新失败: ${e.message}` });
         }
         
         // 2) 更新财务记录状态为"待签收"
@@ -318,8 +331,14 @@ export const handler: Handler = async (event) => {
           }));
           try { const ins = await client.from('finances').insert(rows); if (!(ins as any)?.error) created = rows.length; } catch {}
         }
-        try { await client.from('audit_logs').insert([{ actor, action: 'transport.arrive', detail: { shipmentId, count: arr.length, created } }]); } catch {}
-        return json(200, { ok: true, updated: arr.length, created });
+        try { await client.from('audit_logs').insert([{ actor, action: 'transport.arrive', detail: { shipmentId, count: arr.length, packageUpdateCount, created } }]); } catch {}
+        return json(200, { 
+          ok: true, 
+          updated: arr.length, 
+          packageUpdated: packageUpdateCount,
+          created,
+          message: `成功处理 ${arr.length} 个包裹，其中 ${packageUpdateCount} 个包裹状态已更新为"待签收"`
+        });
       }
       if (op === 'transit') {
         // 中转操作：记录中转信息，财务状态保持"运输中"

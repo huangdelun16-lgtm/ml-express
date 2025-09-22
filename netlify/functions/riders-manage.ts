@@ -1,9 +1,11 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE!;
+const supabase = createClient(supabaseUrl, supabaseKey, { 
+  auth: { persistSession: false } 
+});
 
 // 内存中存储骑手的动态状态
 interface RiderState {

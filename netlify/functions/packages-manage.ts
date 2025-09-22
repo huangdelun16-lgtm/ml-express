@@ -46,18 +46,42 @@ async function autoAddToTransport(client: any, trackingNo: string, actor: string
   const today = new Date().toISOString().slice(0, 10);
   const freightNo = `AUTO-${today}-${Date.now()}`;
   
-  // 1) 创建自动运单
-  const { data: shipment, error: shipmentError } = await client
-    .from('shipments')
-    .insert([{
-      freight_no: freightNo,
-      destination: '自动出库',
-      depart_date: today,
-      note: `自动创建 - 包裹出库: ${trackingNo}`,
-      created_by: actor
-    }])
-    .select('id')
-    .single();
+  // 1) 创建自动运单 - 兼容destination和dest字段
+  let shipment, shipmentError;
+  try {
+    const result = await client
+      .from('shipments')
+      .insert([{
+        freight_no: freightNo,
+        destination: '自动出库',
+        depart_date: today,
+        note: `自动创建 - 包裹出库: ${trackingNo}`,
+        created_by: actor
+      }])
+      .select('id')
+      .single();
+    shipment = result.data;
+    shipmentError = result.error;
+  } catch (e) {
+    // 如果destination字段不存在，尝试使用dest字段
+    try {
+      const fallbackResult = await client
+        .from('shipments')
+        .insert([{
+          freight_no: freightNo,
+          dest: '自动出库',
+          depart_date: today,
+          note: `自动创建 - 包裹出库: ${trackingNo}`,
+          created_by: actor
+        }])
+        .select('id')
+        .single();
+      shipment = fallbackResult.data;
+      shipmentError = fallbackResult.error;
+    } catch (fallbackError) {
+      shipmentError = fallbackError;
+    }
+  }
     
   if (shipmentError) {
     console.error('创建自动运单失败:', shipmentError);
