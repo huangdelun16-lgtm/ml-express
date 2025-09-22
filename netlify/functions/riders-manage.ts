@@ -51,6 +51,52 @@ const updateRiderState = (riderId: string, updates: Partial<RiderState>) => {
   return newState;
 };
 
+// 自动完成送货：更新包裹状态为"已签收"，财务状态为"已入账"
+const autoCompleteDelivery = async (trackingNumber: string, riderId: string) => {
+  try {
+    // 1) 更新包裹状态为"已签收"
+    const { data: packageData, error: packageError } = await supabase
+      .from('packages')
+      .update({ status: '已签收' })
+      .eq('tracking_no', trackingNumber)
+      .select('id, status');
+      
+    if (packageError) {
+      console.error('更新包裹状态失败:', packageError);
+      throw packageError;
+    }
+    
+    // 2) 更新对应的财务记录状态为"已入账"
+    const { error: financeError } = await supabase
+      .from('finances')
+      .update({ status: '已入账' })
+      .eq('tracking_no', trackingNumber);
+      
+    if (financeError) {
+      console.error('更新财务状态失败:', financeError);
+      // 财务更新失败不抛出错误，因为包裹状态已经更新成功
+    }
+    
+    // 3) 记录审计日志
+    try {
+      await supabase.from('audit_logs').insert([{
+        actor: riderId,
+        action: 'delivery_completed',
+        detail: { trackingNumber, status: '已签收' }
+      }]);
+    } catch (auditError) {
+      console.error('记录审计日志失败:', auditError);
+    }
+    
+    console.log(`✅ 送货完成: ${trackingNumber} -> 已签收/已入账`);
+    return { success: true, trackingNumber, status: '已签收' };
+    
+  } catch (error) {
+    console.error('自动完成送货失败:', error);
+    throw error;
+  }
+};
+
 export const handler: Handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -339,6 +385,17 @@ export const handler: Handler = async (event, context) => {
         } else if (status === 'completed') {
           console.log(`🎉 骑手 ${assignment.riderName} 完成了任务 ${assignment.trackingNumber}`);
           updateRiderState(assignment.riderId, { status: 'online', currentTask: null });
+          
+          // 🚀 新增：骑手完成送货任务时，自动更新包裹状态为"已签收"
+          if (assignment.trackingNumber) {
+            try {
+              await autoCompleteDelivery(assignment.trackingNumber, assignment.riderId);
+              console.log(`✅ 自动完成送货: ${assignment.trackingNumber} -> 已签收`);
+            } catch (e) {
+              console.error('自动完成送货失败:', e);
+            }
+          }
+          
           taskAssignments.delete(taskId);
         }
 
