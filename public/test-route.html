@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Route Test</title>
+</head>
+<body>
+    <h1>测试路由</h1>
+    <ul>
+        <li><a href="/admin/dashboard">仪表板 (localStorage版本)</a></li>
+        <li><a href="/admin/inventory">跨境包裹 (Supabase版本)</a></li>
+        <li><a href="/admin/finance">财务管理</a></li>
+        <li><a href="/admin/transport">跨境运输</a></li>
+        <li><a href="/admin/data-merger">数据合并工具</a></li>
+    </ul>
+    <p>当前时间: <span id="time"></span></p>
+    <script>
+        document.getElementById('time').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>
