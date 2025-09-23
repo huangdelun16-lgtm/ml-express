@@ -1,0 +1,27 @@
+网站修复步骤：
+
+1. 清理本地仓库（在新的PowerShell窗口执行）:
+   cd D:\ML-Express-Clean
+   git clone https://github.com/huangdelun16-lgtm/ml-express.git .
+   
+2. 只复制源代码（不包括node_modules）:
+   - src/
+   - public/
+   - package.json
+   - netlify.toml
+   - .gitignore
+
+3. 确保.gitignore包含:
+   node_modules/
+   .cache/
+   build/
+   dist/
+
+4. 推送清理后的代码:
+   git add -A
+   git commit -m "Clean repository"
+   git push origin main
+
+5. 在Netlify重新部署:
+   - 登录Netlify
+   - 点击 "Clear cache and deploy site"

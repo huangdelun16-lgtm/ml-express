@@ -1,0 +1,13 @@
+# Files and folders to exclude from EAS Build upload
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.expo
+.expo-shared
+dist
+build
+ios
+*.hbc
+*.map
+

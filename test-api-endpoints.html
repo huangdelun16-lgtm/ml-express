@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API端点测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        button { padding: 8px 16px; margin: 5px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1565c0; }
+        pre { white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 ML Express API端点测试</h1>
+    
+    <div class="test-section">
+        <h3>1. 测试同城包裹API</h3>
+        <button onclick="testCityPackages()">测试同城包裹</button>
+        <div id="city-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. 测试跨境包裹API</h3>
+        <button onclick="testCrossPackages()">测试跨境包裹</button>
+        <div id="cross-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. 测试财务管理API</h3>
+        <button onclick="testFinances()">测试财务管理</button>
+        <div id="finance-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. 测试包裹调试API</h3>
+        <button onclick="testPackagesDebug()">测试调试模式</button>
+        <div id="debug-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://market-link-express.com/.netlify/functions/';
+        
+        async function makeRequest(url, options = {}) {
+            try {
+                console.log('请求URL:', url);
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-ml-actor': 'test-user',
+                        'x-ml-role': 'manager',
+                        ...options.headers
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('响应数据:', data);
+                
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                console.error('请求错误:', error);
+                return {
+                    ok: false,
+                    status: 0,
+                    error: error.message
+                };
+            }
+        }
+        
+        async function testCityPackages() {
+            const resultDiv = document.getElementById('city-result');
+            resultDiv.innerHTML = '🔄 测试中...';
+            
+            const url = `${API_BASE}packages-manage?biz=city&page=1&pageSize=5`;
+            const result = await makeRequest(url);
+            
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ 同城包裹API正常</h4>
+                    <p><strong>总数:</strong> ${result.data.total || 0}</p>
+                    <p><strong>返回条数:</strong> ${result.data.items?.length || 0}</p>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ 同城包裹API错误</h4>
+                    <p><strong>状态码:</strong> ${result.status}</p>
+                    <pre>${JSON.stringify(result.data || result.error, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        async function testCrossPackages() {
+            const resultDiv = document.getElementById('cross-result');
+            resultDiv.innerHTML = '🔄 测试中...';
+            
+            const url = `${API_BASE}packages-manage?biz=cross&page=1&pageSize=5`;
+            const result = await makeRequest(url);
+            
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ 跨境包裹API正常</h4>
+                    <p><strong>总数:</strong> ${result.data.total || 0}</p>
+                    <p><strong>返回条数:</strong> ${result.data.items?.length || 0}</p>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ 跨境包裹API错误</h4>
+                    <p><strong>状态码:</strong> ${result.status}</p>
+                    <pre>${JSON.stringify(result.data || result.error, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        async function testFinances() {
+            const resultDiv = document.getElementById('finance-result');
+            resultDiv.innerHTML = '🔄 测试中...';
+            
+            const url = `${API_BASE}finances-manage?page=1&pageSize=5`;
+            const result = await makeRequest(url);
+            
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ 财务管理API正常</h4>
+                    <p><strong>总数:</strong> ${result.data.total || 0}</p>
+                    <p><strong>返回条数:</strong> ${result.data.items?.length || 0}</p>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ 财务管理API错误</h4>
+                    <p><strong>状态码:</strong> ${result.status}</p>
+                    <pre>${JSON.stringify(result.data || result.error, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        async function testPackagesDebug() {
+            const resultDiv = document.getElementById('debug-result');
+            resultDiv.innerHTML = '🔄 测试中...';
+            
+            const url = `${API_BASE}packages-manage?debug=1`;
+            const result = await makeRequest(url);
+            
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ 调试API正常</h4>
+                    <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                `;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ 调试API错误</h4>
+                    <p><strong>状态码:</strong> ${result.status}</p>
+                    <pre>${JSON.stringify(result.data || result.error, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.onload = function() {
+            console.log('页面加载完成，准备测试API...');
+        };
+    </script>
+</body>
+</html>
