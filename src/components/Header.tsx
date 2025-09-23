@@ -33,6 +33,7 @@ const Header: React.FC = () => {
     { name: '价格咨询', path: '/pricing' },
     { name: '查询快递', path: '/tracking' },
     { name: '联系我们', path: '/contact' },
+    { name: '直接下单', path: '/order' },
   ];
 
   const handleDrawerToggle = () => {
@@ -53,7 +54,7 @@ const Header: React.FC = () => {
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
       <Typography variant="h6" sx={{ my: 2 }}>
-        MARKETLINK EXPRESS
+        MARKET LINK
       </Typography>
       <List>
         {navItems.map((item) => (
@@ -107,54 +108,55 @@ const Header: React.FC = () => {
               <Box
                 sx={{
                   position: 'relative',
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                  width: 50,
+                  height: 50,
+                  background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   mr: 2,
-                  boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
-                  '&::before': {
+                  borderRadius: '8px',
+                  boxShadow: '0 8px 32px rgba(44, 62, 80, 0.3)',
+                  '&::after': {
                     content: '""',
                     position: 'absolute',
-                    top: 2,
-                    left: 2,
-                    right: 2,
-                    bottom: 2,
-                    borderRadius: '50%',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    top: '50%',
+                    right: 8,
+                    width: 12,
+                    height: 8,
+                    background: 'white',
+                    clipPath: 'polygon(0 0, 100% 50%, 0 100%)',
+                    transform: 'translateY(-50%)',
                   }
                 }}
               >
-                {/* 高级感 ML 字母组合 Logo */}
-                <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg" aria-label="MARKETLINK EXPRESS">
-                  <defs>
-                    <linearGradient id="mlg" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#fff" stopOpacity="0.95" />
-                      <stop offset="100%" stopColor="#e3f2ff" stopOpacity="0.95" />
-                    </linearGradient>
-                  </defs>
-                  <g fill="url(#mlg)">
-                    <path d="M3 20 L3 6 L5.8 6 L10.2 14 L14.6 6 L17.4 6 L17.4 20 L14.9 20 L14.9 11.4 L10.9 18.6 L9.5 18.6 L5.5 11.4 L5.5 20 Z"/>
-                    <rect x="18.6" y="6" width="2.8" height="14" rx="1.2" />
-                  </g>
-                </svg>
+                {/* ML Logo with truck icon */}
+                <Typography
+                  sx={{
+                    fontSize: '24px',
+                    fontWeight: 900,
+                    color: 'white',
+                    letterSpacing: '-2px',
+                    fontFamily: '"Arial Black", sans-serif',
+                  }}
+                >
+                  ML
+                </Typography>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 <Typography 
-                  variant="h5" 
+                  variant="h6" 
                   component="div" 
                   sx={{ 
-                    fontWeight: 800, 
-                    color: 'primary.main',
+                    fontWeight: 700, 
+                    color: '#2c3e50',
                     display: { xs: 'none', sm: 'block' },
                     lineHeight: 1,
-                    mb: 0.5,
+                    mb: 0.2,
+                    letterSpacing: '1px',
                   }}
                 >
-                  MARKETLINK EXPRESS
+                  MARKET LINK
                 </Typography>
                 <Typography 
                   variant="caption" 
@@ -162,7 +164,7 @@ const Header: React.FC = () => {
                     color: 'text.secondary',
                     display: { xs: 'none', sm: 'block' },
                     fontWeight: 500,
-                    letterSpacing: 1,
+                    letterSpacing: '0.5px',
                   }}
                 >
                   专业快递服务

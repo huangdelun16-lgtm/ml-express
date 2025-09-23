@@ -48,12 +48,6 @@ const HomePage: React.FC = () => {
     },
   ];
 
-  const stats = [
-    { number: '100+', label: '覆盖城市' },
-    { number: '50万+', label: '服务客户' },
-    { number: '99.9%', label: '准时率' },
-    { number: '24小时', label: '营业时间' },
-  ];
 
   return (
     <Box>
@@ -72,7 +66,7 @@ const HomePage: React.FC = () => {
             component="h1"
             sx={{ fontWeight: 800, mb: 2, letterSpacing: 1 }}
           >
-            MARKETLINK EXPRESS
+            MARKET LINK
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.9, mb: 4 }}>
             缅甸领先的快递服务
@@ -161,25 +155,6 @@ const HomePage: React.FC = () => {
         </Grid>
       </Container>
 
-      {/* 统计数据 */}
-      <Box sx={{ backgroundColor: 'grey.50', py: 8 }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4}>
-            {stats.map((stat, index) => (
-              <Grid item xs={6} md={3} key={index}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h2" component="div" sx={{ fontWeight: 700, color: 'primary.main', mb: 1 }}>
-                    {stat.number}
-                  </Typography>
-                  <Typography variant="h6" color="text.secondary">
-                    {stat.label}
-                  </Typography>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
 
       {/* 服务流程 */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
