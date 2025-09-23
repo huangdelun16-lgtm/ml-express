@@ -44,6 +44,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminNavigation from '../components/AdminNavigation';
 import { getAdminSession } from '../utils/auth';
 import { fetchWithRetry } from '../utils/api';
+import PremiumBackground from '../components/PremiumBackground';
 
 interface Package {
   id: string;
@@ -265,7 +266,7 @@ const AdminPackages: React.FC = () => {
   const total = data?.total || 0;
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'grey.50' }}>
+    <PremiumBackground variant="admin" minHeight="100vh">
       <AdminNavigation title="跨境包裹管理" />
       
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -628,7 +629,7 @@ const AdminPackages: React.FC = () => {
           </Alert>
         </Snackbar>
       </Container>
-    </Box>
+    </PremiumBackground>
   );
 };
 

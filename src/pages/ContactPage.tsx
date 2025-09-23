@@ -22,6 +22,7 @@ import {
   Facebook,
   Instagram,
 } from '@mui/icons-material';
+import PremiumBackground from '../components/PremiumBackground';
 
 const ContactPage: React.FC = () => {
   const theme = useTheme();
@@ -76,7 +77,7 @@ const ContactPage: React.FC = () => {
   ];
 
   return (
-    <Box>
+    <PremiumBackground variant="page">
       {/* Hero Section */}
       <Box
         sx={{
@@ -363,7 +364,7 @@ const ContactPage: React.FC = () => {
           </Grid>
         </Box>
       </Container>
-    </Box>
+    </PremiumBackground>
   );
 };
 

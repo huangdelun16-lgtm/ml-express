@@ -21,6 +21,7 @@ import {
   Payment,
   CheckCircle,
 } from '@mui/icons-material';
+import PremiumBackground from '../components/PremiumBackground';
 
 const OrderPage: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
@@ -319,7 +320,8 @@ const OrderPage: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PremiumBackground variant="page">
+      <Container maxWidth="md" sx={{ py: 4 }}>
       <Paper sx={{ p: 4 }}>
         <Typography variant="h4" component="h1" textAlign="center" gutterBottom>
           在线下单
@@ -361,7 +363,8 @@ const OrderPage: React.FC = () => {
           </Box>
         )}
       </Paper>
-    </Container>
+      </Container>
+    </PremiumBackground>
   );
 };
 

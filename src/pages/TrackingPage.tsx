@@ -27,6 +27,7 @@ import {
   AccessTime,
 } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
+import PremiumBackground from '../components/PremiumBackground';
 
 interface TrackingInfo {
   trackingNumber: string;
@@ -208,7 +209,7 @@ const TrackingPage: React.FC = () => {
   };
 
   return (
-    <Box>
+    <PremiumBackground variant="page">
       {/* Hero Section */}
       <Box
         sx={{
@@ -441,7 +442,7 @@ const TrackingPage: React.FC = () => {
           </Paper>
         )}
       </Container>
-    </Box>
+    </PremiumBackground>
   );
 };
 

@@ -47,6 +47,7 @@ import {
   Settings,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import PremiumBackground from '../components/PremiumBackground';
 
 interface Package {
   id: string;
@@ -320,19 +321,124 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'grey.50' }}>
+    <PremiumBackground variant="admin" minHeight="100vh">
       {/* 顶部导航栏 */}
-      <AppBar position="static" sx={{ backgroundColor: 'white', color: 'text.primary' }}>
+      <AppBar position="static" sx={{ 
+        background: 'rgba(255, 255, 255, 0.1)', 
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      }}>
         <Toolbar>
-          <LocalShipping sx={{ color: 'primary.main', mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 600 }}>
-            MARKETLINK EXPRESS 管理后台
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 2,
+              boxShadow: '0 4px 20px rgba(44, 62, 80, 0.3)',
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: '50%',
+                right: 6,
+                width: 8,
+                height: 6,
+                background: 'white',
+                clipPath: 'polygon(0 0, 100% 50%, 0 100%)',
+                transform: 'translateY(-50%)',
+              }
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '16px',
+                fontWeight: 900,
+                color: 'white',
+                letterSpacing: '-1px',
+                fontFamily: '"Arial Black", sans-serif',
+              }}
+            >
+              ML
+            </Typography>
+          </Box>
+          <Typography variant="h6" component="div" sx={{ 
+            flexGrow: 1, 
+            color: 'white', 
+            fontWeight: 700,
+            letterSpacing: '1px',
+          }}>
+            MARKET LINK EXPRESS 管理后台
           </Typography>
           {/* 后台顶部导航 */}
           <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
-            <Button size="small" variant="contained" onClick={() => navigate('/admin/dashboard')}>包裹管理</Button>
-            <Button size="small" onClick={() => navigate('/admin/finance')}>财务系统</Button>
-            <Button size="small" onClick={() => navigate('/admin/inventory')}>库存管理</Button>
+            <Button 
+              size="small" 
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                color: 'white',
+                borderRadius: '20px',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                  transform: 'translateY(-1px)',
+                },
+              }}
+            >
+              仪表板
+            </Button>
+            <Button 
+              size="small" 
+              onClick={() => navigate('/admin/inventory')}
+              sx={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                borderRadius: '20px',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.3)',
+                  transform: 'translateY(-1px)',
+                },
+              }}
+            >
+              跨境包裹
+            </Button>
+            <Button 
+              size="small" 
+              onClick={() => navigate('/admin/finance')}
+              sx={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                borderRadius: '20px',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.3)',
+                  transform: 'translateY(-1px)',
+                },
+              }}
+            >
+              财务管理
+            </Button>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -478,7 +584,7 @@ const AdminDashboard: React.FC = () => {
           {toast.text}
         </Alert>
       </Snackbar>
-    </Box>
+    </PremiumBackground>
   );
 };
 
