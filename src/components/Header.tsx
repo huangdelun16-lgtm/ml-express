@@ -54,7 +54,7 @@ const Header: React.FC = () => {
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
       <Typography variant="h6" sx={{ my: 2 }}>
-        MARKET LINK
+        MARKET LINK EXPRESS
       </Typography>
       <List>
         {navItems.map((item) => (
@@ -154,9 +154,13 @@ const Header: React.FC = () => {
                     lineHeight: 1,
                     mb: 0.2,
                     letterSpacing: '1px',
+                    fontSize: '1.1rem',
                   }}
                 >
-                  MARKET LINK
+                  MARKET LINK{' '}
+                  <Box component="span" sx={{ fontWeight: 400, opacity: 0.8 }}>
+                    EXPRESS
+                  </Box>
                 </Typography>
                 <Typography 
                   variant="caption" 
@@ -180,10 +184,21 @@ const Header: React.FC = () => {
                     key={item.name}
                     onClick={() => handleNavClick(item.path)}
                     sx={{
-                      color: isActive(item.path) ? 'primary.main' : 'text.primary',
                       fontWeight: isActive(item.path) ? 600 : 400,
+                      borderRadius: item.name === '直接下单' ? '25px' : '4px',
+                      background: item.name === '直接下单' ? 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)' : 'transparent',
+                      color: item.name === '直接下单' ? 'white' : (isActive(item.path) ? 'primary.main' : 'text.primary'),
+                      px: item.name === '直接下单' ? 3 : 1,
+                      py: item.name === '直接下单' ? 1 : 0.5,
+                      textTransform: 'none',
+                      boxShadow: item.name === '直接下单' ? '0 4px 20px rgba(25, 118, 210, 0.3)' : 'none',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       '&:hover': {
-                        backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                        backgroundColor: item.name === '直接下单' 
+                          ? 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)'
+                          : 'rgba(25, 118, 210, 0.08)',
+                        transform: item.name === '直接下单' ? 'translateY(-1px)' : 'none',
+                        boxShadow: item.name === '直接下单' ? '0 6px 25px rgba(25, 118, 210, 0.4)' : 'none',
                       },
                     }}
                   >

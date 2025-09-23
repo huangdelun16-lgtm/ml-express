@@ -27,22 +27,78 @@ const HomePage: React.FC = () => {
 
   const features = [
     {
-      icon: <Speed sx={{ fontSize: 48, color: 'primary.main' }} />,
+      icon: (
+        <Box sx={{
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          boxShadow: '0 8px 32px rgba(25, 118, 210, 0.3)',
+        }}>
+          <Speed sx={{ fontSize: 40, color: 'white' }} />
+        </Box>
+      ),
       title: '快速配送',
       description: '专业的物流网络确保您的包裹快速送达目的地',
     },
     {
-      icon: <Security sx={{ fontSize: 48, color: 'primary.main' }} />,
+      icon: (
+        <Box sx={{
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #2e7d32 0%, #4caf50 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          boxShadow: '0 8px 32px rgba(46, 125, 50, 0.3)',
+        }}>
+          <Security sx={{ fontSize: 40, color: 'white' }} />
+        </Box>
+      ),
       title: '安全保障',
       description: '全程保险覆盖，货物安全有保障，让您放心托付',
     },
     {
-      icon: <Support sx={{ fontSize: 48, color: 'primary.main' }} />,
+      icon: (
+        <Box sx={{
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #f57c00 0%, #ff9800 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          boxShadow: '0 8px 32px rgba(245, 124, 0, 0.3)',
+        }}>
+          <Support sx={{ fontSize: 40, color: 'white' }} />
+        </Box>
+      ),
       title: '24/7客服',
       description: '专业客服团队，随时为您解答问题和提供帮助',
     },
     {
-      icon: <TrendingUp sx={{ fontSize: 48, color: 'primary.main' }} />,
+      icon: (
+        <Box sx={{
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          boxShadow: '0 8px 32px rgba(123, 31, 162, 0.3)',
+        }}>
+          <TrendingUp sx={{ fontSize: 40, color: 'white' }} />
+        </Box>
+      ),
       title: '实时跟踪',
       description: '全程物流信息实时更新，让您随时掌握货物状态',
     },
@@ -54,19 +110,45 @@ const HomePage: React.FC = () => {
       {/* Hero Section */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+          background: `
+            linear-gradient(135deg, rgba(15, 32, 39, 0.9) 0%, rgba(32, 58, 67, 0.9) 50%, rgba(44, 83, 100, 0.9) 100%),
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%)
+          `,
           color: 'white',
-          py: { xs: 8, md: 12 },
+          py: { xs: 10, md: 16 },
           textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Cpath d="m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+            opacity: 0.1,
+          }
         }}
       >
         <Container maxWidth="lg">
           <Typography
-            variant={isMobile ? 'h3' : 'h1'}
+            variant={isMobile ? 'h3' : 'h2'}
             component="h1"
-            sx={{ fontWeight: 800, mb: 2, letterSpacing: 1 }}
+            sx={{ 
+              fontWeight: 700, 
+              mb: 2, 
+              letterSpacing: '2px',
+              fontFamily: '"Roboto", "Arial", sans-serif',
+              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            }}
           >
-            MARKET LINK
+            MARKET LINK{' '}
+            <Box component="span" sx={{ fontWeight: 300, opacity: 0.9 }}>
+              EXPRESS
+            </Box>
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.9, mb: 4 }}>
             缅甸领先的快递服务
@@ -74,20 +156,35 @@ const HomePage: React.FC = () => {
           <Typography variant="h5" sx={{ opacity: 0.9, mb: 4, maxWidth: 600, mx: 'auto' }}>
             快速、安全、便捷的快递物流服务，让您的包裹安全送达
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Box sx={{ 
+            display: 'flex', 
+            gap: 3, 
+            justifyContent: 'center', 
+            flexWrap: 'wrap',
+            position: 'relative',
+            zIndex: 1,
+          }}>
             <Button
               variant="contained"
               size="large"
               onClick={() => navigate('/tracking')}
               sx={{
-                backgroundColor: 'white',
-                color: 'primary.main',
-                px: 4,
-                py: 1.5,
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                color: '#2c3e50',
+                px: 5,
+                py: 2,
                 fontSize: '1.1rem',
-                fontWeight: 600,
+                fontWeight: 700,
+                borderRadius: '50px',
+                textTransform: 'none',
+                boxShadow: '0 8px 32px rgba(255,255,255,0.3)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  backgroundColor: 'grey.100',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 12px 40px rgba(255,255,255,0.4)',
+                  background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
                 },
               }}
             >
@@ -98,15 +195,22 @@ const HomePage: React.FC = () => {
               size="large"
               onClick={() => navigate('/services')}
               sx={{
-                borderColor: 'white',
+                borderColor: 'rgba(255,255,255,0.5)',
                 color: 'white',
-                px: 4,
-                py: 1.5,
+                px: 5,
+                py: 2,
                 fontSize: '1.1rem',
                 fontWeight: 600,
+                borderRadius: '50px',
+                textTransform: 'none',
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
                   borderColor: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.2)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 32px rgba(255,255,255,0.2)',
                 },
               }}
             >
@@ -134,15 +238,36 @@ const HomePage: React.FC = () => {
                 sx={{
                   height: '100%',
                   textAlign: 'center',
-                  p: 3,
-                  transition: 'all 0.3s ease',
+                  p: 4,
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                  border: '1px solid rgba(25, 118, 210, 0.1)',
+                  borderRadius: '20px',
+                  boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
+                    transform: 'scaleX(0)',
+                    transformOrigin: 'left',
+                    transition: 'transform 0.3s ease',
+                  },
                   '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                    transform: 'translateY(-12px)',
+                    boxShadow: '0 20px 60px rgba(25, 118, 210, 0.15)',
+                    '&::before': {
+                      transform: 'scaleX(1)',
+                    },
                   },
                 }}
               >
-                <Box sx={{ mb: 3 }}>{feature.icon}</Box>
+                <Box sx={{ mb: 4 }}>{feature.icon}</Box>
                 <Typography variant="h6" component="h3" sx={{ mb: 2, fontWeight: 600 }}>
                   {feature.title}
                 </Typography>
