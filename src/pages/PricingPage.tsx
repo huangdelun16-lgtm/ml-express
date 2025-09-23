@@ -34,6 +34,7 @@ import {
   CheckCircle,
   Info,
 } from '@mui/icons-material';
+import PremiumBackground from '../components/PremiumBackground';
 
 interface PricingForm {
   serviceType: string;
@@ -260,11 +261,15 @@ const PricingPage: React.FC = () => {
   };
 
   return (
-    <Box>
+    <PremiumBackground variant="page">
       {/* Hero Section */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+          background: `
+            linear-gradient(135deg, rgba(15, 32, 39, 0.9) 0%, rgba(32, 58, 67, 0.9) 50%, rgba(44, 83, 100, 0.9) 100%),
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%)
+          `,
           color: 'white',
           py: { xs: 6, md: 8 },
           textAlign: 'center',
@@ -443,7 +448,7 @@ const PricingPage: React.FC = () => {
           </Alert>
         )}
       </Container>
-    </Box>
+    </PremiumBackground>
   );
 };
 

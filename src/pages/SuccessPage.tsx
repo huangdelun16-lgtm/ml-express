@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Button, Container, Typography } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PremiumBackground from '../components/PremiumBackground';
 
 const SuccessPage: React.FC = () => {
   const location = useLocation();
@@ -15,9 +16,9 @@ const SuccessPage: React.FC = () => {
       : '我们已收到您的留言，客服将尽快回复您。';
 
   return (
-    <Box
-      sx={{
-        background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+    <PremiumBackground variant="hero">
+      <Box
+        sx={{
         color: 'white',
         py: { xs: 8, md: 10 },
         textAlign: 'center',
@@ -32,7 +33,8 @@ const SuccessPage: React.FC = () => {
         </Typography>
         <Button variant="contained" color="secondary" onClick={() => navigate('/')}>返回首页</Button>
       </Container>
-    </Box>
+      </Box>
+    </PremiumBackground>
   );
 };
 
