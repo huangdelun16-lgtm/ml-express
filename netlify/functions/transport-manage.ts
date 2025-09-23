@@ -251,7 +251,7 @@ export const handler: Handler = async (event) => {
         return json(200, { ok: true });
       }
       if (op === 'arrive') {
-        // 到货通知：把该运单所有包裹状态置为"待签收"，同时更新对应的财务记录，若缺失则补建
+        // 到货通知：把该运单所有包裹对应的财务记录置为"待签收"，若缺失则补建
         const allowed = await hasDbRole(client!, actor, ['manager', 'master', 'staff','cross_clearance']);
         if (!allowed) return deny();
         const { shipmentId } = body || {};
@@ -264,30 +264,7 @@ export const handler: Handler = async (event) => {
         if (spErr) return json(500, { message: spErr.message });
         const arr = Array.from(new Set((sp || []).map((r: any) => String(r.tracking_no || '')).filter(Boolean)));
         if (!arr.length) return json(200, { ok: true, updated: 0, created: 0 });
-        
-        // 🔥 核心修复：同时更新包裹状态和财务状态
-        // 1) 更新包裹状态为"待签收"
-        let packageUpdateCount = 0;
-        try { 
-          const { data: packageUpdates, error: packageUpdateError } = await (client as any)
-            .from('packages')
-            .update({ status: '待签收' })
-            .in('tracking_no', arr)
-            .select('tracking_no, status');
-          
-          if (packageUpdateError) {
-            console.error('更新包裹状态失败:', packageUpdateError);
-            throw new Error(`包裹状态更新失败: ${packageUpdateError.message}`);
-          }
-          
-          packageUpdateCount = packageUpdates ? packageUpdates.length : 0;
-          console.log(`✅ 已更新 ${packageUpdateCount}/${arr.length} 个包裹状态为"待签收"`, packageUpdates?.map(p => p.tracking_no));
-        } catch (e) {
-          console.error('更新包裹状态异常:', e);
-          return json(500, { message: `包裹状态更新失败: ${e.message}` });
-        }
-        
-        // 2) 更新财务记录状态为"待签收"
+        // 1) 现有财务：按 tracking_no 批量置为"待签收"
         try { await (client as any).from('finances').update({ status: '待签收' }).in('tracking_no', arr); } catch {}
         // 兼容旧数据：备注中包含"新包裹入库 - 单号 X"
         for (const t of arr) {
@@ -331,14 +308,8 @@ export const handler: Handler = async (event) => {
           }));
           try { const ins = await client.from('finances').insert(rows); if (!(ins as any)?.error) created = rows.length; } catch {}
         }
-        try { await client.from('audit_logs').insert([{ actor, action: 'transport.arrive', detail: { shipmentId, count: arr.length, packageUpdateCount, created } }]); } catch {}
-        return json(200, { 
-          ok: true, 
-          updated: arr.length, 
-          packageUpdated: packageUpdateCount,
-          created,
-          message: `成功处理 ${arr.length} 个包裹，其中 ${packageUpdateCount} 个包裹状态已更新为"待签收"`
-        });
+        try { await client.from('audit_logs').insert([{ actor, action: 'transport.arrive', detail: { shipmentId, count: arr.length, created } }]); } catch {}
+        return json(200, { ok: true, updated: arr.length, created });
       }
       if (op === 'transit') {
         // 中转操作：记录中转信息，财务状态保持"运输中"

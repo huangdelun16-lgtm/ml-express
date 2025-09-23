@@ -314,34 +314,12 @@ const AdminTransport: React.FC = () => {
     if (!(window as any).confirm('确定标记该运单到货并通知财务置为"待签收"？')) return;
     try {
       const r = await fetchWithRetry('/.netlify/functions/transport-manage', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ml-actor': user.username }, body: JSON.stringify({ op: 'arrive', shipmentId: shipment.id }) });
-      if (!r.ok) { 
-        try { 
-          const j = await r.json(); 
-          alert(`到货通知失败: ${j.message || '未知错误'}`); 
-        } catch { 
-          alert(`到货通知失败: HTTP ${r.status}`); 
-        } 
-        return; 
-      }
-      
-      // 解析成功响应
-      try {
-        const result = await r.json();
-        const message = result.message || `到货已通知，相关包裹和财务记录已置为"待签收"。`;
-        alert(message);
-      } catch {
-        alert('到货已通知，相关包裹和财务记录已置为"待签收"。');
-      }
-      
+      if (!r.ok) { try { const j = await r.json(); alert(j.message || '到货通知失败'); } catch {} return; }
       // 刷新财务页签缓存：触发一次查询
       try { await fetchWithRetry('/.netlify/functions/finances-manage?status=' + encodeURIComponent('待签收')); } catch {}
-      
-      // 🔄 刷新当前运单列表以反映状态变化
-      await reloadShipmentsList();
-      
-    } catch (error) {
-      console.error('到货通知异常:', error);
-      alert(`到货通知失败: ${error.message || '网络错误'}`);
+      alert('到货已通知，相关财务记录已置为"待签收"。');
+    } catch {
+      alert('到货通知失败');
     }
   };
 

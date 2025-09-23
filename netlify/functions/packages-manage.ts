@@ -41,78 +41,6 @@ async function hasRequiredRole(username: string, roles: string[]): Promise<boole
   }
 }
 
-// 自动加入跨境运输系统
-async function autoAddToTransport(client: any, trackingNo: string, actor: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  const freightNo = `AUTO-${today}-${Date.now()}`;
-  
-  // 1) 创建自动运单 - 兼容destination和dest字段
-  let shipment, shipmentError;
-  try {
-    const result = await client
-      .from('shipments')
-      .insert([{
-        freight_no: freightNo,
-        destination: '自动出库',
-        depart_date: today,
-        note: `自动创建 - 包裹出库: ${trackingNo}`,
-        created_by: actor
-      }])
-      .select('id')
-      .single();
-    shipment = result.data;
-    shipmentError = result.error;
-  } catch (e) {
-    // 如果destination字段不存在，尝试使用dest字段
-    try {
-      const fallbackResult = await client
-        .from('shipments')
-        .insert([{
-          freight_no: freightNo,
-          dest: '自动出库',
-          depart_date: today,
-          note: `自动创建 - 包裹出库: ${trackingNo}`,
-          created_by: actor
-        }])
-        .select('id')
-        .single();
-      shipment = fallbackResult.data;
-      shipmentError = fallbackResult.error;
-    } catch (fallbackError) {
-      shipmentError = fallbackError;
-    }
-  }
-    
-  if (shipmentError) {
-    console.error('创建自动运单失败:', shipmentError);
-    throw shipmentError;
-  }
-  
-  // 2) 将包裹加入运单
-  const { error: packageError } = await client
-    .from('shipment_packages')
-    .insert([{
-      shipment_id: shipment.id,
-      tracking_no: trackingNo
-    }]);
-    
-  if (packageError) {
-    console.error('包裹加入运单失败:', packageError);
-    throw packageError;
-  }
-  
-  // 3) 记录审计日志
-  try {
-    await client.from('audit_logs').insert([{
-      actor,
-      action: 'auto_transport',
-      detail: { trackingNo, shipmentId: shipment.id, freightNo }
-    }]);
-  } catch {}
-  
-  return { shipmentId: shipment.id, freightNo };
-}
-
 export const handler = async (event: any) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: cors, body: '' } as any;
   if (!client) return json(500, { message: 'backend not configured: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE' });
@@ -679,11 +607,9 @@ export const handler = async (event: any) => {
       try {
         if (update.status && update.status !== '已取消') {
           let trackingNo: string | null = null;
-          let currentStatus: string | null = null;
           try {
-            const { data: row } = await client.from('packages').select('tracking_no, status').eq('id', id).single();
+            const { data: row } = await client.from('packages').select('tracking_no').eq('id', id).single();
             trackingNo = row?.tracking_no ? String(row.tracking_no) : null;
-            currentStatus = row?.status || null;
           } catch {}
           
           if (trackingNo) {
@@ -706,9 +632,6 @@ export const handler = async (event: any) => {
               case '运输中':
                 financeStatus = '运输中';
                 break;
-              case '待签收':
-                financeStatus = '待签收';
-                break;
               case '已签收':
                 financeStatus = '已入账';
                 break;
@@ -719,21 +642,7 @@ export const handler = async (event: any) => {
             // 更新对应的财务记录状态
             try { 
               await client.from('finances').update({ status: financeStatus }).eq('tracking_no', trackingNo); 
-              console.log(`✅ 同步更新财务状态: ${trackingNo} -> ${financeStatus}`);
-            } catch (e) {
-              console.error('财务状态同步失败:', e);
-            }
-            
-            // 🚀 新增：自动流转逻辑
-            // 当包裹从"已入库"变为"运输中"时，自动加入跨境运输系统
-            if (currentStatus === '已入库' && update.status === '运输中') {
-              try {
-                await autoAddToTransport(client, trackingNo, actor);
-                console.log(`✅ 自动加入跨境运输: ${trackingNo}`);
-              } catch (e) {
-                console.error('自动加入跨境运输失败:', e);
-              }
-            }
+            } catch {}
           }
         }
       } catch {}
