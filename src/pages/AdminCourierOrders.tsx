@@ -46,6 +46,7 @@ import {
   Schedule,
   Cancel,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -132,6 +133,7 @@ const mockOrders: Order[] = [
 
 const AdminCourierOrders: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -175,9 +177,25 @@ const AdminCourierOrders: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ mb: 1, fontWeight: 600, color: 'white' }}>
-            订单管理
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: 'white' }}>
+              订单管理
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: 'white',
+                '&:hover': { 
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              返回管理中心
+            </Button>
+          </Box>
           <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
             管理所有快递订单，跟踪配送状态
           </Typography>

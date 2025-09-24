@@ -380,12 +380,7 @@ const AdminDashboard: React.FC = () => {
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <LanguageSwitcher
-              currentLanguage={language as LanguageType}
-              onLanguageChange={setLanguage}
-              variant="admin"
-            />
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: 'white' }}>
               {t('welcome')}，{user.username} ({user.role})
             </Typography>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>

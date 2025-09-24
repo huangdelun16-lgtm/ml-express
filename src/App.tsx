@@ -30,6 +30,7 @@ import AdminCourierUsers from './pages/AdminCourierUsers';
 import AdminCourierManagement from './pages/AdminCourierManagement';
 import AdminCourierFinance from './pages/AdminCourierFinance';
 import AdminCourierSettings from './pages/AdminCourierSettings';
+import UpdateNotification from './components/UpdateNotification';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -72,6 +73,9 @@ function App() {
         </Routes>
       </Box>
       <Footer />
+      
+      {/* Update Notification */}
+      <UpdateNotification />
       </Box>
     </LanguageProvider>
   );

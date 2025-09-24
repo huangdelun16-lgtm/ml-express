@@ -36,6 +36,7 @@ import {
   Person,
   Settings,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -100,6 +101,7 @@ const mockAdminUsers: AdminUser[] = [
 
 const AdminCourierSettings: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [priceRules, setPriceRules] = useState<PriceRule[]>(mockPriceRules);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(mockAdminUsers);
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
@@ -159,9 +161,25 @@ const AdminCourierSettings: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ mb: 1, fontWeight: 600, color: 'white' }}>
-            系统设置
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: 'white' }}>
+              系统设置
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: 'white',
+                '&:hover': { 
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              返回管理中心
+            </Button>
+          </Box>
           <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
             配置系统参数、价格规则和管理员权限
           </Typography>

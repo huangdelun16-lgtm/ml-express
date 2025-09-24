@@ -33,6 +33,7 @@ import {
   AttachMoney,
   ShoppingCart,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -90,6 +91,7 @@ const mockUsers: User[] = [
 
 const AdminCourierUsers: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -125,9 +127,25 @@ const AdminCourierUsers: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ mb: 1, fontWeight: 600, color: 'white' }}>
-            用户管理
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: 'white' }}>
+              用户管理
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/admin/dashboard')}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: 'white',
+                '&:hover': { 
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              返回管理中心
+            </Button>
+          </Box>
           <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
             管理平台用户，查看用户行为分析
           </Typography>
