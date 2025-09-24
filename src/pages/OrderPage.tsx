@@ -21,9 +21,21 @@ import {
   Payment,
   CheckCircle,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
+import { useLanguage } from '../contexts/LanguageContext';
+import { 
+  generateOrderId, 
+  calculateDistance, 
+  calculateOrderAmount, 
+  formatMyanmarTime,
+  OrderStatus,
+  OrderData 
+} from '../utils/orderUtils';
 
 const OrderPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { t } = useLanguage();
   const [activeStep, setActiveStep] = useState(0);
   const [orderData, setOrderData] = useState({
     senderName: '',
@@ -37,21 +49,24 @@ const OrderPage: React.FC = () => {
     description: '',
     serviceType: '',
   });
+  const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const [calculatedDistance, setCalculatedDistance] = useState(0);
+  const [submittedOrderId, setSubmittedOrderId] = useState('');
 
   const steps = ['寄件信息', '收件信息', '包裹信息', '确认下单'];
 
   const packageTypes = [
-    { value: 'document', label: '文件' },
-    { value: 'electronics', label: '电子产品' },
-    { value: 'clothing', label: '服装' },
-    { value: 'food', label: '食品' },
-    { value: 'other', label: '其他' },
+    { value: '文件', label: '文件' },
+    { value: '电子产品', label: '电子产品' },
+    { value: '服装', label: '服装' },
+    { value: '食品', label: '食品' },
+    { value: '其他', label: '其他' },
   ];
 
   const serviceTypes = [
-    { value: 'standard', label: '标准快递 (3-5天)', price: '¥15' },
-    { value: 'express', label: '特快专递 (1-2天)', price: '¥25' },
-    { value: 'overnight', label: '次日达 (24小时)', price: '¥35' },
+    { value: 'standard', label: '标准快递 (当日-次日)', basePrice: 5000 },
+    { value: 'express', label: '特快专递 (2-4小时)', basePrice: 8000 },
+    { value: 'same_day', label: '同城急送 (1-2小时)', basePrice: 12000 },
   ];
 
   const handleNext = () => {
@@ -63,16 +78,101 @@ const OrderPage: React.FC = () => {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setOrderData(prev => ({
-      ...prev,
+    const newOrderData = {
+      ...orderData,
       [field]: value
-    }));
+    };
+    setOrderData(newOrderData);
+    
+    // 当地址和包裹信息完整时，实时计算价格
+    if (newOrderData.senderAddress && newOrderData.receiverAddress && 
+        newOrderData.packageType && newOrderData.weight && newOrderData.serviceType) {
+      calculateOrderPrice();
+    }
+  };
+
+  const calculateOrderPrice = () => {
+    if (!orderData.senderAddress || !orderData.receiverAddress || 
+        !orderData.packageType || !orderData.weight) return;
+    
+    const distance = calculateDistance(orderData.senderAddress, orderData.receiverAddress);
+    const weight = parseFloat(orderData.weight) || 0;
+    const price = calculateOrderAmount(distance, weight, orderData.packageType);
+    
+    // 根据服务类型调整价格
+    const serviceType = serviceTypes.find(s => s.value === orderData.serviceType);
+    const finalPrice = serviceType ? price + serviceType.basePrice : price;
+    
+    setCalculatedDistance(Math.round(distance * 10) / 10);
+    setCalculatedPrice(finalPrice);
   };
 
   const handleSubmit = () => {
-    // 这里可以添加提交订单的逻辑
-    alert('订单提交成功！我们将尽快联系您确认详细信息。');
-    setActiveStep(4);
+    try {
+      // 生成订单号
+      const orderId = generateOrderId();
+      
+      // 计算最终价格和距离
+      const distance = calculateDistance(orderData.senderAddress, orderData.receiverAddress);
+      const weight = parseFloat(orderData.weight) || 0;
+      const basePrice = calculateOrderAmount(distance, weight, orderData.packageType);
+      const serviceType = serviceTypes.find(s => s.value === orderData.serviceType);
+      const finalPrice = serviceType ? basePrice + serviceType.basePrice : basePrice;
+      
+      // 创建完整订单对象
+      const newOrder: OrderData = {
+        orderId,
+        customerName: orderData.senderName,
+        customerPhone: orderData.senderPhone,
+        senderAddress: orderData.senderAddress,
+        receiverName: orderData.receiverName,
+        receiverPhone: orderData.receiverPhone,
+        receiverAddress: orderData.receiverAddress,
+        packageType: orderData.packageType,
+        weight: weight,
+        description: orderData.description,
+        serviceType: orderData.serviceType,
+        distance: Math.round(distance * 10) / 10,
+        amount: finalPrice,
+        status: OrderStatus.PENDING,
+        createdAt: formatMyanmarTime(),
+        estimatedDelivery: getEstimatedDelivery(orderData.serviceType),
+        notes: `客户下单 - ${formatMyanmarTime()}`,
+      };
+      
+      // 保存到localStorage（模拟数据库）
+      const existingOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
+      existingOrders.unshift(newOrder);
+      localStorage.setItem('courier_orders', JSON.stringify(existingOrders));
+      
+      // 设置订单号并进入成功页面
+      setSubmittedOrderId(orderId);
+      setActiveStep(4);
+      
+      console.log('订单创建成功:', newOrder);
+    } catch (error) {
+      console.error('订单创建失败:', error);
+      alert('订单创建失败，请重试');
+    }
+  };
+
+  const getEstimatedDelivery = (serviceType: string): string => {
+    const myanmarTime = new Date();
+    myanmarTime.setTime(myanmarTime.getTime() + (6.5 * 60 * 60 * 1000)); // 缅甸时间
+    
+    switch (serviceType) {
+      case 'same_day':
+        myanmarTime.setHours(myanmarTime.getHours() + 2);
+        break;
+      case 'express':
+        myanmarTime.setHours(myanmarTime.getHours() + 4);
+        break;
+      default:
+        myanmarTime.setDate(myanmarTime.getDate() + 1);
+        break;
+    }
+    
+    return formatMyanmarTime(myanmarTime);
   };
 
   const renderStepContent = (step: number) => {
@@ -219,7 +319,7 @@ const OrderPage: React.FC = () => {
                     >
                       <CardContent>
                         <Typography variant="h6" color="primary">
-                          {service.price}
+                          起价 {service.basePrice.toLocaleString()} MMK
                         </Typography>
                         <Typography variant="body2">
                           {service.label}
@@ -230,6 +330,24 @@ const OrderPage: React.FC = () => {
                 ))}
               </Grid>
             </Grid>
+            
+            {/* 实时价格预览 */}
+            {orderData.senderAddress && orderData.receiverAddress && 
+             orderData.packageType && orderData.weight && orderData.serviceType && (
+              <Grid item xs={12}>
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    📍 预估距离: {calculatedDistance} km
+                  </Typography>
+                  <Typography variant="h6" color="primary">
+                    💰 预估费用: {calculatedPrice.toLocaleString()} MMK
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    *最终价格可能根据实际情况调整
+                  </Typography>
+                </Alert>
+              </Grid>
+            )}
           </Grid>
         );
 
@@ -290,13 +408,16 @@ const OrderPage: React.FC = () => {
                     重量: {orderData.weight} kg
                   </Typography>
                   <Typography variant="body2">
+                    距离: {calculatedDistance} km
+                  </Typography>
+                  <Typography variant="body2">
                     描述: {orderData.description}
                   </Typography>
                   <Typography variant="body2">
                     服务: {serviceTypes.find(s => s.value === orderData.serviceType)?.label}
                   </Typography>
                   <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
-                    预估费用: {serviceTypes.find(s => s.value === orderData.serviceType)?.price}
+                    预估费用: {calculatedPrice > 0 ? `${calculatedPrice.toLocaleString()} MMK` : '计算中...'}
                   </Typography>
                 </CardContent>
               </Card>
@@ -311,9 +432,26 @@ const OrderPage: React.FC = () => {
             <Typography variant="h5" gutterBottom>
               订单提交成功！
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              我们已收到您的订单，客服人员将在24小时内联系您确认详细信息。
+            <Typography variant="h6" color="primary" sx={{ mb: 2, fontWeight: 600 }}>
+              订单号: {submittedOrderId}
             </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              我们已收到您的订单，客服人员将在30分钟内联系您确认详细信息。
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+              <Button 
+                variant="contained" 
+                onClick={() => navigate('/tracking')}
+              >
+                查询订单
+              </Button>
+              <Button 
+                variant="outlined" 
+                onClick={() => navigate('/admin/orders')}
+              >
+                查看管理后台
+              </Button>
+            </Box>
           </Box>
         );
     }

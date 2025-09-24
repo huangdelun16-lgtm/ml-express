@@ -49,6 +49,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
+import { OrderData, orderStatusLabels } from '../utils/orderUtils';
 
 interface Order {
   id: string;
@@ -134,11 +135,57 @@ const mockOrders: Order[] = [
 const AdminCourierOrders: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  // 从localStorage加载订单数据
+  React.useEffect(() => {
+    const loadOrders = () => {
+      try {
+        const storedOrders = localStorage.getItem('courier_orders');
+        if (storedOrders) {
+          const parsedOrders: OrderData[] = JSON.parse(storedOrders);
+          // 转换为Order格式
+          const convertedOrders: Order[] = parsedOrders.map((order, index) => ({
+            id: (index + 1).toString(),
+            orderId: order.orderId,
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
+            senderAddress: order.senderAddress,
+            receiverName: order.receiverName,
+            receiverPhone: order.receiverPhone,
+            receiverAddress: order.receiverAddress,
+            packageType: order.packageType,
+            weight: order.weight,
+            distance: order.distance,
+            amount: order.amount,
+            status: order.status as any,
+            courierId: undefined,
+            courierName: undefined,
+            courierPhone: undefined,
+            createdAt: order.createdAt,
+            estimatedDelivery: order.estimatedDelivery,
+            actualDelivery: order.status === 'delivered' ? order.estimatedDelivery : undefined,
+          }));
+          setOrders([...convertedOrders, ...mockOrders]);
+        } else {
+          setOrders(mockOrders);
+        }
+      } catch (error) {
+        console.error('加载订单数据失败:', error);
+        setOrders(mockOrders);
+      }
+    };
+
+    loadOrders();
+
+    // 定期刷新订单数据（每30秒）
+    const interval = setInterval(loadOrders, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const statusColors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
     pending: 'warning',
