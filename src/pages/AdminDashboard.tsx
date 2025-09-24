@@ -30,6 +30,10 @@ import {
   Menu,
   MenuItem,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  styled,
 } from '@mui/material';
 import {
   LocalShipping,
@@ -45,6 +49,9 @@ import {
   Logout,
   Person,
   Settings,
+  CloudUpload,
+  Work,
+  Badge,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
@@ -91,9 +98,36 @@ const AdminDashboard: React.FC = () => {
   // 使用独立的草稿对象，避免受控组件因 null 状态导致无法输入
   const [draftPackage, setDraftPackage] = useState<Package | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [allUsers, setAllUsers] = useState<Array<{ username: string; role: string; password?: string }>>([]);
+  const [allUsers, setAllUsers] = useState<Array<{ 
+    username: string; 
+    role: string; 
+    password?: string;
+    workId?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    idNumber?: string;
+    joinDate?: string;
+    salary?: number;
+    avatar?: string;
+  }>>([]);
   const [openUserDialog, setOpenUserDialog] = useState(false);
-  const [newUser, setNewUser] = useState<{ username: string; password: string; role: string }>({ username: '', password: '', role: 'staff' });
+  const [newUser, setNewUser] = useState({
+    workId: '',
+    username: '', 
+    password: '', 
+    role: 'staff',
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    idNumber: '',
+    joinDate: new Date().toISOString().split('T')[0],
+    salary: 450000,
+    avatar: '',
+  });
+  const [editingUserIndex, setEditingUserIndex] = useState<number>(-1);
   const [finance, setFinance] = useState<FinanceTxn[]>([]);
   const [openFinanceDialog, setOpenFinanceDialog] = useState(false);
   const [newTxn, setNewTxn] = useState<FinanceTxn>({ id: '', type: '收入', amount: 0, note: '', date: new Date().toISOString().slice(0,10) });
@@ -291,17 +325,49 @@ const AdminDashboard: React.FC = () => {
   const canManageUsers = user && ['manager', 'master'].includes(user.role);
 
   const handleCreateUser = () => {
-    if (!newUser.username.trim() || !newUser.password.trim()) return;
-    const exists = allUsers.some(u => u.username === newUser.username);
-    if (exists) {
-      alert('用户名已存在');
-      return;
+    if (!newUser.username.trim() || (!newUser.password.trim() && editingUserIndex < 0)) return;
+    
+    if (editingUserIndex >= 0) {
+      // 编辑现有用户
+      const updated = allUsers.map((user, index) => 
+        index === editingUserIndex 
+          ? { 
+              ...user, 
+              ...newUser, 
+              password: newUser.password || user.password 
+            }
+          : user
+      );
+      setAllUsers(updated);
+      localStorage.setItem('users', JSON.stringify(updated));
+    } else {
+      // 新增用户
+      const exists = allUsers.some(u => u.username === newUser.username);
+      if (exists) {
+        alert('用户名已存在');
+        return;
+      }
+      const updated = [...allUsers, newUser];
+      setAllUsers(updated);
+      localStorage.setItem('users', JSON.stringify(updated));
     }
-    const updated = [...allUsers, { username: newUser.username, password: newUser.password, role: newUser.role }];
-    setAllUsers(updated);
-    localStorage.setItem('users', JSON.stringify(updated));
+    
     setOpenUserDialog(false);
-    setNewUser({ username: '', password: '', role: 'staff' });
+    setEditingUserIndex(-1);
+    setNewUser({
+      workId: '',
+      username: '', 
+      password: '', 
+      role: 'staff',
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      idNumber: '',
+      joinDate: new Date().toISOString().split('T')[0],
+      salary: 450000,
+      avatar: '',
+    });
   };
 
   const financeSummary = finance.reduce((acc, t) => {
@@ -623,33 +689,129 @@ const AdminDashboard: React.FC = () => {
           </Grid>
         </Box>
 
-        {/* 原有的用户管理保留（如果需要） */}
+        {/* 用户管理 */}
         {canManageUsers && (
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>用户管理</Typography>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Button variant="contained" onClick={() => setOpenUserDialog(true)}>新增用户</Button>
-            </Paper>
-            <Paper>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                      <TableCell>用户名</TableCell>
-                      <TableCell>角色</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {allUsers.map((u, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{u.username}</TableCell>
-                        <TableCell>{u.role}</TableCell>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'white' }}>
+              用户管理
+            </Typography>
+            <Card sx={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              mb: 2,
+            }}>
+              <CardContent sx={{ p: 2 }}>
+                <Button 
+                  variant="contained" 
+                  onClick={() => setOpenUserDialog(true)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                    '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+                  }}
+                >
+                  新增用户
+                </Button>
+              </CardContent>
+            </Card>
+            <Card sx={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+            }}>
+              <CardContent>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          工作号
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          用户名
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          角色
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          姓名
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          薪水
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          入职日期
+                        </TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                          操作
+                        </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
+                    </TableHead>
+                    <TableBody>
+                      {allUsers.map((u, i) => (
+                        <TableRow key={i}>
+                          <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Inventory sx={{ fontSize: 16, color: '#42a5f5' }} />
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {u.workId || `ML${String(i + 1).padStart(3, '0')}`}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                            {u.username}
+                          </TableCell>
+                          <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                            <Chip 
+                              label={u.role === 'master' ? '管理员' : u.role === 'manager' ? '经理' : u.role === 'staff' ? '员工' : u.role} 
+                              color={u.role === 'master' || u.role === 'admin' ? 'error' : u.role === 'manager' ? 'secondary' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                            {u.name || u.username}
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#52c41a' }}>
+                              {u.salary ? `${u.salary.toLocaleString()} MMK` : '待设置'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                            {u.joinDate || '2024-01-01'}
+                          </TableCell>
+                          <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                            <IconButton 
+                              size="small" 
+                              sx={{ color: '#faad14' }}
+                              onClick={() => {
+                                setNewUser({
+                                  workId: u.workId || `ML${String(i + 1).padStart(3, '0')}`,
+                                  username: u.username,
+                                  role: u.role,
+                                  name: u.name || u.username,
+                                  phone: u.phone || '',
+                                  email: u.email || '',
+                                  address: u.address || '',
+                                  idNumber: u.idNumber || '',
+                                  joinDate: u.joinDate || '2024-01-01',
+                                  salary: u.salary || 450000,
+                                  password: '',
+                                  avatar: u.avatar || '',
+                                });
+                                setEditingUserIndex(i);
+                                setOpenUserDialog(true);
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
           </Box>
         )}
 
@@ -658,28 +820,325 @@ const AdminDashboard: React.FC = () => {
         {/* 包裹编辑对话框已移除 */}
 
         {/* 新增用户对话框 */}
-        <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>新增用户</DialogTitle>
+        <Dialog 
+          open={openUserDialog} 
+          onClose={() => setOpenUserDialog(false)} 
+          maxWidth="md" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              background: 'rgba(15, 32, 39, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'white',
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: 'white' }}>
+            {editingUserIndex >= 0 ? '编辑用户' : '新增用户'}
+          </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField fullWidth label="用户名" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} />
+              {/* 工作号 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="工作号"
+                  value={newUser.workId}
+                  onChange={(e) => setNewUser({...newUser, workId: e.target.value})}
+                  placeholder="例: ML004"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
               </Grid>
-              <Grid item xs={12}>
-                <TextField fullWidth label="密码" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+
+              {/* 角色 */}
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>角色</InputLabel>
+                  <Select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="staff">员工</MenuItem>
+                    <MenuItem value="accountant">会计</MenuItem>
+                    <MenuItem value="manager">经理</MenuItem>
+                    <MenuItem value="admin">管理员</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
+
+              {/* 用户名 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="用户名"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 密码 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="password"
+                  label="密码"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                  placeholder={editingUserIndex >= 0 ? "留空则不修改" : ""}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 姓名 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="姓名"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 电话 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="电话"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
+                  placeholder="09-XXXXXXXXX"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 邮箱 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="邮箱"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 身份证号 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="身份证号"
+                  value={newUser.idNumber}
+                  onChange={(e) => setNewUser({...newUser, idNumber: e.target.value})}
+                  placeholder="12/LAKANA(N)123456"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 地址 */}
               <Grid item xs={12}>
-                <TextField select fullWidth label="角色" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-                  <MenuItem value="staff">员工</MenuItem>
-                  <MenuItem value="accountant">会计</MenuItem>
-                  <MenuItem value="manager">经理</MenuItem>
-                </TextField>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="地址"
+                  value={newUser.address}
+                  onChange={(e) => setNewUser({...newUser, address: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 入职日期 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="入职日期"
+                  value={newUser.joinDate}
+                  onChange={(e) => setNewUser({...newUser, joinDate: e.target.value})}
+                  InputLabelProps={{ 
+                    style: { color: 'rgba(255,255,255,0.7)' },
+                    shrink: true,
+                  }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 薪水 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="薪水 (MMK)"
+                  value={newUser.salary}
+                  onChange={(e) => setNewUser({...newUser, salary: parseInt(e.target.value) || 0})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* CV 照片上传 */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    startIcon={<CloudUpload />}
+                    sx={{
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      color: 'white',
+                      '&:hover': { borderColor: 'rgba(255,255,255,0.5)' },
+                    }}
+                  >
+                    上传CV照片
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setNewUser({...newUser, avatar: event.target?.result as string});
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </Button>
+                  {newUser.avatar && (
+                    <Avatar 
+                      src={newUser.avatar} 
+                      sx={{ width: 40, height: 40 }}
+                    />
+                  )}
+                </Box>
               </Grid>
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenUserDialog(false)}>取消</Button>
-            <Button variant="contained" onClick={handleCreateUser}>创建</Button>
+            <Button 
+              onClick={() => {
+                setOpenUserDialog(false);
+                setEditingUserIndex(-1);
+                setNewUser({
+                  workId: '',
+                  username: '', 
+                  password: '', 
+                  role: 'staff',
+                  name: '',
+                  phone: '',
+                  email: '',
+                  address: '',
+                  idNumber: '',
+                  joinDate: new Date().toISOString().split('T')[0],
+                  salary: 450000,
+                  avatar: '',
+                });
+              }}
+              sx={{ color: 'white' }}
+            >
+              取消
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={handleCreateUser}
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+              }}
+            >
+              {editingUserIndex >= 0 ? '保存' : '创建'}
+            </Button>
           </DialogActions>
         </Dialog>
 
