@@ -31,6 +31,7 @@ import AdminCourierManagement from './pages/AdminCourierManagement';
 import AdminCourierFinance from './pages/AdminCourierFinance';
 import AdminCourierSettings from './pages/AdminCourierSettings';
 import AdminControlPanel from './pages/AdminControlPanel';
+import DataMigrationTool from './pages/DataMigrationTool';
 import UpdateNotification from './components/UpdateNotification';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
@@ -72,6 +73,7 @@ function App() {
           <Route path="/admin/courier-finance" element={<AdminCourierFinance />} />
           <Route path="/admin/courier-settings" element={<AdminCourierSettings />} />
           <Route path="/admin/control-panel" element={<AdminControlPanel />} />
+          <Route path="/admin/cloud-upgrade" element={<DataMigrationTool />} />
         </Routes>
       </Box>
       <Footer />

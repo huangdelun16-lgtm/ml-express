@@ -388,6 +388,29 @@ const AdminDashboard: React.FC = () => {
               控制台
             </Button>
             
+            {/* 云升级按钮 */}
+            <Button
+              variant="contained"
+              onClick={() => navigate('/admin/cloud-upgrade')}
+              sx={{
+                background: 'linear-gradient(135deg, #722ed1 0%, #9c27b0 100%)',
+                color: 'white',
+                borderRadius: '20px',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: '0 4px 20px rgba(156, 39, 176, 0.3)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 6px 25px rgba(156, 39, 176, 0.4)',
+                },
+              }}
+            >
+              ☁️ 云升级
+            </Button>
+            
             <Typography variant="body2" sx={{ color: 'white' }}>
               {t('welcome')}，{user.username} ({user.role})
             </Typography>
