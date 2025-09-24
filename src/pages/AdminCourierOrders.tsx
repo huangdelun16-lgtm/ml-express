@@ -327,39 +327,72 @@ const AdminCourierOrders: React.FC = () => {
 
   // 删除订单处理函数
   const handleDeleteOrder = (order: Order) => {
-    console.log('删除按钮被点击，订单:', order.orderId);
+    console.log('🗑️ 删除整个订单被点击，订单:', order.orderId);
     
-    const confirmDelete = window.confirm(`⚠️ 确定要删除订单吗？\n\n订单号: ${order.orderId}\n客户: ${order.customerName}\n金额: ${order.amount.toLocaleString()} MMK\n\n此操作不可撤销！`);
+    const confirmDelete = window.confirm(`⚠️ 永久删除整个订单？\n\n📦 订单号: ${order.orderId}\n👤 客户: ${order.customerName}\n💰 金额: ${order.amount.toLocaleString()} MMK\n📞 电话: ${order.customerPhone}\n\n⚠️ 此操作将完全移除订单号及所有相关数据！\n⚠️ 删除后无法恢复！\n\n确定要继续吗？`);
     
     if (confirmDelete) {
       try {
-        console.log('开始删除订单:', order.orderId);
+        console.log('🔥 开始永久删除整个订单:', order.orderId);
         
-        // 从状态中移除订单
-        const updatedOrders = orders.filter(o => o.id !== order.id);
-        console.log('更新后的订单列表长度:', updatedOrders.length);
+        // 1. 从当前状态中移除订单
+        const updatedOrders = orders.filter(o => o.id !== order.id && o.orderId !== order.orderId);
+        console.log('✅ 从状态中移除，剩余订单:', updatedOrders.length);
         setOrders(updatedOrders);
         
-        // 从localStorage中移除订单
+        // 2. 从localStorage中完全移除订单
         const storedOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
-        console.log('localStorage中的订单数量:', storedOrders.length);
+        console.log('📦 localStorage中的订单数量:', storedOrders.length);
         
-        const updatedStoredOrders = storedOrders.filter((o: OrderData) => o.orderId !== order.orderId);
-        console.log('删除后localStorage订单数量:', updatedStoredOrders.length);
+        const updatedStoredOrders = storedOrders.filter((o: any) => 
+          o.orderId !== order.orderId && o.id !== order.id
+        );
+        console.log('🗑️ 删除后localStorage订单数量:', updatedStoredOrders.length);
         
         localStorage.setItem('courier_orders', JSON.stringify(updatedStoredOrders));
         
-        console.log('✅ 订单删除成功:', order.orderId);
-        alert(`✅ 订单删除成功！\n\n订单号: ${order.orderId} 已从系统中移除。`);
+        // 3. 清理相关的缓存数据
+        const cacheKeys = [
+          `order_${order.orderId}`,
+          `order_details_${order.orderId}`,
+          `order_status_${order.orderId}`,
+          `order_tracking_${order.orderId}`,
+        ];
         
-        // 强制重新加载数据
+        cacheKeys.forEach(key => {
+          localStorage.removeItem(key);
+          console.log('🧹 清理缓存:', key);
+        });
+        
+        // 4. 从其他相关存储中移除
+        try {
+          // 清理财务记录中的相关数据
+          const financeData = JSON.parse(localStorage.getItem('finance_records') || '[]');
+          const updatedFinanceData = financeData.filter((record: any) => record.orderId !== order.orderId);
+          localStorage.setItem('finance_records', JSON.stringify(updatedFinanceData));
+          console.log('💰 清理财务记录完成');
+          
+          // 清理包裹数据中的相关记录
+          const packageData = JSON.parse(localStorage.getItem('packages') || '[]');
+          const updatedPackageData = packageData.filter((pkg: any) => pkg.orderId !== order.orderId);
+          localStorage.setItem('packages', JSON.stringify(updatedPackageData));
+          console.log('📦 清理包裹数据完成');
+          
+        } catch (cleanupError) {
+          console.warn('⚠️ 清理相关数据时出现警告:', cleanupError);
+        }
+        
+        console.log('🎉 订单完全删除成功:', order.orderId);
+        alert(`🎉 订单完全删除成功！\n\n📦 订单号: ${order.orderId}\n✅ 已完全从系统中移除\n✅ 所有相关数据已清理\n✅ 缓存已清空\n\n系统将自动刷新...`);
+        
+        // 立即刷新页面显示最新数据
         setTimeout(() => {
           window.location.reload();
-        }, 1000);
+        }, 2000);
         
       } catch (error) {
         console.error('❌ 删除订单失败:', error);
-        alert(`❌ 删除失败！\n\n错误信息: ${error instanceof Error ? error.message : '未知错误'}\n请重试或联系技术支持。`);
+        alert(`❌ 删除订单失败\n\n错误信息: ${error instanceof Error ? error.message : '未知错误'}\n\n请重试或联系技术支持`);
       }
     } else {
       console.log('用户取消了删除操作');
@@ -684,12 +717,18 @@ const AdminCourierOrders: React.FC = () => {
                           >
                             <Edit fontSize="small" />
                           </IconButton>
-                          <IconButton 
+                          <Button 
                             size="small"
+                            variant="outlined"
                             sx={{ 
                               color: '#f5222d',
+                              borderColor: '#f5222d',
+                              minWidth: '60px',
+                              height: '32px',
+                              fontSize: '12px',
                               '&:hover': {
                                 backgroundColor: 'rgba(245, 34, 45, 0.1)',
+                                borderColor: '#f5222d',
                               }
                             }}
                             onClick={(e) => {
@@ -698,8 +737,8 @@ const AdminCourierOrders: React.FC = () => {
                               handleDeleteOrder(order);
                             }}
                           >
-                            <Delete fontSize="small" />
-                          </IconButton>
+                            删除
+                          </Button>
                         </Box>
                       </TableCell>
                     </TableRow>

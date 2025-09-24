@@ -50,14 +50,7 @@ interface PriceRule {
   isActive: boolean;
 }
 
-interface AdminUser {
-  id: string;
-  username: string;
-  email: string;
-  role: 'super_admin' | 'admin' | 'operator' | 'finance';
-  status: 'active' | 'inactive';
-  lastLogin: string;
-}
+// AdminUser 接口已删除 - 使用新的管理系统
 
 const mockPriceRules: PriceRule[] = [
   {
@@ -80,34 +73,14 @@ const mockPriceRules: PriceRule[] = [
   },
 ];
 
-const mockAdminUsers: AdminUser[] = [
-  {
-    id: 'A001',
-    username: 'admin',
-    email: 'admin@marketlink.com',
-    role: 'super_admin',
-    status: 'active',
-    lastLogin: '2024-01-15 10:30:00',
-  },
-  {
-    id: 'A002',
-    username: 'operator1',
-    email: 'operator1@marketlink.com',
-    role: 'operator',
-    status: 'active',
-    lastLogin: '2024-01-14 16:20:00',
-  },
-];
+// mockAdminUsers 已删除 - 使用新的管理系统
 
 const AdminCourierSettings: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [priceRules, setPriceRules] = useState<PriceRule[]>(mockPriceRules);
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>(mockAdminUsers);
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingPrice, setEditingPrice] = useState<PriceRule | null>(null);
-  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
   // System settings state
   const [systemSettings, setSystemSettings] = useState({
@@ -124,12 +97,7 @@ const AdminCourierSettings: React.FC = () => {
     defaultLanguage: 'my',
   });
 
-  const roleLabels = {
-    super_admin: '超级管理员',
-    admin: '管理员',
-    operator: '操作员',
-    finance: '财务',
-  };
+  // roleLabels 已删除 - 使用新的管理系统
 
   const handleSaveSettings = () => {
     console.log('Saving system settings:', systemSettings);
@@ -146,15 +114,7 @@ const AdminCourierSettings: React.FC = () => {
     setPriceDialogOpen(true);
   };
 
-  const handleAddUser = () => {
-    setEditingUser(null);
-    setUserDialogOpen(true);
-  };
-
-  const handleEditUser = (user: AdminUser) => {
-    setEditingUser(user);
-    setUserDialogOpen(true);
-  };
+  // 管理员用户相关函数已删除
 
   return (
     <PremiumBackground variant="admin" minHeight="100vh">
@@ -497,97 +457,7 @@ const AdminCourierSettings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Admin Users */}
-        <Card sx={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                管理员账户
-              </Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<Add />}
-                onClick={handleAddUser}
-                sx={{
-                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                  '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
-                }}
-              >
-                添加管理员
-              </Button>
-            </Box>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      用户名
-                    </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      邮箱
-                    </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      角色
-                    </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      状态
-                    </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      最后登录
-                    </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      操作
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {adminUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ backgroundColor: '#1890ff' }}>
-                            <Person />
-                          </Avatar>
-                          {user.username}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {user.email}
-                      </TableCell>
-                      <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {roleLabels[user.role]}
-                      </TableCell>
-                      <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                        <Switch checked={user.status === 'active'} size="small" disabled />
-                      </TableCell>
-                      <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {user.lastLogin}
-                      </TableCell>
-                      <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleEditUser(user)}
-                            sx={{ color: '#faad14' }}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" sx={{ color: '#f5222d' }}>
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
+        {/* 管理员账户部分已删除 - 用户已配置新的管理系统 */}
 
         {/* Price Rule Dialog - Placeholder */}
         <Dialog 
@@ -608,24 +478,7 @@ const AdminCourierSettings: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* User Dialog - Placeholder */}
-        <Dialog 
-          open={userDialogOpen} 
-          onClose={() => setUserDialogOpen(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>
-            {editingUser ? '编辑管理员' : '添加管理员'}
-          </DialogTitle>
-          <DialogContent>
-            <Typography>管理员编辑功能</Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setUserDialogOpen(false)}>取消</Button>
-            <Button variant="contained">保存</Button>
-          </DialogActions>
-        </Dialog>
+        {/* 管理员用户对话框已删除 */}
       </Container>
     </PremiumBackground>
   );
