@@ -380,6 +380,27 @@ const AdminDashboard: React.FC = () => {
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* 控制台按钮 */}
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/admin/control-panel')}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: 'white',
+                borderRadius: '20px',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': { 
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              控制台
+            </Button>
+            
             <Typography variant="body2" sx={{ color: 'white' }}>
               {t('welcome')}，{user.username} ({user.role})
             </Typography>
