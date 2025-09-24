@@ -321,6 +321,29 @@ const AdminCourierOrders: React.FC = () => {
     }
   };
 
+  // 删除订单处理函数
+  const handleDeleteOrder = (order: Order) => {
+    if (window.confirm(`确定要删除订单 ${order.orderId} 吗？此操作不可撤销。`)) {
+      try {
+        // 从状态中移除订单
+        const updatedOrders = orders.filter(o => o.id !== order.id);
+        setOrders(updatedOrders);
+        
+        // 从localStorage中移除订单
+        const storedOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
+        const updatedStoredOrders = storedOrders.filter((o: OrderData) => o.orderId !== order.orderId);
+        localStorage.setItem('courier_orders', JSON.stringify(updatedStoredOrders));
+        
+        console.log('订单已删除:', order.orderId);
+        alert(`订单 ${order.orderId} 已成功删除！`);
+        
+      } catch (error) {
+        console.error('删除订单失败:', error);
+        alert('删除订单失败，请重试');
+      }
+    }
+  };
+
 
   return (
     <PremiumBackground variant="admin" minHeight="100vh">
@@ -547,6 +570,7 @@ const AdminCourierOrders: React.FC = () => {
                           <IconButton 
                             size="small"
                             sx={{ color: '#f5222d' }}
+                            onClick={() => handleDeleteOrder(order)}
                           >
                             <Delete fontSize="small" />
                           </IconButton>

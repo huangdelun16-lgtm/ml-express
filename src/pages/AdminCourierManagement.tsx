@@ -42,6 +42,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 interface Courier {
   id: string;
+  workId: string;
   name: string;
   phone: string;
   email: string;
@@ -59,6 +60,7 @@ interface Courier {
 const mockCouriers: Courier[] = [
   {
     id: 'C001',
+    workId: 'ML001',
     name: '李师傅',
     phone: '09-111222333',
     email: 'li@courier.com',
@@ -74,6 +76,7 @@ const mockCouriers: Courier[] = [
   },
   {
     id: 'C002',
+    workId: 'ML002',
     name: '王师傅',
     phone: '09-222333444',
     email: 'wang@courier.com',
@@ -89,6 +92,7 @@ const mockCouriers: Courier[] = [
   },
   {
     id: 'C003',
+    workId: 'ML003',
     name: 'Ko Ko',
     phone: '09-333444555',
     email: 'koko@courier.com',
@@ -123,6 +127,7 @@ const AdminCourierManagement: React.FC = () => {
             .filter((emp: any) => emp.role === 'employee')
             .map((emp: any, index: number) => ({
               id: emp.id || `C${String(index + 1).padStart(3, '0')}`,
+              workId: emp.workId || `ML${String(index + 1).padStart(3, '0')}`,
               name: emp.name,
               phone: emp.phone,
               email: emp.email,
@@ -189,6 +194,29 @@ const AdminCourierManagement: React.FC = () => {
         ? { ...courier, status: newStatus ? 'online' : 'offline' }
         : courier
     ));
+  };
+
+  // 查看快递员详情
+  const handleViewCourier = (courier: Courier) => {
+    alert(`快递员详情：
+姓名：${courier.name}
+电话：${courier.phone}
+工作号：${courier.workId}
+车辆：${courier.vehicleType} - ${courier.vehiclePlate}
+评分：${courier.rating}⭐
+完成订单：${courier.completedOrders}单
+总收入：${courier.totalEarnings.toLocaleString()} MMK
+当前位置：${courier.currentLocation}
+状态：${courier.status === 'online' ? '在线' : '离线'}`);
+  };
+
+  // 编辑快递员信息
+  const handleEditCourier = (courier: Courier) => {
+    // 跳转到控制台的员工管理页面
+    alert(`要编辑快递员信息，请前往：
+控制台 → 员工管理 → 找到 ${courier.name} → 点击编辑
+
+快递员信息统一在员工管理中维护。`);
   };
 
   return (
@@ -491,10 +519,18 @@ const AdminCourierManagement: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton size="small" sx={{ color: '#42a5f5' }}>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: '#42a5f5' }}
+                            onClick={() => handleViewCourier(courier)}
+                          >
                             <Visibility fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" sx={{ color: '#faad14' }}>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: '#faad14' }}
+                            onClick={() => handleEditCourier(courier)}
+                          >
                             <Edit fontSize="small" />
                           </IconButton>
                           <IconButton 

@@ -52,6 +52,7 @@ import {
   CloudUpload,
   Work,
   Badge,
+  MyLocation,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
@@ -572,34 +573,79 @@ const AdminDashboard: React.FC = () => {
             </Grid>
 
             {/* 财务管理 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/courier-finance')}
-              >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                  <Assessment sx={{ fontSize: 48, color: '#f5222d', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    财务管理
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    收入统计和佣金管理
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+            {(user.role !== 'employee') && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                    },
+                  }}
+                  onClick={() => navigate('/admin/courier-finance')}
+                >
+                  <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                    <Assessment sx={{ fontSize: 48, color: '#f5222d', mb: 2 }} />
+                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                      财务管理
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      收入统计和佣金管理
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* 实时跟踪 - 只有管理员和经理可以访问 */}
+            {(user.role === 'admin' || user.role === 'manager') && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                    },
+                  }}
+                  onClick={() => navigate('/admin/realtime-tracking')}
+                >
+                  <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                    <MyLocation sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
+                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                      实时跟踪
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      GPS位置监控和路线跟踪
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Chip 
+                        label="仅管理层" 
+                        size="small" 
+                        sx={{ 
+                          backgroundColor: 'rgba(114, 46, 209, 0.2)', 
+                          color: '#722ed1',
+                          fontSize: '10px',
+                        }} 
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
 
             {/* 系统设置 */}
             <Grid item xs={12} sm={6} md={4}>
