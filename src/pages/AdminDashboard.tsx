@@ -546,7 +546,7 @@ const AdminDashboard: React.FC = () => {
                     boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
                   },
                 }}
-                onClick={() => navigate('/admin/users')}
+                onClick={() => navigate('/admin/city-packages')}
               >
                 <CardContent sx={{ 
                   textAlign: 'center', 
@@ -558,12 +558,12 @@ const AdminDashboard: React.FC = () => {
                   justifyContent: 'center',
                   alignItems: 'center'
                 }}>
-                  <People sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
+                  <LocalShipping sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    用户管理
+                    同城包裹
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    客户信息和行为分析
+                    直接下单包裹管理和跟踪
                   </Typography>
                 </CardContent>
               </Card>

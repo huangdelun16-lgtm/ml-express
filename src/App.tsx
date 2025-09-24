@@ -27,6 +27,7 @@ import CourierAdminSystem from './pages/CourierAdminSystem';
 import AdminCourierDashboard from './pages/AdminCourierDashboard';
 import AdminCourierOrders from './pages/AdminCourierOrders';
 import AdminCourierUsers from './pages/AdminCourierUsers';
+import AdminCityPackages from './pages/AdminCityPackages';
 import AdminCourierManagement from './pages/AdminCourierManagement';
 import AdminCourierFinance from './pages/AdminCourierFinance';
 import AdminCourierSettings from './pages/AdminCourierSettings';
@@ -70,6 +71,7 @@ function App() {
           <Route path="/admin/courier-dashboard" element={<AdminCourierDashboard />} />
           <Route path="/admin/orders" element={<AdminCourierOrders />} />
           <Route path="/admin/users" element={<AdminCourierUsers />} />
+          <Route path="/admin/city-packages" element={<AdminCityPackages />} />
           <Route path="/admin/couriers" element={<AdminCourierManagement />} />
           <Route path="/admin/courier-finance" element={<AdminCourierFinance />} />
           <Route path="/admin/courier-settings" element={<AdminCourierSettings />} />
