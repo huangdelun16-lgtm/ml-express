@@ -329,7 +329,18 @@ const AdminCourierOrders: React.FC = () => {
   const handleDeleteOrder = (order: Order) => {
     console.log('🗑️ 删除整个订单被点击，订单:', order.orderId);
     
-    const confirmDelete = window.confirm(`⚠️ 永久删除整个订单？\n\n📦 订单号: ${order.orderId}\n👤 客户: ${order.customerName}\n💰 金额: ${order.amount.toLocaleString()} MMK\n📞 电话: ${order.customerPhone}\n\n⚠️ 此操作将完全移除订单号及所有相关数据！\n⚠️ 删除后无法恢复！\n\n确定要继续吗？`);
+    // 使用双重确认防止误操作
+    const firstConfirm = window.confirm(`⚠️ 删除订单确认\n\n📦 订单号: ${order.orderId}\n👤 客户: ${order.customerName}\n💰 金额: ${order.amount.toLocaleString()} MMK\n\n点击"确定"继续删除操作`);
+    
+    if (!firstConfirm) {
+      console.log('❌ 用户取消了第一次确认');
+      return;
+    }
+    
+    // 第二次确认
+    const secondConfirm = window.confirm(`🚨 最终确认删除\n\n⚠️ 此操作将完全移除订单号及所有相关数据！\n⚠️ 删除后无法恢复！\n\n📦 订单: ${order.orderId}\n👤 客户: ${order.customerName}\n\n请再次确认是否要永久删除？`);
+    
+    const confirmDelete = firstConfirm && secondConfirm;
     
     if (confirmDelete) {
       try {
@@ -395,7 +406,12 @@ const AdminCourierOrders: React.FC = () => {
         alert(`❌ 删除订单失败\n\n错误信息: ${error instanceof Error ? error.message : '未知错误'}\n\n请重试或联系技术支持`);
       }
     } else {
-      console.log('用户取消了删除操作');
+      if (!secondConfirm) {
+        console.log('❌ 用户取消了第二次确认');
+        alert('🔒 删除操作已取消\n\n订单数据安全保护');
+      } else {
+        console.log('❌ 用户取消了删除操作');
+      }
     }
   };
 
@@ -723,21 +739,32 @@ const AdminCourierOrders: React.FC = () => {
                             sx={{ 
                               color: '#f5222d',
                               borderColor: '#f5222d',
-                              minWidth: '60px',
+                              minWidth: '70px',
                               height: '32px',
                               fontSize: '12px',
+                              fontWeight: 600,
+                              borderWidth: '2px',
                               '&:hover': {
-                                backgroundColor: 'rgba(245, 34, 45, 0.1)',
-                                borderColor: '#f5222d',
-                              }
+                                backgroundColor: 'rgba(245, 34, 45, 0.15)',
+                                borderColor: '#ff4d4f',
+                                borderWidth: '2px',
+                                transform: 'scale(1.05)',
+                              },
+                              '&:active': {
+                                transform: 'scale(0.95)',
+                              },
+                              transition: 'all 0.2s ease',
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('🗑️ 删除按钮被点击！订单:', order.orderId);
-                              handleDeleteOrder(order);
+                              e.preventDefault();
+                              console.log('🗑️ 删除按钮被明确点击！订单:', order.orderId);
+                              setTimeout(() => {
+                                handleDeleteOrder(order);
+                              }, 100); // 短暂延迟确保事件处理完成
                             }}
                           >
-                            删除
+                            🗑️ 删除
                           </Button>
                         </Box>
                       </TableCell>
