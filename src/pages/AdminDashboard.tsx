@@ -419,16 +419,195 @@ const AdminDashboard: React.FC = () => {
       </Menu>
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* 包裹管理模块已暂时关闭 */}
+        {/* 管理模块导航 */}
         <Box sx={{ mb: 4 }}>
-          <Alert severity="info">包裹管理模块已暂时关闭。请使用上方导航进入其它模块。</Alert>
+          <Typography variant="h4" sx={{ mb: 3, fontWeight: 600, color: 'white' }}>
+            管理中心
+          </Typography>
+          <Grid container spacing={3}>
+            {/* 仪表盘 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/courier-dashboard')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <Assessment sx={{ fontSize: 48, color: '#42a5f5', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    仪表板
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    实时数据统计和系统监控
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 订单管理 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/orders')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <LocalShipping sx={{ fontSize: 48, color: '#52c41a', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    订单管理
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    订单处理和状态跟踪
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 用户管理 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/users')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <People sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    用户管理
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    客户信息和行为分析
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 快递员管理 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/couriers')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <LocalShipping sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    快递员管理
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    快递员信息和业绩管理
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 财务管理 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/courier-finance')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <Assessment sx={{ fontSize: 48, color: '#f5222d', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    财务管理
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    收入统计和佣金管理
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 系统设置 */}
+            <Grid item xs={12} sm={6} md={4}>
+              <Card
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                  },
+                }}
+                onClick={() => navigate('/admin/courier-settings')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <Settings sx={{ fontSize: 48, color: '#13c2c2', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+                    系统设置
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    价格规则和系统配置
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         </Box>
 
-        {/* 包裹搜索/新增已移除 */}
-
-        {/* 财务系统已移至独立页面 /admin/finance */}
-
-        {/* 用户管理（权限：经理/主账号） */}
+        {/* 原有的用户管理保留（如果需要） */}
         {canManageUsers && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>用户管理</Typography>

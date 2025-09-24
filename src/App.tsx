@@ -24,6 +24,12 @@ import TermsOfService from './pages/TermsOfService';
 import DbDebug from './pages/DbDebug';
 import OrderPage from './pages/OrderPage';
 import CourierAdminSystem from './pages/CourierAdminSystem';
+import AdminCourierDashboard from './pages/AdminCourierDashboard';
+import AdminCourierOrders from './pages/AdminCourierOrders';
+import AdminCourierUsers from './pages/AdminCourierUsers';
+import AdminCourierManagement from './pages/AdminCourierManagement';
+import AdminCourierFinance from './pages/AdminCourierFinance';
+import AdminCourierSettings from './pages/AdminCourierSettings';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -57,6 +63,12 @@ function App() {
           <Route path="/admin/db-debug" element={<DbDebug />} />
           <Route path="/admin/data-merger" element={<DataMerger />} />
           <Route path="/courier-admin" element={<CourierAdminSystem />} />
+          <Route path="/admin/courier-dashboard" element={<AdminCourierDashboard />} />
+          <Route path="/admin/orders" element={<AdminCourierOrders />} />
+          <Route path="/admin/users" element={<AdminCourierUsers />} />
+          <Route path="/admin/couriers" element={<AdminCourierManagement />} />
+          <Route path="/admin/courier-finance" element={<AdminCourierFinance />} />
+          <Route path="/admin/courier-settings" element={<AdminCourierSettings />} />
         </Routes>
       </Box>
       <Footer />
