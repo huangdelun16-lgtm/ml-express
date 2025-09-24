@@ -19,11 +19,13 @@ import {
   ArrowForward,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const HomePage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const features = [
     {
@@ -42,8 +44,8 @@ const HomePage: React.FC = () => {
           <Speed sx={{ fontSize: 40, color: 'white' }} />
         </Box>
       ),
-      title: '快速配送',
-      description: '专业的物流网络确保您的包裹快速送达目的地',
+      title: t('feature1Title'),
+      description: t('feature1Desc'),
     },
     {
       icon: (
@@ -61,8 +63,8 @@ const HomePage: React.FC = () => {
           <Security sx={{ fontSize: 40, color: 'white' }} />
         </Box>
       ),
-      title: '安全保障',
-      description: '全程保险覆盖，货物安全有保障，让您放心托付',
+      title: t('feature2Title'),
+      description: t('feature2Desc'),
     },
     {
       icon: (
@@ -80,8 +82,8 @@ const HomePage: React.FC = () => {
           <Support sx={{ fontSize: 40, color: 'white' }} />
         </Box>
       ),
-      title: '24/7客服',
-      description: '专业客服团队，随时为您解答问题和提供帮助',
+      title: t('feature3Title'),
+      description: t('feature3Desc'),
     },
     {
       icon: (
@@ -99,8 +101,8 @@ const HomePage: React.FC = () => {
           <TrendingUp sx={{ fontSize: 40, color: 'white' }} />
         </Box>
       ),
-      title: '实时跟踪',
-      description: '全程物流信息实时更新，让您随时掌握货物状态',
+      title: t('feature4Title'),
+      description: t('feature4Desc'),
     },
   ];
 
@@ -150,11 +152,8 @@ const HomePage: React.FC = () => {
               EXPRESS
             </Box>
           </Typography>
-          <Typography variant="h6" sx={{ opacity: 0.9, mb: 4 }}>
-            缅甸领先的快递服务
-          </Typography>
           <Typography variant="h5" sx={{ opacity: 0.9, mb: 4, maxWidth: 600, mx: 'auto' }}>
-            快速、安全、便捷的快递物流服务，让您的包裹安全送达
+            {t('heroSubtitle')}
           </Typography>
           <Box sx={{ 
             display: 'flex', 
@@ -188,7 +187,7 @@ const HomePage: React.FC = () => {
                 },
               }}
             >
-              查询快递
+              {t('trackPackage')}
             </Button>
             <Button
               variant="outlined"
@@ -214,7 +213,7 @@ const HomePage: React.FC = () => {
                 },
               }}
             >
-              了解服务
+              {t('learnServices')}
             </Button>
           </Box>
         </Container>
@@ -228,7 +227,7 @@ const HomePage: React.FC = () => {
           align="center"
           sx={{ mb: 6, fontWeight: 600 }}
         >
-          为什么选择我们
+          {t('featuresTitle')}
         </Typography>
         
         <Grid container spacing={4}>
@@ -282,24 +281,36 @@ const HomePage: React.FC = () => {
 
 
       {/* 服务流程 */}
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Typography
-          variant="h3"
-          component="h2"
-          align="center"
-          sx={{ mb: 6, fontWeight: 600 }}
-        >
-          服务流程
-        </Typography>
-        
-        <Grid container spacing={4}>
-          {[
-            { step: '1', title: '下单', description: '客户通过网站或电话下单' },
-            { step: '2', title: '揽收', description: '快递员上门揽收包裹' },
-            { step: '3', title: '运输', description: '包裹进入物流网络运输' },
-            { step: '4', title: '派送', description: '快递员派送包裹到收件人' },
-            { step: '5', title: '签收', description: '收件人确认签收包裹' },
-          ].map((item, index) => (
+      <Box
+        sx={{
+          background: `
+            linear-gradient(135deg, rgba(15, 32, 39, 0.95) 0%, rgba(32, 58, 67, 0.95) 50%, rgba(44, 83, 100, 0.95) 100%),
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%)
+          `,
+          py: 8,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <Container maxWidth="lg">
+          <Typography
+            variant="h3"
+            component="h2"
+            align="center"
+            sx={{ mb: 6, fontWeight: 600, color: 'white' }}
+          >
+            {t('serviceFlow')}
+          </Typography>
+          
+          <Grid container spacing={4}>
+            {[
+              { step: '1', title: t('step1Title'), description: t('step1Desc') },
+              { step: '2', title: t('step2Title'), description: t('step2Desc') },
+              { step: '3', title: t('step3Title'), description: t('step3Desc') },
+              { step: '4', title: t('step4Title'), description: t('step4Desc') },
+              { step: '5', title: t('step5Title'), description: t('step5Desc') },
+            ].map((item, index) => (
             <Grid item xs={12} sm={6} md={2.4} key={index}>
               <Box sx={{ textAlign: 'center' }}>
                 <Box
@@ -307,7 +318,7 @@ const HomePage: React.FC = () => {
                     width: 60,
                     height: 60,
                     borderRadius: '50%',
-                    backgroundColor: 'primary.main',
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
                     color: 'white',
                     display: 'flex',
                     alignItems: 'center',
@@ -316,21 +327,23 @@ const HomePage: React.FC = () => {
                     fontWeight: 'bold',
                     mx: 'auto',
                     mb: 2,
+                    boxShadow: '0 8px 32px rgba(25, 118, 210, 0.4)',
                   }}
                 >
                   {item.step}
                 </Box>
-                <Typography variant="h6" component="h3" sx={{ mb: 1, fontWeight: 600 }}>
+                <Typography variant="h6" component="h3" sx={{ mb: 1, fontWeight: 600, color: 'white' }}>
                   {item.title}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                   {item.description}
                 </Typography>
               </Box>
             </Grid>
           ))}
-        </Grid>
-      </Container>
+          </Grid>
+        </Container>
+      </Box>
 
       {/* 快速查询和价格咨询 */}
       <Box sx={{ backgroundColor: 'primary.main', color: 'white', py: 8 }}>
@@ -339,10 +352,10 @@ const HomePage: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="h3" component="h2" sx={{ mb: 3, fontWeight: 600 }}>
-                  快速查询您的包裹
+                  {t('quickTrack')}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-                  输入快递单号，实时跟踪包裹状态
+                  {t('quickTrackDesc')}
                 </Typography>
                 <Button
                   variant="outlined"
@@ -362,17 +375,17 @@ const HomePage: React.FC = () => {
                   }}
                   endIcon={<ArrowForward />}
                 >
-                  立即查询
+                  {t('trackNow')}
                 </Button>
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="h3" component="h2" sx={{ mb: 3, fontWeight: 600 }}>
-                  获取最优价格
+                  {t('getBestPrice')}
                 </Typography>
                 <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-                  在线询价，专业客服为您提供个性化报价
+                  {t('getBestPriceDesc')}
                 </Typography>
                 <Button
                   variant="outlined"
@@ -392,7 +405,7 @@ const HomePage: React.FC = () => {
                   }}
                   endIcon={<ArrowForward />}
                 >
-                  立即询价
+                  {t('getQuote')}
                 </Button>
               </Box>
             </Grid>

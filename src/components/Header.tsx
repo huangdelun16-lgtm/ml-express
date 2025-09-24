@@ -19,6 +19,8 @@ import {
   LocalShipping,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher, { LanguageType } from './LanguageSwitcher';
 
 const Header: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -26,14 +28,15 @@ const Header: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
+  const { language, setLanguage, t } = useLanguage();
 
   const navItems = [
-    { name: '首页', path: '/' },
-    { name: '服务介绍', path: '/services' },
-    { name: '价格咨询', path: '/pricing' },
-    { name: '查询快递', path: '/tracking' },
-    { name: '联系我们', path: '/contact' },
-    { name: '直接下单', path: '/order' },
+    { name: t('home'), path: '/' },
+    { name: t('services'), path: '/services' },
+    { name: t('pricing'), path: '/pricing' },
+    { name: t('tracking'), path: '/tracking' },
+    { name: t('contact'), path: '/contact' },
+    { name: t('directOrder'), path: '/order' },
   ];
 
   const handleDrawerToggle = () => {
@@ -71,13 +74,20 @@ const Header: React.FC = () => {
         ))}
         <ListItem onClick={() => handleNavClick('/admin/login')}>
           <ListItemText 
-            primary="管理后台" 
+            primary={t('adminPanel')} 
             sx={{ 
               textAlign: 'center',
               color: isActive('/admin/login') ? 'primary.main' : 'text.primary',
               fontWeight: isActive('/admin/login') ? 600 : 400,
             }}
           />
+        </ListItem>
+        <ListItem sx={{ justifyContent: 'center', py: 2 }}>
+            <LanguageSwitcher
+              currentLanguage={language as LanguageType}
+              onLanguageChange={setLanguage}
+              variant="header"
+            />
         </ListItem>
       </List>
     </Box>
@@ -208,6 +218,15 @@ const Header: React.FC = () => {
               </Box>
             )}
 
+            {/* Language Switcher */}
+            {!isMobile && (
+            <LanguageSwitcher
+              currentLanguage={language as LanguageType}
+              onLanguageChange={setLanguage}
+              variant="header"
+            />
+            )}
+
             {/* Admin Login Button */}
             {!isMobile && (
               <Button
@@ -216,13 +235,14 @@ const Header: React.FC = () => {
                 sx={{
                   borderColor: 'primary.main',
                   color: 'primary.main',
+                  ml: 2,
                   '&:hover': {
                     borderColor: 'primary.dark',
                     backgroundColor: 'rgba(25, 118, 210, 0.08)',
                   },
                 }}
               >
-                管理后台
+                {t('adminPanel')}
               </Button>
             )}
 

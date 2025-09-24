@@ -48,6 +48,8 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher, { LanguageType } from '../components/LanguageSwitcher';
 
 interface Package {
   id: string;
@@ -98,6 +100,7 @@ const AdminDashboard: React.FC = () => {
   const [toast, setToast] = useState<{ open: boolean; text: string; severity: 'success' | 'error' | 'info' | 'warning' }>({ open: false, text: '', severity: 'success' });
   const theme = useTheme();
   const navigate = useNavigate();
+  const { language, setLanguage, t } = useLanguage();
 
   // 模拟快递数据
   const mockPackages: Package[] = [
@@ -373,12 +376,17 @@ const AdminDashboard: React.FC = () => {
             fontWeight: 700,
             letterSpacing: '1px',
           }}>
-            MARKET LINK EXPRESS 管理后台
+            MARKET LINK EXPRESS {t('adminPanel')}
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <LanguageSwitcher
+              currentLanguage={language as LanguageType}
+              onLanguageChange={setLanguage}
+              variant="admin"
+            />
             <Typography variant="body2" color="text.secondary">
-              欢迎，{user.username} ({user.role})
+              {t('welcome')}，{user.username} ({user.role})
             </Typography>
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
               <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
@@ -406,7 +414,7 @@ const AdminDashboard: React.FC = () => {
         <Divider />
         <MenuItem onClick={handleLogout}>
           <Logout sx={{ mr: 1 }} />
-          退出登录
+          {t('logout')}
         </MenuItem>
       </Menu>
 

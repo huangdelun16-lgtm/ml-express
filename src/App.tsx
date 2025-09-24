@@ -23,11 +23,13 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DbDebug from './pages/DbDebug';
 import OrderPage from './pages/OrderPage';
+import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
 function App() {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <LanguageProvider>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Header />
       <Box component="main" sx={{ flexGrow: 1 }}>
         <Routes>
@@ -56,7 +58,8 @@ function App() {
         </Routes>
       </Box>
       <Footer />
-    </Box>
+      </Box>
+    </LanguageProvider>
   );
 }
 
