@@ -199,7 +199,7 @@ const AdminCourierOrders: React.FC = () => {
           const employees = JSON.parse(storedEmployees);
           // 只显示员工角色的人员作为快递员选项
           const couriers = employees.filter((emp: any) => 
-            emp.role === 'employee' || emp.role === 'manager'
+            emp.role === 'employee'
           );
           setAvailableCouriers(couriers);
         }

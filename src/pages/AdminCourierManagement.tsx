@@ -107,9 +107,53 @@ const mockCouriers: Courier[] = [
 const AdminCourierManagement: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [couriers, setCouriers] = useState<Courier[]>(mockCouriers);
+  const [couriers, setCouriers] = useState<Courier[]>([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // 从员工管理中加载"员工"角色的数据作为快递员
+  React.useEffect(() => {
+    const loadCouriersFromEmployees = () => {
+      try {
+        const storedEmployees = localStorage.getItem('company_employees');
+        if (storedEmployees) {
+          const employees = JSON.parse(storedEmployees);
+          // 只获取"员工"角色的人员
+          const employeeCouriers = employees
+            .filter((emp: any) => emp.role === 'employee')
+            .map((emp: any, index: number) => ({
+              id: emp.id || `C${String(index + 1).padStart(3, '0')}`,
+              name: emp.name,
+              phone: emp.phone,
+              email: emp.email,
+              vehicleType: '摩托车', // 默认交通工具
+              vehiclePlate: `YGN-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`, // 随机车牌
+              status: emp.status === 'active' ? 'online' : 'offline',
+              rating: 4.5 + Math.random() * 0.5, // 随机评分 4.5-5.0
+              completedOrders: Math.floor(Math.random() * 200) + 50, // 随机订单数
+              totalEarnings: emp.salary * 0.8 + Math.floor(Math.random() * 200000), // 基于薪水的收入
+              currentLocation: emp.address || '仰光市',
+              joinedAt: emp.joinDate,
+              lastActive: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            }));
+          
+          setCouriers([...employeeCouriers, ...mockCouriers]);
+          console.log('从员工管理加载快递员:', employeeCouriers.length, '个员工');
+        } else {
+          setCouriers(mockCouriers);
+        }
+      } catch (error) {
+        console.error('加载快递员数据失败:', error);
+        setCouriers(mockCouriers);
+      }
+    };
+
+    loadCouriersFromEmployees();
+    
+    // 定期刷新快递员数据（每30秒）
+    const interval = setInterval(loadCouriersFromEmployees, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const statusColors: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
     online: 'success',
@@ -333,17 +377,13 @@ const AdminCourierManagement: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={3}>
-                <Button 
-                  variant="contained" 
-                  startIcon={<Add />}
-                  fullWidth
-                  sx={{
-                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                    '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
-                  }}
-                >
-                  添加快递员
-                </Button>
+                <Typography variant="body2" sx={{ 
+                  color: 'rgba(255,255,255,0.7)', 
+                  textAlign: 'center',
+                  py: 1,
+                }}>
+                  快递员从"控制台 → 员工管理"中的"员工"角色自动显示
+                </Typography>
               </Grid>
             </Grid>
           </CardContent>
