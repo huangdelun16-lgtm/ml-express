@@ -1,9 +1,19 @@
 [build]
-  command = "npm run build"
   publish = "build"
+  command = "npm run build"
 
-# 确保前端路由回退到 index.html
+[build.environment]
+  NODE_VERSION = "18"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[context.production.environment]
+  REACT_APP_SUPABASE_URL = "https://your-project.supabase.co"
+  REACT_APP_SUPABASE_ANON_KEY = "your-anon-key-here"
+
+[context.deploy-preview.environment]
+  REACT_APP_SUPABASE_URL = "https://your-project.supabase.co"
+  REACT_APP_SUPABASE_ANON_KEY = "your-anon-key-here"

@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
+import SupabaseStatus from '../components/SupabaseStatus';
 import { useLanguage } from '../contexts/LanguageContext';
 import SupabaseService from '../utils/supabaseClient';
 
@@ -206,6 +207,9 @@ const DataMigrationTool: React.FC = () => {
             升级到Supabase云数据库，实现多设备同步和数据安全保障
           </Typography>
         </Box>
+
+        {/* Supabase Status */}
+        <SupabaseStatus />
 
         {/* Connection Status */}
         <Grid container spacing={3} sx={{ mb: 4 }}>

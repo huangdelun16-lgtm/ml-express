@@ -151,7 +151,7 @@ const AdminCourierOrders: React.FC = () => {
         const storedOrders = localStorage.getItem('courier_orders');
         if (storedOrders) {
           const parsedOrders: OrderData[] = JSON.parse(storedOrders);
-          // 转换为Order格式
+          // 转换为Order格式，保持快递员分配信息
           const convertedOrders: Order[] = parsedOrders.map((order, index) => ({
             id: (index + 1).toString(),
             orderId: order.orderId,
@@ -166,9 +166,10 @@ const AdminCourierOrders: React.FC = () => {
             distance: order.distance,
             amount: order.amount,
             status: order.status as any,
-            courierId: undefined,
-            courierName: undefined,
-            courierPhone: undefined,
+            // 重要：保持快递员分配信息
+            courierId: order.courierId,
+            courierName: order.courierName,
+            courierPhone: order.courierPhone,
             createdAt: order.createdAt,
             estimatedDelivery: order.estimatedDelivery,
             actualDelivery: order.status === 'delivered' ? order.estimatedDelivery : undefined,
@@ -279,14 +280,41 @@ const AdminCourierOrders: React.FC = () => {
       const storedOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
       const updatedStoredOrders = storedOrders.map((order: OrderData) => 
         order.orderId === selectedOrder.orderId 
-          ? { ...order, ...editOrderData }
+          ? { 
+              ...order, 
+              customerName: editOrderData.customerName || order.customerName,
+              customerPhone: editOrderData.customerPhone || order.customerPhone,
+              receiverName: editOrderData.receiverName || order.receiverName,
+              receiverPhone: editOrderData.receiverPhone || order.receiverPhone,
+              amount: editOrderData.amount || order.amount,
+              status: editOrderData.status || order.status,
+              // 重要：保存快递员分配信息
+              courierId: editOrderData.courierId,
+              courierName: editOrderData.courierName,
+              courierPhone: editOrderData.courierPhone,
+              notes: `${order.notes || ''} | 快递员分配: ${editOrderData.courierName || '未分配'} - ${new Date().toLocaleString()}`,
+            }
           : order
       );
       localStorage.setItem('courier_orders', JSON.stringify(updatedStoredOrders));
       
+      console.log('订单已保存:', {
+        orderId: selectedOrder.orderId,
+        courierAssigned: editOrderData.courierName,
+        status: editOrderData.status,
+      });
+      
       setEditDialogOpen(false);
       setSelectedOrder(null);
       setEditOrderData({});
+      
+      alert(`订单 ${selectedOrder.orderId} 保存成功！${editOrderData.courierName ? `已分配给快递员: ${editOrderData.courierName}` : ''}`);
+      
+      // 立即重新加载数据以确保显示最新状态
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
     } catch (error) {
       console.error('保存订单失败:', error);
       alert('保存订单失败，请重试');

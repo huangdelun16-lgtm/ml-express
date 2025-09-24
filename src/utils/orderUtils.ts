@@ -127,4 +127,8 @@ export interface OrderData {
   createdAt: string;
   estimatedDelivery: string;
   notes?: string;
+  // 快递员分配信息
+  courierId?: string;
+  courierName?: string;
+  courierPhone?: string;
 }
