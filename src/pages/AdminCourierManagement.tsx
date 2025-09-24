@@ -198,25 +198,72 @@ const AdminCourierManagement: React.FC = () => {
 
   // 查看快递员详情
   const handleViewCourier = (courier: Courier) => {
-    alert(`快递员详情：
-姓名：${courier.name}
-电话：${courier.phone}
-工作号：${courier.workId}
-车辆：${courier.vehicleType} - ${courier.vehiclePlate}
-评分：${courier.rating}⭐
-完成订单：${courier.completedOrders}单
-总收入：${courier.totalEarnings.toLocaleString()} MMK
-当前位置：${courier.currentLocation}
-状态：${courier.status === 'online' ? '在线' : '离线'}`);
+    console.log('查看快递员详情:', courier.name);
+    
+    const detailInfo = `📋 快递员详情信息
+
+👤 基本信息：
+• 姓名：${courier.name}
+• 工作号：${courier.workId}
+• 电话：${courier.phone}
+• 邮箱：${courier.email}
+
+🚗 车辆信息：
+• 车辆类型：${courier.vehicleType}
+• 车牌号码：${courier.vehiclePlate}
+
+📊 业绩数据：
+• 服务评分：${courier.rating}⭐
+• 完成订单：${courier.completedOrders}单
+• 总收入：${courier.totalEarnings.toLocaleString()} MMK
+
+📍 状态信息：
+• 当前位置：${courier.currentLocation}
+• 在线状态：${courier.status === 'online' ? '🟢 在线' : '🔴 离线'}
+• 入职日期：${courier.joinedAt}
+• 最后活跃：${courier.lastActive}`;
+
+    alert(detailInfo);
   };
 
   // 编辑快递员信息
   const handleEditCourier = (courier: Courier) => {
-    // 跳转到控制台的员工管理页面
-    alert(`要编辑快递员信息，请前往：
-控制台 → 员工管理 → 找到 ${courier.name} → 点击编辑
+    console.log('编辑快递员信息:', courier.name);
+    
+    const editInfo = `✏️ 编辑快递员信息
 
-快递员信息统一在员工管理中维护。`);
+要编辑 ${courier.name} 的信息，请按以下步骤操作：
+
+1. 点击页面顶部的"返回管理中心"
+2. 在管理中心点击"控制台"
+3. 在控制台页面找到"员工管理"
+4. 搜索或找到员工：${courier.name} (${courier.workId})
+5. 点击该员工的"编辑"按钮
+6. 修改完成后保存
+
+💡 提示：快递员信息统一在员工管理中维护，确保数据一致性。`;
+
+    if (window.confirm(editInfo + '\n\n是否现在跳转到控制台？')) {
+      navigate('/admin/control-panel');
+    }
+  };
+
+  // 拨打快递员电话
+  const handleCallCourier = (courier: Courier) => {
+    console.log('拨打快递员电话:', courier.phone);
+    
+    const callInfo = `📞 联系快递员
+
+快递员：${courier.name}
+电话：${courier.phone}
+状态：${courier.status === 'online' ? '🟢 在线' : '🔴 离线'}
+
+点击确定将尝试拨打电话`;
+
+    if (window.confirm(callInfo)) {
+      // 尝试打开电话应用
+      window.open(`tel:${courier.phone}`, '_self');
+    }
   };
 
   return (
@@ -536,7 +583,7 @@ const AdminCourierManagement: React.FC = () => {
                           <IconButton 
                             size="small" 
                             sx={{ color: '#52c41a' }}
-                            onClick={() => window.open(`tel:${courier.phone}`)}
+                            onClick={() => handleCallCourier(courier)}
                           >
                             <Phone fontSize="small" />
                           </IconButton>

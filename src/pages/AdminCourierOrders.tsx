@@ -323,24 +323,118 @@ const AdminCourierOrders: React.FC = () => {
 
   // 删除订单处理函数
   const handleDeleteOrder = (order: Order) => {
-    if (window.confirm(`确定要删除订单 ${order.orderId} 吗？此操作不可撤销。`)) {
+    console.log('删除按钮被点击，订单:', order.orderId);
+    
+    const confirmDelete = window.confirm(`⚠️ 确定要删除订单吗？\n\n订单号: ${order.orderId}\n客户: ${order.customerName}\n金额: ${order.amount.toLocaleString()} MMK\n\n此操作不可撤销！`);
+    
+    if (confirmDelete) {
       try {
+        console.log('开始删除订单:', order.orderId);
+        
         // 从状态中移除订单
         const updatedOrders = orders.filter(o => o.id !== order.id);
+        console.log('更新后的订单列表长度:', updatedOrders.length);
         setOrders(updatedOrders);
         
         // 从localStorage中移除订单
         const storedOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
+        console.log('localStorage中的订单数量:', storedOrders.length);
+        
         const updatedStoredOrders = storedOrders.filter((o: OrderData) => o.orderId !== order.orderId);
+        console.log('删除后localStorage订单数量:', updatedStoredOrders.length);
+        
         localStorage.setItem('courier_orders', JSON.stringify(updatedStoredOrders));
         
-        console.log('订单已删除:', order.orderId);
-        alert(`订单 ${order.orderId} 已成功删除！`);
+        console.log('✅ 订单删除成功:', order.orderId);
+        alert(`✅ 订单删除成功！\n\n订单号: ${order.orderId} 已从系统中移除。`);
+        
+        // 强制重新加载数据
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
         
       } catch (error) {
-        console.error('删除订单失败:', error);
-        alert('删除订单失败，请重试');
+        console.error('❌ 删除订单失败:', error);
+        alert(`❌ 删除失败！\n\n错误信息: ${error instanceof Error ? error.message : '未知错误'}\n请重试或联系技术支持。`);
       }
+    } else {
+      console.log('用户取消了删除操作');
+    }
+  };
+
+  // 创建测试订单
+  const handleCreateTestOrder = () => {
+    console.log('创建测试订单');
+    
+    const testCustomers = [
+      { name: 'Aung Ko', phone: '09-123456789', address: '仰光市中心区第1街123号' },
+      { name: 'Thida Min', phone: '09-234567890', address: '曼德勒市北区商业街45号' },
+      { name: 'Zaw Win', phone: '09-345678901', address: '内比都新区政府大楼附近' },
+      { name: 'Su Su', phone: '09-456789012', address: '勃生市港口区渔民街67号' },
+      { name: 'Kyaw Soe', phone: '09-567890123', address: '密支那市中心市场对面' },
+    ];
+    
+    const testReceivers = [
+      { name: 'Ma Htwe', phone: '09-111111111', address: '仰光市东区大学路89号' },
+      { name: 'Ko Thant', phone: '09-222222222', address: '曼德勒市南区寺庙街12号' },
+      { name: 'Daw Khin', phone: '09-333333333', address: '内比都商业区购物中心' },
+      { name: 'U Maung', phone: '09-444444444', address: '勃生市老城区传统市场' },
+      { name: 'Ma Aye', phone: '09-555555555', address: '密支那市郊区农场路34号' },
+    ];
+
+    const packageTypes = ['文件', '小包裹', '中包裹', '大包裹', '易碎品'];
+    const serviceTypes = ['标准配送', '加急配送', '当日达', '次日达'];
+
+    const customer = testCustomers[Math.floor(Math.random() * testCustomers.length)];
+    const receiver = testReceivers[Math.floor(Math.random() * testReceivers.length)];
+    const packageType = packageTypes[Math.floor(Math.random() * packageTypes.length)];
+    const serviceType = serviceTypes[Math.floor(Math.random() * serviceTypes.length)];
+
+    // 生成缅甸时间的订单号
+    const { generateOrderId } = require('../utils/orderUtils');
+    const orderId = generateOrderId();
+    
+    const weight = Math.round((Math.random() * 10 + 0.5) * 10) / 10; // 0.5-10.5kg
+    const distance = Math.round((Math.random() * 50 + 5) * 10) / 10; // 5-55km
+    const amount = Math.round((distance * 1000 + weight * 500 + Math.random() * 5000) / 100) * 100; // 价格计算
+
+    const newOrder: OrderData = {
+      orderId,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      senderAddress: customer.address,
+      receiverName: receiver.name,
+      receiverPhone: receiver.phone,
+      receiverAddress: receiver.address,
+      packageType,
+      weight,
+      description: `${packageType} - ${serviceType}`,
+      serviceType,
+      distance,
+      amount,
+      status: 'pending' as any,
+      createdAt: new Date().toISOString(),
+      estimatedDelivery: new Date(Date.now() + (serviceType === '当日达' ? 8 : serviceType === '次日达' ? 24 : 48) * 60 * 60 * 1000).toISOString(),
+    };
+
+    try {
+      // 保存到localStorage
+      const existingOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
+      const updatedOrders = [newOrder, ...existingOrders];
+      localStorage.setItem('courier_orders', JSON.stringify(updatedOrders));
+
+      console.log('✅ 测试订单创建成功:', newOrder);
+      
+      alert(`🎉 测试订单创建成功！\n\n订单号: ${orderId}\n客户: ${customer.name}\n收货人: ${receiver.name}\n包裹: ${packageType} (${weight}kg)\n距离: ${distance}km\n金额: ${amount.toLocaleString()} MMK\n服务: ${serviceType}`);
+
+      // 刷新页面显示新订单
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
+    } catch (error) {
+      console.error('❌ 创建测试订单失败:', error);
+      alert('创建测试订单失败，请重试');
     }
   };
 
@@ -433,6 +527,7 @@ const AdminCourierOrders: React.FC = () => {
                   <Button 
                     variant="contained" 
                     startIcon={<Add />}
+                    onClick={handleCreateTestOrder}
                     sx={{
                       background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
                       '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },

@@ -470,7 +470,7 @@ const AdminDashboard: React.FC = () => {
                 }}
                 onClick={() => navigate('/admin/courier-dashboard')}
               >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Assessment sx={{ fontSize: 48, color: '#42a5f5', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                     仪表板
@@ -500,7 +500,7 @@ const AdminDashboard: React.FC = () => {
                 }}
                 onClick={() => navigate('/admin/orders')}
               >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <LocalShipping sx={{ fontSize: 48, color: '#52c41a', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                     订单管理
@@ -530,7 +530,7 @@ const AdminDashboard: React.FC = () => {
                 }}
                 onClick={() => navigate('/admin/users')}
               >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <People sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                     用户管理
@@ -560,7 +560,7 @@ const AdminDashboard: React.FC = () => {
                 }}
                 onClick={() => navigate('/admin/couriers')}
               >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <LocalShipping sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                     快递员管理
@@ -591,7 +591,7 @@ const AdminDashboard: React.FC = () => {
                   }}
                   onClick={() => navigate('/admin/courier-finance')}
                 >
-                  <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <Assessment sx={{ fontSize: 48, color: '#f5222d', mb: 2 }} />
                     <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                       财务管理
@@ -623,25 +623,24 @@ const AdminDashboard: React.FC = () => {
                   }}
                   onClick={() => navigate('/admin/realtime-tracking')}
                 >
-                  <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <MyLocation sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
                     <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                       实时跟踪
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 1 }}>
                       GPS位置监控和路线跟踪
                     </Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <Chip 
-                        label="仅管理层" 
-                        size="small" 
-                        sx={{ 
-                          backgroundColor: 'rgba(114, 46, 209, 0.2)', 
-                          color: '#722ed1',
-                          fontSize: '10px',
-                        }} 
-                      />
-                    </Box>
+                    <Chip 
+                      label="仅管理层" 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: 'rgba(114, 46, 209, 0.2)', 
+                        color: '#722ed1',
+                        fontSize: '10px',
+                        alignSelf: 'center',
+                      }} 
+                    />
                   </CardContent>
                 </Card>
               </Grid>
@@ -665,7 +664,7 @@ const AdminDashboard: React.FC = () => {
                 }}
                 onClick={() => navigate('/admin/courier-settings')}
               >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                <CardContent sx={{ textAlign: 'center', py: 3, height: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Settings sx={{ fontSize: 48, color: '#13c2c2', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
                     系统设置
