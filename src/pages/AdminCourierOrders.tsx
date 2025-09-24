@@ -654,22 +654,49 @@ const AdminCourierOrders: React.FC = () => {
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton 
                             size="small" 
-                            onClick={() => handleViewOrder(order)}
-                            sx={{ color: '#42a5f5' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('👁️ 查看按钮被点击！订单:', order.orderId);
+                              handleViewOrder(order);
+                            }}
+                            sx={{ 
+                              color: '#42a5f5',
+                              '&:hover': {
+                                backgroundColor: 'rgba(66, 165, 245, 0.1)',
+                              }
+                            }}
                           >
                             <Visibility fontSize="small" />
                           </IconButton>
                           <IconButton 
                             size="small"
-                            sx={{ color: '#faad14' }}
-                            onClick={() => handleEditOrder(order)}
+                            sx={{ 
+                              color: '#faad14',
+                              '&:hover': {
+                                backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('✏️ 编辑按钮被点击！订单:', order.orderId);
+                              handleEditOrder(order);
+                            }}
                           >
                             <Edit fontSize="small" />
                           </IconButton>
                           <IconButton 
                             size="small"
-                            sx={{ color: '#f5222d' }}
-                            onClick={() => handleDeleteOrder(order)}
+                            sx={{ 
+                              color: '#f5222d',
+                              '&:hover': {
+                                backgroundColor: 'rgba(245, 34, 45, 0.1)',
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('🗑️ 删除按钮被点击！订单:', order.orderId);
+                              handleDeleteOrder(order);
+                            }}
                           >
                             <Delete fontSize="small" />
                           </IconButton>

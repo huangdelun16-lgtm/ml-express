@@ -189,11 +189,21 @@ const AdminCourierManagement: React.FC = () => {
   const totalOrders = couriers.reduce((sum, c) => sum + c.completedOrders, 0);
 
   const handleToggleStatus = (courierId: string, newStatus: boolean) => {
+    console.log('🔄 切换在线状态:', courierId, newStatus ? '上线' : '下线');
+    
+    // 找到快递员名称
+    const courier = couriers.find(c => c.id === courierId);
+    const courierName = courier?.name || '快递员';
+    
+    // 更新状态
     setCouriers(couriers.map(courier => 
       courier.id === courierId 
         ? { ...courier, status: newStatus ? 'online' : 'offline' }
         : courier
     ));
+    
+    // 显示反馈
+    alert(`✅ 状态更新成功！\n\n${courierName} 已${newStatus ? '上线' : '下线'}`);
   };
 
   // 查看快递员详情
@@ -564,30 +574,69 @@ const AdminCourierManagement: React.FC = () => {
                       <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                         <Switch
                           checked={courier.status === 'online'}
-                          onChange={(e) => handleToggleStatus(courier.id, e.target.checked)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            console.log('🔄 在线状态开关被点击！', courier.name, e.target.checked);
+                            handleToggleStatus(courier.id, e.target.checked);
+                          }}
                           size="small"
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: '#52c41a',
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              backgroundColor: '#52c41a',
+                            },
+                          }}
                         />
                       </TableCell>
                       <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton 
                             size="small" 
-                            sx={{ color: '#42a5f5' }}
-                            onClick={() => handleViewCourier(courier)}
+                            sx={{ 
+                              color: '#42a5f5',
+                              '&:hover': {
+                                backgroundColor: 'rgba(66, 165, 245, 0.1)',
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('👁️ 查看快递员按钮被点击！', courier.name);
+                              handleViewCourier(courier);
+                            }}
                           >
                             <Visibility fontSize="small" />
                           </IconButton>
                           <IconButton 
                             size="small" 
-                            sx={{ color: '#faad14' }}
-                            onClick={() => handleEditCourier(courier)}
+                            sx={{ 
+                              color: '#faad14',
+                              '&:hover': {
+                                backgroundColor: 'rgba(250, 173, 20, 0.1)',
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('✏️ 编辑快递员按钮被点击！', courier.name);
+                              handleEditCourier(courier);
+                            }}
                           >
                             <Edit fontSize="small" />
                           </IconButton>
                           <IconButton 
                             size="small" 
-                            sx={{ color: '#52c41a' }}
-                            onClick={() => handleCallCourier(courier)}
+                            sx={{ 
+                              color: '#52c41a',
+                              '&:hover': {
+                                backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('📞 电话按钮被点击！', courier.phone);
+                              handleCallCourier(courier);
+                            }}
                           >
                             <Phone fontSize="small" />
                           </IconButton>
