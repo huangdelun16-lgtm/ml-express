@@ -20,23 +20,25 @@ import {
   Email,
   LocationOn,
 } from '@mui/icons-material';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Footer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { t } = useLanguage();
 
   const quickLinks = [
-    { name: '首页', href: '/' },
-    { name: '服务介绍', href: '/services' },
-    { name: '价格咨询', href: '/pricing' },
-    { name: '查询快递', href: '/tracking' },
-    { name: '联系我们', href: '/contact' },
+    { name: t('home'), href: '/' },
+    { name: t('services'), href: '/services' },
+    { name: t('pricing'), href: '/pricing' },
+    { name: t('tracking'), href: '/tracking' },
+    { name: t('contact'), href: '/contact' },
   ];
 
   const services = [
-    { name: '国内快递', href: '/services' },
-    { name: '国际快递', href: '/services' },
-    { name: '同城配送', href: '/services' },
+    { name: t('domesticExpress'), href: '/services' },
+    { name: t('internationalExpress'), href: '/services' },
+    { name: t('sameDay'), href: '/services' },
   ];
 
   const contactInfo = [
@@ -55,10 +57,27 @@ const Footer: React.FC = () => {
   return (
     <Box
       sx={{
-        backgroundColor: 'grey.900',
+        background: `
+          linear-gradient(135deg, rgba(15, 32, 39, 0.95) 0%, rgba(32, 58, 67, 0.95) 50%, rgba(44, 83, 100, 0.95) 100%),
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%)
+        `,
         color: 'white',
         pt: 6,
         pb: 3,
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Cpath d="m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+          opacity: 0.1,
+          pointerEvents: 'none',
+        }
       }}
     >
       <Container maxWidth="lg">
@@ -97,7 +116,7 @@ const Footer: React.FC = () => {
           {/* 快速链接 */}
           <Grid item xs={12} sm={6} md={2}>
             <Typography variant="h6" component="h3" sx={{ mb: 3, fontWeight: 600 }}>
-              快速链接
+              {t('quickLinks')}
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {quickLinks.map((link, index) => (
@@ -123,7 +142,7 @@ const Footer: React.FC = () => {
           {/* 服务 */}
           <Grid item xs={12} sm={6} md={2}>
             <Typography variant="h6" component="h3" sx={{ mb: 3, fontWeight: 600 }}>
-              我们的服务
+              {t('servicesTitle')}
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {services.map((service, index) => (
@@ -149,7 +168,7 @@ const Footer: React.FC = () => {
           {/* 联系信息 */}
           <Grid item xs={12} md={4}>
             <Typography variant="h6" component="h3" sx={{ mb: 3, fontWeight: 600 }}>
-              联系我们
+              {t('contactTitle')}
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {contactInfo.map((contact, index) => (

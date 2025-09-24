@@ -50,6 +50,35 @@ export interface Translations {
   welcome: string;
   logout: string;
   
+  // Services Page
+  servicesTitle: string;
+  servicesSubtitle: string;
+  domesticExpress: string;
+  domesticExpressDesc: string;
+  internationalExpress: string;
+  internationalExpressDesc: string;
+  sameDay: string;
+  sameDayDesc: string;
+  
+  // Contact Page
+  contactTitle: string;
+  contactSubtitle: string;
+  address: string;
+  phone: string;
+  email: string;
+  workingHours: string;
+  
+  // Pricing Page
+  pricingTitle: string;
+  pricingSubtitle: string;
+  
+  // Footer
+  aboutUs: string;
+  companyInfo: string;
+  quickLinks: string;
+  followUs: string;
+  copyright: string;
+  
   // Common
   loading: string;
   error: string;
@@ -116,6 +145,35 @@ export const translations: Record<'zh' | 'en' | 'my', Translations> = {
     welcome: '欢迎',
     logout: '退出登录',
     
+    // Services Page
+    servicesTitle: '我们的服务',
+    servicesSubtitle: '专业的快递物流服务，满足您的各种需求',
+    domesticExpress: '国内快递',
+    domesticExpressDesc: '覆盖全国的快递网络，安全快捷',
+    internationalExpress: '国际快递',
+    internationalExpressDesc: '连接全球的国际物流服务',
+    sameDay: '当日达',
+    sameDayDesc: '同城当日送达服务，急件首选',
+    
+    // Contact Page
+    contactTitle: '联系我们',
+    contactSubtitle: '我们随时为您提供专业的服务支持',
+    address: '地址',
+    phone: '电话',
+    email: '邮箱',
+    workingHours: '工作时间',
+    
+    // Pricing Page
+    pricingTitle: '价格咨询',
+    pricingSubtitle: '透明的价格体系，为您提供最优惠的服务',
+    
+    // Footer
+    aboutUs: '关于我们',
+    companyInfo: '公司信息',
+    quickLinks: '快捷链接',
+    followUs: '关注我们',
+    copyright: '版权所有',
+    
     // Common
     loading: '加载中...',
     error: '错误',
@@ -181,6 +239,35 @@ export const translations: Record<'zh' | 'en' | 'my', Translations> = {
     welcome: 'Welcome',
     logout: 'Logout',
     
+    // Services Page
+    servicesTitle: 'Our Services',
+    servicesSubtitle: 'Professional express and logistics services to meet all your needs',
+    domesticExpress: 'Domestic Express',
+    domesticExpressDesc: 'Nationwide express network, safe and fast',
+    internationalExpress: 'International Express',
+    internationalExpressDesc: 'Global logistics services connecting worldwide',
+    sameDay: 'Same Day Delivery',
+    sameDayDesc: 'Same-day delivery service within the city, perfect for urgent items',
+    
+    // Contact Page
+    contactTitle: 'Contact Us',
+    contactSubtitle: 'We are always here to provide professional service support',
+    address: 'Address',
+    phone: 'Phone',
+    email: 'Email',
+    workingHours: 'Working Hours',
+    
+    // Pricing Page
+    pricingTitle: 'Pricing Inquiry',
+    pricingSubtitle: 'Transparent pricing system, offering you the most competitive rates',
+    
+    // Footer
+    aboutUs: 'About Us',
+    companyInfo: 'Company Info',
+    quickLinks: 'Quick Links',
+    followUs: 'Follow Us',
+    copyright: 'All Rights Reserved',
+    
     // Common
     loading: 'Loading...',
     error: 'Error',
@@ -245,6 +332,35 @@ export const translations: Record<'zh' | 'en' | 'my', Translations> = {
     // Admin
     welcome: 'ကြိုဆိုပါသည်',
     logout: 'ထွက်ရန်',
+    
+    // Services Page
+    servicesTitle: 'ကျွန်ုပ်တို့၏ ဝန်ဆောင်မှုများ',
+    servicesSubtitle: 'သင့်လိုအပ်ချက်အားလုံးကို ဖြည့်ဆည်းပေးမည့် ပရော်ဖက်ရှင်နယ် စာပို့ဝန်ဆောင်မှု',
+    domesticExpress: 'ပြည်တွင်းစာပို့ဝန်ဆောင်မှု',
+    domesticExpressDesc: 'နိုင်ငံတဝှမ်းလုံး ဖုံးလွှမ်းထားသော စာပို့ကွန်ယက်၊ ဘေးကင်းပြီး လျင်မြန်',
+    internationalExpress: 'နိုင်ငံတကာစာပို့ဝန်ဆောင်မှု',
+    internationalExpressDesc: 'ကမ္ဘာ့နိုင်ငံများကို ဆက်သွယ်ပေးသော နိုင်ငံတကာ ပို့ဆောင်ရေးဝန်ဆောင်မှု',
+    sameDay: 'တစ်နေ့တည်း ပို့ဆောင်မှု',
+    sameDayDesc: 'မြို့တွင်း တစ်နေ့တည်း ပို့ဆောင်ပေးသော ဝန်ဆောင်မှု၊ အရေးကြီးသော ပစ္စည်းများအတွက် အကောင်းဆုံး',
+    
+    // Contact Page
+    contactTitle: 'ဆက်သွယ်ရန်',
+    contactSubtitle: 'ကျွန်ုပ်တို့သည် သင့်အတွက် ပရော်ဖက်ရှင်နယ် ဝန်ဆောင်မှုများ အမြဲအဆင်သင့်ဖြစ်ပါသည်',
+    address: 'လိပ်စာ',
+    phone: 'ဖုန်းနံပါတ်',
+    email: 'အီးမေးလ်',
+    workingHours: 'အလုပ်ချိန်',
+    
+    // Pricing Page
+    pricingTitle: 'စျေးနှုန်းမေးမြန်းခြင်း',
+    pricingSubtitle: 'ပွင့်လင်းသော စျေးနှုန်းစနစ်၊ သင့်အတွက် အကောင်းဆုံး ဝန်ဆောင်မှုများ ပေးဆောင်ပါသည်',
+    
+    // Footer
+    aboutUs: 'ကျွန်ုပ်တို့အကြောင်း',
+    companyInfo: 'ကုမ္ပဏီအချက်အလက်',
+    quickLinks: 'အမြန်လင့်ခ်များ',
+    followUs: 'ကျွန်ုပ်တို့ကို လိုက်ပါပါ',
+    copyright: 'မူပိုင်ခွင့်များ လေးစားခံရသည်',
     
     // Common
     loading: 'လုပ်ဆောင်နေသည်...',

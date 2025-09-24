@@ -21,32 +21,34 @@ import {
   AccessTime,
 } from '@mui/icons-material';
 import PremiumBackground from '../components/PremiumBackground';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ServicesPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { t } = useLanguage();
 
   const services = [
     {
       icon: <LocalShipping sx={{ fontSize: 48, color: 'primary.main' }} />,
-      title: '国内快递',
-      description: '覆盖缅甸全境的快速配送服务，24-48小时送达',
+      title: t('domesticExpress'),
+      description: t('domesticExpressDesc'),
       features: ['全国覆盖', '快速配送', '实时跟踪', '安全保障'],
       price: '起价 2,000 缅币',
       deliveryTime: '24-48小时',
     },
     {
       icon: <Flight sx={{ fontSize: 48, color: 'primary.main' }} />,
-      title: '国际快递',
-      description: '连接全球的国际快递服务，安全可靠的跨境物流',
+      title: t('internationalExpress'),
+      description: t('internationalExpressDesc'),
       features: ['全球覆盖', '专业报关', '全程保险', '快速通关'],
       price: '起价 15,000 缅币',
       deliveryTime: '3-7天',
     },
     {
       icon: <DirectionsCar sx={{ fontSize: 48, color: 'primary.main' }} />,
-      title: '同城配送',
-      description: '城市内快速配送服务，2-4小时送达',
+      title: t('sameDay'),
+      description: t('sameDayDesc'),
       features: ['同城配送', '即时响应', '专业配送', '准时送达'],
       price: '起价 1,500 缅币',
       deliveryTime: '2-4小时',
@@ -125,10 +127,10 @@ const ServicesPage: React.FC = () => {
             component="h1"
             sx={{ fontWeight: 700, mb: 3 }}
           >
-            我们的服务
+            {t('servicesTitle')}
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.9, maxWidth: 600, mx: 'auto' }}>
-            专业的快递物流服务，满足您的各种配送需求
+            {t('servicesSubtitle')}
           </Typography>
         </Container>
       </Box>

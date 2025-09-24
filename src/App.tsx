@@ -23,6 +23,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DbDebug from './pages/DbDebug';
 import OrderPage from './pages/OrderPage';
+import CourierAdminSystem from './pages/CourierAdminSystem';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -55,6 +56,7 @@ function App() {
           <Route path="/admin/mobile" element={<AdminMobile />} />
           <Route path="/admin/db-debug" element={<DbDebug />} />
           <Route path="/admin/data-merger" element={<DataMerger />} />
+          <Route path="/courier-admin" element={<CourierAdminSystem />} />
         </Routes>
       </Box>
       <Footer />
