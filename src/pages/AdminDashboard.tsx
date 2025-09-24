@@ -111,6 +111,7 @@ const AdminDashboard: React.FC = () => {
     joinDate?: string;
     salary?: number;
     avatar?: string;
+    status?: 'active' | 'inactive';
   }>>([]);
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -128,6 +129,8 @@ const AdminDashboard: React.FC = () => {
     avatar: '',
   });
   const [editingUserIndex, setEditingUserIndex] = useState<number>(-1);
+  const [userSearchText, setUserSearchText] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
   const [finance, setFinance] = useState<FinanceTxn[]>([]);
   const [openFinanceDialog, setOpenFinanceDialog] = useState(false);
   const [newTxn, setNewTxn] = useState<FinanceTxn>({ id: '', type: '收入', amount: 0, note: '', date: new Date().toISOString().slice(0,10) });
@@ -323,6 +326,20 @@ const AdminDashboard: React.FC = () => {
 
   const canViewFinance = user && ['accountant', 'manager', 'master'].includes(user.role);
   const canManageUsers = user && ['manager', 'master'].includes(user.role);
+
+  // 筛选用户
+  const filteredUsers = allUsers.filter(u => {
+    const matchesSearch = u.username.toLowerCase().includes(userSearchText.toLowerCase()) ||
+                         (u.name && u.name.toLowerCase().includes(userSearchText.toLowerCase())) ||
+                         (u.email && u.email.toLowerCase().includes(userSearchText.toLowerCase())) ||
+                         (u.phone && u.phone.includes(userSearchText));
+    
+    const matchesStatus = userStatusFilter === 'all' || 
+                         (userStatusFilter === 'active' && (!u.status || u.status === 'active')) ||
+                         (userStatusFilter === 'inactive' && u.status === 'inactive');
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const handleCreateUser = () => {
     if (!newUser.username.trim() || (!newUser.password.trim() && editingUserIndex < 0)) return;
@@ -701,17 +718,64 @@ const AdminDashboard: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.2)',
               mb: 2,
             }}>
-              <CardContent sx={{ p: 2 }}>
-                <Button 
-                  variant="contained" 
-                  onClick={() => setOpenUserDialog(true)}
-                  sx={{
-                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                    '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
-                  }}
-                >
-                  新增用户
-                </Button>
+              <CardContent>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="搜索用户姓名、电话、邮箱"
+                      value={userSearchText}
+                      onChange={(e) => setUserSearchText(e.target.value)}
+                      InputProps={{
+                        startAdornment: <Search sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
+                        style: { color: 'white' },
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                          '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                          '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                        },
+                        '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.5)' },
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>用户状态</InputLabel>
+                      <Select
+                        value={userStatusFilter}
+                        onChange={(e) => setUserStatusFilter(e.target.value)}
+                        sx={{
+                          color: 'white',
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                          '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                        }}
+                      >
+                        <MenuItem value="all">全部状态</MenuItem>
+                        <MenuItem value="active">活跃</MenuItem>
+                        <MenuItem value="inactive">不活跃</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <Button 
+                      variant="contained" 
+                      startIcon={<Add />}
+                      fullWidth
+                      onClick={() => setOpenUserDialog(true)}
+                      sx={{
+                        background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                        '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+                      }}
+                    >
+                      新增用户
+                    </Button>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
             <Card sx={{ 
@@ -748,7 +812,7 @@ const AdminDashboard: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {allUsers.map((u, i) => (
+                      {filteredUsers.map((u, i) => (
                         <TableRow key={i}>
                           <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -784,8 +848,9 @@ const AdminDashboard: React.FC = () => {
                               size="small" 
                               sx={{ color: '#faad14' }}
                               onClick={() => {
+                                const originalIndex = allUsers.findIndex(user => user.username === u.username);
                                 setNewUser({
-                                  workId: u.workId || `ML${String(i + 1).padStart(3, '0')}`,
+                                  workId: u.workId || `ML${String(originalIndex + 1).padStart(3, '0')}`,
                                   username: u.username,
                                   role: u.role,
                                   name: u.name || u.username,
@@ -798,7 +863,7 @@ const AdminDashboard: React.FC = () => {
                                   password: '',
                                   avatar: u.avatar || '',
                                 });
-                                setEditingUserIndex(i);
+                                setEditingUserIndex(originalIndex);
                                 setOpenUserDialog(true);
                               }}
                             >
