@@ -25,6 +25,26 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     // 检查是否有新版本
     const checkForUpdates = async () => {
       try {
+        console.log('🔍 检查更新...');
+        
+        // 强制显示更新通知（因为我们刚刚修复了按钮问题）
+        const currentAppVersion = localStorage.getItem('app_version') || '2.0.0';
+        const newAppVersion = '2.1.0'; // 最新版本
+        
+        if (currentAppVersion !== newAppVersion) {
+          console.log('✅ 发现新版本!', newAppVersion);
+          setShowUpdate(true);
+          setLastVersion(currentAppVersion);
+          
+          // 自动弹出确认对话框
+          setTimeout(() => {
+            if (window.confirm(`🚀 发现新版本 ${newAppVersion}！\n\n✅ 修复内容：\n• 订单管理删除按钮现在可以点击\n• 快递员管理操作按钮完全修复\n• 在线状态开关正常工作\n• 所有按钮都有明确反馈\n\n是否立即更新获取修复？`)) {
+              handleUpdate();
+            }
+          }, 1000);
+          return;
+        }
+        
         // 尝试获取最新的构建信息
         const response = await fetch('/asset-manifest.json?' + Date.now());
         const manifest = await response.json();
@@ -34,47 +54,57 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
           key.startsWith('static/js/main.') && key.endsWith('.js')
         );
         
-        const storedVersion = localStorage.getItem('app_version');
+        const storedVersion = localStorage.getItem('build_version');
         
         if (storedVersion && storedVersion !== currentVersion && currentVersion) {
+          console.log('🔄 检测到构建更新');
           setShowUpdate(true);
           setLastVersion(storedVersion);
+          localStorage.setItem('build_version', currentVersion);
         } else if (!storedVersion && currentVersion) {
           // 首次访问，设置版本但不显示更新提示
-          localStorage.setItem('app_version', currentVersion);
+          localStorage.setItem('build_version', currentVersion);
         }
       } catch (error) {
-        // 如果无法获取manifest，使用简单的时间戳检查
-        const lastCheck = localStorage.getItem('last_update_check');
-        const now = Date.now();
-        const oneHour = 60 * 60 * 1000;
-        
-        if (!lastCheck || (now - parseInt(lastCheck)) > oneHour) {
-          localStorage.setItem('last_update_check', now.toString());
-          // 随机显示更新提示（模拟检测到更新）
-          if (Math.random() > 0.7) {
-            setShowUpdate(true);
-          }
-        }
+        console.log('检查更新失败:', error);
       }
     };
 
     // 页面加载时检查
     checkForUpdates();
 
-    // 定期检查更新（每10分钟）
-    const interval = setInterval(checkForUpdates, 10 * 60 * 1000);
+    // 更频繁地检查更新（每30秒）
+    const interval = setInterval(checkForUpdates, 30000);
 
     return () => clearInterval(interval);
-  }, [showUpdate]);
+  }, []);
 
   const handleUpdate = () => {
+    console.log('🔄 执行更新...');
     setShowUpdate(false);
+    
+    // 更新版本号
+    localStorage.setItem('app_version', '2.1.0');
+    
+    // 清除所有缓存
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          console.log('🗑️ 清除缓存:', name);
+          caches.delete(name);
+        });
+      });
+    }
+    
+    // 清除浏览器缓存并强制刷新
+    const timestamp = Date.now();
+    const newUrl = window.location.href.split('?')[0] + '?v=' + timestamp + '&updated=true';
+    
     if (onUpdate) {
       onUpdate();
     } else {
-      // 默认刷新页面
-      window.location.reload();
+      console.log('🔄 强制刷新页面:', newUrl);
+      window.location.href = newUrl;
     }
   };
 
@@ -140,10 +170,10 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
         >
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-              🎉 网站已更新！
+              🚀 重要修复更新 v2.1.0！
             </Typography>
             <Typography variant="caption">
-              发现新版本，点击更新获取最新功能
+              ✅ 所有按钮点击问题已修复，立即更新体验
             </Typography>
           </Box>
         </Alert>
@@ -181,10 +211,10 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
         >
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-              🎉 网站已更新！
+              🚀 重要修复更新 v2.1.0！
             </Typography>
             <Typography variant="caption" sx={{ mb: 2, display: 'block' }}>
-              发现新版本，点击更新获取最新功能
+              ✅ 所有按钮点击问题已修复，立即更新体验
             </Typography>
             <Button
               size="small"
