@@ -242,11 +242,15 @@ const AdminCourierOrders: React.FC = () => {
   });
 
   const handleViewOrder = (order: Order) => {
+    console.log('🔍 查看订单被点击:', order.orderId);
+    alert(`🔍 查看订单详情\n\n订单号: ${order.orderId}\n客户: ${order.customerName}\n金额: ${order.amount.toLocaleString()} MMK\n状态: ${order.status}`);
     setSelectedOrder(order);
     setDetailDialogOpen(true);
   };
 
   const handleEditOrder = (order: Order) => {
+    console.log('✏️ 编辑订单被点击:', order.orderId);
+    alert(`✏️ 编辑订单\n\n订单号: ${order.orderId}\n即将打开编辑对话框`);
     setSelectedOrder(order);
     setEditOrderData({
       customerName: order.customerName,

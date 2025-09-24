@@ -198,7 +198,7 @@ const AdminCourierManagement: React.FC = () => {
 
   // 查看快递员详情
   const handleViewCourier = (courier: Courier) => {
-    console.log('查看快递员详情:', courier.name);
+    console.log('🔍 查看快递员详情按钮被点击:', courier.name);
     
     const detailInfo = `📋 快递员详情信息
 
@@ -221,14 +221,16 @@ const AdminCourierManagement: React.FC = () => {
 • 当前位置：${courier.currentLocation}
 • 在线状态：${courier.status === 'online' ? '🟢 在线' : '🔴 离线'}
 • 入职日期：${courier.joinedAt}
-• 最后活跃：${courier.lastActive}`;
+• 最后活跃：${courier.lastActive}
+
+✅ 按钮功能正常工作！`;
 
     alert(detailInfo);
   };
 
   // 编辑快递员信息
   const handleEditCourier = (courier: Courier) => {
-    console.log('编辑快递员信息:', courier.name);
+    console.log('✏️ 编辑快递员信息按钮被点击:', courier.name);
     
     const editInfo = `✏️ 编辑快递员信息
 
@@ -241,7 +243,8 @@ const AdminCourierManagement: React.FC = () => {
 5. 点击该员工的"编辑"按钮
 6. 修改完成后保存
 
-💡 提示：快递员信息统一在员工管理中维护，确保数据一致性。`;
+💡 提示：快递员信息统一在员工管理中维护，确保数据一致性。
+✅ 按钮功能正常工作！`;
 
     if (window.confirm(editInfo + '\n\n是否现在跳转到控制台？')) {
       navigate('/admin/control-panel');
@@ -250,7 +253,7 @@ const AdminCourierManagement: React.FC = () => {
 
   // 拨打快递员电话
   const handleCallCourier = (courier: Courier) => {
-    console.log('拨打快递员电话:', courier.phone);
+    console.log('📞 拨打快递员电话按钮被点击:', courier.phone);
     
     const callInfo = `📞 联系快递员
 
@@ -258,6 +261,7 @@ const AdminCourierManagement: React.FC = () => {
 电话：${courier.phone}
 状态：${courier.status === 'online' ? '🟢 在线' : '🔴 离线'}
 
+✅ 按钮功能正常工作！
 点击确定将尝试拨打电话`;
 
     if (window.confirm(callInfo)) {
