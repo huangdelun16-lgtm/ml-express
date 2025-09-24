@@ -117,7 +117,7 @@ const mockEmployees: Employee[] = [
 const AdminControlPanel: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [addEmployeeDialogOpen, setAddEmployeeDialogOpen] = useState(false);
@@ -137,6 +137,42 @@ const AdminControlPanel: React.FC = () => {
     password: '',
     avatar: '',
   });
+
+  // 数据持久化 - 加载员工数据
+  React.useEffect(() => {
+    const loadEmployees = () => {
+      try {
+        const storedEmployees = localStorage.getItem('company_employees');
+        if (storedEmployees) {
+          const parsedEmployees = JSON.parse(storedEmployees);
+          console.log('加载员工数据:', parsedEmployees);
+          setEmployees(parsedEmployees);
+        } else {
+          // 首次使用，设置默认数据
+          console.log('首次使用，设置默认员工数据');
+          setEmployees(mockEmployees);
+          localStorage.setItem('company_employees', JSON.stringify(mockEmployees));
+        }
+      } catch (error) {
+        console.error('加载员工数据失败:', error);
+        setEmployees(mockEmployees);
+      }
+    };
+
+    loadEmployees();
+  }, []);
+
+  // 数据持久化 - 保存员工数据
+  React.useEffect(() => {
+    if (employees.length > 0) {
+      try {
+        localStorage.setItem('company_employees', JSON.stringify(employees));
+        console.log('员工数据已保存:', employees);
+      } catch (error) {
+        console.error('保存员工数据失败:', error);
+      }
+    }
+  }, [employees]);
 
   const roleLabels = {
     employee: '员工',
@@ -214,22 +250,49 @@ const AdminControlPanel: React.FC = () => {
 
   const handleSaveEmployee = () => {
     try {
+      let updatedEmployees: Employee[];
+      
       if (selectedEmployee) {
         // 编辑员工
-        setEmployees(employees.map(emp => 
+        updatedEmployees = employees.map(emp => 
           emp.id === selectedEmployee.id 
-            ? { ...emp, ...newEmployeeData, password: newEmployeeData.password || emp.username }
+            ? { 
+                ...emp, 
+                ...newEmployeeData, 
+                role: newEmployeeData.role,
+                // 保持原有密码如果没有输入新密码
+                password: newEmployeeData.password || emp.username 
+              }
             : emp
-        ));
+        );
+        console.log('编辑员工:', selectedEmployee.id, newEmployeeData);
       } else {
         // 新增员工
         const newEmployee: Employee = {
           id: `E${String(employees.length + 1).padStart(3, '0')}`,
-          ...newEmployeeData,
+          workId: newEmployeeData.workId || `ML${String(employees.length + 1).padStart(3, '0')}`,
+          username: newEmployeeData.username,
+          role: newEmployeeData.role,
+          name: newEmployeeData.name,
+          phone: newEmployeeData.phone,
+          email: newEmployeeData.email,
+          address: newEmployeeData.address,
+          idNumber: newEmployeeData.idNumber,
+          joinDate: newEmployeeData.joinDate,
+          salary: newEmployeeData.salary,
+          avatar: newEmployeeData.avatar,
           status: 'active',
         };
-        setEmployees([...employees, newEmployee]);
+        updatedEmployees = [...employees, newEmployee];
+        console.log('新增员工:', newEmployee);
       }
+      
+      // 立即保存到localStorage
+      localStorage.setItem('company_employees', JSON.stringify(updatedEmployees));
+      console.log('员工数据已保存到localStorage:', updatedEmployees);
+      
+      // 更新状态
+      setEmployees(updatedEmployees);
       
       // 重置表单
       setNewEmployeeData({
@@ -249,8 +312,11 @@ const AdminControlPanel: React.FC = () => {
       setSelectedEmployee(null);
       setAddEmployeeDialogOpen(false);
       setEditEmployeeDialogOpen(false);
+      
+      alert('员工信息保存成功！');
     } catch (error) {
       console.error('保存员工失败:', error);
+      alert('保存员工失败，请重试！');
     }
   };
 

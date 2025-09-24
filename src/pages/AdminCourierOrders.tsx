@@ -140,6 +140,9 @@ const AdminCourierOrders: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editOrderData, setEditOrderData] = useState<Partial<Order>>({});
+  const [availableCouriers, setAvailableCouriers] = useState<any[]>([]);
 
   // 从localStorage加载订单数据
   React.useEffect(() => {
@@ -187,6 +190,30 @@ const AdminCourierOrders: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // 加载员工数据作为快递员选项
+  React.useEffect(() => {
+    const loadCouriers = () => {
+      try {
+        const storedEmployees = localStorage.getItem('company_employees');
+        if (storedEmployees) {
+          const employees = JSON.parse(storedEmployees);
+          // 只显示员工角色的人员作为快递员选项
+          const couriers = employees.filter((emp: any) => 
+            emp.role === 'employee' || emp.role === 'manager'
+          );
+          setAvailableCouriers(couriers);
+        }
+      } catch (error) {
+        console.error('加载快递员数据失败:', error);
+      }
+    };
+
+    loadCouriers();
+    // 定期刷新快递员数据
+    const interval = setInterval(loadCouriers, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const statusColors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
     pending: 'warning',
     accepted: 'info',
@@ -216,6 +243,54 @@ const AdminCourierOrders: React.FC = () => {
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
+  };
+
+  const handleEditOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setEditOrderData({
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      receiverName: order.receiverName,
+      receiverPhone: order.receiverPhone,
+      packageType: order.packageType,
+      weight: order.weight,
+      amount: order.amount,
+      status: order.status,
+      courierId: order.courierId,
+      courierName: order.courierName,
+      courierPhone: order.courierPhone,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveOrder = () => {
+    if (!selectedOrder) return;
+    
+    try {
+      // 更新订单数据
+      const updatedOrders = orders.map(order => 
+        order.id === selectedOrder.id 
+          ? { ...order, ...editOrderData }
+          : order
+      );
+      setOrders(updatedOrders);
+      
+      // 同时更新localStorage中的数据
+      const storedOrders = JSON.parse(localStorage.getItem('courier_orders') || '[]');
+      const updatedStoredOrders = storedOrders.map((order: OrderData) => 
+        order.orderId === selectedOrder.orderId 
+          ? { ...order, ...editOrderData }
+          : order
+      );
+      localStorage.setItem('courier_orders', JSON.stringify(updatedStoredOrders));
+      
+      setEditDialogOpen(false);
+      setSelectedOrder(null);
+      setEditOrderData({});
+    } catch (error) {
+      console.error('保存订单失败:', error);
+      alert('保存订单失败，请重试');
+    }
   };
 
 
@@ -437,6 +512,7 @@ const AdminCourierOrders: React.FC = () => {
                           <IconButton 
                             size="small"
                             sx={{ color: '#faad14' }}
+                            onClick={() => handleEditOrder(order)}
                           >
                             <Edit fontSize="small" />
                           </IconButton>
@@ -687,6 +763,190 @@ const AdminCourierOrders: React.FC = () => {
           <DialogActions>
             <Button onClick={() => setDetailDialogOpen(false)} sx={{ color: 'white' }}>
               关闭
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Order Dialog */}
+        <Dialog 
+          open={editDialogOpen} 
+          onClose={() => setEditDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              background: 'rgba(15, 32, 39, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'white',
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: 'white' }}>
+            编辑订单 - {selectedOrder?.orderId}
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="寄件人姓名"
+                  value={editOrderData.customerName || ''}
+                  onChange={(e) => setEditOrderData({...editOrderData, customerName: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="寄件人电话"
+                  value={editOrderData.customerPhone || ''}
+                  onChange={(e) => setEditOrderData({...editOrderData, customerPhone: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="收件人姓名"
+                  value={editOrderData.receiverName || ''}
+                  onChange={(e) => setEditOrderData({...editOrderData, receiverName: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="收件人电话"
+                  value={editOrderData.receiverPhone || ''}
+                  onChange={(e) => setEditOrderData({...editOrderData, receiverPhone: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>订单状态</InputLabel>
+                  <Select
+                    value={editOrderData.status || ''}
+                    onChange={(e) => setEditOrderData({...editOrderData, status: e.target.value as any})}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="pending">待接单</MenuItem>
+                    <MenuItem value="accepted">已接单</MenuItem>
+                    <MenuItem value="picked_up">已取件</MenuItem>
+                    <MenuItem value="in_transit">配送中</MenuItem>
+                    <MenuItem value="delivered">已送达</MenuItem>
+                    <MenuItem value="cancelled">已取消</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="金额 (MMK)"
+                  value={editOrderData.amount || ''}
+                  onChange={(e) => setEditOrderData({...editOrderData, amount: parseInt(e.target.value) || 0})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              
+              {/* 快递员选择 */}
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>分配快递员</InputLabel>
+                  <Select
+                    value={editOrderData.courierId || ''}
+                    onChange={(e) => {
+                      const selectedCourier = availableCouriers.find(c => c.id === e.target.value);
+                      setEditOrderData({
+                        ...editOrderData, 
+                        courierId: e.target.value,
+                        courierName: selectedCourier?.name,
+                        courierPhone: selectedCourier?.phone,
+                      });
+                    }}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="">未分配</MenuItem>
+                    {availableCouriers.map((courier) => (
+                      <MenuItem key={courier.id} value={courier.id}>
+                        {courier.name} ({courier.workId}) - {courier.phone}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setEditDialogOpen(false)}
+              sx={{ color: 'white' }}
+            >
+              取消
+            </Button>
+            <Button 
+              onClick={handleSaveOrder}
+              variant="contained"
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+              }}
+            >
+              保存
             </Button>
           </DialogActions>
         </Dialog>
