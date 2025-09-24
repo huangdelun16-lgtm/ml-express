@@ -15,124 +15,254 @@ import {
   TableRow,
   Chip,
   Avatar,
-  LinearProgress,
-  Alert,
-  Switch,
-  FormControlLabel,
-  Divider,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  IconButton,
 } from '@mui/material';
 import {
-  Dashboard,
-  Computer,
-  Storage,
-  NetworkCheck,
-  Security,
-  Update,
-  Settings,
-  Warning,
-  CheckCircle,
-  Error,
-  Info,
+  Search,
+  Add,
+  Edit,
+  Work,
+  Badge,
+  CloudUpload,
+  Person,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
 
-interface SystemStatus {
-  service: string;
-  status: 'online' | 'warning' | 'error';
-  uptime: string;
-  lastCheck: string;
-  details: string;
+interface Employee {
+  id: string;
+  workId: string;
+  username: string;
+  role: 'employee' | 'accountant' | 'manager' | 'admin';
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  idNumber: string;
+  joinDate: string;
+  salary: number;
+  avatar?: string;
+  status: 'active' | 'inactive';
 }
 
-interface ServerMetrics {
-  cpu: number;
-  memory: number;
-  disk: number;
-  network: number;
-}
-
-const mockSystemStatus: SystemStatus[] = [
+const mockEmployees: Employee[] = [
   {
-    service: 'Web服务器',
-    status: 'online',
-    uptime: '99.9%',
-    lastCheck: '2024-01-15 15:30:00',
-    details: '运行正常',
+    id: 'E001',
+    workId: 'ML001',
+    username: 'master',
+    role: 'admin',
+    name: 'AMT',
+    phone: '09-123456789',
+    email: 'amt@marketlink.com',
+    address: '仰光市中心区',
+    idNumber: '12/LAKANA(N)123456',
+    joinDate: '2023-06-06',
+    salary: 1000000,
+    status: 'active',
   },
   {
-    service: '数据库',
-    status: 'online',
-    uptime: '99.8%',
-    lastCheck: '2024-01-15 15:30:00',
-    details: '连接稳定',
+    id: 'E002',
+    workId: 'ML002',
+    username: 'MDY2409251',
+    role: 'manager',
+    name: 'KO AUNG',
+    phone: '09-987654321',
+    email: 'koaung@marketlink.com',
+    address: '曼德勒市北区',
+    idNumber: '12/MAHAAUNGMYE(N)789012',
+    joinDate: '2025-09-24',
+    salary: 800000,
+    status: 'active',
   },
   {
-    service: 'API服务',
-    status: 'warning',
-    uptime: '98.5%',
-    lastCheck: '2024-01-15 15:29:00',
-    details: '响应较慢',
+    id: 'E003',
+    workId: 'ML003',
+    username: 'MDY2409252',
+    role: 'employee',
+    name: 'KO KO',
+    phone: '09-555666777',
+    email: 'koko@marketlink.com',
+    address: '仰光市东区',
+    idNumber: '12/YANKIN(N)345678',
+    joinDate: '2025-09-24',
+    salary: 600000,
+    status: 'active',
   },
   {
-    service: '短信服务',
-    status: 'online',
-    uptime: '99.2%',
-    lastCheck: '2024-01-15 15:30:00',
-    details: '发送正常',
-  },
-  {
-    service: '支付网关',
-    status: 'error',
-    uptime: '95.1%',
-    lastCheck: '2024-01-15 15:25:00',
-    details: '连接超时',
+    id: 'E004',
+    workId: 'ML004',
+    username: 'MDY2409253',
+    role: 'accountant',
+    name: 'MA MYAT NOE',
+    phone: '09-444333222',
+    email: 'mamyatnoe@marketlink.com',
+    address: '曼德勒市南区',
+    idNumber: '12/CHANMYATHAZI(N)567890',
+    joinDate: '2025-09-24',
+    salary: 700000,
+    status: 'active',
   },
 ];
 
 const AdminControlPanel: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [serverMetrics, setServerMetrics] = useState<ServerMetrics>({
-    cpu: 45,
-    memory: 68,
-    disk: 32,
-    network: 78,
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [addEmployeeDialogOpen, setAddEmployeeDialogOpen] = useState(false);
+  const [editEmployeeDialogOpen, setEditEmployeeDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [newEmployeeData, setNewEmployeeData] = useState({
+    workId: '',
+    username: '',
+    role: 'employee' as 'employee' | 'accountant' | 'manager' | 'admin',
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    idNumber: '',
+    joinDate: new Date().toISOString().split('T')[0],
+    salary: 450000,
+    password: '',
+    avatar: '',
   });
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online':
-        return <CheckCircle sx={{ color: '#52c41a' }} />;
-      case 'warning':
-        return <Warning sx={{ color: '#faad14' }} />;
-      case 'error':
-        return <Error sx={{ color: '#f5222d' }} />;
-      default:
-        return <Info sx={{ color: '#1890ff' }} />;
+  const roleLabels = {
+    employee: '员工',
+    accountant: '会计',
+    manager: '经理',
+    admin: '管理员',
+  };
+
+  const roleColors: Record<string, 'default' | 'primary' | 'secondary' | 'error'> = {
+    employee: 'default',
+    accountant: 'primary',
+    manager: 'secondary',
+    admin: 'error',
+  };
+
+  const statusLabels = {
+    active: '活跃',
+    inactive: '不活跃',
+  };
+
+  const statusColors: Record<string, 'success' | 'warning'> = {
+    active: 'success',
+    inactive: 'warning',
+  };
+
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.name.toLowerCase().includes(searchText.toLowerCase()) ||
+                         emp.username.toLowerCase().includes(searchText.toLowerCase()) ||
+                         emp.phone.includes(searchText) ||
+                         emp.email.toLowerCase().includes(searchText.toLowerCase()) ||
+                         emp.workId.toLowerCase().includes(searchText.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || emp.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleAddEmployee = () => {
+    setSelectedEmployee(null);
+    setNewEmployeeData({
+      workId: '',
+      username: '',
+      role: 'employee',
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      idNumber: '',
+      joinDate: new Date().toISOString().split('T')[0],
+      salary: 450000,
+      password: '',
+      avatar: '',
+    });
+    setAddEmployeeDialogOpen(true);
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setNewEmployeeData({
+      workId: employee.workId,
+      username: employee.username,
+      role: employee.role,
+      name: employee.name,
+      phone: employee.phone,
+      email: employee.email,
+      address: employee.address,
+      idNumber: employee.idNumber,
+      joinDate: employee.joinDate,
+      salary: employee.salary,
+      password: '',
+      avatar: employee.avatar || '',
+    });
+    setEditEmployeeDialogOpen(true);
+  };
+
+  const handleSaveEmployee = () => {
+    try {
+      if (selectedEmployee) {
+        // 编辑员工
+        setEmployees(employees.map(emp => 
+          emp.id === selectedEmployee.id 
+            ? { ...emp, ...newEmployeeData, password: newEmployeeData.password || emp.username }
+            : emp
+        ));
+      } else {
+        // 新增员工
+        const newEmployee: Employee = {
+          id: `E${String(employees.length + 1).padStart(3, '0')}`,
+          ...newEmployeeData,
+          status: 'active',
+        };
+        setEmployees([...employees, newEmployee]);
+      }
+      
+      // 重置表单
+      setNewEmployeeData({
+        workId: '',
+        username: '',
+        role: 'employee',
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+        idNumber: '',
+        joinDate: new Date().toISOString().split('T')[0],
+        salary: 450000,
+        password: '',
+        avatar: '',
+      });
+      setSelectedEmployee(null);
+      setAddEmployeeDialogOpen(false);
+      setEditEmployeeDialogOpen(false);
+    } catch (error) {
+      console.error('保存员工失败:', error);
     }
   };
 
-  const getStatusColor = (status: string): 'success' | 'warning' | 'error' | 'info' => {
-    switch (status) {
-      case 'online':
-        return 'success';
-      case 'warning':
-        return 'warning';
-      case 'error':
-        return 'error';
-      default:
-        return 'info';
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNewEmployeeData({ ...newEmployeeData, avatar: e.target?.result as string });
+      };
+      reader.readAsDataURL(file);
     }
-  };
-
-  const getMetricColor = (value: number): string => {
-    if (value < 50) return '#52c41a';
-    if (value < 80) return '#faad14';
-    return '#f5222d';
   };
 
   return (
@@ -142,7 +272,7 @@ const AdminControlPanel: React.FC = () => {
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h4" sx={{ fontWeight: 600, color: 'white' }}>
-              控制台
+              员工管理
             </Typography>
             <Button
               variant="outlined"
@@ -160,191 +290,168 @@ const AdminControlPanel: React.FC = () => {
             </Button>
           </Box>
           <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-            系统监控和管理控制台 - 实时监控系统状态
+            管理公司员工信息，包括工作号、角色、薪水等详细信息
           </Typography>
         </Box>
 
-        {/* System Metrics */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} lg={3}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ color: 'white' }}>
-                    CPU使用率
-                  </Typography>
-                  <Computer sx={{ color: getMetricColor(serverMetrics.cpu) }} />
-                </Box>
-                <Typography variant="h4" sx={{ color: getMetricColor(serverMetrics.cpu), fontWeight: 600, mb: 1 }}>
-                  {serverMetrics.cpu}%
-                </Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={serverMetrics.cpu}
-                  sx={{
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    '& .MuiLinearProgress-bar': { 
-                      backgroundColor: getMetricColor(serverMetrics.cpu),
-                    },
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} lg={3}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ color: 'white' }}>
-                    内存使用率
-                  </Typography>
-                  <Storage sx={{ color: getMetricColor(serverMetrics.memory) }} />
-                </Box>
-                <Typography variant="h4" sx={{ color: getMetricColor(serverMetrics.memory), fontWeight: 600, mb: 1 }}>
-                  {serverMetrics.memory}%
-                </Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={serverMetrics.memory}
-                  sx={{
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    '& .MuiLinearProgress-bar': { 
-                      backgroundColor: getMetricColor(serverMetrics.memory),
-                    },
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} lg={3}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ color: 'white' }}>
-                    磁盘使用率
-                  </Typography>
-                  <Storage sx={{ color: getMetricColor(serverMetrics.disk) }} />
-                </Box>
-                <Typography variant="h4" sx={{ color: getMetricColor(serverMetrics.disk), fontWeight: 600, mb: 1 }}>
-                  {serverMetrics.disk}%
-                </Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={serverMetrics.disk}
-                  sx={{
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    '& .MuiLinearProgress-bar': { 
-                      backgroundColor: getMetricColor(serverMetrics.disk),
-                    },
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} lg={3}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ color: 'white' }}>
-                    网络流量
-                  </Typography>
-                  <NetworkCheck sx={{ color: getMetricColor(serverMetrics.network) }} />
-                </Box>
-                <Typography variant="h4" sx={{ color: getMetricColor(serverMetrics.network), fontWeight: 600, mb: 1 }}>
-                  {serverMetrics.network}%
-                </Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={serverMetrics.network}
-                  sx={{
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    '& .MuiLinearProgress-bar': { 
-                      backgroundColor: getMetricColor(serverMetrics.network),
-                    },
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* System Status Table */}
+        {/* Search and Filter */}
         <Card sx={{ 
           background: 'rgba(255, 255, 255, 0.1)', 
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
-          mb: 4,
+          mb: 3,
         }}>
           <CardContent>
-            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-              系统服务状态
-            </Typography>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="搜索用户姓名、电话、邮箱"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  InputProps={{
+                    startAdornment: <Search sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
+                    style: { color: 'white' },
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                    '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.5)' },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>全部状态</InputLabel>
+                  <Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="all">全部状态</MenuItem>
+                    <MenuItem value="active">活跃</MenuItem>
+                    <MenuItem value="inactive">不活跃</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Button 
+                  variant="contained" 
+                  startIcon={<Add />}
+                  fullWidth
+                  onClick={handleAddEmployee}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                    '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+                  }}
+                >
+                  新增用户
+                </Button>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {/* Employees Table */}
+        <Card sx={{ 
+          background: 'rgba(255, 255, 255, 0.1)', 
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
+          <CardContent>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      服务名称
+                      工作号
                     </TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      状态
+                      用户名
                     </TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      运行时间
+                      角色
                     </TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      最后检查
+                      姓名
                     </TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      详情
+                      薪水
+                    </TableCell>
+                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                      入职日期
+                    </TableCell>
+                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                      操作
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {mockSystemStatus.map((service, index) => (
-                    <TableRow key={index}>
+                  {filteredEmployees.map((employee) => (
+                    <TableRow key={employee.id}>
                       <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          {getStatusIcon(service.status)}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Work sx={{ fontSize: 16, color: '#42a5f5' }} />
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {service.service}
+                            {employee.workId}
                           </Typography>
                         </Box>
                       </TableCell>
+                      <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
+                        {employee.username}
+                      </TableCell>
                       <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                         <Chip 
-                          label={service.status === 'online' ? '在线' : service.status === 'warning' ? '警告' : '错误'}
-                          color={getStatusColor(service.status)}
+                          label={roleLabels[employee.role]} 
+                          color={roleColors[employee.role]}
                           size="small"
+                          icon={<Badge />}
                         />
                       </TableCell>
                       <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {service.uptime}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar 
+                            src={employee.avatar} 
+                            sx={{ backgroundColor: '#1890ff', width: 32, height: 32 }}
+                          >
+                            <Person />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {employee.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                              {employee.phone}
+                            </Typography>
+                          </Box>
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {service.lastCheck}
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#52c41a' }}>
+                          {employee.salary.toLocaleString()} MMK
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}>
-                        {service.details}
+                        {employee.joinDate}
+                      </TableCell>
+                      <TableCell sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                        <IconButton 
+                          size="small" 
+                          sx={{ color: '#faad14' }}
+                          onClick={() => handleEditEmployee(employee)}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -354,236 +461,418 @@ const AdminControlPanel: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* System Controls */}
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-                  系统控制
-                </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch 
-                        checked={maintenanceMode}
-                        onChange={(e) => setMaintenanceMode(e.target.checked)}
-                      />
-                    }
-                    label={
-                      <Typography sx={{ color: 'white' }}>
-                        维护模式
-                      </Typography>
-                    }
-                  />
-                  
-                  <FormControlLabel
-                    control={
-                      <Switch 
-                        checked={debugMode}
-                        onChange={(e) => setDebugMode(e.target.checked)}
-                      />
-                    }
-                    label={
-                      <Typography sx={{ color: 'white' }}>
-                        调试模式
-                      </Typography>
-                    }
-                  />
-                </Box>
-
-                <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
-
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<Update />}
-                      sx={{
-                        borderColor: 'rgba(255,255,255,0.3)',
-                        color: 'white',
-                        '&:hover': { borderColor: 'rgba(255,255,255,0.5)' },
-                      }}
-                    >
-                      重启服务
-                    </Button>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<Security />}
-                      sx={{
-                        borderColor: 'rgba(255,255,255,0.3)',
-                        color: 'white',
-                        '&:hover': { borderColor: 'rgba(255,255,255,0.5)' },
-                      }}
-                    >
-                      备份数据
-                    </Button>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<Settings />}
-                      sx={{
-                        borderColor: 'rgba(255,255,255,0.3)',
-                        color: 'white',
-                        '&:hover': { borderColor: 'rgba(255,255,255,0.5)' },
-                      }}
-                    >
-                      清理缓存
-                    </Button>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      startIcon={<Dashboard />}
-                      sx={{
-                        background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                        '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
-                      }}
-                    >
-                      系统诊断
-                    </Button>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              background: 'rgba(255, 255, 255, 0.1)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-                  系统信息
-                </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      系统版本:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                      v2.0.0
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      运行时间:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                      15天 8小时 32分钟
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      总订单数:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                      12,456
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      在线用户:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                      128
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      数据库大小:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                      2.3 GB
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
-
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    backgroundColor: 'rgba(25, 118, 210, 0.2)',
-                    color: 'white',
-                    '& .MuiAlert-icon': { color: '#42a5f5' },
+        {/* Add Employee Dialog */}
+        <Dialog 
+          open={addEmployeeDialogOpen} 
+          onClose={() => setAddEmployeeDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              background: 'rgba(15, 32, 39, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'white',
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: 'white' }}>
+            新增员工
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* 工作号 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="工作号"
+                  value={newEmployeeData.workId}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, workId: e.target.value})}
+                  placeholder="例: ML005"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
                   }}
-                >
-                  系统运行正常，所有服务状态良好
-                </Alert>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+                />
+              </Grid>
 
-        {/* Recent System Events */}
-        <Card sx={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-              系统事件日志
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 1, backgroundColor: 'rgba(82, 196, 26, 0.1)' }}>
-                <CheckCircle sx={{ color: '#52c41a' }} />
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                    系统启动成功
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    2024-01-15 09:00:00
-                  </Typography>
+              {/* 角色 */}
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>角色</InputLabel>
+                  <Select
+                    value={newEmployeeData.role}
+                    onChange={(e) => setNewEmployeeData({...newEmployeeData, role: e.target.value as any})}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="employee">员工</MenuItem>
+                    <MenuItem value="accountant">会计</MenuItem>
+                    <MenuItem value="manager">经理</MenuItem>
+                    <MenuItem value="admin">管理员</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              {/* 用户名 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="用户名"
+                  value={newEmployeeData.username}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, username: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 密码 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="password"
+                  label="密码"
+                  value={newEmployeeData.password}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, password: e.target.value})}
+                  placeholder={selectedEmployee ? "留空则不修改" : ""}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 姓名 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="姓名"
+                  value={newEmployeeData.name}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, name: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 电话 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="电话"
+                  value={newEmployeeData.phone}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, phone: e.target.value})}
+                  placeholder="09-XXXXXXXXX"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 邮箱 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="邮箱"
+                  type="email"
+                  value={newEmployeeData.email}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, email: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 身份证号 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="身份证号"
+                  value={newEmployeeData.idNumber}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, idNumber: e.target.value})}
+                  placeholder="12/LAKANA(N)123456"
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 地址 */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="地址"
+                  value={newEmployeeData.address}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, address: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 入职日期 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="入职日期"
+                  value={newEmployeeData.joinDate}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, joinDate: e.target.value})}
+                  InputLabelProps={{ 
+                    style: { color: 'rgba(255,255,255,0.7)' },
+                    shrink: true,
+                  }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* 薪水 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="薪水 (MMK)"
+                  value={newEmployeeData.salary}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, salary: parseInt(e.target.value) || 0})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* CV 照片上传 */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    startIcon={<CloudUpload />}
+                    sx={{
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      color: 'white',
+                      '&:hover': { borderColor: 'rgba(255,255,255,0.5)' },
+                    }}
+                  >
+                    上传CV照片
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleFileUpload}
+                    />
+                  </Button>
+                  {newEmployeeData.avatar && (
+                    <Avatar 
+                      src={newEmployeeData.avatar} 
+                      sx={{ width: 40, height: 40 }}
+                    />
+                  )}
                 </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 1, backgroundColor: 'rgba(250, 173, 20, 0.1)' }}>
-                <Warning sx={{ color: '#faad14' }} />
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                    API响应时间较慢
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    2024-01-15 14:25:00
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 1, backgroundColor: 'rgba(245, 34, 45, 0.1)' }}>
-                <Error sx={{ color: '#f5222d' }} />
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                    支付网关连接超时
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    2024-01-15 15:25:00
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setAddEmployeeDialogOpen(false)}
+              sx={{ color: 'white' }}
+            >
+              取消
+            </Button>
+            <Button 
+              onClick={handleSaveEmployee}
+              variant="contained"
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+              }}
+            >
+              保存
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Employee Dialog */}
+        <Dialog 
+          open={editEmployeeDialogOpen} 
+          onClose={() => setEditEmployeeDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              background: 'rgba(15, 32, 39, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'white',
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: 'white' }}>
+            编辑员工 - {selectedEmployee?.name}
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* 相同的表单字段 */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="工作号"
+                  value={newEmployeeData.workId}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, workId: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>角色</InputLabel>
+                  <Select
+                    value={newEmployeeData.role}
+                    onChange={(e) => setNewEmployeeData({...newEmployeeData, role: e.target.value as any})}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#42a5f5' },
+                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                    }}
+                  >
+                    <MenuItem value="employee">员工</MenuItem>
+                    <MenuItem value="accountant">会计</MenuItem>
+                    <MenuItem value="manager">经理</MenuItem>
+                    <MenuItem value="admin">管理员</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="姓名"
+                  value={newEmployeeData.name}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, name: e.target.value})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="薪水 (MMK)"
+                  value={newEmployeeData.salary}
+                  onChange={(e) => setNewEmployeeData({...newEmployeeData, salary: parseInt(e.target.value) || 0})}
+                  InputLabelProps={{ style: { color: 'rgba(255,255,255,0.7)' } }}
+                  InputProps={{ style: { color: 'white' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#42a5f5' },
+                    },
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setEditEmployeeDialogOpen(false)}
+              sx={{ color: 'white' }}
+            >
+              取消
+            </Button>
+            <Button 
+              onClick={handleSaveEmployee}
+              variant="contained"
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)' },
+              }}
+            >
+              保存
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </PremiumBackground>
   );
