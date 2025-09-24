@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase配置
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 
+                   process.env.SUPABASE_URL || 
+                   localStorage.getItem('supabase_url') ||
+                   'https://cabtgyzmokewrgkxjgvg.supabase.co';
+
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 
+                       process.env.SUPABASE_ANON_KEY || 
+                       localStorage.getItem('supabase_key') ||
+                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhYnRneXptb2tld3Jna3hqZ3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzMjAyOTMsImV4cCI6MjA3MDg5NjI5M30.kL_XN5ySfmlD5YIdXr5AgLHs3-4j0y90a9LOEUOjcnc';
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {

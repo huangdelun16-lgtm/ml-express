@@ -17,8 +17,8 @@ const SupabaseStatus: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState({
-    url: localStorage.getItem('supabase_url') || '',
-    key: localStorage.getItem('supabase_key') || '',
+    url: localStorage.getItem('supabase_url') || 'https://cabtgyzmokewrgkxjgvg.supabase.co',
+    key: localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhYnRneXptb2tld3Jna3hqZ3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzMjAyOTMsImV4cCI6MjA3MDg5NjI5M30.kL_XN5ySfmlD5YIdXr5AgLHs3-4j0y90a9LOEUOjcnc',
   });
 
   useEffect(() => {
@@ -27,16 +27,17 @@ const SupabaseStatus: React.FC = () => {
 
   const checkConnection = async () => {
     try {
-      // 检查环境变量或本地配置
-      const url = process.env.REACT_APP_SUPABASE_URL || config.url;
-      const key = process.env.REACT_APP_SUPABASE_ANON_KEY || config.key;
+      // 先保存配置到localStorage
+      localStorage.setItem('supabase_url', config.url);
+      localStorage.setItem('supabase_key', config.key);
       
-      if (url && key) {
-        // 这里可以添加实际的连接测试
-        setIsConnected(true);
-      } else {
-        setIsConnected(false);
-      }
+      // 使用testSupabaseConnection进行实际连接测试
+      const { testSupabaseConnection } = await import('../utils/initializeDatabase');
+      const result = await testSupabaseConnection();
+      
+      setIsConnected(result.connected);
+      console.log('Supabase连接状态:', result);
+      
     } catch (error) {
       console.error('Supabase连接检查失败:', error);
       setIsConnected(false);
