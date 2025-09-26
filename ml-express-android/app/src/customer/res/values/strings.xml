@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 客户版特定字符串 -->
+    <string name="app_name">缅甸快递</string>
+    <string name="app_description">缅甸本地快递服务客户端</string>
+    
+    <!-- 客户版功能 -->
+    <string name="customer_home_title">欢迎使用缅甸快递</string>
+    <string name="customer_send_package">发送包裹</string>
+    <string name="customer_track_package">跟踪包裹</string>
+    <string name="customer_order_history">订单历史</string>
+    <string name="customer_profile">个人资料</string>
+    
+    <!-- 客户版特定操作 -->
+    <string name="create_new_order">创建新订单</string>
+    <string name="track_existing_order">跟踪现有订单</string>
+    <string name="view_order_history">查看订单历史</string>
+    <string name="manage_addresses">管理地址</string>
+    <string name="payment_methods">支付方式</string>
+    
+    <!-- 客户版通知 -->
+    <string name="notification_order_confirmed">您的订单已确认</string>
+    <string name="notification_courier_assigned">配送员已分配</string>
+    <string name="notification_package_picked_up">包裹已取件</string>
+    <string name="notification_package_delivered">包裹已送达</string>
+    
+    <!-- 客户版帮助 -->
+    <string name="customer_help_title">客户帮助中心</string>
+    <string name="how_to_place_order">如何下单</string>
+    <string name="how_to_track_order">如何跟踪订单</string>
+    <string name="payment_guide">支付指南</string>
+    <string name="delivery_policy">配送政策</string>
+</resources>

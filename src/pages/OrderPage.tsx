@@ -447,7 +447,7 @@ const OrderPage: React.FC = () => {
               </Button>
               <Button 
                 variant="outlined" 
-                onClick={() => navigate('/admin/orders')}
+                onClick={() => navigate('/admin/dashboard')}
               >
                 查看管理后台
               </Button>

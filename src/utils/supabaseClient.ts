@@ -115,7 +115,7 @@ export class SupabaseService {
     if (error) throw error;
   }
 
-  // 订单管理
+  // 包裹管理
   static async getOrders(): Promise<SupabaseOrder[]> {
     if (!supabase) throw new Error('Supabase未配置');
     

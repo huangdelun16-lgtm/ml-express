@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 缅甸快递品牌色彩 -->
+    
+    <!-- Light Theme Colors -->
+    <color name="primary">#1976D2</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#D3E3FD</color>
+    <color name="on_primary_container">#001C38</color>
+    
+    <color name="secondary">#FFB300</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="secondary_container">#FFECB3</color>
+    <color name="on_secondary_container">#261A00</color>
+    
+    <color name="tertiary">#4CAF50</color>
+    <color name="on_tertiary">#FFFFFF</color>
+    <color name="tertiary_container">#C8E6C9</color>
+    <color name="on_tertiary_container">#1B5E20</color>
+    
+    <color name="error">#F44336</color>
+    <color name="error_container">#FFEBEE</color>
+    <color name="on_error">#FFFFFF</color>
+    <color name="on_error_container">#B71C1C</color>
+    
+    <color name="background">#FEFBFF</color>
+    <color name="on_background">#1A1C1E</color>
+    <color name="surface">#FEFBFF</color>
+    <color name="on_surface">#1A1C1E</color>
+    <color name="surface_variant">#E2E2EC</color>
+    <color name="on_surface_variant">#45464F</color>
+    
+    <color name="outline">#757780</color>
+    <color name="inverse_on_surface">#F1F0F4</color>
+    <color name="inverse_surface">#2F3033</color>
+    <color name="inverse_primary">#A8C8EC</color>
+    
+    <!-- 状态颜色 -->
+    <color name="status_pending">#FF9800</color>
+    <color name="status_confirmed">#2196F3</color>
+    <color name="status_picked_up">#9C27B0</color>
+    <color name="status_in_transit">#00BCD4</color>
+    <color name="status_delivering">#4CAF50</color>
+    <color name="status_delivered">#388E3C</color>
+    <color name="status_cancelled">#F44336</color>
+    <color name="status_returned">#FF5722</color>
+    
+    <!-- 功能颜色 -->
+    <color name="warning">#FF9800</color>
+    <color name="info">#2196F3</color>
+    <color name="success">#4CAF50</color>
+    <color name="danger">#F44336</color>
+    
+    <!-- 中性颜色 -->
+    <color name="gray_50">#FAFAFA</color>
+    <color name="gray_100">#F5F5F5</color>
+    <color name="gray_200">#EEEEEE</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_400">#BDBDBD</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
+    <color name="gray_700">#616161</color>
+    <color name="gray_800">#424242</color>
+    <color name="gray_900">#212121</color>
+    
+    <!-- 半透明颜色 -->
+    <color name="black_overlay">#66000000</color>
+    <color name="white_overlay">#66FFFFFF</color>
+</resources>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 客户版特定权限 -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <application
+        tools:node="merge">
+
+        <!-- 客户版特定Activity -->
+        <activity
+            android:name=".presentation.order.CreateOrderActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MyanmarExpress.Customer.Order"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".presentation.tracking.TrackingActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyanmarExpress.Customer">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="myanmarexpress"
+                    android:host="track" />
+            </intent-filter>
+        </activity>
+
+        <!-- 客户版服务 -->
+        <service
+            android:name=".data.service.OrderStatusSyncService"
+            android:exported="false" />
+
+        <!-- 客户版广播接收器 -->
+        <receiver
+            android:name=".data.receiver.OrderUpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.myanmarexpress.ORDER_UPDATE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 客户版应用快捷方式 -->
+        <meta-data
+            android:name="android.app.shortcuts"
+            android:resource="@xml/shortcuts_customer" />
+
+    </application>
+
+</manifest>

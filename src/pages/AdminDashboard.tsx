@@ -449,7 +449,7 @@ const AdminDashboard: React.FC = () => {
         {/* 管理模块导航 */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" sx={{ mb: 3, fontWeight: 600, color: 'white' }}>
-            管理中心
+            管理中心 (已更新 - 订单管理已移除)
           </Typography>
           <Grid container spacing={3}>
             {/* 仪表盘 */}
@@ -486,84 +486,6 @@ const AdminDashboard: React.FC = () => {
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                     实时数据统计和系统监控
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* 订单管理 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/orders')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <LocalShipping sx={{ fontSize: 48, color: '#52c41a', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    订单管理
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    订单处理和状态跟踪
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* 用户管理 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/city-packages')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <LocalShipping sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    同城包裹
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    直接下单包裹管理和跟踪
                   </Typography>
                 </CardContent>
               </Card>

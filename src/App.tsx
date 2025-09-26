@@ -25,7 +25,6 @@ import DbDebug from './pages/DbDebug';
 import OrderPage from './pages/OrderPage';
 import CourierAdminSystem from './pages/CourierAdminSystem';
 import AdminCourierDashboard from './pages/AdminCourierDashboard';
-import AdminCourierOrders from './pages/AdminCourierOrders';
 import AdminCourierUsers from './pages/AdminCourierUsers';
 import AdminCityPackages from './pages/AdminCityPackages';
 import AdminCourierManagement from './pages/AdminCourierManagement';
@@ -69,7 +68,6 @@ function App() {
           <Route path="/admin/data-merger" element={<DataMerger />} />
           <Route path="/courier-admin" element={<CourierAdminSystem />} />
           <Route path="/admin/courier-dashboard" element={<AdminCourierDashboard />} />
-          <Route path="/admin/orders" element={<AdminCourierOrders />} />
           <Route path="/admin/users" element={<AdminCourierUsers />} />
           <Route path="/admin/city-packages" element={<AdminCityPackages />} />
           <Route path="/admin/couriers" element={<AdminCourierManagement />} />

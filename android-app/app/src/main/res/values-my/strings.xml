@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- အက်ပ်အမည် -->
+    <string name="app_name">မြန်မာ့ပို့ဆောင်ရေး</string>
+    <string name="app_name_full">Myanmar Express</string>
+    <string name="app_name_english">Myanmar Express</string>
+    
+    <!-- အထွေထွေစာသားများ -->
+    <string name="ok">အိုကေ</string>
+    <string name="cancel">ပယ်ဖျက်</string>
+    <string name="confirm">အတည်ပြု</string>
+    <string name="save">သိမ်း</string>
+    <string name="delete">ဖျက်</string>
+    <string name="edit">တည်းဖြတ်</string>
+    <string name="add">ထည့်</string>
+    <string name="remove">ဖယ်ရှား</string>
+    <string name="retry">ပြန်လုပ်</string>
+    <string name="loading">ဖွင့်နေသည်...</string>
+    <string name="error">အမှား</string>
+    <string name="success">အောင်မြင်</string>
+    <string name="warning">သတိပေး</string>
+    <string name="info">အချက်အလက်</string>
+    <string name="yes">ဟုတ်</string>
+    <string name="no">မဟုတ်</string>
+    <string name="next">နောက်</string>
+    <string name="previous">ရှေ့</string>
+    <string name="done">ပြီး</string>
+    <string name="skip">ကျော်</string>
+    <string name="continue_text">ဆက်လုပ်</string>
+    <string name="login">ဝင်ရောက်</string>
+    <string name="order_now">ယခုပဲမှာ</string>
+    
+    <!-- ညွှန်ပြခြင်း -->
+    <string name="nav_home">ပင်မ</string>
+    <string name="nav_orders">အမှာစာများ</string>
+    <string name="nav_tracking">ခြေရာခံ</string>
+    <string name="nav_profile">ကိုယ်ရေးကိုယ်တာ</string>
+    
+    <!-- အထောက်အထားစိစစ်ခြင်း -->
+    <string name="auth_welcome_title">မြန်မာ့ပို့ဆောင်ရေးမှ ကြိုဆိုပါသည်</string>
+    <string name="auth_welcome_subtitle">မြန်မာနိုင်ငံတစ်ဝှမ်း မြန်ဆန်၍ ယုံကြည်စိတ်ချရသော ပို့ဆောင်ရေးဝန်ဆောင်မှု</string>
+    <string name="auth_phone_number">ဖုန်းနံပါတ်</string>
+    <string name="auth_phone_hint">သင့်ဖုန်းနံပါတ်ကို ထည့်ပါ</string>
+    <string name="auth_phone_format">ပုံစံ: 09xxxxxxxxx</string>
+    <string name="auth_send_otp">အတည်ပြုကုဒ် ပို့ပါ</string>
+    <string name="auth_otp_title">အတည်ပြုကုဒ်ကို ထည့်ပါ</string>
+    <string name="auth_otp_subtitle">%s သို့ ဂဏန်း ၆ လုံး ပါသော ကုဒ်ပို့ပြီးပါပြီ</string>
+    <string name="auth_otp_hint">ဂဏန်း ၆ လုံး ထည့်ပါ</string>
+    <string name="auth_verify_otp">ကုဒ်အတည်ပြု</string>
+    <string name="auth_resend_otp">ကုဒ်ပြန်ပို့</string>
+    <string name="auth_resend_in">%d စက္ကန့်အတွင်း ပြန်ပို့ပါ</string>
+    <string name="auth_invalid_phone">မှန်ကန်သော ဖုန်းနံပါတ်ကို ထည့်ပါ</string>
+    <string name="auth_invalid_otp">အတည်ပြုကုဒ် မမှန်ကန်ပါ</string>
+    <string name="auth_otp_expired">အတည်ပြုကုဒ် သက်တမ်းကုန်ပါပြီ</string>
+    <string name="auth_complete_profile">သင့်ပရိုဖိုင်ကို ပြီးစီးအောင်လုပ်ပါ</string>
+    <string name="auth_full_name">အမည်အပြည့်အစုံ</string>
+    <string name="auth_email">အီးမေးလ်လိပ်စာ</string>
+    <string name="auth_address">လိပ်စာ</string>
+    <string name="auth_create_account">အကောင့်ဖွင့်</string>
+    
+    <!-- ပင်မစာမျက်နှာ -->
+    <string name="home_title">မြန်မာ့ပို့ဆောင်ရေး</string>
+    <string name="home_subtitle">သင်ယုံကြည်စိတ်ချရသော ပို့ဆောင်ရေး လက်တွဲဖော်</string>
+    <string name="home_send_package">ပစ္စည်းပို့</string>
+    <string name="home_track_order">အမှာစာခြေရာခံ</string>
+    <string name="home_recent_orders">လတ်တလော အမှာစာများ</string>
+    <string name="home_no_recent_orders">လတ်တလော အမှာစာများမရှိပါ</string>
+    <string name="home_quick_actions">မြန်ဆန်သော လုပ်ဆောင်ချက်များ</string>
+    
+    <!-- အမှာစာမှာခြင်း -->
+    <string name="order_create_title">အမှာစာအသစ် ဖန်တီးခြင်း</string>
+    <string name="order_sender_info">ပို့သူအချက်အလက်</string>
+    <string name="order_receiver_info">လက်ခံသူအချက်အလက်</string>
+    <string name="order_package_info">ပစ္စည်းအချက်အလက်</string>
+    <string name="order_service_info">ဝန်ဆောင်မှုအချက်အလက်</string>
+    
+    <string name="order_sender_name">ပို့သူအမည်</string>
+    <string name="order_sender_phone">ပို့သူဖုန်း</string>
+    <string name="order_sender_address">ယူမည့်လိပ်စာ</string>
+    
+    <string name="order_receiver_name">လက်ခံသူအမည်</string>
+    <string name="order_receiver_phone">လက်ခံသူဖုန်း</string>
+    <string name="order_receiver_address">ပို့မည့်လိပ်စာ</string>
+    
+    <string name="order_package_type">ပစ္စည်းအမျိုးအစား</string>
+    <string name="order_package_weight">အလေးချိန် (ကီလိုဂရမ်)</string>
+    <string name="order_package_dimensions">အရွယ်အစား</string>
+    <string name="order_package_description">ဖော်ပြချက်</string>
+    <string name="order_package_value">ကြေညာတန်ဖိုး</string>
+    
+    <string name="order_service_type">ဝန်ဆောင်မှုအမျိုးအစား</string>
+    <string name="order_service_standard">ပုံမှန်ပို့ဆောင်ခြင်း</string>
+    <string name="order_service_express">အမြန်ပို့ဆောင်ခြင်း</string>
+    <string name="order_service_same_day">တစ်နေ့တည်းပို့ဆောင်ခြင်း</string>
+    
+    <string name="order_cost_calculation">ကုန်ကျစရိတ်တွက်ချက်ခြင်း</string>
+    <string name="order_distance">အကွာအဝေး: %s ကီလိုမီတာ</string>
+    <string name="order_base_cost">အခြေခံကုန်ကျစရိတ်: %s ကျပ်</string>
+    <string name="order_service_fee">ဝန်ဆောင်မှုခ: %s ကျပ်</string>
+    <string name="order_total_cost">စုစုပေါင်းကုန်ကျစရိတ်: %s ကျပ်</string>
+    
+    <string name="order_place_order">အမှာစာမှာ</string>
+    <string name="order_confirm_details">အမှာစာအသေးစိတ်အတည်ပြု</string>
+    <string name="order_payment_method">ငွေပေးချေမှုနည်းလမ်း</string>
+    <string name="order_cash_on_delivery">ပို့ရောက်မှ ငွေပေး</string>
+    <string name="order_mobile_payment">မိုဘိုင်းငွေပေးချေမှု</string>
+    
+    <!-- လိပ်စာရွေးချယ်ခြင်း -->
+    <string name="address_select_location">နေရာရွေးချယ်ပါ</string>
+    <string name="address_search_hint">လိပ်စာ သို့မဟုတ် အမှတ်အသားရှာပါ</string>
+    <string name="address_use_current_location">လက်ရှိနေရာသုံးပါ</string>
+    <string name="address_saved_addresses">သိမ်းထားသော လိပ်စာများ</string>
+    <string name="address_add_new">လိပ်စာအသစ်ထည့်ပါ</string>
+    <string name="address_home">အိမ်</string>
+    <string name="address_work">ရုံး</string>
+    <string name="address_other">အခြား</string>
+    <string name="address_label">လိပ်စာတံဆိပ်</string>
+    <string name="address_details">လိပ်စာအသေးစိတ်</string>
+    <string name="address_save_address">လိပ်စာသိမ်းပါ</string>
+    
+    <!-- အမှာစာစီမံခြင်း -->
+    <string name="orders_title">ကျွန်ုပ်၏ အမှာစာများ</string>
+    <string name="orders_all">အမှာစာအားလုံး</string>
+    <string name="orders_active">လုပ်ဆောင်နေသော</string>
+    <string name="orders_completed">ပြီးစီးသော</string>
+    <string name="orders_cancelled">ပယ်ဖျက်သော</string>
+    <string name="orders_empty">အမှာစာများမတွေ့ပါ</string>
+    <string name="orders_empty_subtitle">သင့်အမှာစာများ ဤနေရာတွင် ပေါ်လာပါမည်</string>
+    
+    <string name="order_details_title">အမှာစာအသေးစိတ်</string>
+    <string name="order_id">အမှာစာနံပါတ်</string>
+    <string name="order_status">အခြေအနေ</string>
+    <string name="order_created_at">ဖန်တီးသည့်နေ့</string>
+    <string name="order_estimated_delivery">ခန့်မှန်းရောက်ရှိမည့်ရက်</string>
+    <string name="order_courier_info">ကူရီယာအချက်အလက်</string>
+    <string name="order_call_courier">ကူရီယာကို ဖုန်းခေါ်</string>
+    <string name="order_track_location">နေရာခြေရာခံ</string>
+    <string name="order_cancel_order">အမှာစာပယ်ဖျက်</string>
+    <string name="order_rate_service">ဝန်ဆောင်မှုအဆင့်သတ်မှတ်</string>
+    
+    <!-- အမှာစာအခြေအနေ -->
+    <string name="status_pending">စောင့်ဆိုင်းနေ</string>
+    <string name="status_confirmed">အတည်ပြုပြီး</string>
+    <string name="status_picked_up">ယူပြီး</string>
+    <string name="status_in_transit">ပို့ဆောင်နေ</string>
+    <string name="status_delivering">ပို့ရောက်နေ</string>
+    <string name="status_delivered">ရောက်ရှိပြီး</string>
+    <string name="status_cancelled">ပယ်ဖျက်ပြီး</string>
+    <string name="status_returned">ပြန်ပို့ပြီး</string>
+    
+    <!-- ခြေရာခံခြင်း -->
+    <string name="tracking_title">သင့်အမှာစာကို ခြေရာခံပါ</string>
+    <string name="tracking_enter_id">အမှာစာနံပါတ်ထည့်ပါ</string>
+    <string name="tracking_search">ရှာပါ</string>
+    <string name="tracking_courier_location">ကူရီယာနေရာ</string>
+    <string name="tracking_estimated_arrival">ခန့်မှန်းရောက်ရှိမည့်အချိန်</string>
+    <string name="tracking_order_timeline">အမှာစာအချိန်ဇယား</string>
+    
+    <!-- ကိုယ်ရေးကိုယ်တာ -->
+    <string name="profile_title">ကိုယ်ရေးကိုယ်တာ</string>
+    <string name="profile_personal_info">ကိုယ်ပိုင်အချက်အလက်</string>
+    <string name="profile_addresses">လိပ်စာများ</string>
+    <string name="profile_payment_methods">ငွေပေးချေမှုနည်းလမ်းများ</string>
+    <string name="profile_order_history">အမှာစာမှတ်တမ်း</string>
+    <string name="profile_notifications">အကြောင်းကြားချက်များ</string>
+    <string name="profile_language">ဘာသာစကား</string>
+    <string name="profile_help_support">အကူအညီနှင့် ပံ့ပိုးမှု</string>
+    <string name="profile_about">အကြောင်း</string>
+    <string name="profile_logout">ထွက်</string>
+    
+    <string name="profile_edit_info">အချက်အလက်တည်းဖြတ်</string>
+    <string name="profile_change_phone">ဖုန်းနံပါတ်ပြောင်း</string>
+    <string name="profile_change_password">စကားဝှက်ပြောင်း</string>
+    
+    <!-- ငွေပေးချေမှုနည်းလမ်းများ -->
+    <string name="payment_methods_title">ငွေပေးချေမှုနည်းလမ်းများ</string>
+    <string name="payment_add_method">ငွေပေးချေမှုနည်းလမ်းထည့်</string>
+    <string name="payment_cash_on_delivery">ပို့ရောက်မှ ငွေပေး</string>
+    <string name="payment_kbz_pay">KBZ Pay</string>
+    <string name="payment_wave_money">Wave Money</string>
+    <string name="payment_cb_pay">CB Pay</string>
+    <string name="payment_aya_pay">AYA Pay</string>
+    
+    <!-- အကြောင်းကြားချက် -->
+    <string name="notifications_title">အကြောင်းကြားချက်များ</string>
+    <string name="notifications_order_updates">အမှာစာအပ်ဒိတ်များ</string>
+    <string name="notifications_promotions">ပရိုမိုးရှင်းများ</string>
+    <string name="notifications_system">စနစ်အကြောင်းကြားချက်များ</string>
+    <string name="notifications_empty">အကြောင်းကြားချက်များမရှိပါ</string>
+    
+    <!-- အကူအညီနှင့် ပံ့ပိုးမှု -->
+    <string name="help_title">အကူအညီနှင့် ပံ့ပိုးမှု</string>
+    <string name="help_faq">မကြာခဏမေးလေ့ရှိသောမေးခွန်းများ</string>
+    <string name="help_contact_us">ကျွန်ုပ်တို့ကို ဆက်သွယ်ပါ</string>
+    <string name="help_report_issue">ပြဿနာတင်ပြပါ</string>
+    <string name="help_terms_conditions">စည်းကမ်းချက်များ</string>
+    <string name="help_privacy_policy">ကိုယ်ရေးကိုယ်တာမူဝါဒ</string>
+    
+    <!-- အမှားသတင်းများ -->
+    <string name="error_network">ကွန်ယက်ချိတ်ဆက်မှုအမှား</string>
+    <string name="error_server">ဆာဗာအမှားဖြစ်ပွားသည်</string>
+    <string name="error_unknown">အမည်မသိအမှားဖြစ်ပွားသည်</string>
+    <string name="error_location_permission">တည်နေရာခွင့်ပြုချက်လိုအပ်သည်</string>
+    <string name="error_location_unavailable">တည်နေရာဝန်ဆောင်မှုမရရှိနိုင်ပါ</string>
+    <string name="error_invalid_input">သင့်ရေးထည့်မှုကို စစ်ဆေးပါ</string>
+    <string name="error_order_not_found">အမှာစာမတွေ့ပါ</string>
+    <string name="error_payment_failed">ငွေပေးချေမှုမအောင်မြင်ပါ</string>
+    
+    <!-- အောင်မြင်မှုသတင်းများ -->
+    <string name="success_order_placed">အမှာစာအောင်မြင်စွာ မှာပြီးပါပြီ</string>
+    <string name="success_order_cancelled">အမှာစာအောင်မြင်စွာ ပယ်ဖျက်ပြီးပါပြီ</string>
+    <string name="success_profile_updated">ပရိုဖိုင်အောင်မြင်စွာ အပ်ဒိတ်ပြီးပါပြီ</string>
+    <string name="success_address_saved">လိပ်စာအောင်မြင်စွာ သိမ်းပြီးပါပြီ</string>
+    <string name="success_payment_added">ငွေပေးချေမှုနည်းလမ်းအောင်မြင်စွာ ထည့်ပြီးပါပြီ</string>
+    
+    <!-- ခွင့်ပြုချက် -->
+    <string name="permission_location_title">တည်နေရာခွင့်ပြုချက်</string>
+    <string name="permission_location_message">တိကျသော ယူခြင်းနှင့် ပို့ဆောင်ခြင်းဝန်ဆောင်မှုများ ပေးနိုင်ရန် တည်နေရာဝင်ရောက်ခွင့် လိုအပ်သည်</string>
+    <string name="permission_camera_title">ကင်မရာခွင့်ပြုချက်</string>
+    <string name="permission_camera_message">QR ကုဒ်များ စကန်ဖတ်ရန် ကင်မရာဝင်ရောက်ခွင့် လိုအပ်သည်</string>
+    <string name="permission_denied">ခွင့်ပြုချက်ငြင်းပယ်သည်</string>
+    <string name="permission_grant">ခွင့်ပြုချက်ပေး</string>
+    
+    <!-- မြန်မာ့ဒေသခံအသုံးအနှုန်း -->
+    <string name="myanmar_currency">ကျပ်</string>
+    <string name="myanmar_phone_prefix">+95</string>
+    <string name="myanmar_regions">တိုင်းဒေသကြီးများ</string>
+    <string name="myanmar_yangon">ရန်ကုန်</string>
+    <string name="myanmar_mandalay">မန္တလေး</string>
+    <string name="myanmar_naypyidaw">နေပြည်တော်</string>
+    
+    <!-- ပစ္စည်းအမျိုးအစားများ -->
+    <string name="package_type_document">စာရွက်စာတမ်းများ</string>
+    <string name="package_type_food">အစားအသောက်</string>
+    <string name="package_type_electronics">အီလက်ထရွန်နစ်ပစ္စည်းများ</string>
+    <string name="package_type_clothing">အဝတ်အထည်</string>
+    <string name="package_type_fragile">ပျက်စီးလွယ်သောပစ္စည်းများ</string>
+    <string name="package_type_other">အခြား</string>
+    
+    <!-- ဘာသာစကားဆက်တင် -->
+    <string name="language_settings">ဘာသာစကားဆက်တင်</string>
+    <string name="language_chinese">တရုတ်</string>
+    <string name="language_english">အင်္ဂလိပ်</string>
+    <string name="language_myanmar">မြန်မာ</string>
+    <string name="language_select">ဘာသာစကားရွေးပါ</string>
+    <string name="language_current">လက်ရှိဘာသာစကား</string>
+    <string name="language_change_success">ဘာသာစကားအောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ</string>
+    <string name="language_change_restart">ပြောင်းလဲမှုများကို အသုံးပြုရန် အက်ပ်ကို ပြန်ဖွင့်ပါ</string>
+    
+    <!-- အပိုစာသားများ -->
+    <string name="optional">ရွေးချယ်ခွင့်ရှိသော</string>
+    <string name="payment">ငွေပေးချေမှု</string>
+    <string name="history">မှတ်တမ်း</string>
+    <string name="language">ဘာသာစကား</string>
+    <string name="help">အကူအညီ</string>
+    <string name="info">အချက်အလက်</string>
+    <string name="chevron_right">ညာမြှား</string>
+    
+    <!-- အိုင်ကွန်ဖော်ပြချက်များ -->
+    <string name="icon_money">ငွေ</string>
+    <string name="icon_waves">လှိုင်းများ</string>
+    <string name="icon_account_balance">အကောင့်လက်ကျန်</string>
+    <string name="icon_account_balance_wallet">အကောင့်ပိုက်ဆံအိတ်</string>
+    <string name="icon_credit_card">ခရက်ဒစ်ကတ်</string>
+</resources>

@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用名称 -->
+    <string name="app_name">Myanmar Express</string>
+    <string name="app_name_full">Myanmar Express</string>
+    <string name="app_name_english">Myanmar Express</string>
+    
+    <!-- 通用文本 -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="add">Add</string>
+    <string name="remove">Remove</string>
+    <string name="retry">Retry</string>
+    <string name="loading">Loading...</string>
+    <string name="error">Error</string>
+    <string name="success">Success</string>
+    <string name="warning">Warning</string>
+    <string name="info">Information</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="done">Done</string>
+    <string name="skip">Skip</string>
+    <string name="continue_text">Continue</string>
+    <string name="login">Login</string>
+    <string name="order_now">Order Now</string>
+    
+    <!-- 导航 -->
+    <string name="nav_home">Home</string>
+    <string name="nav_orders">Orders</string>
+    <string name="nav_tracking">Tracking</string>
+    <string name="nav_profile">Profile</string>
+    
+    <!-- 认证模块 -->
+    <string name="auth_welcome_title">Welcome to Myanmar Express</string>
+    <string name="auth_welcome_subtitle">Fast and reliable delivery service across Myanmar</string>
+    <string name="auth_phone_number">Phone Number</string>
+    <string name="auth_phone_hint">Enter your phone number</string>
+    <string name="auth_phone_format">Format: 09xxxxxxxxx</string>
+    <string name="auth_send_otp">Send OTP</string>
+    <string name="auth_otp_title">Enter Verification Code</string>
+    <string name="auth_otp_subtitle">We sent a 6-digit code to %s</string>
+    <string name="auth_otp_hint">Enter 6-digit code</string>
+    <string name="auth_verify_otp">Verify Code</string>
+    <string name="auth_resend_otp">Resend Code</string>
+    <string name="auth_resend_in">Resend in %d seconds</string>
+    <string name="auth_invalid_phone">Please enter a valid phone number</string>
+    <string name="auth_invalid_otp">Invalid verification code</string>
+    <string name="auth_otp_expired">Verification code expired</string>
+    <string name="auth_complete_profile">Complete Your Profile</string>
+    <string name="auth_full_name">Full Name</string>
+    <string name="auth_email">Email Address</string>
+    <string name="auth_address">Address</string>
+    <string name="auth_create_account">Create Account</string>
+    
+    <!-- 首页 -->
+    <string name="home_title">Myanmar Express</string>
+    <string name="home_subtitle">Your trusted delivery partner</string>
+    <string name="home_send_package">Send Package</string>
+    <string name="home_track_order">Track Order</string>
+    <string name="home_recent_orders">Recent Orders</string>
+    <string name="home_no_recent_orders">No recent orders</string>
+    <string name="home_quick_actions">Quick Actions</string>
+    
+    <!-- 下单模块 -->
+    <string name="order_create_title">Create New Order</string>
+    <string name="order_sender_info">Sender Information</string>
+    <string name="order_receiver_info">Receiver Information</string>
+    <string name="order_package_info">Package Information</string>
+    <string name="order_service_info">Service Information</string>
+    
+    <string name="order_sender_name">Sender Name</string>
+    <string name="order_sender_phone">Sender Phone</string>
+    <string name="order_sender_address">Pickup Address</string>
+    
+    <string name="order_receiver_name">Receiver Name</string>
+    <string name="order_receiver_phone">Receiver Phone</string>
+    <string name="order_receiver_address">Delivery Address</string>
+    
+    <string name="order_package_type">Package Type</string>
+    <string name="order_package_weight">Weight (kg)</string>
+    <string name="order_package_dimensions">Dimensions</string>
+    <string name="order_package_description">Description</string>
+    <string name="order_package_value">Declared Value</string>
+    
+    <string name="order_service_type">Service Type</string>
+    <string name="order_service_standard">Standard Delivery</string>
+    <string name="order_service_express">Express Delivery</string>
+    <string name="order_service_same_day">Same Day Delivery</string>
+    
+    <string name="order_cost_calculation">Cost Calculation</string>
+    <string name="order_distance">Distance: %s km</string>
+    <string name="order_base_cost">Base Cost: %s MMK</string>
+    <string name="order_service_fee">Service Fee: %s MMK</string>
+    <string name="order_total_cost">Total Cost: %s MMK</string>
+    
+    <string name="order_place_order">Place Order</string>
+    <string name="order_confirm_details">Confirm Order Details</string>
+    <string name="order_payment_method">Payment Method</string>
+    <string name="order_cash_on_delivery">Cash on Delivery</string>
+    <string name="order_mobile_payment">Mobile Payment</string>
+    
+    <!-- 地址选择 -->
+    <string name="address_select_location">Select Location</string>
+    <string name="address_search_hint">Search for address or landmark</string>
+    <string name="address_use_current_location">Use Current Location</string>
+    <string name="address_saved_addresses">Saved Addresses</string>
+    <string name="address_add_new">Add New Address</string>
+    <string name="address_home">Home</string>
+    <string name="address_work">Work</string>
+    <string name="address_other">Other</string>
+    <string name="address_label">Address Label</string>
+    <string name="address_details">Address Details</string>
+    <string name="address_save_address">Save Address</string>
+    
+    <!-- 订单管理 -->
+    <string name="orders_title">My Orders</string>
+    <string name="orders_all">All Orders</string>
+    <string name="orders_active">Active</string>
+    <string name="orders_completed">Completed</string>
+    <string name="orders_cancelled">Cancelled</string>
+    <string name="orders_empty">No orders found</string>
+    <string name="orders_empty_subtitle">Your orders will appear here</string>
+    
+    <string name="order_details_title">Order Details</string>
+    <string name="order_id">Order ID</string>
+    <string name="order_status">Status</string>
+    <string name="order_created_at">Created</string>
+    <string name="order_estimated_delivery">Estimated Delivery</string>
+    <string name="order_courier_info">Courier Information</string>
+    <string name="order_call_courier">Call Courier</string>
+    <string name="order_track_location">Track Location</string>
+    <string name="order_cancel_order">Cancel Order</string>
+    <string name="order_rate_service">Rate Service</string>
+    
+    <!-- 订单状态 -->
+    <string name="status_pending">Pending</string>
+    <string name="status_confirmed">Confirmed</string>
+    <string name="status_picked_up">Picked Up</string>
+    <string name="status_in_transit">In Transit</string>
+    <string name="status_delivering">Out for Delivery</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="status_returned">Returned</string>
+    
+    <!-- 跟踪 -->
+    <string name="tracking_title">Track Your Order</string>
+    <string name="tracking_enter_id">Enter Order ID</string>
+    <string name="tracking_search">Search</string>
+    <string name="tracking_courier_location">Courier Location</string>
+    <string name="tracking_estimated_arrival">Estimated Arrival</string>
+    <string name="tracking_order_timeline">Order Timeline</string>
+    
+    <!-- 个人中心 -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_personal_info">Personal Information</string>
+    <string name="profile_addresses">Addresses</string>
+    <string name="profile_payment_methods">Payment Methods</string>
+    <string name="profile_order_history">Order History</string>
+    <string name="profile_notifications">Notifications</string>
+    <string name="profile_language">Language</string>
+    <string name="profile_help_support">Help &amp; Support</string>
+    <string name="profile_about">About</string>
+    <string name="profile_logout">Logout</string>
+    
+    <string name="profile_edit_info">Edit Information</string>
+    <string name="profile_change_phone">Change Phone Number</string>
+    <string name="profile_change_password">Change Password</string>
+    
+    <!-- 支付方式 -->
+    <string name="payment_methods_title">Payment Methods</string>
+    <string name="payment_add_method">Add Payment Method</string>
+    <string name="payment_cash_on_delivery">Cash on Delivery</string>
+    <string name="payment_kbz_pay">KBZ Pay</string>
+    <string name="payment_wave_money">Wave Money</string>
+    <string name="payment_cb_pay">CB Pay</string>
+    <string name="payment_aya_pay">AYA Pay</string>
+    
+    <!-- 通知 -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_order_updates">Order Updates</string>
+    <string name="notifications_promotions">Promotions</string>
+    <string name="notifications_system">System Notifications</string>
+    <string name="notifications_empty">No notifications</string>
+    
+    <!-- 帮助和支持 -->
+    <string name="help_title">Help &amp; Support</string>
+    <string name="help_faq">Frequently Asked Questions</string>
+    <string name="help_contact_us">Contact Us</string>
+    <string name="help_report_issue">Report an Issue</string>
+    <string name="help_terms_conditions">Terms &amp; Conditions</string>
+    <string name="help_privacy_policy">Privacy Policy</string>
+    
+    <!-- 错误消息 -->
+    <string name="error_network">Network connection error</string>
+    <string name="error_server">Server error occurred</string>
+    <string name="error_unknown">Unknown error occurred</string>
+    <string name="error_location_permission">Location permission required</string>
+    <string name="error_location_unavailable">Location service unavailable</string>
+    <string name="error_invalid_input">Please check your input</string>
+    <string name="error_order_not_found">Order not found</string>
+    <string name="error_payment_failed">Payment failed</string>
+    
+    <!-- 成功消息 -->
+    <string name="success_order_placed">Order placed successfully</string>
+    <string name="success_order_cancelled">Order cancelled successfully</string>
+    <string name="success_profile_updated">Profile updated successfully</string>
+    <string name="success_address_saved">Address saved successfully</string>
+    <string name="success_payment_added">Payment method added successfully</string>
+    
+    <!-- 权限 -->
+    <string name="permission_location_title">Location Permission</string>
+    <string name="permission_location_message">We need location access to provide accurate pickup and delivery services</string>
+    <string name="permission_camera_title">Camera Permission</string>
+    <string name="permission_camera_message">Camera access is needed to scan QR codes</string>
+    <string name="permission_denied">Permission denied</string>
+    <string name="permission_grant">Grant Permission</string>
+    
+    <!-- 缅甸本地化 -->
+    <string name="myanmar_currency">MMK</string>
+    <string name="myanmar_phone_prefix">+95</string>
+    <string name="myanmar_regions">Regions</string>
+    <string name="myanmar_yangon">Yangon</string>
+    <string name="myanmar_mandalay">Mandalay</string>
+    <string name="myanmar_naypyidaw">Naypyidaw</string>
+    
+    <!-- 包裹类型 -->
+    <string name="package_type_document">Documents</string>
+    <string name="package_type_food">Food</string>
+    <string name="package_type_electronics">Electronics</string>
+    <string name="package_type_clothing">Clothing</string>
+    <string name="package_type_fragile">Fragile Items</string>
+    <string name="package_type_other">Other</string>
+    
+    <!-- 语言设置 -->
+    <string name="language_settings">Language Settings</string>
+    <string name="language_chinese">Chinese</string>
+    <string name="language_english">English</string>
+    <string name="language_myanmar">Myanmar</string>
+    <string name="language_select">Select Language</string>
+    <string name="language_current">Current Language</string>
+    <string name="language_change_success">Language changed successfully</string>
+    <string name="language_change_restart">Please restart the app to apply changes</string>
+    
+    <!-- 额外字符串 -->
+    <string name="optional">Optional</string>
+    <string name="payment">Payment</string>
+    <string name="history">History</string>
+    <string name="language">Language</string>
+    <string name="help">Help</string>
+    <string name="info">Info</string>
+    <string name="chevron_right">Chevron Right</string>
+    
+    <!-- 图标描述 -->
+    <string name="icon_money">Money</string>
+    <string name="icon_waves">Waves</string>
+    <string name="icon_account_balance">Account Balance</string>
+    <string name="icon_account_balance_wallet">Account Balance Wallet</string>
+    <string name="icon_credit_card">Credit Card</string>
+</resources>

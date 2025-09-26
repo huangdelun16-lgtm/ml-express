@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 骑手版特定字符串 -->
+    <string name="app_name">骑手快递</string>
+    <string name="app_description">缅甸本地快递服务骑手端</string>
+    
+    <!-- 骑手版功能 -->
+    <string name="courier_dashboard_title">骑手工作台</string>
+    <string name="courier_orders_available">可接订单</string>
+    <string name="courier_current_tasks">当前任务</string>
+    <string name="courier_earnings">收入统计</string>
+    <string name="courier_profile">骑手资料</string>
+    
+    <!-- 骑手版特定操作 -->
+    <string name="accept_order">接受订单</string>
+    <string name="reject_order">拒绝订单</string>
+    <string name="start_navigation">开始导航</string>
+    <string name="confirm_pickup">确认取件</string>
+    <string name="confirm_delivery">确认送达</string>
+    <string name="report_issue">报告问题</string>
+    <string name="go_online">上线接单</string>
+    <string name="go_offline">下线休息</string>
+    
+    <!-- 骑手版状态 -->
+    <string name="status_online">在线</string>
+    <string name="status_offline">离线</string>
+    <string name="status_busy">忙碌</string>
+    <string name="status_unavailable">不可用</string>
+    
+    <!-- 骑手版通知 -->
+    <string name="notification_new_order">新订单推送</string>
+    <string name="notification_urgent_order">紧急订单</string>
+    <string name="notification_earnings_update">收入更新</string>
+    <string name="notification_task_reminder">任务提醒</string>
+    
+    <!-- 骑手版收入 -->
+    <string name="today_earnings">今日收入</string>
+    <string name="total_earnings">总收入</string>
+    <string name="available_balance">可提现余额</string>
+    <string name="pending_earnings">待结算</string>
+    <string name="withdraw_earnings">申请提现</string>
+    
+    <!-- 骑手版任务 -->
+    <string name="pickup_task">取件任务</string>
+    <string name="delivery_task">送件任务</string>
+    <string name="task_in_progress">任务进行中</string>
+    <string name="task_completed">任务已完成</string>
+    <string name="navigate_to_pickup">导航到取件地点</string>
+    <string name="navigate_to_delivery">导航到送件地点</string>
+    
+    <!-- 骑手版帮助 -->
+    <string name="courier_help_title">骑手帮助中心</string>
+    <string name="how_to_accept_orders">如何接单</string>
+    <string name="delivery_procedures">配送流程</string>
+    <string name="earnings_guide">收入指南</string>
+    <string name="safety_guidelines">安全指南</string>
+</resources>

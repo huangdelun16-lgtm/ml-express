@@ -182,7 +182,7 @@ const AdminCourierUsers: React.FC = () => {
 
   // 权限定义
   const permissions = {
-    employee: ['orders', 'couriers'], // 员工只能访问订单管理和快递员管理
+    employee: ['couriers'], // 员工只能访问快递员管理
     accountant: ['orders', 'couriers', 'courier-finance'], // 会计可以访问财务
     manager: ['orders', 'couriers', 'courier-finance', 'users', 'courier-dashboard', 'courier-settings'], // 经理全权限
     admin: ['orders', 'couriers', 'courier-finance', 'users', 'courier-dashboard', 'courier-settings', 'control-panel'], // 管理员全权限+控制台

@@ -30,7 +30,6 @@ import LanguageSwitcher, { LanguageType } from '../components/LanguageSwitcher';
 
 // Import admin modules
 import CourierDashboard from '../components/courier-admin/CourierDashboard';
-import OrderManagement from '../components/courier-admin/OrderManagement';
 import UserManagement from '../components/courier-admin/UserManagement';
 import CourierManagement from '../components/courier-admin/CourierManagement';
 import FinanceManagement from '../components/courier-admin/FinanceManagement';
@@ -72,11 +71,6 @@ const CourierAdminSystem: React.FC = () => {
       key: 'dashboard',
       icon: <DashboardOutlined />,
       label: '仪表盘',
-    },
-    {
-      key: 'orders',
-      icon: <ShoppingCartOutlined />,
-      label: '订单管理',
     },
     {
       key: 'users',
@@ -137,8 +131,6 @@ const CourierAdminSystem: React.FC = () => {
     switch (selectedKey) {
       case 'dashboard':
         return <CourierDashboard />;
-      case 'orders':
-        return <OrderManagement />;
       case 'users':
         return <UserManagement />;
       case 'couriers':

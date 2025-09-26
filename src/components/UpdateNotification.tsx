@@ -27,9 +27,9 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
       try {
         console.log('🔍 检查更新...');
         
-        // 强制显示更新通知（因为我们刚刚修复了按钮问题）
-        const currentAppVersion = localStorage.getItem('app_version') || '2.0.0';
-        const newAppVersion = '2.1.0'; // 最新版本
+        // 强制显示更新通知（因为我们刚刚移除了订单管理模块）
+        const currentAppVersion = localStorage.getItem('app_version') || '2.1.0';
+        const newAppVersion = '2.2.0'; // 最新版本
         
         if (currentAppVersion !== newAppVersion) {
           console.log('✅ 发现新版本!', newAppVersion);
@@ -38,7 +38,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
           
           // 自动弹出确认对话框
           setTimeout(() => {
-            if (window.confirm(`🚀 发现新版本 ${newAppVersion}！\n\n✅ 修复内容：\n• 订单管理删除按钮现在可以点击\n• 快递员管理操作按钮完全修复\n• 在线状态开关正常工作\n• 所有按钮都有明确反馈\n\n是否立即更新获取修复？`)) {
+            if (window.confirm(`🚀 发现新版本 ${newAppVersion}！\n\n✅ 更新内容：\n• 已彻底移除"订单管理"模块\n• 清理所有相关路由和组件\n• 优化后台管理界面结构\n• 提升系统性能和稳定性\n\n是否立即更新获取最新版本？`)) {
               handleUpdate();
             }
           }, 1000);
@@ -84,7 +84,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     setShowUpdate(false);
     
     // 更新版本号
-    localStorage.setItem('app_version', '2.1.0');
+    localStorage.setItem('app_version', '2.2.0');
     
     // 清除所有缓存
     if ('caches' in window) {
@@ -96,15 +96,28 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
       });
     }
     
+    // 清除所有localStorage缓存（除了必要的登录信息）
+    const adminUser = localStorage.getItem('adminUser');
+    localStorage.clear();
+    if (adminUser) {
+      localStorage.setItem('adminUser', adminUser);
+    }
+    localStorage.setItem('app_version', '2.2.0');
+    
     // 清除浏览器缓存并强制刷新
     const timestamp = Date.now();
-    const newUrl = window.location.href.split('?')[0] + '?v=' + timestamp + '&updated=true';
+    const newUrl = window.location.href.split('?')[0] + '?v=' + timestamp + '&updated=true&cache_bust=' + timestamp;
     
     if (onUpdate) {
       onUpdate();
     } else {
       console.log('🔄 强制刷新页面:', newUrl);
-      window.location.href = newUrl;
+      // 使用更强力的刷新方式
+      window.location.replace(newUrl);
+      // 备用方案
+      setTimeout(() => {
+        window.location.reload(true);
+      }, 100);
     }
   };
 

@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用名称 -->
+    <string name="app_name">ML Express</string>
+    <string name="app_name_full">缅甸本地快递</string>
+    
+    <!-- 通用文本 -->
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="add">添加</string>
+    <string name="remove">移除</string>
+    <string name="retry">重试</string>
+    <string name="loading">加载中...</string>
+    <string name="error">错误</string>
+    <string name="success">成功</string>
+    <string name="warning">警告</string>
+    <string name="info">信息</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+    <string name="next">下一步</string>
+    <string name="previous">上一步</string>
+    <string name="done">完成</string>
+    <string name="skip">跳过</string>
+    <string name="continue_text">继续</string>
+    
+    <!-- 导航 -->
+    <string name="nav_home">首页</string>
+    <string name="nav_orders">订单</string>
+    <string name="nav_tracking">跟踪</string>
+    <string name="nav_profile">个人</string>
+    
+    <!-- 认证模块 -->
+    <string name="auth_welcome_title">欢迎使用ML Express</string>
+    <string name="auth_welcome_subtitle">缅甸全境快速可靠的配送服务</string>
+    <string name="auth_phone_number">手机号码</string>
+    <string name="auth_phone_hint">请输入手机号码</string>
+    <string name="auth_phone_format">格式: 09xxxxxxxxx</string>
+    <string name="auth_send_otp">发送验证码</string>
+    <string name="auth_otp_title">输入验证码</string>
+    <string name="auth_otp_subtitle">我们已向 %s 发送6位验证码</string>
+    <string name="auth_otp_hint">请输入6位验证码</string>
+    <string name="auth_verify_otp">验证码确认</string>
+    <string name="auth_resend_otp">重新发送</string>
+    <string name="auth_resend_in">%d秒后重新发送</string>
+    <string name="auth_invalid_phone">请输入有效的手机号码</string>
+    <string name="auth_invalid_otp">验证码无效</string>
+    <string name="auth_otp_expired">验证码已过期</string>
+    <string name="auth_complete_profile">完善个人资料</string>
+    <string name="auth_full_name">姓名</string>
+    <string name="auth_email">邮箱地址</string>
+    <string name="auth_address">地址</string>
+    <string name="auth_create_account">创建账户</string>
+    
+    <!-- 首页 -->
+    <string name="home_title">ML Express</string>
+    <string name="home_subtitle">您信赖的配送伙伴</string>
+    <string name="home_send_package">寄包裹</string>
+    <string name="home_track_order">跟踪订单</string>
+    <string name="home_recent_orders">最近订单</string>
+    <string name="home_no_recent_orders">暂无最近订单</string>
+    <string name="home_quick_actions">快捷操作</string>
+    
+    <!-- 下单模块 -->
+    <string name="order_create_title">创建新订单</string>
+    <string name="order_sender_info">寄件人信息</string>
+    <string name="order_receiver_info">收件人信息</string>
+    <string name="order_package_info">包裹信息</string>
+    <string name="order_service_info">服务信息</string>
+    
+    <string name="order_sender_name">寄件人姓名</string>
+    <string name="order_sender_phone">寄件人电话</string>
+    <string name="order_sender_address">取件地址</string>
+    
+    <string name="order_receiver_name">收件人姓名</string>
+    <string name="order_receiver_phone">收件人电话</string>
+    <string name="order_receiver_address">收件地址</string>
+    
+    <string name="order_package_type">包裹类型</string>
+    <string name="order_package_weight">重量 (公斤)</string>
+    <string name="order_package_dimensions">尺寸</string>
+    <string name="order_package_description">描述</string>
+    <string name="order_package_value">申报价值</string>
+    
+    <string name="order_service_type">服务类型</string>
+    <string name="order_service_standard">标准配送</string>
+    <string name="order_service_express">快速配送</string>
+    <string name="order_service_same_day">当日达</string>
+    
+    <string name="order_cost_calculation">费用计算</string>
+    <string name="order_distance">距离: %s 公里</string>
+    <string name="order_base_cost">基础费用: %s 缅币</string>
+    <string name="order_service_fee">服务费: %s 缅币</string>
+    <string name="order_total_cost">总费用: %s 缅币</string>
+    
+    <string name="order_place_order">下单</string>
+    <string name="order_confirm_details">确认订单详情</string>
+    <string name="order_payment_method">支付方式</string>
+    <string name="order_cash_on_delivery">货到付款</string>
+    <string name="order_mobile_payment">移动支付</string>
+    
+    <!-- 地址选择 -->
+    <string name="address_select_location">选择位置</string>
+    <string name="address_search_hint">搜索地址或地标</string>
+    <string name="address_use_current_location">使用当前位置</string>
+    <string name="address_saved_addresses">保存的地址</string>
+    <string name="address_add_new">添加新地址</string>
+    <string name="address_home">家</string>
+    <string name="address_work">公司</string>
+    <string name="address_other">其他</string>
+    <string name="address_label">地址标签</string>
+    <string name="address_details">地址详情</string>
+    <string name="address_save_address">保存地址</string>
+    
+    <!-- 订单管理 -->
+    <string name="orders_title">我的订单</string>
+    <string name="orders_all">全部订单</string>
+    <string name="orders_active">进行中</string>
+    <string name="orders_completed">已完成</string>
+    <string name="orders_cancelled">已取消</string>
+    <string name="orders_empty">暂无订单</string>
+    <string name="orders_empty_subtitle">您的订单将显示在这里</string>
+    
+    <string name="order_details_title">订单详情</string>
+    <string name="order_id">订单号</string>
+    <string name="order_status">状态</string>
+    <string name="order_created_at">创建时间</string>
+    <string name="order_estimated_delivery">预计送达</string>
+    <string name="order_courier_info">快递员信息</string>
+    <string name="order_call_courier">联系快递员</string>
+    <string name="order_track_location">位置跟踪</string>
+    <string name="order_cancel_order">取消订单</string>
+    <string name="order_rate_service">评价服务</string>
+    
+    <!-- 订单状态 -->
+    <string name="status_pending">待处理</string>
+    <string name="status_confirmed">已确认</string>
+    <string name="status_picked_up">已取件</string>
+    <string name="status_in_transit">运输中</string>
+    <string name="status_delivering">派送中</string>
+    <string name="status_delivered">已送达</string>
+    <string name="status_cancelled">已取消</string>
+    <string name="status_returned">已退回</string>
+    
+    <!-- 跟踪 -->
+    <string name="tracking_title">跟踪您的订单</string>
+    <string name="tracking_enter_id">输入订单号</string>
+    <string name="tracking_search">搜索</string>
+    <string name="tracking_courier_location">快递员位置</string>
+    <string name="tracking_estimated_arrival">预计到达时间</string>
+    <string name="tracking_order_timeline">订单时间线</string>
+    
+    <!-- 个人中心 -->
+    <string name="profile_title">个人中心</string>
+    <string name="profile_personal_info">个人信息</string>
+    <string name="profile_addresses">地址管理</string>
+    <string name="profile_payment_methods">支付方式</string>
+    <string name="profile_order_history">订单历史</string>
+    <string name="profile_notifications">通知设置</string>
+    <string name="profile_language">语言</string>
+    <string name="profile_help_support">帮助与支持</string>
+    <string name="profile_about">关于</string>
+    <string name="profile_logout">退出登录</string>
+    
+    <string name="profile_edit_info">编辑信息</string>
+    <string name="profile_change_phone">更换手机号</string>
+    <string name="profile_change_password">修改密码</string>
+    
+    <!-- 支付方式 -->
+    <string name="payment_methods_title">支付方式</string>
+    <string name="payment_add_method">添加支付方式</string>
+    <string name="payment_cash_on_delivery">货到付款</string>
+    <string name="payment_kbz_pay">KBZ Pay</string>
+    <string name="payment_wave_money">Wave Money</string>
+    <string name="payment_cb_pay">CB Pay</string>
+    <string name="payment_aya_pay">AYA Pay</string>
+    
+    <!-- 通知 -->
+    <string name="notifications_title">通知</string>
+    <string name="notifications_order_updates">订单更新</string>
+    <string name="notifications_promotions">促销信息</string>
+    <string name="notifications_system">系统通知</string>
+    <string name="notifications_empty">暂无通知</string>
+    
+    <!-- 帮助和支持 -->
+    <string name="help_title">帮助与支持</string>
+    <string name="help_faq">常见问题</string>
+    <string name="help_contact_us">联系我们</string>
+    <string name="help_report_issue">问题反馈</string>
+    <string name="help_terms_conditions">服务条款</string>
+    <string name="help_privacy_policy">隐私政策</string>
+    
+    <!-- 错误消息 -->
+    <string name="error_network">网络连接错误</string>
+    <string name="error_server">服务器错误</string>
+    <string name="error_unknown">发生未知错误</string>
+    <string name="error_location_permission">需要位置权限</string>
+    <string name="error_location_unavailable">位置服务不可用</string>
+    <string name="error_invalid_input">请检查您的输入</string>
+    <string name="error_order_not_found">未找到订单</string>
+    <string name="error_payment_failed">支付失败</string>
+    
+    <!-- 成功消息 -->
+    <string name="success_order_placed">订单提交成功</string>
+    <string name="success_order_cancelled">订单取消成功</string>
+    <string name="success_profile_updated">资料更新成功</string>
+    <string name="success_address_saved">地址保存成功</string>
+    <string name="success_payment_added">支付方式添加成功</string>
+    
+    <!-- 权限 -->
+    <string name="permission_location_title">位置权限</string>
+    <string name="permission_location_message">我们需要位置权限来提供准确的取件和配送服务</string>
+    <string name="permission_camera_title">相机权限</string>
+    <string name="permission_camera_message">需要相机权限来扫描二维码</string>
+    <string name="permission_denied">权限被拒绝</string>
+    <string name="permission_grant">授予权限</string>
+    
+    <!-- 缅甸本地化 -->
+    <string name="myanmar_currency">缅币</string>
+    <string name="myanmar_phone_prefix">+95</string>
+    <string name="myanmar_regions">地区</string>
+    <string name="myanmar_yangon">仰光</string>
+    <string name="myanmar_mandalay">曼德勒</string>
+    <string name="myanmar_naypyidaw">内比都</string>
+    
+    <!-- 包裹类型 -->
+    <string name="package_type_document">文件</string>
+    <string name="package_type_food">食品</string>
+    <string name="package_type_electronics">电子产品</string>
+    <string name="package_type_clothing">服装</string>
+    <string name="package_type_fragile">易碎物品</string>
+    <string name="package_type_other">其他</string>
+</resources>

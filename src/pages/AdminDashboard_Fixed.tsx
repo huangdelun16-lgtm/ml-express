@@ -343,14 +343,6 @@ const AdminDashboard: React.FC = () => {
       stats: `${dashboardStats.totalOrders} 个订单`,
     },
     {
-      title: '订单管理',
-      description: '订单处理和状态跟踪',
-      icon: <LocalShipping sx={{ fontSize: 48, color: '#52c41a' }} />,
-      path: '/admin/courier-orders',
-      permission: 'employee',
-      stats: `${dashboardStats.pendingOrders} 待处理`,
-    },
-    {
       title: '用户管理',
       description: '客户信息和行为分析',
       icon: <People sx={{ fontSize: 48, color: '#faad14' }} />,

@@ -178,7 +178,6 @@ export class SafeLocalStorage {
       const criticalKeys = [
         'adminUser',
         'company_employees',
-        'courier_orders',
         'finance_records',
       ];
       
