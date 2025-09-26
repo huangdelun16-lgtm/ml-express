@@ -116,7 +116,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
       window.location.replace(newUrl);
       // 备用方案
       setTimeout(() => {
-        window.location.reload(true);
+        window.location.reload();
       }, 100);
     }
   };
