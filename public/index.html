@@ -12,15 +12,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // 🚨 紧急版本检测和强制更新
-      window.__ML_BUILD_ID__ = 20241228006;
-      window.__ML_VERSION__ = "2.5.6";
-      window.__CACHE_BUST__ = Date.now() + Math.random();
-      window.__FORCE_RELOAD__ = true;
+      // 🚨 版本检测 - 移除自动刷新逻辑
+      window.__ML_BUILD_ID__ = 20241228007;
+      window.__ML_VERSION__ = "2.5.7";
       
-      // 强制清除所有缓存
+      // 只清除缓存，不自动刷新
       try {
-        console.log('🚨 紧急版本 2.5.6 启动');
+        console.log('🚨 稳定版本 2.5.7 启动');
         
         // 清除所有localStorage
         const adminUser = localStorage.getItem('adminUser');
@@ -28,15 +26,9 @@
         if (adminUser) {
           localStorage.setItem('adminUser', adminUser);
         }
-        localStorage.setItem('app_version', '2.5.6');
+        localStorage.setItem('app_version', '2.5.7');
         
-        // 强制刷新页面
-        if (window.location.href.includes('admin/dashboard')) {
-          console.log('🔄 检测到管理后台，强制刷新到新版本');
-          setTimeout(() => {
-            window.location.href = window.location.href + '?v=2.5.6&force=' + Date.now();
-          }, 1000);
-        }
+        console.log('✅ 缓存已清除，页面稳定加载');
       } catch (e) {
         console.warn('缓存清除失败:', e);
       }

@@ -88,10 +88,12 @@ const AdminDashboardUltimate: React.FC = () => {
     }
   };
 
-  // 强制刷新
+  // 强制刷新 - 避免无限循环
   const forceRefresh = () => {
-    console.log('🔄 强制刷新页面');
-    window.location.href = window.location.href.split('?')[0] + '?v=2.5.6&force=' + Date.now();
+    console.log('🔄 手动强制刷新页面');
+    // 清除URL参数，避免无限循环
+    const baseUrl = window.location.href.split('?')[0];
+    window.location.href = baseUrl + '?v=2.5.7&manual=' + Date.now();
   };
 
   return (
@@ -99,13 +101,13 @@ const AdminDashboardUltimate: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            🚨 终极修复版本 v2.5.6 - 如果卡片还是不能点击，请点击右上角"强制刷新"
+            🚨 稳定版本 v2.5.7 - 已修复无限刷新问题，卡片现在应该可以正常点击
           </Typography>
         </Alert>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Typography variant="h4" sx={{ color: 'white', fontWeight: 600 }}>
-            🚨 终极修复版本 v2.5.6
+            🚨 稳定版本 v2.5.7
           </Typography>
           <Button
             variant="contained"
