@@ -317,7 +317,12 @@ const AdminDashboard: React.FC = () => {
 
   // 权限检查
   const hasPermission = useCallback((requiredRole: string): boolean => {
-    if (!user) return false;
+    console.log('🔍 权限检查开始:', { user: user?.role, requiredRole });
+    
+    if (!user) {
+      console.warn('❌ 用户未登录');
+      return false;
+    }
     
     const roleHierarchy = {
       'admin': 4,
@@ -329,7 +334,16 @@ const AdminDashboard: React.FC = () => {
     const userLevel = roleHierarchy[user.role as keyof typeof roleHierarchy] || 0;
     const requiredLevel = roleHierarchy[requiredRole as keyof typeof roleHierarchy] || 0;
     
-    return userLevel >= requiredLevel;
+    const hasAccess = userLevel >= requiredLevel;
+    console.log('🔐 权限计算:', { 
+      userRole: user.role, 
+      userLevel, 
+      requiredRole, 
+      requiredLevel, 
+      hasAccess 
+    });
+    
+    return hasAccess;
   }, [user]);
 
   // 获取卡片数据
@@ -386,18 +400,25 @@ const AdminDashboard: React.FC = () => {
 
   // 处理卡片点击
   const handleCardClick = useCallback((path: string, permission: string) => {
+    console.log('🎯 卡片点击事件触发:', { path, permission, user: user?.role });
+    
     try {
-      if (!hasPermission(permission)) {
-        showNotification('您没有访问此功能的权限', 'warning');
+      const hasAccess = hasPermission(permission);
+      console.log('🔐 权限检查结果:', { hasAccess, userRole: user?.role, requiredPermission: permission });
+      
+      if (!hasAccess) {
+        console.warn('❌ 权限不足:', { userRole: user?.role, requiredPermission: permission });
+        showNotification(`权限不足！需要 ${permission} 权限，当前为 ${user?.role}`, 'warning');
         return;
       }
       
+      console.log('✅ 权限通过，开始导航到:', path);
       safeNavigate(path);
     } catch (error) {
-      console.error('卡片点击失败:', error);
+      console.error('❌ 卡片点击失败:', error);
       showNotification('操作失败，请重试', 'error');
     }
-  }, [hasPermission, showNotification, safeNavigate]);
+  }, [hasPermission, showNotification, safeNavigate, user]);
 
   // 渲染加载状态
   if (loading) {
@@ -613,7 +634,10 @@ const AdminDashboard: React.FC = () => {
                       boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
                     } : {},
                   }}
-                  onClick={() => hasAccess && handleCardClick(card.path, card.permission)}
+                  onClick={() => {
+                    console.log('🖱️ 卡片被点击:', card.title, { hasAccess, path: card.path, permission: card.permission });
+                    handleCardClick(card.path, card.permission);
+                  }}
                 >
                   <CardContent sx={{ 
                     textAlign: 'center', 
