@@ -35,7 +35,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && cp public/version.json build/version.json",
+    "build": "react-scripts build && copy public\\version.json build\\version.json",
     "build:win": "react-scripts build && copy public\\version.json build\\version.json",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
