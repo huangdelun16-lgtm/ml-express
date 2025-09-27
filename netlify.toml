@@ -1,25 +1,8 @@
 [build]
-  publish = "build"
   command = "npm run build"
-
-[build.environment]
-  NODE_VERSION = "18"
-
-[[redirects]]
-  from = "/version.json"
-  to = "/version.json"
-  status = 200
-  force = false
+  publish = "build"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[context.production.environment]
-  REACT_APP_SUPABASE_URL = "https://cabtgyzmokewrgkxjgvg.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhYnRneXptb2tld3Jna3hqZ3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzMjAyOTMsImV4cCI6MjA3MDg5NjI5M30.kL_XN5ySfmlD5YIdXr5AgLHs3-4j0y90a9LOEUOjcnc"
-
-[context.deploy-preview.environment]
-  REACT_APP_SUPABASE_URL = "https://cabtgyzmokewrgkxjgvg.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhYnRneXptb2tld3Jna3hqZ3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzMjAyOTMsImV4cCI6MjA3MDg5NjI5M30.kL_XN5ySfmlD5YIdXr5AgLHs3-4j0y90a9LOEUOjcnc"

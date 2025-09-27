@@ -1,418 +1,56 @@
 import React from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
-import {
-  LocalShipping,
-  Speed,
-  Security,
-  Support,
-  TrendingUp,
-  ArrowForward,
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '../contexts/LanguageContext';
 
 const HomePage: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const navigate = useNavigate();
-  const { t } = useLanguage();
-
-  const features = [
-    {
-      icon: (
-        <Box sx={{
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          boxShadow: '0 8px 32px rgba(25, 118, 210, 0.3)',
-        }}>
-          <Speed sx={{ fontSize: 40, color: 'white' }} />
-        </Box>
-      ),
-      title: t('feature1Title'),
-      description: t('feature1Desc'),
-    },
-    {
-      icon: (
-        <Box sx={{
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #2e7d32 0%, #4caf50 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          boxShadow: '0 8px 32px rgba(46, 125, 50, 0.3)',
-        }}>
-          <Security sx={{ fontSize: 40, color: 'white' }} />
-        </Box>
-      ),
-      title: t('feature2Title'),
-      description: t('feature2Desc'),
-    },
-    {
-      icon: (
-        <Box sx={{
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #f57c00 0%, #ff9800 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          boxShadow: '0 8px 32px rgba(245, 124, 0, 0.3)',
-        }}>
-          <Support sx={{ fontSize: 40, color: 'white' }} />
-        </Box>
-      ),
-      title: t('feature3Title'),
-      description: t('feature3Desc'),
-    },
-    {
-      icon: (
-        <Box sx={{
-          width: 80,
-          height: 80,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          boxShadow: '0 8px 32px rgba(123, 31, 162, 0.3)',
-        }}>
-          <TrendingUp sx={{ fontSize: 40, color: 'white' }} />
-        </Box>
-      ),
-      title: t('feature4Title'),
-      description: t('feature4Desc'),
-    },
-  ];
-
-
   return (
-    <Box>
-      {/* Hero Section */}
-      <Box
-        sx={{
-          background: `
-            linear-gradient(135deg, rgba(15, 32, 39, 0.9) 0%, rgba(32, 58, 67, 0.9) 50%, rgba(44, 83, 100, 0.9) 100%),
-            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%)
-          `,
-          color: 'white',
-          py: { xs: 10, md: 16 },
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Cpath d="m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-            opacity: 0.1,
-          }
-        }}
-      >
-        <Container maxWidth="lg">
-          <Typography
-            variant={isMobile ? 'h3' : 'h2'}
-            component="h1"
-            sx={{ 
-              fontWeight: 700, 
-              mb: 2, 
-              letterSpacing: '2px',
-              fontFamily: '"Roboto", "Arial", sans-serif',
-              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      textAlign: 'center',
+      padding: '20px'
+    }}>
+      <div style={{ maxWidth: '800px' }}>
+        <h1 style={{ fontSize: '3rem', marginBottom: '20px', fontWeight: 'bold' }}>
+          MARKET LINK EXPRESS
+        </h1>
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '40px', opacity: 0.9 }}>
+          缅甸专业快递服务
+        </h2>
+        <p style={{ fontSize: '1.2rem', marginBottom: '40px', lineHeight: '1.6' }}>
+          快速、安全、可靠的快递服务，连接缅甸各地
+        </p>
+        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <a 
+            href="/admin/login" 
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              color: 'white',
+              padding: '15px 30px',
+              borderRadius: '25px',
+              textDecoration: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            MARKET LINK{' '}
-            <Box component="span" sx={{ fontWeight: 300, opacity: 0.9 }}>
-              EXPRESS
-            </Box>
-          </Typography>
-          <Typography variant="h5" sx={{ opacity: 0.9, mb: 4, maxWidth: 600, mx: 'auto' }}>
-            {t('heroSubtitle')}
-          </Typography>
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 3, 
-            justifyContent: 'center', 
-            flexWrap: 'wrap',
-            position: 'relative',
-            zIndex: 1,
-          }}>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={() => navigate('/tracking')}
-              sx={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                color: '#2c3e50',
-                px: 5,
-                py: 2,
-                fontSize: '1.1rem',
-                fontWeight: 700,
-                borderRadius: '50px',
-                textTransform: 'none',
-                boxShadow: '0 8px 32px rgba(255,255,255,0.3)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 12px 40px rgba(255,255,255,0.4)',
-                  background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-                },
-              }}
-            >
-              {t('trackPackage')}
-            </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              onClick={() => navigate('/services')}
-              sx={{
-                borderColor: 'rgba(255,255,255,0.5)',
-                color: 'white',
-                px: 5,
-                py: 2,
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                borderRadius: '50px',
-                textTransform: 'none',
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  borderColor: 'white',
-                  background: 'rgba(255,255,255,0.2)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 32px rgba(255,255,255,0.2)',
-                },
-              }}
-            >
-              {t('learnServices')}
-            </Button>
-          </Box>
-        </Container>
-      </Box>
-
-      {/* 服务特色 */}
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Typography
-          variant="h3"
-          component="h2"
-          align="center"
-          sx={{ mb: 6, fontWeight: 600 }}
-        >
-          {t('featuresTitle')}
-        </Typography>
-        
-        <Grid container spacing={4}>
-          {features.map((feature, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card
-                sx={{
-                  height: '100%',
-                  textAlign: 'center',
-                  p: 4,
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                  border: '1px solid rgba(25, 118, 210, 0.1)',
-                  borderRadius: '20px',
-                  boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
-                    transform: 'scaleX(0)',
-                    transformOrigin: 'left',
-                    transition: 'transform 0.3s ease',
-                  },
-                  '&:hover': {
-                    transform: 'translateY(-12px)',
-                    boxShadow: '0 20px 60px rgba(25, 118, 210, 0.15)',
-                    '&::before': {
-                      transform: 'scaleX(1)',
-                    },
-                  },
-                }}
-              >
-                <Box sx={{ mb: 4 }}>{feature.icon}</Box>
-                <Typography variant="h6" component="h3" sx={{ mb: 2, fontWeight: 600 }}>
-                  {feature.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {feature.description}
-                </Typography>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
-
-
-      {/* 服务流程 */}
-      <Box
-        sx={{
-          background: `
-            linear-gradient(135deg, rgba(15, 32, 39, 0.95) 0%, rgba(32, 58, 67, 0.95) 50%, rgba(44, 83, 100, 0.95) 100%),
-            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%)
-          `,
-          py: 8,
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Typography
-            variant="h3"
-            component="h2"
-            align="center"
-            sx={{ mb: 6, fontWeight: 600, color: 'white' }}
-          >
-            {t('serviceFlow')}
-          </Typography>
-          
-          <Grid container spacing={4}>
-            {[
-              { step: '1', title: t('step1Title'), description: t('step1Desc') },
-              { step: '2', title: t('step2Title'), description: t('step2Desc') },
-              { step: '3', title: t('step3Title'), description: t('step3Desc') },
-              { step: '4', title: t('step4Title'), description: t('step4Desc') },
-              { step: '5', title: t('step5Title'), description: t('step5Desc') },
-            ].map((item, index) => (
-            <Grid item xs={12} sm={6} md={2.4} key={index}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                    mx: 'auto',
-                    mb: 2,
-                    boxShadow: '0 8px 32px rgba(25, 118, 210, 0.4)',
-                  }}
-                >
-                  {item.step}
-                </Box>
-                <Typography variant="h6" component="h3" sx={{ mb: 1, fontWeight: 600, color: 'white' }}>
-                  {item.title}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                  {item.description}
-                </Typography>
-              </Box>
-            </Grid>
-          ))}
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* 快速查询和价格咨询 */}
-      <Box sx={{ backgroundColor: 'primary.main', color: 'white', py: 8 }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={6}>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h3" component="h2" sx={{ mb: 3, fontWeight: 600 }}>
-                  {t('quickTrack')}
-                </Typography>
-                <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-                  {t('quickTrackDesc')}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={() => navigate('/tracking')}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'white',
-                    px: 4,
-                    py: 1.5,
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    '&:hover': {
-                      borderColor: 'white',
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                    },
-                  }}
-                  endIcon={<ArrowForward />}
-                >
-                  {t('trackNow')}
-                </Button>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h3" component="h2" sx={{ mb: 3, fontWeight: 600 }}>
-                  {t('getBestPrice')}
-                </Typography>
-                <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
-                  {t('getBestPriceDesc')}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={() => navigate('/pricing')}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'white',
-                    px: 4,
-                    py: 1.5,
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    '&:hover': {
-                      borderColor: 'white',
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                    },
-                  }}
-                  endIcon={<ArrowForward />}
-                >
-                  {t('getQuote')}
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
-    </Box>
+            管理后台
+          </a>
+        </div>
+      </div>
+    </div>
   );
 };
 
