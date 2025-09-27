@@ -56,38 +56,7 @@ const orderStatusData = [
   { name: '已取消', value: 15, color: '#f5222d' },
 ];
 
-const recentOrdersData = [
-  {
-    key: '1',
-    orderId: 'ML001234',
-    customer: '张三',
-    phone: '09-123456789',
-    status: '配送中',
-    amount: '15,000 MMK',
-    courier: '李师傅',
-    time: '10:30',
-  },
-  {
-    key: '2',
-    orderId: 'ML001235',
-    customer: '李四',
-    phone: '09-987654321',
-    status: '已完成',
-    amount: '8,500 MMK',
-    courier: '王师傅',
-    time: '09:45',
-  },
-  {
-    key: '3',
-    orderId: 'ML001236',
-    customer: 'Aung Ko',
-    phone: '09-555666777',
-    status: '待接单',
-    amount: '12,000 MMK',
-    courier: '-',
-    time: '11:15',
-  },
-];
+const recentOrdersData: any[] = [];
 
 const topCouriers = [
   {

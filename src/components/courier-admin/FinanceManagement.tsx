@@ -57,41 +57,7 @@ const revenueData = [
   { month: '6月', income: 3800000, expense: 1200000, profit: 2600000 },
 ];
 
-const mockTransactions: Transaction[] = [
-  {
-    key: '1',
-    id: 'T001234',
-    type: 'income',
-    amount: 15000,
-    description: '订单收入',
-    orderId: 'ML001234',
-    date: '2024-01-15 10:30:00',
-    status: 'completed',
-  },
-  {
-    key: '2',
-    id: 'T001235',
-    type: 'commission',
-    amount: -4500,
-    description: '快递员佣金',
-    orderId: 'ML001234',
-    courierId: 'C001',
-    courierName: '李师傅',
-    date: '2024-01-15 10:35:00',
-    status: 'completed',
-  },
-  {
-    key: '3',
-    id: 'T001236',
-    type: 'expense',
-    amount: -2000,
-    description: '燃油补贴',
-    courierId: 'C002',
-    courierName: '王师傅',
-    date: '2024-01-15 09:00:00',
-    status: 'completed',
-  },
-];
+const mockTransactions: Transaction[] = [];
 
 const FinanceManagement: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
