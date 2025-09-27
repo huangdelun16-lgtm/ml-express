@@ -29,7 +29,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
         
         // 强制显示更新通知（因为我们刚刚移除了订单管理模块）
         const currentAppVersion = localStorage.getItem('app_version') || '2.1.0';
-        const newAppVersion = '2.5.1'; // 🛠️ 修复构建问题 - 正式上线
+        const newAppVersion = '2.5.2'; // 🎯 修复导航功能 - 正式上线
         
         if (currentAppVersion !== newAppVersion) {
           console.log('✅ 发现新版本!', newAppVersion);
@@ -84,7 +84,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     setShowUpdate(false);
     
     // 更新版本号
-    localStorage.setItem('app_version', '2.5.1');
+    localStorage.setItem('app_version', '2.5.2');
     
     // 清除所有缓存
     if ('caches' in window) {
@@ -102,7 +102,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     if (adminUser) {
       localStorage.setItem('adminUser', adminUser);
     }
-    localStorage.setItem('app_version', '2.5.1');
+    localStorage.setItem('app_version', '2.5.2');
     
     // 清除浏览器缓存并强制刷新
     const timestamp = Date.now();

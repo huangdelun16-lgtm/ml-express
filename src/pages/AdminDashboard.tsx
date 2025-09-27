@@ -333,12 +333,12 @@ const AdminDashboard: React.FC = () => {
   }, [user]);
 
   // 获取卡片数据
-  const getCardData = useMemo(() => [
+  const cardData = useMemo(() => [
     {
-      title: '仪表板',
-      description: '实时数据统计和系统监控',
+      title: '同城包裹',
+      description: '同城快递包裹管理',
       icon: <Assessment sx={{ fontSize: 48, color: '#42a5f5' }} />,
-      path: '/admin/courier-dashboard',
+      path: '/admin/city-packages',
       permission: 'employee',
       stats: `${dashboardStats.totalOrders} 个订单`,
     },
@@ -346,7 +346,7 @@ const AdminDashboard: React.FC = () => {
       title: '用户管理',
       description: '客户信息和行为分析',
       icon: <People sx={{ fontSize: 48, color: '#faad14' }} />,
-      path: '/admin/courier-users',
+      path: '/admin/users',
       permission: 'accountant',
       stats: `${employees.length} 个用户`,
     },
@@ -354,7 +354,7 @@ const AdminDashboard: React.FC = () => {
       title: '快递员管理',
       description: '快递员信息和业绩管理',
       icon: <LocalShipping sx={{ fontSize: 48, color: '#722ed1' }} />,
-      path: '/admin/courier-management',
+      path: '/admin/couriers',
       permission: 'employee',
       stats: `${dashboardStats.activeEmployees} 在线`,
     },
@@ -594,7 +594,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* 功能模块卡片 */}
         <Grid container spacing={3}>
-          {getCardData.map((card) => {
+          {cardData.map((card) => {
             const hasAccess = hasPermission(card.permission);
             
             return (

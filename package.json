@@ -1,6 +1,6 @@
 {
   "name": "ml-express-website",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "缅甸快递公司官方网站",
   "private": true,
   "dependencies": {
