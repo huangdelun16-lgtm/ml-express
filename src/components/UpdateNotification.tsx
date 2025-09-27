@@ -27,12 +27,17 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
       try {
         console.log('🔍 检查更新...');
         
-        // 强制显示更新通知（因为我们刚刚移除了订单管理模块）
+        // 强制显示更新通知（因为我们刚刚修复了卡片点击问题）
         const currentAppVersion = localStorage.getItem('app_version') || '2.1.0';
-        const newAppVersion = '2.5.4'; // 🎯 修复导航功能 - 正式上线
+        const newAppVersion = '2.5.4'; // 🎯 修复卡片点击功能 - 紧急修复
         
-        if (currentAppVersion !== newAppVersion) {
-          console.log('✅ 发现新版本!', newAppVersion);
+        // 强制显示更新通知，无论当前版本是什么
+        console.log('🔄 强制检查更新:', { currentAppVersion, newAppVersion });
+        const needsUpdate = currentAppVersion !== newAppVersion || 
+                           currentAppVersion.includes('2.5.2') || 
+                           currentAppVersion.includes('2.5.3');
+        if (needsUpdate) {
+          console.log('✅ 发现新版本或需要强制更新!', newAppVersion);
           setShowUpdate(true);
           setLastVersion(currentAppVersion);
           
