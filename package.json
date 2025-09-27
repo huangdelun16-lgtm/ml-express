@@ -1,6 +1,6 @@
 {
   "name": "ml-express-website",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "缅甸快递公司官方网站",
   "private": true,
   "dependencies": {
@@ -35,7 +35,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && copy public\\version.json build\\version.json",
+    "build": "react-scripts build && cp public/version.json build/version.json",
     "build:win": "react-scripts build && copy public\\version.json build\\version.json",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
