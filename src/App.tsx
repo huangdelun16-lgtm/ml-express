@@ -9,7 +9,7 @@ import ServicesPage from './pages/ServicesPage';
 import PricingPage from './pages/PricingPage';
 import ContactPage from './pages/ContactPage';
 import AdminLogin from './pages/AdminLogin';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminDashboardTest from './pages/AdminDashboardTest';
 import AdminFinance from './pages/AdminFinance';
 import AdminInventory from './pages/AdminInventory';
 import AdminPackages from './pages/AdminPackages';
@@ -56,7 +56,7 @@ function App() {
           
           {/* 管理后台路由 */}
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardTest />} />
           <Route path="/admin/finance" element={<AdminFinance />} />
           <Route path="/admin/inventory" element={<AdminPackages />} />
           <Route path="/admin/inventory-items" element={<AdminInventory />} />

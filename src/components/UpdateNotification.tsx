@@ -29,7 +29,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
         
         // 强制显示更新通知（因为我们刚刚修复了卡片点击问题）
         const currentAppVersion = localStorage.getItem('app_version') || '2.1.0';
-        const newAppVersion = '2.5.4'; // 🎯 修复卡片点击功能 - 紧急修复
+        const newAppVersion = '2.5.5'; // 🎯 修复卡片点击功能 - 紧急修复
         
         // 强制显示更新通知，无论当前版本是什么
         console.log('🔄 强制检查更新:', { currentAppVersion, newAppVersion });
@@ -89,7 +89,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     setShowUpdate(false);
     
     // 更新版本号
-        localStorage.setItem('app_version', '2.5.4');
+        localStorage.setItem('app_version', '2.5.5');
     
     // 清除所有缓存
     if ('caches' in window) {
@@ -107,7 +107,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onUpdate }) => 
     if (adminUser) {
       localStorage.setItem('adminUser', adminUser);
     }
-        localStorage.setItem('app_version', '2.5.4');
+        localStorage.setItem('app_version', '2.5.5');
     
     // 清除浏览器缓存并强制刷新
     const timestamp = Date.now();
