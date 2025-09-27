@@ -4,51 +4,38 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1976d2" />
-    <meta name="description" content="MARKETLINK EXPRESS - 缅甸专业快递服务，提供国内快递、国际快递、同城快递等服务。快速、安全、可靠的快递解决方案。" />
-    <meta name="keywords" content="缅甸快递,快递服务,国际快递,国内快递,同城快递,铁路运输,包裹追踪,价格咨询" />
-    <meta name="author" content="MARKETLINK EXPRESS" />
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ml-express.com/" />
-    <meta property="og:title" content="MARKETLINK EXPRESS - 缅甸专业快递服务" />
-    <meta property="og:description" content="提供国内快递、国际快递、同城快递、铁路运输等服务。快速、安全、可靠的快递解决方案。" />
-    <meta property="og:image" content="%PUBLIC_URL%/og-image.jpg" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://ml-express.com/" />
-    <meta property="twitter:title" content="MARKETLINK EXPRESS - 缅甸专业快递服务" />
-    <meta property="twitter:description" content="提供国内快递、国际快递、同城快递、铁路运输等服务。快速、安全、可靠的快递解决方案。" />
-    <meta property="twitter:image" content="%PUBLIC_URL%/og-image.jpg" />
-    
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="缅甸专业快递服务 - 快速、安全、可靠" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // 强制缓存破坏 - 防止旧版本缓存
-      window.__ML_BUILD_ID__ = 20241228005;
-      window.__ML_VERSION__ = "2.5.5";
+      // 🚨 紧急版本检测和强制更新
+      window.__ML_BUILD_ID__ = 20241228006;
+      window.__ML_VERSION__ = "2.5.6";
       window.__CACHE_BUST__ = Date.now() + Math.random();
       window.__FORCE_RELOAD__ = true;
       
-      // 强制清除所有localStorage缓存（除了用户登录信息）
+      // 强制清除所有缓存
       try {
+        console.log('🚨 紧急版本 2.5.6 启动');
+        
+        // 清除所有localStorage
         const adminUser = localStorage.getItem('adminUser');
         localStorage.clear();
         if (adminUser) {
           localStorage.setItem('adminUser', adminUser);
         }
-        localStorage.setItem('app_version', '2.5.5');
-        console.log('🔄 强制清除缓存完成，版本更新到 2.5.5');
+        localStorage.setItem('app_version', '2.5.6');
         
         // 强制刷新页面
         if (window.location.href.includes('admin/dashboard')) {
-          console.log('🔄 检测到管理后台页面，强制刷新');
-          window.location.reload(true);
+          console.log('🔄 检测到管理后台，强制刷新到新版本');
+          setTimeout(() => {
+            window.location.href = window.location.href + '?v=2.5.6&force=' + Date.now();
+          }, 1000);
         }
       } catch (e) {
         console.warn('缓存清除失败:', e);
