@@ -30,8 +30,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       // 强制缓存破坏 - 防止旧版本缓存
-      window.__ML_BUILD_ID__ = 20241228004;
-      window.__ML_VERSION__ = "2.5.4";
+      window.__ML_BUILD_ID__ = 20241228005;
+      window.__ML_VERSION__ = "2.5.5";
       window.__CACHE_BUST__ = Date.now() + Math.random();
       window.__FORCE_RELOAD__ = true;
       
@@ -42,8 +42,14 @@
         if (adminUser) {
           localStorage.setItem('adminUser', adminUser);
         }
-        localStorage.setItem('app_version', '2.5.4');
-        console.log('🔄 强制清除缓存完成，版本更新到 2.5.4');
+        localStorage.setItem('app_version', '2.5.5');
+        console.log('🔄 强制清除缓存完成，版本更新到 2.5.5');
+        
+        // 强制刷新页面
+        if (window.location.href.includes('admin/dashboard')) {
+          console.log('🔄 检测到管理后台页面，强制刷新');
+          window.location.reload(true);
+        }
       } catch (e) {
         console.warn('缓存清除失败:', e);
       }
