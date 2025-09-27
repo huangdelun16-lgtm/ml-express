@@ -1,487 +1,679 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Box,
   Container,
-  Typography,
   Grid,
   Card,
   CardContent,
-  AppBar,
-  Toolbar,
-  Avatar,
-  Menu,
-  MenuItem,
-  Divider,
-  IconButton,
+  Typography,
+  Box,
   Button,
+  Chip,
   Alert,
   Snackbar,
+  CircularProgress,
+  Backdrop,
 } from '@mui/material';
 import {
   Assessment,
   LocalShipping,
+  People,
   Settings,
   MyLocation,
-  Person,
-  Logout,
+  ExitToApp,
+  Refresh,
+  Dashboard,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import PremiumBackground from '../components/PremiumBackground';
 import { useLanguage } from '../contexts/LanguageContext';
 
+// 类型定义
 interface User {
   username: string;
   role: string;
-  loginTime: string;
+  loginTime?: string;
 }
 
-interface FinanceTxn {
+interface Package {
   id: string;
-  type: '收入' | '支出';
+  trackingNumber: string;
+  status: string;
+  sender: string;
+  receiver: string;
   amount: number;
-  note: string;
-  date: string;
-  category?: string;
+  createdAt: string;
+}
+
+interface FinanceRecord {
+  id: string;
+  type: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+}
+
+interface DashboardStats {
+  totalOrders: number;
+  pendingOrders: number;
+  completedOrders: number;
+  totalRevenue: number;
+  activeEmployees: number;
+  totalEmployees: number;
+}
+
+interface NotificationState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'warning' | 'info';
 }
 
 const AdminDashboard: React.FC = () => {
+  // 基础状态
   const [user, setUser] = useState<User | null>(null);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [finance, setFinance] = useState<FinanceTxn[]>([]);
-  const [toast, setToast] = useState<{ open: boolean; text: string; severity: 'success' | 'error' | 'info' | 'warning' }>({ 
-    open: false, 
-    text: '', 
-    severity: 'success' 
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [finance, setFinance] = useState<FinanceRecord[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  
+  // UI状态
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notification, setNotification] = useState<NotificationState>({
+    open: false,
+    message: '',
+    severity: 'info'
   });
+  
+  // Hooks
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const mountedRef = useRef(true);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 计算仪表板统计数据
+  const dashboardStats = useMemo<DashboardStats>(() => {
+    const totalOrders = packages.length;
+    const pendingOrders = packages.filter(pkg => 
+      ['已下单', '待确认', '运输中'].includes(pkg.status)
+    ).length;
+    const completedOrders = packages.filter(pkg => 
+      pkg.status === '已送达'
+    ).length;
+    const totalRevenue = finance
+      .filter(record => record.type === 'income' && record.status === 'completed')
+      .reduce((sum, record) => sum + record.amount, 0);
+    const activeEmployees = employees.filter(emp => emp.status === 'active').length;
+    const totalEmployees = employees.length;
 
-  useEffect(() => {
-    // 检查登录状态
-    const userData = localStorage.getItem('adminUser');
-    if (!userData) {
-      navigate('/admin/login');
-      return;
-    }
+    return {
+      totalOrders,
+      pendingOrders,
+      completedOrders,
+      totalRevenue,
+      activeEmployees,
+      totalEmployees,
+    };
+  }, [packages, finance, employees]);
 
+  // 显示通知
+  const showNotification = useCallback((message: string, severity: NotificationState['severity'] = 'info') => {
+    if (!mountedRef.current) return;
+    
+    setNotification({
+      open: true,
+      message,
+      severity,
+    });
+  }, []);
+
+  // 关闭通知
+  const handleCloseNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, open: false }));
+  }, []);
+
+  // 安全的localStorage操作
+  const safeLocalStorageGet = useCallback((key: string, defaultValue: any = null) => {
     try {
-      const userInfo = JSON.parse(userData);
-      setUser(userInfo);
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`读取localStorage失败 [${key}]:`, error);
+      return defaultValue;
+    }
+  }, []);
+
+  const safeLocalStorageSet = useCallback((key: string, value: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error(`保存localStorage失败 [${key}]:`, error);
+      showNotification(`数据保存失败: ${key}`, 'error');
+      return false;
+    }
+  }, [showNotification]);
+
+  // 加载用户数据
+  const loadUserData = useCallback(async () => {
+    try {
+      const userData = safeLocalStorageGet('adminUser');
+      if (!userData) {
+        navigate('/admin/login');
+        return false;
+      }
       
-      // 读取财务数据
-      try {
-        const rawFinance = localStorage.getItem('finance');
-        setFinance(rawFinance ? JSON.parse(rawFinance) : []);
-      } catch { 
-        setFinance([]); 
+      if (mountedRef.current) {
+        setUser(userData);
+      }
+      return true;
+    } catch (error) {
+      console.error('加载用户数据失败:', error);
+      navigate('/admin/login');
+      return false;
+    }
+  }, [navigate, safeLocalStorageGet]);
+
+  // 加载包裹数据
+  const loadPackagesData = useCallback(async () => {
+    try {
+      const packagesData = safeLocalStorageGet('packages', []);
+      
+      if (mountedRef.current) {
+        setPackages(Array.isArray(packagesData) ? packagesData : []);
       }
     } catch (error) {
-      navigate('/admin/login');
+      console.error('加载包裹数据失败:', error);
+      showNotification('加载包裹数据失败', 'error');
     }
-  }, [navigate]);
+  }, [safeLocalStorageGet, showNotification]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminUser');
-    navigate('/admin/login');
-  };
+  // 加载财务数据
+  const loadFinanceData = useCallback(async () => {
+    try {
+      const financeData = safeLocalStorageGet('finance_records', []);
+      
+      if (mountedRef.current) {
+        setFinance(Array.isArray(financeData) ? financeData : []);
+      }
+    } catch (error) {
+      console.error('加载财务数据失败:', error);
+      showNotification('加载财务数据失败', 'error');
+    }
+  }, [safeLocalStorageGet, showNotification]);
 
+  // 加载员工数据
+  const loadEmployeesData = useCallback(async () => {
+    try {
+      const employeesData = safeLocalStorageGet('company_employees', []);
+      
+      if (mountedRef.current) {
+        setEmployees(Array.isArray(employeesData) ? employeesData : []);
+      }
+    } catch (error) {
+      console.error('加载员工数据失败:', error);
+      showNotification('加载员工数据失败', 'error');
+    }
+  }, [safeLocalStorageGet, showNotification]);
+
+  // 加载所有数据
+  const loadAllData = useCallback(async () => {
+    if (!mountedRef.current) return;
+    
+    setLoading(true);
+    
+    try {
+      // 检查用户登录状态
+      const userLoaded = await loadUserData();
+      if (!userLoaded) return;
+      
+      // 并行加载所有数据
+      await Promise.allSettled([
+        loadPackagesData(),
+        loadFinanceData(),
+        loadEmployeesData(),
+      ]);
+      
+      if (mountedRef.current) {
+        showNotification('数据加载完成', 'success');
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      if (mountedRef.current) {
+        showNotification('数据加载失败，请重试', 'error');
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [loadUserData, loadPackagesData, loadFinanceData, loadEmployeesData, showNotification]);
+
+  // 刷新数据
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    
+    setRefreshing(true);
+    
+    try {
+      await loadAllData();
+      showNotification('数据刷新完成', 'success');
+    } catch (error) {
+      console.error('刷新数据失败:', error);
+      showNotification('刷新失败，请重试', 'error');
+    } finally {
+      if (mountedRef.current) {
+        setRefreshing(false);
+      }
+    }
+  }, [refreshing, loadAllData, showNotification]);
+
+  // 安全的导航函数
+  const safeNavigate = useCallback((path: string) => {
+    try {
+      navigate(path);
+    } catch (error) {
+      console.error('导航失败:', error);
+      showNotification('页面跳转失败', 'error');
+    }
+  }, [navigate, showNotification]);
+
+  // 登出处理
+  const handleLogout = useCallback(() => {
+    try {
+      // 清理定时器
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      
+      // 清理用户数据
+      localStorage.removeItem('adminUser');
+      
+      // 导航到登录页
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('登出失败:', error);
+      showNotification('登出失败', 'error');
+    }
+  }, [navigate, showNotification]);
+
+  // 组件挂载时加载数据
+  useEffect(() => {
+    mountedRef.current = true;
+    loadAllData();
+    
+    // 设置自动刷新（每5分钟）
+    refreshIntervalRef.current = setInterval(() => {
+      if (mountedRef.current) {
+        loadAllData();
+      }
+    }, 5 * 60 * 1000);
+    
+    return () => {
+      mountedRef.current = false;
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [loadAllData]);
+
+  // 权限检查
+  const hasPermission = useCallback((requiredRole: string): boolean => {
+    if (!user) return false;
+    
+    const roleHierarchy = {
+      'admin': 4,
+      'manager': 3,
+      'accountant': 2,
+      'employee': 1,
+    };
+    
+    const userLevel = roleHierarchy[user.role as keyof typeof roleHierarchy] || 0;
+    const requiredLevel = roleHierarchy[requiredRole as keyof typeof roleHierarchy] || 0;
+    
+    return userLevel >= requiredLevel;
+  }, [user]);
+
+  // 获取卡片数据
+  const getCardData = useMemo(() => [
+    {
+      title: '仪表板',
+      description: '实时数据统计和系统监控',
+      icon: <Assessment sx={{ fontSize: 48, color: '#42a5f5' }} />,
+      path: '/admin/courier-dashboard',
+      permission: 'employee',
+      stats: `${dashboardStats.totalOrders} 个订单`,
+    },
+    {
+      title: '用户管理',
+      description: '客户信息和行为分析',
+      icon: <People sx={{ fontSize: 48, color: '#faad14' }} />,
+      path: '/admin/courier-users',
+      permission: 'accountant',
+      stats: `${employees.length} 个用户`,
+    },
+    {
+      title: '快递员管理',
+      description: '快递员信息和业绩管理',
+      icon: <LocalShipping sx={{ fontSize: 48, color: '#722ed1' }} />,
+      path: '/admin/courier-management',
+      permission: 'employee',
+      stats: `${dashboardStats.activeEmployees} 在线`,
+    },
+    {
+      title: '财务管理',
+      description: '收入统计和佣金管理',
+      icon: <Assessment sx={{ fontSize: 48, color: '#f5222d' }} />,
+      path: '/admin/courier-finance',
+      permission: 'accountant',
+      stats: `${dashboardStats.totalRevenue.toLocaleString()} MMK`,
+    },
+    {
+      title: '实时跟踪',
+      description: 'GPS位置监控和路线跟踪',
+      icon: <MyLocation sx={{ fontSize: 48, color: '#722ed1' }} />,
+      path: '/admin/realtime-tracking',
+      permission: 'manager',
+      stats: '位置监控',
+    },
+    {
+      title: '系统设置',
+      description: '价格规则和系统配置',
+      icon: <Settings sx={{ fontSize: 48, color: '#13c2c2' }} />,
+      path: '/admin/courier-settings',
+      permission: 'admin',
+      stats: '系统配置',
+    },
+  ], [dashboardStats, employees.length]);
+
+  // 处理卡片点击
+  const handleCardClick = useCallback((path: string, permission: string) => {
+    try {
+      if (!hasPermission(permission)) {
+        showNotification('您没有访问此功能的权限', 'warning');
+        return;
+      }
+      
+      safeNavigate(path);
+    } catch (error) {
+      console.error('卡片点击失败:', error);
+      showNotification('操作失败，请重试', 'error');
+    }
+  }, [hasPermission, showNotification, safeNavigate]);
+
+  // 渲染加载状态
+  if (loading) {
+    return (
+      <PremiumBackground variant="admin" minHeight="100vh">
+        <Backdrop open={loading} sx={{ color: '#fff', zIndex: 9999 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CircularProgress color="inherit" size={60} />
+            <Typography variant="h6" sx={{ color: 'white' }}>
+              正在加载管理中心...
+            </Typography>
+          </Box>
+        </Backdrop>
+      </PremiumBackground>
+    );
+  }
+
+  // 渲染未登录状态
   if (!user) {
-    return null;
+    return (
+      <PremiumBackground variant="admin" minHeight="100vh">
+        <Container maxWidth="sm" sx={{ py: 8 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            用户未登录，正在跳转到登录页面...
+          </Alert>
+        </Container>
+      </PremiumBackground>
+    );
   }
 
   return (
     <PremiumBackground variant="admin" minHeight="100vh">
-      {/* 顶部导航栏 */}
-      <AppBar position="static" sx={{ 
-        background: 'rgba(255, 255, 255, 0.1)', 
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-      }}>
-        <Toolbar>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mr: 2,
-              boxShadow: '0 4px 20px rgba(44, 62, 80, 0.3)',
-              position: 'relative',
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: '50%',
-                right: 6,
-                width: 8,
-                height: 6,
-                background: 'white',
-                clipPath: 'polygon(0 0, 100% 50%, 0 100%)',
-                transform: 'translateY(-50%)',
-              }
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: '16px',
-                fontWeight: 900,
-                color: 'white',
-                letterSpacing: '-1px',
-                fontFamily: '"Arial Black", sans-serif',
-              }}
-            >
-              ML
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {/* 页面头部 */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2,
+        }}>
+          <Box>
+            <Typography variant="h4" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
+              管理中心
+            </Typography>
+            <Typography variant="subtitle1" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+              欢迎回来，{user.username}
             </Typography>
           </Box>
-          <Typography variant="h6" component="div" sx={{ 
-            flexGrow: 1, 
-            color: 'white', 
-            fontWeight: 700,
-            letterSpacing: '1px',
-          }}>
-            MARKET LINK EXPRESS {t('adminPanel')}
-          </Typography>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* 控制台按钮 */}
+          
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <Button
               variant="outlined"
-              onClick={() => navigate('/admin/control-panel')}
+              startIcon={<Refresh />}
+              onClick={handleRefresh}
+              disabled={refreshing}
               sx={{
-                borderColor: 'rgba(255,255,255,0.3)',
                 color: 'white',
-                borderRadius: '20px',
-                px: 2,
-                py: 0.5,
-                textTransform: 'none',
-                fontWeight: 600,
-                '&:hover': { 
-                  borderColor: 'rgba(255,255,255,0.5)',
-                  background: 'rgba(255,255,255,0.1)',
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': {
+                  borderColor: 'white',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                },
+              }}
+            >
+              {refreshing ? '刷新中...' : '刷新数据'}
+            </Button>
+            
+            <Button
+              variant="outlined"
+              startIcon={<Dashboard />}
+              onClick={() => safeNavigate('/admin/control-panel')}
+              sx={{
+                color: 'white',
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': {
+                  borderColor: 'white',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
                 },
               }}
             >
               控制台
             </Button>
             
-            {/* 云升级按钮 */}
             <Button
-              variant="contained"
-              onClick={() => navigate('/admin/cloud-upgrade')}
+              variant="outlined"
+              startIcon={<ExitToApp />}
+              onClick={handleLogout}
               sx={{
-                background: 'linear-gradient(135deg, #722ed1 0%, #9c27b0 100%)',
-                color: 'white',
-                borderRadius: '20px',
-                px: 2,
-                py: 0.5,
-                textTransform: 'none',
-                fontWeight: 600,
-                boxShadow: '0 4px 20px rgba(156, 39, 176, 0.3)',
-                '&:hover': { 
-                  background: 'linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 6px 25px rgba(156, 39, 176, 0.4)',
+                color: '#f5222d',
+                borderColor: '#f5222d',
+                '&:hover': {
+                  borderColor: '#ff4d4f',
+                  backgroundColor: 'rgba(245, 34, 45, 0.1)',
                 },
               }}
             >
-              ☁️ 云升级
+              退出登录
             </Button>
-            
-            <Typography variant="body2" sx={{ color: 'white' }}>
-              {t('welcome')}，{user.username} ({user.role})
-            </Typography>
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                <Person />
-              </Avatar>
-            </IconButton>
           </Box>
-        </Toolbar>
-      </AppBar>
-
-      {/* 用户菜单 */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
-      >
-        <MenuItem>
-          <Person sx={{ mr: 1 }} />
-          个人信息
-        </MenuItem>
-        <MenuItem>
-          <Settings sx={{ mr: 1 }} />
-          设置
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleLogout}>
-          <Logout sx={{ mr: 1 }} />
-          {t('logout')}
-        </MenuItem>
-      </Menu>
-
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* 管理模块导航 */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 600, color: 'white' }}>
-            管理中心 (v2.2.0 - 已彻底移除订单管理)
-          </Typography>
-          <Grid container spacing={3}>
-            {/* 仪表盘 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/courier-dashboard')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <Assessment sx={{ fontSize: 48, color: '#42a5f5', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    仪表板
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    实时数据统计和系统监控
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* 同城包裹 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/city-packages')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <LocalShipping sx={{ fontSize: 48, color: '#faad14', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    同城包裹
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    直接下单包裹管理和跟踪
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* 快递员管理 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/couriers')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <LocalShipping sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    快递员管理
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    快递员信息和业绩管理
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* 财务管理 */}
-            {(user.role !== 'employee') && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '16px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                    },
-                  }}
-                  onClick={() => navigate('/admin/courier-finance')}
-                >
-                  <CardContent sx={{ 
-                    textAlign: 'center', 
-                    py: 3, 
-                    minHeight: 180, 
-                    height: 180,
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    <Assessment sx={{ fontSize: 48, color: '#f5222d', mb: 2 }} />
-                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                      财务管理
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      收入统计和佣金管理
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* 实时跟踪 - 只有管理员和经理可以访问 */}
-            {(user.role === 'admin' || user.role === 'manager') && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '16px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                    },
-                  }}
-                  onClick={() => navigate('/admin/realtime-tracking')}
-                >
-                  <CardContent sx={{ 
-                    textAlign: 'center', 
-                    py: 3, 
-                    minHeight: 180, 
-                    height: 180,
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    <MyLocation sx={{ fontSize: 48, color: '#722ed1', mb: 2 }} />
-                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                      实时跟踪
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      GPS位置监控和路线跟踪
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* 系统设置 */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Card
-                sx={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
-                  },
-                }}
-                onClick={() => navigate('/admin/courier-settings')}
-              >
-                <CardContent sx={{ 
-                  textAlign: 'center', 
-                  py: 3, 
-                  minHeight: 180, 
-                  height: 180,
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}>
-                  <Settings sx={{ fontSize: 48, color: '#13c2c2', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1 }}>
-                    系统设置
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                    价格规则和系统配置
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
         </Box>
+
+        {/* 统计卡片 */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                color: 'white',
+                height: 120,
+              }}
+            >
+              <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    {dashboardStats.totalOrders}
+                  </Typography>
+                  <Typography variant="body2">
+                    总订单数
+                  </Typography>
+                </Box>
+                <LocalShipping sx={{ fontSize: 40, opacity: 0.8 }} />
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+                color: 'white',
+                height: 120,
+              }}
+            >
+              <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    {dashboardStats.completedOrders}
+                  </Typography>
+                  <Typography variant="body2">
+                    已完成
+                  </Typography>
+                </Box>
+                <Assessment sx={{ fontSize: 40, opacity: 0.8 }} />
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                background: 'linear-gradient(135deg, #faad14 0%, #fa8c16 100%)',
+                color: 'white',
+                height: 120,
+              }}
+            >
+              <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    {dashboardStats.pendingOrders}
+                  </Typography>
+                  <Typography variant="body2">
+                    待处理
+                  </Typography>
+                </Box>
+                <People sx={{ fontSize: 40, opacity: 0.8 }} />
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                background: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)',
+                color: 'white',
+                height: 120,
+              }}
+            >
+              <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    {(dashboardStats.totalRevenue / 1000).toFixed(1)}K
+                  </Typography>
+                  <Typography variant="body2">
+                    总收入 (MMK)
+                  </Typography>
+                </Box>
+                <Assessment sx={{ fontSize: 40, opacity: 0.8 }} />
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* 功能模块卡片 */}
+        <Grid container spacing={3}>
+          {getCardData.map((card) => {
+            const hasAccess = hasPermission(card.permission);
+            
+            return (
+              <Grid item xs={12} sm={6} md={4} key={card.title}>
+                <Card
+                  sx={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '16px',
+                    cursor: hasAccess ? 'pointer' : 'not-allowed',
+                    opacity: hasAccess ? 1 : 0.6,
+                    transition: 'all 0.3s ease',
+                    '&:hover': hasAccess ? {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 12px 40px rgba(255, 255, 255, 0.1)',
+                    } : {},
+                  }}
+                  onClick={() => hasAccess && handleCardClick(card.path, card.permission)}
+                >
+                  <CardContent sx={{ 
+                    textAlign: 'center', 
+                    py: 3, 
+                    minHeight: 180, 
+                    height: 180,
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
+                      {card.icon}
+                      <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 1, mt: 2 }}>
+                        {card.title}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
+                        {card.description}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                        {card.stats}
+                      </Typography>
+                      {!hasAccess && (
+                        <Chip 
+                          label="权限不足" 
+                          size="small" 
+                          sx={{ 
+                            backgroundColor: 'rgba(245, 34, 45, 0.2)', 
+                            color: '#f5222d',
+                            fontSize: '10px',
+                          }} 
+                        />
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
+
+        {/* 通知组件 */}
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={4000}
+          onClose={handleCloseNotification}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={handleCloseNotification}
+            severity={notification.severity}
+            sx={{ width: '100%' }}
+          >
+            {notification.message}
+          </Alert>
+        </Snackbar>
       </Container>
-      
-      {/* 全局提示 */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={2500}
-        onClose={() => setToast(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setToast(prev => ({ ...prev, open: false }))} severity={toast.severity} sx={{ width: '100%' }}>
-          {toast.text}
-        </Alert>
-      </Snackbar>
     </PremiumBackground>
   );
 };
