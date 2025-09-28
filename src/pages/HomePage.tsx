@@ -249,7 +249,18 @@ const HomePage: React.FC = () => {
     const logoSize = size === 'small' ? '40px' : size === 'large' ? '80px' : '60px';
     
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px',
+          cursor: 'pointer',
+          transition: 'opacity 0.3s ease'
+        }}
+        onClick={() => window.location.href = '/'}
+        onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+        onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+      >
         {/* LOGO图标 */}
         <div style={{
           width: logoSize,

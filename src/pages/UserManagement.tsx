@@ -60,17 +60,8 @@ const UserManagement: React.FC = () => {
         // 使用模拟数据
         setUsers(getMockUsers());
       } else {
-        // 合并数据库数据和模拟数据
-        const dbUsers = data || [];
-        const mockUsers = getMockUsers();
-        const allUsers = [...dbUsers, ...mockUsers];
-        
-        // 去重（基于电话）
-        const uniqueUsers = allUsers.filter((user, index, self) => 
-          index === self.findIndex(u => u.phone === user.phone)
-        );
-        
-        setUsers(uniqueUsers);
+        // 只使用数据库数据
+        setUsers(data || []);
       }
     } catch (error) {
       console.error('加载用户数据失败:', error);
@@ -80,69 +71,8 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // 模拟用户数据
-  const getMockUsers = (): User[] => [
-    {
-      id: 'USR001',
-      name: '张先生',
-      phone: '09-123456789',
-      email: 'zhang@example.com',
-      address: '曼德勒市中心区',
-      user_type: 'customer',
-      status: 'active',
-      registration_date: '2024-12-01',
-      last_login: '2024-12-28 10:30',
-      total_orders: 15,
-      total_spent: 75000,
-      rating: 4.8,
-      notes: '优质客户，经常使用快递服务'
-    },
-    {
-      id: 'USR002',
-      name: '李快递员',
-      phone: '09-987654321',
-      email: 'li@example.com',
-      address: '曼德勒东区',
-      user_type: 'courier',
-      status: 'active',
-      registration_date: '2024-11-15',
-      last_login: '2024-12-28 09:15',
-      total_orders: 0,
-      total_spent: 0,
-      rating: 4.9,
-      notes: '经验丰富的快递员，服务态度好'
-    },
-    {
-      id: 'USR003',
-      name: '王女士',
-      phone: '09-111222333',
-      email: 'wang@example.com',
-      address: '曼德勒南区',
-      user_type: 'customer',
-      status: 'inactive',
-      registration_date: '2024-10-20',
-      last_login: '2024-12-20 14:20',
-      total_orders: 8,
-      total_spent: 32000,
-      rating: 4.5,
-      notes: '最近较少使用服务'
-    },
-    {
-      id: 'USR004',
-      name: '陈管理员',
-      phone: '09-444555666',
-      email: 'chen@example.com',
-      address: '曼德勒北区',
-      user_type: 'admin',
-      status: 'active',
-      registration_date: '2024-09-01',
-      last_login: '2024-12-28 11:45',
-      total_orders: 0,
-      total_spent: 0,
-      rating: 5.0,
-      notes: '系统管理员'
-    }
-  ];
+  // 模拟用户数据 - 已删除测试数据
+  const getMockUsers = (): User[] => [];
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -923,7 +853,6 @@ const UserManagement: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  // setShowUserForm(false);
                   setEditingUser(null);
                   setUserForm({
                     name: '',
@@ -934,6 +863,7 @@ const UserManagement: React.FC = () => {
                     status: 'active',
                     notes: ''
                   });
+                  setActiveTab('list');
                 }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
