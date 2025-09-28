@@ -459,10 +459,10 @@ const CourierManagement: React.FC = () => {
                   fontSize: '1rem'
                 }}
               >
-                <option value="all">所有状态</option>
-                <option value="active">活跃</option>
-                <option value="inactive">非活跃</option>
-                <option value="busy">忙碌</option>
+                <option value="all" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>所有状态</option>
+                <option value="active" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>活跃</option>
+                <option value="inactive" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>非活跃</option>
+                <option value="busy" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>忙碌</option>
               </select>
               <select
                 value={vehicleFilter}
@@ -476,13 +476,13 @@ const CourierManagement: React.FC = () => {
                   fontSize: '1rem'
                 }}
               >
-                <option value="all">所有车辆</option>
-                <option value="motorcycle">摩托车</option>
-                <option value="car">汽车</option>
-                <option value="bicycle">自行车</option>
-                <option value="truck">卡车</option>
-                <option value="tricycle">三轮车</option>
-                <option value="small_truck">小卡车</option>
+                <option value="all" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>所有车辆</option>
+                <option value="motorcycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>摩托车</option>
+                <option value="car" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>汽车</option>
+                <option value="bicycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>自行车</option>
+                <option value="truck" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>卡车</option>
+                <option value="tricycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>三轮车</option>
+                <option value="small_truck" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>小卡车</option>
               </select>
             </div>
 
@@ -752,12 +752,12 @@ const CourierManagement: React.FC = () => {
                       fontSize: '1rem'
                     }}
                   >
-                    <option value="motorcycle">摩托车</option>
-                    <option value="car">汽车</option>
-                    <option value="bicycle">自行车</option>
-                    <option value="truck">卡车</option>
-                    <option value="tricycle">三轮车</option>
-                    <option value="small_truck">小卡车</option>
+                    <option value="motorcycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>摩托车</option>
+                    <option value="car" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>汽车</option>
+                    <option value="bicycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>自行车</option>
+                    <option value="truck" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>卡车</option>
+                    <option value="tricycle" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>三轮车</option>
+                    <option value="small_truck" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>小卡车</option>
                   </select>
                 </div>
                 <div>
@@ -798,9 +798,9 @@ const CourierManagement: React.FC = () => {
                       fontSize: '1rem'
                     }}
                   >
-                    <option value="active">活跃</option>
-                    <option value="inactive">非活跃</option>
-                    <option value="busy">忙碌</option>
+                    <option value="active" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>活跃</option>
+                    <option value="inactive" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>非活跃</option>
+                    <option value="busy" style={{ background: 'rgba(26, 54, 93, 0.9)', color: 'white' }}>忙碌</option>
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
