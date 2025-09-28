@@ -58,17 +58,8 @@ const CourierManagement: React.FC = () => {
         // 使用模拟数据
         setCouriers(getMockCouriers());
       } else {
-        // 合并数据库数据和模拟数据
-        const dbCouriers = data || [];
-        const mockCouriers = getMockCouriers();
-        const allCouriers = [...dbCouriers, ...mockCouriers];
-        
-        // 去重（基于电话）
-        const uniqueCouriers = allCouriers.filter((courier, index, self) => 
-          index === self.findIndex(c => c.phone === courier.phone)
-        );
-        
-        setCouriers(uniqueCouriers);
+        // 只使用数据库数据
+        setCouriers(data || []);
       }
     } catch (error) {
       console.error('加载快递员数据失败:', error);
@@ -78,54 +69,8 @@ const CourierManagement: React.FC = () => {
     }
   };
 
-  // 模拟快递员数据
-  const getMockCouriers = (): Courier[] => [
-    {
-      id: 'COU001',
-      name: '李快递员',
-      phone: '09-987654321',
-      email: 'li@example.com',
-      address: '曼德勒东区',
-      vehicle_type: 'motorcycle',
-      license_number: 'ML-2024-001',
-      status: 'active',
-      join_date: '2024-11-15',
-      last_active: '2024-12-28 09:15',
-      total_deliveries: 156,
-      rating: 4.9,
-      notes: '经验丰富的快递员，服务态度好'
-    },
-    {
-      id: 'COU002',
-      name: '王师傅',
-      phone: '09-111222333',
-      email: 'wang@example.com',
-      address: '曼德勒南区',
-      vehicle_type: 'car',
-      license_number: 'ML-2024-002',
-      status: 'active',
-      join_date: '2024-10-20',
-      last_active: '2024-12-28 14:20',
-      total_deliveries: 89,
-      rating: 4.7,
-      notes: '驾驶技术好，适合大件配送'
-    },
-    {
-      id: 'COU003',
-      name: '陈小哥',
-      phone: '09-444555666',
-      email: 'chen@example.com',
-      address: '曼德勒北区',
-      vehicle_type: 'bicycle',
-      license_number: 'ML-2024-003',
-      status: 'inactive',
-      join_date: '2024-09-01',
-      last_active: '2024-12-25 16:30',
-      total_deliveries: 45,
-      rating: 4.5,
-      notes: '适合短距离配送'
-    }
-  ];
+  // 模拟快递员数据 - 已删除测试数据
+  const getMockCouriers = (): Courier[] => [];
 
   const handleCreateCourier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -307,6 +252,8 @@ const CourierManagement: React.FC = () => {
       case 'car': return '🚗';
       case 'bicycle': return '🚲';
       case 'truck': return '🚚';
+      case 'tricycle': return '🛺';
+      case 'small_truck': return '🚛';
       default: return '🚚';
     }
   };
@@ -533,6 +480,8 @@ const CourierManagement: React.FC = () => {
                 <option value="car">汽车</option>
                 <option value="bicycle">自行车</option>
                 <option value="truck">卡车</option>
+                <option value="tricycle">三轮车</option>
+                <option value="small_truck">小卡车</option>
               </select>
             </div>
 
@@ -806,6 +755,8 @@ const CourierManagement: React.FC = () => {
                     <option value="car">汽车</option>
                     <option value="bicycle">自行车</option>
                     <option value="truck">卡车</option>
+                    <option value="tricycle">三轮车</option>
+                    <option value="small_truck">小卡车</option>
                   </select>
                 </div>
                 <div>
