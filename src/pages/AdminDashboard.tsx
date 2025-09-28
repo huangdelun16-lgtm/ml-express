@@ -48,7 +48,11 @@ const AdminDashboard: React.FC = () => {
   ];
 
   const handleCardClick = (title: string) => {
-    alert(`点击了: ${title}`);
+    if (title === '同城包裹') {
+      navigate('/admin/city-packages');
+    } else {
+      alert(`点击了: ${title}`);
+    }
   };
 
   // LOGO组件
