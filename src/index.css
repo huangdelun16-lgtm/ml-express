@@ -21,14 +21,17 @@ code {
 }
 
 select {
-  background-color: transparent !important;
+  background-color: rgba(7, 23, 53, 0.65) !important;
   color: inherit;
+  border: none;
 }
 
 select:focus {
-  background-color: transparent !important;
+  background-color: rgba(7, 23, 53, 0.75) !important;
+  outline: none;
 }
 
 option {
-  background-color: transparent !important;
+  background-color: rgba(7, 23, 53, 0.9) !important;
+  color: inherit;
 }

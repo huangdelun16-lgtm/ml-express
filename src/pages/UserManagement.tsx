@@ -469,7 +469,7 @@ const UserManagement: React.FC = () => {
                 padding: '10px',
                 border: '2px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: 'rgba(7, 23, 53, 0.65)',
                 color: 'white',
                 fontSize: '1rem'
               }}
@@ -486,7 +486,7 @@ const UserManagement: React.FC = () => {
                 padding: '10px',
                 border: '2px solid rgba(255, 255, 255, 0.3)',
                 borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: 'rgba(7, 23, 53, 0.65)',
                 color: 'white',
                 fontSize: '1rem'
               }}
@@ -775,7 +775,7 @@ const UserManagement: React.FC = () => {
                     padding: '12px',
                     border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(7, 23, 53, 0.65)',
                     color: 'white',
                     marginBottom: '10px',
                     fontSize: '1rem'
@@ -793,7 +793,7 @@ const UserManagement: React.FC = () => {
                     padding: '12px',
                     border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(7, 23, 53, 0.65)',
                     color: 'white',
                     marginBottom: '10px',
                     fontSize: '1rem'

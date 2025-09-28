@@ -454,7 +454,7 @@ const CourierManagement: React.FC = () => {
                   padding: '12px',
                   borderRadius: '8px',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
-                  background: 'rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(7, 23, 53, 0.65)',
                   color: 'white',
                   fontSize: '1rem'
                 }}
@@ -471,7 +471,7 @@ const CourierManagement: React.FC = () => {
                   padding: '12px',
                   borderRadius: '8px',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
-                  background: 'rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(7, 23, 53, 0.65)',
                   color: 'white',
                   fontSize: '1rem'
                 }}
@@ -747,7 +747,7 @@ const CourierManagement: React.FC = () => {
                       padding: '12px',
                       borderRadius: '8px',
                       border: '1px solid rgba(255, 255, 255, 0.3)',
-                      background: 'rgba(255, 255, 255, 0.1)',
+                      background: 'rgba(7, 23, 53, 0.65)',
                       color: 'white',
                       fontSize: '1rem'
                     }}
@@ -793,7 +793,7 @@ const CourierManagement: React.FC = () => {
                       padding: '12px',
                       borderRadius: '8px',
                       border: '1px solid rgba(255, 255, 255, 0.3)',
-                      background: 'rgba(255, 255, 255, 0.1)',
+                      background: 'rgba(7, 23, 53, 0.65)',
                       color: 'white',
                       fontSize: '1rem'
                     }}

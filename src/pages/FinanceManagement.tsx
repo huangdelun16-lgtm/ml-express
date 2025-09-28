@@ -453,8 +453,8 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   padding: '12px 16px',
                   borderRadius: '12px',
-                  border: 'none',
-                  background: 'rgba(255, 255, 255, 0.18)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  background: 'rgba(7, 23, 53, 0.65)',
                   color: 'white'
                 }}
               >
@@ -468,8 +468,8 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   padding: '12px 16px',
                   borderRadius: '12px',
-                  border: 'none',
-                  background: 'rgba(255, 255, 255, 0.18)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  background: 'rgba(7, 23, 53, 0.65)',
                   color: 'white'
                 }}
               >
@@ -559,8 +559,8 @@ const FinanceManagement: React.FC = () => {
                           width: '100%',
                           padding: '12px',
                           borderRadius: '10px',
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: 'rgba(7, 23, 53, 0.65)',
                           color: 'white'
                         }}
                       >
@@ -580,8 +580,8 @@ const FinanceManagement: React.FC = () => {
                           width: '100%',
                           padding: '12px',
                           borderRadius: '10px',
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: 'rgba(7, 23, 53, 0.65)',
                           color: 'white'
                         }}
                       >
@@ -661,8 +661,8 @@ const FinanceManagement: React.FC = () => {
                           width: '100%',
                           padding: '12px',
                           borderRadius: '10px',
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: 'rgba(7, 23, 53, 0.65)',
                           color: 'white'
                         }}
                       >
@@ -684,8 +684,8 @@ const FinanceManagement: React.FC = () => {
                           width: '100%',
                           padding: '12px',
                           borderRadius: '10px',
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: 'rgba(7, 23, 53, 0.65)',
                           color: 'white'
                         }}
                       >
@@ -705,8 +705,8 @@ const FinanceManagement: React.FC = () => {
                           width: '100%',
                           padding: '12px',
                           borderRadius: '10px',
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: 'rgba(7, 23, 53, 0.65)',
                           color: 'white'
                         }}
                       >
