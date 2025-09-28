@@ -55,22 +55,23 @@ const CourierManagement: React.FC = () => {
       
       if (error) {
         console.error('获取快递员列表失败:', error);
-        // 使用模拟数据
-        setCouriers(getMockCouriers());
+        // 不使用模拟数据，显示空列表
+        setCouriers([]);
       } else {
         // 只使用数据库数据
         setCouriers(data || []);
       }
     } catch (error) {
       console.error('加载快递员数据失败:', error);
-      setCouriers(getMockCouriers());
+      // 不使用模拟数据，显示空列表
+      setCouriers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 模拟快递员数据 - 已删除测试数据
-  const getMockCouriers = (): Courier[] => [];
+  // 模拟快递员数据 - 已完全移除
+  // const getMockCouriers = (): Courier[] => [];
 
   const handleCreateCourier = async (e: React.FormEvent) => {
     e.preventDefault();
