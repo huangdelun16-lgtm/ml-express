@@ -19,3 +19,16 @@ code {
 #root {
   min-height: 100vh;
 }
+
+select {
+  background-color: transparent !important;
+  color: inherit;
+}
+
+select:focus {
+  background-color: transparent !important;
+}
+
+option {
+  background-color: transparent !important;
+}
