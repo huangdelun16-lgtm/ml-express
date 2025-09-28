@@ -3,8 +3,10 @@ import React, { useState } from 'react';
 const HomePage: React.FC = () => {
   const [language, setLanguage] = useState('zh');
   const [showOrderForm, setShowOrderForm] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
+  // const [orderData, setOrderData] = useState<any>(null);
 
   const translations = {
     zh: {
@@ -167,10 +169,41 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // 生成缅甸时间格式的包裹ID
+  const generateMyanmarPackageId = () => {
+    const now = new Date();
+    // 缅甸时间 (UTC+6:30)
+    const myanmarTime = new Date(now.getTime() + (6.5 * 60 * 60 * 1000));
+    
+    const year = myanmarTime.getFullYear();
+    const month = String(myanmarTime.getMonth() + 1).padStart(2, '0');
+    const day = String(myanmarTime.getDate()).padStart(2, '0');
+    const hour = String(myanmarTime.getHours()).padStart(2, '0');
+    const minute = String(myanmarTime.getMinutes()).padStart(2, '0');
+    const random1 = Math.floor(Math.random() * 10);
+    const random2 = Math.floor(Math.random() * 10);
+    
+    return `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+  };
+
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('订单提交成功！我们会尽快联系您。');
+    // const formData = new FormData(e.currentTarget as HTMLFormElement);
+    // const orderInfo = {
+    //   senderName: formData.get('senderName'),
+    //   senderPhone: formData.get('senderPhone'),
+    //   senderAddress: formData.get('senderAddress'),
+    //   receiverName: formData.get('receiverName'),
+    //   receiverPhone: formData.get('receiverPhone'),
+    //   receiverAddress: formData.get('receiverAddress'),
+    //   packageType: formData.get('packageType'),
+    //   weight: formData.get('weight'),
+    //   description: formData.get('description')
+    // };
+    
+    // setOrderData(orderInfo);
     setShowOrderForm(false);
+    setShowPaymentModal(true);
   };
 
   // LOGO组件
@@ -665,6 +698,7 @@ const HomePage: React.FC = () => {
                 <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.sender}</h3>
                 <input
                   type="text"
+                  name="senderName"
                   placeholder="寄件人姓名"
                   required
                   style={{
@@ -680,6 +714,7 @@ const HomePage: React.FC = () => {
                 />
                 <input
                   type="tel"
+                  name="senderPhone"
                   placeholder="联系电话"
                   required
                   style={{
@@ -694,6 +729,7 @@ const HomePage: React.FC = () => {
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <textarea
+                  name="senderAddress"
                   placeholder="寄件地址"
                   required
                   style={{
@@ -714,6 +750,7 @@ const HomePage: React.FC = () => {
                 <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.receiver}</h3>
                 <input
                   type="text"
+                  name="receiverName"
                   placeholder="收件人姓名"
                   required
                   style={{
@@ -729,6 +766,7 @@ const HomePage: React.FC = () => {
                 />
                 <input
                   type="tel"
+                  name="receiverPhone"
                   placeholder="联系电话"
                   required
                   style={{
@@ -743,6 +781,7 @@ const HomePage: React.FC = () => {
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <textarea
+                  name="receiverAddress"
                   placeholder="收件地址"
                   required
                   style={{
@@ -761,8 +800,29 @@ const HomePage: React.FC = () => {
 
               <div style={{ marginBottom: '2rem' }}>
                 <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.package}</h3>
+                <select
+                  name="packageType"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.8rem',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease',
+                    background: 'white'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                >
+                  <option value="文件">文件</option>
+                  <option value="衣服">衣服</option>
+                  <option value="易碎品">易碎品</option>
+                  <option value="食品">食品</option>
+                </select>
                 <input
                   type="text"
+                  name="description"
                   placeholder="包裹描述"
                   required
                   style={{
@@ -778,6 +838,7 @@ const HomePage: React.FC = () => {
                 />
                 <input
                   type="text"
+                  name="weight"
                   placeholder="重量（kg）"
                   required
                   style={{
@@ -844,6 +905,118 @@ const HomePage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 支付二维码模态窗口 */}
+      {showPaymentModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(26, 54, 93, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
+            borderRadius: '15px',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <Logo size="medium" />
+            </div>
+            <h2 style={{ color: '#2c5282', marginBottom: '1rem' }}>
+              预付取货费
+            </h2>
+            <p style={{ color: '#4a5568', marginBottom: '2rem', fontSize: '1.1rem' }}>
+              请扫描二维码支付 <strong>2000 MMK</strong> 取货费
+            </p>
+            
+            {/* 二维码占位符 */}
+            <div style={{
+              width: '200px',
+              height: '200px',
+              background: 'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)',
+              backgroundSize: '20px 20px',
+              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+              margin: '0 auto 2rem',
+              border: '2px solid #e2e8f0',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+              color: '#666'
+            }}>
+              支付二维码
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem', 
+              justifyContent: 'center',
+              flexDirection: window.innerWidth < 768 ? 'column' : 'row'
+            }}>
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  // 模拟支付成功，生成包裹
+                  const packageId = generateMyanmarPackageId();
+                  alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                    color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  width: window.innerWidth < 768 ? '100%' : 'auto',
+                  boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
+                }}
+              >
+                支付完成
+              </button>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  width: window.innerWidth < 768 ? '100%' : 'auto',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                取消
+              </button>
+            </div>
           </div>
         </div>
       )}
