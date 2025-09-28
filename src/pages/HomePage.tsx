@@ -173,11 +173,67 @@ const HomePage: React.FC = () => {
     setShowOrderForm(false);
   };
 
+  // LOGO组件
+  const Logo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => {
+    const logoSize = size === 'small' ? '40px' : size === 'large' ? '80px' : '60px';
+    const textSize = size === 'small' ? '0.8rem' : size === 'large' ? '1.2rem' : '1rem';
+    
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* LOGO图标 */}
+        <div style={{
+          width: logoSize,
+          height: logoSize,
+          background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 50%, #A8A8A8 100%)',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5)',
+          border: '1px solid rgba(255,255,255,0.2)'
+        }}>
+          {/* ML字母 */}
+          <div style={{
+            color: '#2C3E50',
+            fontWeight: 'bold',
+            fontSize: size === 'small' ? '16px' : size === 'large' ? '28px' : '20px',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+            letterSpacing: '-1px'
+          }}>
+            ML
+          </div>
+          {/* 卡车图标 */}
+          <div style={{
+            position: 'absolute',
+            bottom: '2px',
+            right: '2px',
+            width: size === 'small' ? '8px' : size === 'large' ? '16px' : '12px',
+            height: size === 'small' ? '6px' : size === 'large' ? '12px' : '8px',
+            background: '#2C3E50',
+            borderRadius: '1px',
+            opacity: 0.8
+          }}></div>
+        </div>
+        
+        {/* 公司名称 */}
+        <div style={{
+          color: 'white',
+          fontSize: textSize,
+          fontWeight: 'bold',
+          textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+        }}>
+          MARKET LINK EXPRESS
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6' }}>
       {/* 顶部导航栏 */}
       <nav style={{
-        background: '#2E86AB',
+        background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
         color: 'white',
         padding: '1rem 2rem',
         display: 'flex',
@@ -186,18 +242,10 @@ const HomePage: React.FC = () => {
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         flexWrap: 'wrap'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h1 style={{ 
-            margin: 0, 
-            fontSize: window.innerWidth < 768 ? '1.2rem' : '1.5rem', 
-            fontWeight: 'bold' 
-          }}>
-            MARKET LINK EXPRESS
-          </h1>
-        </div>
+        <Logo size="small" />
         
         <div style={{ 
           display: 'flex', 
@@ -208,40 +256,61 @@ const HomePage: React.FC = () => {
           <a href="#home" style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem'
-          }}>{t.nav.home}</a>
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          >{t.nav.home}</a>
           <a href="#services" style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem'
-          }}>{t.nav.services}</a>
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          >{t.nav.services}</a>
           <a href="#tracking" style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem'
-          }}>{t.nav.tracking}</a>
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          >{t.nav.tracking}</a>
           <a href="#contact" style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem'
-          }}>{t.nav.contact}</a>
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          >{t.nav.contact}</a>
           <a href="/admin/login" style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem'
-          }}>{t.nav.admin}</a>
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          >{t.nav.admin}</a>
           
           <select 
             value={language} 
             onChange={(e) => setLanguage(e.target.value)}
             style={{
-              background: 'white',
-              color: '#2E86AB',
-              border: 'none',
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
               padding: '0.5rem',
               borderRadius: '5px',
               fontWeight: 'bold',
-              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem'
+              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+              backdropFilter: 'blur(10px)'
             }}
           >
             <option value="zh">中文</option>
@@ -253,7 +322,7 @@ const HomePage: React.FC = () => {
 
       {/* 英雄区域 */}
       <section id="home" style={{
-        background: 'linear-gradient(135deg, #2E86AB 0%, #A23B72 100%)',
+        background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)',
         color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem',
         textAlign: 'center',
@@ -261,62 +330,91 @@ const HomePage: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <h1 style={{ 
-          fontSize: window.innerWidth < 768 ? '2rem' : '3rem', 
-          marginBottom: '1rem', 
-          fontWeight: 'bold',
-          lineHeight: '1.2'
-        }}>
-          {t.hero.title}
-        </h1>
-        <p style={{ 
-          fontSize: window.innerWidth < 768 ? '1.1rem' : '1.5rem', 
-          marginBottom: '2rem', 
-          opacity: 0.9,
-          maxWidth: '600px',
-          lineHeight: '1.4'
-        }}>
-          {t.hero.subtitle}
-        </p>
-        <button
-          onClick={() => setShowOrderForm(true)}
-          style={{
-            background: '#FF6B35',
-            color: 'white',
-            border: 'none',
-            padding: window.innerWidth < 768 ? '0.8rem 1.5rem' : '1rem 2rem',
-            fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+        {/* 背景装饰 */}
+        <div style={{
+          position: 'absolute',
+          top: '20%',
+          right: '10%',
+          width: '200px',
+          height: '200px',
+          background: 'rgba(192, 192, 192, 0.1)',
+          borderRadius: '50%',
+          filter: 'blur(40px)'
+        }}></div>
+        <div style={{
+          position: 'absolute',
+          bottom: '20%',
+          left: '10%',
+          width: '150px',
+          height: '150px',
+          background: 'rgba(192, 192, 192, 0.1)',
+          borderRadius: '50%',
+          filter: 'blur(30px)'
+        }}></div>
+        
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Logo size="large" />
+          <h1 style={{ 
+            fontSize: window.innerWidth < 768 ? '2rem' : '3rem', 
+            marginBottom: '1rem', 
             fontWeight: 'bold',
-            borderRadius: '50px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(255, 107, 53, 0.3)',
-            transition: 'all 0.3s ease'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 107, 53, 0.4)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 107, 53, 0.3)';
-          }}
-        >
-          {t.hero.cta}
-        </button>
+            lineHeight: '1.2',
+            marginTop: '1rem'
+          }}>
+            {t.hero.title}
+          </h1>
+          <p style={{ 
+            fontSize: window.innerWidth < 768 ? '1.1rem' : '1.5rem', 
+            marginBottom: '2rem', 
+            opacity: 0.9,
+            maxWidth: '600px',
+            lineHeight: '1.4'
+          }}>
+            {t.hero.subtitle}
+          </p>
+          <button
+            onClick={() => setShowOrderForm(true)}
+            style={{
+              background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
+              color: '#2C3E50',
+              border: 'none',
+              padding: window.innerWidth < 768 ? '0.8rem 1.5rem' : '1rem 2rem',
+              fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+              fontWeight: 'bold',
+              borderRadius: '50px',
+              cursor: 'pointer',
+              boxShadow: '0 6px 20px rgba(192, 192, 192, 0.4)',
+              transition: 'all 0.3s ease',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(192, 192, 192, 0.6)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
+            }}
+          >
+            {t.hero.cta}
+          </button>
+        </div>
       </section>
 
       {/* 服务特色 */}
       <section id="services" style={{ 
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: '#f8f9fa' 
+        background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
       }}>
         <h2 style={{ 
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2E86AB' 
+          color: '#2c5282' 
         }}>
           {t.features.title}
         </h2>
@@ -338,18 +436,21 @@ const HomePage: React.FC = () => {
               padding: '2rem',
               borderRadius: '15px',
               textAlign: 'center',
-              boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
-              transition: 'transform 0.3s ease'
+              boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
+              transition: 'all 0.3s ease',
+              border: '1px solid rgba(192, 192, 192, 0.2)'
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 12px 35px rgba(44, 82, 130, 0.2)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(44, 82, 130, 0.1)';
             }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{feature.icon}</div>
-              <h3 style={{ color: '#2E86AB', marginBottom: '1rem' }}>{feature.title}</h3>
+              <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{feature.title}</h3>
               <p style={{ color: '#666' }}>{feature.desc}</p>
             </div>
           ))}
@@ -365,7 +466,7 @@ const HomePage: React.FC = () => {
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2E86AB' 
+          color: '#2c5282' 
         }}>
           {t.process.title}
         </h2>
@@ -389,7 +490,7 @@ const HomePage: React.FC = () => {
               <div style={{
                 width: '60px',
                 height: '60px',
-                background: '#2E86AB',
+                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
                 color: 'white',
                 borderRadius: '50%',
                 display: 'flex',
@@ -397,11 +498,12 @@ const HomePage: React.FC = () => {
                 justifyContent: 'center',
                 fontSize: '1.5rem',
                 fontWeight: 'bold',
-                margin: '0 auto 1rem'
+                margin: '0 auto 1rem',
+                boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)'
               }}>
                 {process.step}
               </div>
-              <h3 style={{ color: '#2E86AB', marginBottom: '0.5rem' }}>{process.title}</h3>
+              <h3 style={{ color: '#2c5282', marginBottom: '0.5rem' }}>{process.title}</h3>
               <p style={{ color: '#666' }}>{process.desc}</p>
               {index < 3 && (
                 <div style={{
@@ -410,7 +512,7 @@ const HomePage: React.FC = () => {
                   right: '-50%',
                   width: '100%',
                   height: '2px',
-                  background: '#2E86AB',
+                  background: 'linear-gradient(90deg, #2c5282 0%, #3182ce 100%)',
                   zIndex: -1
                 }}></div>
               )}
@@ -422,13 +524,13 @@ const HomePage: React.FC = () => {
       {/* 包裹跟踪 */}
       <section id="tracking" style={{ 
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: '#f8f9fa' 
+        background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
       }}>
         <h2 style={{ 
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2E86AB' 
+          color: '#2c5282' 
         }}>
           {t.tracking.title}
         </h2>
@@ -438,7 +540,8 @@ const HomePage: React.FC = () => {
           background: 'white',
           padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
           borderRadius: '15px',
-          boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
+          boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
+          border: '1px solid rgba(192, 192, 192, 0.2)'
         }}>
           <div style={{ 
             display: 'flex', 
@@ -454,22 +557,35 @@ const HomePage: React.FC = () => {
               style={{
                 flex: 1,
                 padding: '1rem',
-                border: '2px solid #ddd',
+                border: '2px solid #e2e8f0',
                 borderRadius: '10px',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                transition: 'border-color 0.3s ease'
               }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
             />
             <button
               onClick={handleTracking}
               style={{
-                background: '#2E86AB',
+                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
                 color: 'white',
                 border: 'none',
                 padding: '1rem 2rem',
                 borderRadius: '10px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
-                minWidth: window.innerWidth < 768 ? '100%' : 'auto'
+                minWidth: window.innerWidth < 768 ? '100%' : 'auto',
+                boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 82, 130, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.3)';
               }}
             >
               {t.tracking.track}
@@ -478,12 +594,12 @@ const HomePage: React.FC = () => {
           
           {trackingResult && (
             <div style={{
-              background: '#e8f4f8',
+              background: 'linear-gradient(135deg, #e6f3ff 0%, #f0f8ff 100%)',
               padding: '1.5rem',
               borderRadius: '10px',
-              border: '1px solid #2E86AB'
+              border: '1px solid #2c5282'
             }}>
-              <h3 style={{ color: '#2E86AB', marginBottom: '1rem' }}>包裹信息</h3>
+              <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>包裹信息</h3>
               <p><strong>单号：</strong>{trackingResult.number}</p>
               <p><strong>状态：</strong>{trackingResult.status}</p>
               <p><strong>当前位置：</strong>{trackingResult.location}</p>
@@ -495,16 +611,13 @@ const HomePage: React.FC = () => {
 
       {/* 页脚 */}
       <footer id="contact" style={{
-        background: '#2E86AB',
+        background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
         color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '3rem 2rem',
         textAlign: 'center'
       }}>
-        <h3 style={{ 
-          marginBottom: '1rem',
-          fontSize: window.innerWidth < 768 ? '1.2rem' : '1.5rem'
-        }}>{t.footer.company}</h3>
-        <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem' }}>{t.footer.address}</p>
+        <Logo size="medium" />
+        <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem', marginTop: '1rem' }}>{t.footer.address}</p>
         <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem' }}>电话：{t.footer.phone}</p>
         <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem' }}>邮箱：{t.footer.email}</p>
         <p style={{ 
@@ -524,11 +637,12 @@ const HomePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(26, 54, 93, 0.8)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000
+          zIndex: 2000,
+          backdropFilter: 'blur(5px)'
         }}>
           <div style={{
             background: 'white',
@@ -537,15 +651,19 @@ const HomePage: React.FC = () => {
             maxWidth: '500px',
             width: '90%',
             maxHeight: '80vh',
-            overflow: 'auto'
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
           }}>
-            <h2 style={{ color: '#2E86AB', marginBottom: '2rem', textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <Logo size="medium" />
+            </div>
+            <h2 style={{ color: '#2c5282', marginBottom: '2rem', textAlign: 'center' }}>
               {t.order.title}
             </h2>
             
             <form onSubmit={handleOrderSubmit}>
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ color: '#2E86AB', marginBottom: '1rem' }}>{t.order.sender}</h3>
+                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.sender}</h3>
                 <input
                   type="text"
                   placeholder="寄件人姓名"
@@ -553,10 +671,13 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <input
                   type="tel"
@@ -565,10 +686,13 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <textarea
                   placeholder="寄件地址"
@@ -576,16 +700,19 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
                     height: '80px',
-                    resize: 'vertical'
+                    resize: 'vertical',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ color: '#2E86AB', marginBottom: '1rem' }}>{t.order.receiver}</h3>
+                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.receiver}</h3>
                 <input
                   type="text"
                   placeholder="收件人姓名"
@@ -593,10 +720,13 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <input
                   type="tel"
@@ -605,10 +735,13 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <textarea
                   placeholder="收件地址"
@@ -616,16 +749,19 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
                     height: '80px',
-                    resize: 'vertical'
+                    resize: 'vertical',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
               </div>
 
               <div style={{ marginBottom: '2rem' }}>
-                <h3 style={{ color: '#2E86AB', marginBottom: '1rem' }}>{t.order.package}</h3>
+                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.package}</h3>
                 <input
                   type="text"
                   placeholder="包裹描述"
@@ -633,10 +769,13 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
+                    border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '0.5rem'
+                    marginBottom: '0.5rem',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
                 <input
                   type="text"
@@ -645,9 +784,12 @@ const HomePage: React.FC = () => {
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #ddd',
-                    borderRadius: '8px'
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    transition: 'border-color 0.3s ease'
                   }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
               </div>
 
@@ -661,29 +803,42 @@ const HomePage: React.FC = () => {
                   type="button"
                   onClick={() => setShowOrderForm(false)}
                   style={{
-                    background: '#ccc',
-                    color: 'white',
+                    background: '#e2e8f0',
+                    color: '#4a5568',
                     border: 'none',
                     padding: '1rem 2rem',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     fontWeight: 'bold',
-                    width: window.innerWidth < 768 ? '100%' : 'auto'
+                    width: window.innerWidth < 768 ? '100%' : 'auto',
+                    transition: 'all 0.3s ease'
                   }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
                 >
                   {t.order.cancel}
                 </button>
                 <button
                   type="submit"
                   style={{
-                    background: '#2E86AB',
+                    background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
                     color: 'white',
                     border: 'none',
                     padding: '1rem 2rem',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     fontWeight: 'bold',
-                    width: window.innerWidth < 768 ? '100%' : 'auto'
+                    width: window.innerWidth < 768 ? '100%' : 'auto',
+                    boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 82, 130, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.3)';
                   }}
                 >
                   {t.order.submit}
