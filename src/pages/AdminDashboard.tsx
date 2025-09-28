@@ -174,27 +174,6 @@ const AdminDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* 版本信息 */}
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '15px',
-        padding: '20px',
-        marginBottom: '30px',
-        color: 'white',
-        textAlign: 'center',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-          🎯 全新版本 v1.0.0 - 简洁稳定
-        </h2>
-        <p style={{ margin: '10px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-          所有功能正常运行，卡片可以正常点击
-        </p>
-      </div>
 
       {/* 卡片网格 */}
       <div style={{

@@ -176,7 +176,6 @@ const HomePage: React.FC = () => {
   // LOGO组件
   const Logo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => {
     const logoSize = size === 'small' ? '40px' : size === 'large' ? '80px' : '60px';
-    const textSize = size === 'small' ? '0.8rem' : size === 'large' ? '1.2rem' : '1rem';
     
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -216,10 +215,10 @@ const HomePage: React.FC = () => {
           }}></div>
         </div>
         
-        {/* 公司名称 */}
+        {/* 公司名称 - 放大字体 */}
         <div style={{
           color: 'white',
-          fontSize: textSize,
+          fontSize: size === 'small' ? '1.2rem' : size === 'large' ? '2rem' : '1.5rem',
           fontWeight: 'bold',
           textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
         }}>
@@ -290,7 +289,7 @@ const HomePage: React.FC = () => {
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.contact}</a>
           <a href="/admin/login" style={{ 
-            color: 'white', 
+          color: 'white',
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease'
@@ -323,7 +322,7 @@ const HomePage: React.FC = () => {
       {/* 英雄区域 */}
       <section id="home" style={{
         background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)',
-        color: 'white',
+                color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem',
         textAlign: 'center',
         minHeight: window.innerWidth < 768 ? '60vh' : '70vh',
@@ -435,9 +434,9 @@ const HomePage: React.FC = () => {
               background: 'white',
               padding: '2rem',
               borderRadius: '15px',
-              textAlign: 'center',
+                  textAlign: 'center',
               boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
-              transition: 'all 0.3s ease',
+                  transition: 'all 0.3s ease',
               border: '1px solid rgba(192, 192, 192, 0.2)'
             }}
             onMouseOver={(e) => {
@@ -492,12 +491,12 @@ const HomePage: React.FC = () => {
                 height: '60px',
                 background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
                 color: 'white',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.5rem',
-                fontWeight: 'bold',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    fontWeight: 'bold',
                 margin: '0 auto 1rem',
                 boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)'
               }}>
@@ -612,7 +611,7 @@ const HomePage: React.FC = () => {
       {/* 页脚 */}
       <footer id="contact" style={{
         background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
-        color: 'white',
+                    color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '3rem 2rem',
         textAlign: 'center'
       }}>

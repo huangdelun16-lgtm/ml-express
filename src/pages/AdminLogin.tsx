@@ -209,6 +209,34 @@ const AdminLogin: React.FC = () => {
         }}>
           默认账号: admin / admin
         </p>
+        
+        {/* 退出按钮 */}
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button
+            onClick={() => window.location.href = '/'}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            ← 返回首页
+          </button>
+        </div>
       </div>
     </div>
   );
