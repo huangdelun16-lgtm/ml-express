@@ -1,62 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { packageService, Package } from '../services/supabase';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('list');
-  const [packages, setPackages] = useState([
-    {
-      id: 'PKG001',
-      senderName: '张先生',
-      senderPhone: '09-123456789',
-      senderAddress: '曼德勒市中心区',
-      receiverName: '李先生',
-      receiverPhone: '09-987654321',
-      receiverAddress: '曼德勒东区',
-      packageType: '文件',
-      weight: '0.5kg',
-      status: '已取件',
-      createTime: '2024-12-28 10:30',
-      pickupTime: '2024-12-28 11:00',
-      deliveryTime: '',
-      courier: '快递员A',
-      price: '5000 MMK'
-    },
-    {
-      id: 'PKG002',
-      senderName: '王女士',
-      senderPhone: '09-111222333',
-      senderAddress: '曼德勒南区',
-      receiverName: '陈先生',
-      receiverPhone: '09-444555666',
-      receiverAddress: '曼德勒北区',
-      packageType: '包裹',
-      weight: '2.0kg',
-      status: '配送中',
-      createTime: '2024-12-28 09:15',
-      pickupTime: '2024-12-28 10:00',
-      deliveryTime: '',
-      courier: '快递员B',
-      price: '8000 MMK'
-    },
-    {
-      id: 'PKG003',
-      senderName: '刘先生',
-      senderPhone: '09-777888999',
-      senderAddress: '曼德勒西区',
-      receiverName: '赵女士',
-      receiverPhone: '09-000111222',
-      receiverAddress: '曼德勒中区',
-      packageType: '文件',
-      weight: '0.3kg',
-      status: '已送达',
-      createTime: '2024-12-27 14:20',
-      pickupTime: '2024-12-27 15:00',
-      deliveryTime: '2024-12-27 16:30',
-      courier: '快递员C',
-      price: '3000 MMK'
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 加载包裹数据
+  useEffect(() => {
+    loadPackages();
+  }, []);
+
+  const loadPackages = async () => {
+    try {
+      setLoading(true);
+      const data = await packageService.getAllPackages();
+      setPackages(data);
+    } catch (error) {
+      console.error('加载包裹数据失败:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   // const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPackage, setNewPackage] = useState({
@@ -71,12 +38,20 @@ const CityPackages: React.FC = () => {
     description: ''
   });
 
-  const handleCreatePackage = (e: React.FormEvent) => {
+  const handleCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     const newId = `PKG${String(packages.length + 1).padStart(3, '0')}`;
     const newPkg = {
       id: newId,
-      ...newPackage,
+      senderName: newPackage.senderName,
+      senderPhone: newPackage.senderPhone,
+      senderAddress: newPackage.senderAddress,
+      receiverName: newPackage.receiverName,
+      receiverPhone: newPackage.receiverPhone,
+      receiverAddress: newPackage.receiverAddress,
+      packageType: newPackage.packageType,
+      weight: newPackage.weight,
+      description: newPackage.description,
       status: '待取件',
       createTime: new Date().toLocaleString('zh-CN'),
       pickupTime: '',
@@ -84,35 +59,44 @@ const CityPackages: React.FC = () => {
       courier: '待分配',
       price: '5000 MMK'
     };
-    setPackages([...packages, newPkg]);
-    // setShowCreateForm(false);
-    setNewPackage({
-      senderName: '',
-      senderPhone: '',
-      senderAddress: '',
-      receiverName: '',
-      receiverPhone: '',
-      receiverAddress: '',
-      packageType: '文件',
-      weight: '',
-      description: ''
-    });
+    
+    // 保存到数据库
+    const result = await packageService.createPackage(newPkg);
+    if (result) {
+      // 重新加载数据
+      await loadPackages();
+      setNewPackage({
+        senderName: '',
+        senderPhone: '',
+        senderAddress: '',
+        receiverName: '',
+        receiverPhone: '',
+        receiverAddress: '',
+        packageType: '文件',
+        weight: '',
+        description: ''
+      });
+    }
   };
 
-  const updatePackageStatus = (id: string, newStatus: string) => {
-    setPackages(packages.map(pkg => {
-      if (pkg.id === id) {
-        const updated = { ...pkg, status: newStatus };
-        if (newStatus === '已取件' && pkg.pickupTime === '') {
-          updated.pickupTime = new Date().toLocaleString('zh-CN');
-        }
-        if (newStatus === '已送达' && pkg.deliveryTime === '') {
-          updated.deliveryTime = new Date().toLocaleString('zh-CN');
-        }
-        return updated;
-      }
-      return pkg;
-    }));
+  const updatePackageStatus = async (id: string, newStatus: string) => {
+    let pickupTime = '';
+    let deliveryTime = '';
+    
+    if (newStatus === '已取件') {
+      pickupTime = new Date().toLocaleString('zh-CN');
+    }
+    if (newStatus === '已送达') {
+      deliveryTime = new Date().toLocaleString('zh-CN');
+    }
+    
+    // 更新数据库
+    const success = await packageService.updatePackageStatus(id, newStatus, pickupTime, deliveryTime);
+    
+    if (success) {
+      // 重新加载数据
+      await loadPackages();
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -265,11 +249,21 @@ const CityPackages: React.FC = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          <div style={{
-            display: 'grid',
-            gap: '15px'
-          }}>
-            {packages.map((pkg) => (
+          {loading ? (
+            <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+              <p>加载中...</p>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gap: '15px'
+            }}>
+              {packages.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+                  <p>暂无包裹数据</p>
+                </div>
+              ) : (
+                packages.map((pkg) => (
               <div key={pkg.id} style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
@@ -407,8 +401,10 @@ const CityPackages: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
 

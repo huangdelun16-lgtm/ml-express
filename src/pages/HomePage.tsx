@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { packageService } from '../services/supabase';
 
 const HomePage: React.FC = () => {
   const [language, setLanguage] = useState('zh');
@@ -188,20 +189,21 @@ const HomePage: React.FC = () => {
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // const formData = new FormData(e.currentTarget as HTMLFormElement);
-    // const orderInfo = {
-    //   senderName: formData.get('senderName'),
-    //   senderPhone: formData.get('senderPhone'),
-    //   senderAddress: formData.get('senderAddress'),
-    //   receiverName: formData.get('receiverName'),
-    //   receiverPhone: formData.get('receiverPhone'),
-    //   receiverAddress: formData.get('receiverAddress'),
-    //   packageType: formData.get('packageType'),
-    //   weight: formData.get('weight'),
-    //   description: formData.get('description')
-    // };
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const orderInfo = {
+      senderName: formData.get('senderName') as string,
+      senderPhone: formData.get('senderPhone') as string,
+      senderAddress: formData.get('senderAddress') as string,
+      receiverName: formData.get('receiverName') as string,
+      receiverPhone: formData.get('receiverPhone') as string,
+      receiverAddress: formData.get('receiverAddress') as string,
+      packageType: formData.get('packageType') as string,
+      weight: formData.get('weight') as string,
+      description: formData.get('description') as string
+    };
     
-    // setOrderData(orderInfo);
+    // 存储订单信息到localStorage，支付完成后使用
+    localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
     setShowOrderForm(false);
     setShowPaymentModal(true);
   };
@@ -969,11 +971,49 @@ const HomePage: React.FC = () => {
               flexDirection: window.innerWidth < 768 ? 'column' : 'row'
             }}>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowPaymentModal(false);
-                  // 模拟支付成功，生成包裹
+                  
+                  // 获取存储的订单信息
+                  const pendingOrder = localStorage.getItem('pendingOrder');
+                  if (!pendingOrder) {
+                    alert('订单信息丢失，请重新下单');
+                    return;
+                  }
+                  
+                  const orderInfo = JSON.parse(pendingOrder);
                   const packageId = generateMyanmarPackageId();
-                  alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);
+                  
+                  // 创建包裹数据
+                  const packageData = {
+                    id: packageId,
+                    senderName: orderInfo.senderName,
+                    senderPhone: orderInfo.senderPhone,
+                    senderAddress: orderInfo.senderAddress,
+                    receiverName: orderInfo.receiverName,
+                    receiverPhone: orderInfo.receiverPhone,
+                    receiverAddress: orderInfo.receiverAddress,
+                    packageType: orderInfo.packageType,
+                    weight: orderInfo.weight,
+                    description: orderInfo.description,
+                    status: '待取件',
+                    createTime: new Date().toLocaleString('zh-CN'),
+                    pickupTime: '',
+                    deliveryTime: '',
+                    courier: '待分配',
+                    price: '5000 MMK'
+                  };
+                  
+                  // 保存到数据库
+                  const result = await packageService.createPackage(packageData);
+                  
+                  if (result) {
+                    // 清除临时订单信息
+                    localStorage.removeItem('pendingOrder');
+                    alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);
+                  } else {
+                    alert('包裹创建失败，请联系客服');
+                  }
                 }}
                 style={{
                   background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',

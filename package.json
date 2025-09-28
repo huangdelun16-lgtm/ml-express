@@ -4,6 +4,7 @@
   "description": "MARKET LINK EXPRESS - 缅甸专业快递服务",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.58.0",
     "@types/node": "^16.18.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
