@@ -27,37 +27,86 @@ export interface Package {
   updated_at?: string;
 }
 
+// 测试数据库连接
+export const testConnection = async () => {
+  try {
+    const { error } = await supabase
+      .from('packages')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      console.error('数据库连接测试失败:', error);
+      return false;
+    }
+    
+    console.log('数据库连接测试成功');
+    return true;
+  } catch (err) {
+    console.error('数据库连接异常:', err);
+    return false;
+  }
+};
+
 // 包裹数据库操作
 export const packageService = {
   // 获取所有包裹
   async getAllPackages(): Promise<Package[]> {
-    const { data, error } = await supabase
-      .from('packages')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('获取包裹列表失败:', error);
+    try {
+      console.log('尝试获取包裹列表...');
+      
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取包裹列表失败:', error);
+        console.error('错误详情:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        return [];
+      }
+      
+      console.log('获取包裹列表成功:', data);
+      return data || [];
+    } catch (err) {
+      console.error('获取包裹列表异常:', err);
       return [];
     }
-    
-    return data || [];
   },
 
   // 创建新包裹
   async createPackage(packageData: Omit<Package, 'id' | 'created_at' | 'updated_at'>): Promise<Package | null> {
-    const { data, error } = await supabase
-      .from('packages')
-      .insert([packageData])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('创建包裹失败:', error);
+    try {
+      console.log('尝试创建包裹:', packageData);
+      
+      const { data, error } = await supabase
+        .from('packages')
+        .insert([packageData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('创建包裹失败:', error);
+        console.error('错误详情:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        return null;
+      }
+      
+      console.log('包裹创建成功:', data);
+      return data;
+    } catch (err) {
+      console.error('创建包裹异常:', err);
       return null;
     }
-    
-    return data;
   },
 
   // 更新包裹状态

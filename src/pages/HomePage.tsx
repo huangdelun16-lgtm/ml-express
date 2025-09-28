@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { packageService } from '../services/supabase';
+import React, { useState, useEffect } from 'react';
+import { packageService, testConnection } from '../services/supabase';
 
 const HomePage: React.FC = () => {
   const [language, setLanguage] = useState('zh');
@@ -8,6 +8,11 @@ const HomePage: React.FC = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
   // const [orderData, setOrderData] = useState<any>(null);
+
+  // 测试数据库连接
+  useEffect(() => {
+    testConnection();
+  }, []);
 
   const translations = {
     zh: {
@@ -1005,6 +1010,7 @@ const HomePage: React.FC = () => {
                   };
                   
                   // 保存到数据库
+                  console.log('准备保存包裹数据:', packageData);
                   const result = await packageService.createPackage(packageData);
                   
                   if (result) {
@@ -1012,7 +1018,8 @@ const HomePage: React.FC = () => {
                     localStorage.removeItem('pendingOrder');
                     alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);
                   } else {
-                    alert('包裹创建失败，请联系客服');
+                    console.error('包裹创建失败，检查控制台获取详细错误信息');
+                    alert('包裹创建失败，请检查网络连接或联系客服。\n错误信息已记录在控制台。');
                   }
                 }}
                 style={{
