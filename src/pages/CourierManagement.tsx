@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
 interface Courier {
@@ -20,6 +21,7 @@ interface Courier {
 }
 
 const CourierManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
@@ -328,26 +330,54 @@ const CourierManagement: React.FC = () => {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* 标题 */}
+        {/* 标题和退出按钮 */}
         <div style={{
-          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '30px'
         }}>
-          <h1 style={{
-            color: 'white',
-            fontSize: '2.5rem',
-            margin: '0 0 10px 0',
-            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
-          }}>
-            🚚 快递员管理
-          </h1>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.8)',
-            fontSize: '1.1rem',
-            margin: 0
-          }}>
-            管理快递员信息、状态和配送记录
-          </p>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <h1 style={{
+              color: 'white',
+              fontSize: '2.5rem',
+              margin: '0 0 10px 0',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+            }}>
+              🚚 快递员管理
+            </h1>
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '1.1rem',
+              margin: 0
+            }}>
+              管理快递员信息、状态和配送记录
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            ← 返回仪表板
+          </button>
         </div>
 
         {/* 标签页导航 */}
