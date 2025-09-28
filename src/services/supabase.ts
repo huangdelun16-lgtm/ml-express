@@ -200,12 +200,14 @@ export const financeService = {
 
       if (error) {
         console.error('创建财务记录失败:', error);
+        console.error('请求数据:', payload);
         return null;
       }
 
       return data;
     } catch (err) {
       console.error('创建财务记录异常:', err);
+      console.error('请求数据:', recordData);
       return null;
     }
   },
