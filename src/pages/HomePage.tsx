@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { packageService, testConnection } from '../services/supabase';
+import { packageService, testConnection, userService } from '../services/supabase';
 
 const HomePage: React.FC = () => {
   const [language, setLanguage] = useState('zh');
@@ -13,6 +13,37 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     testConnection();
   }, []);
+
+  // 自动保存客户信息到用户管理
+  const saveCustomerToUsers = async (orderInfo: any) => {
+    try {
+      console.log('开始保存客户信息:', orderInfo);
+      
+      // 检查客户是否已存在
+      const existingUser = await userService.getUserByPhone(orderInfo.senderPhone);
+      
+      if (existingUser) {
+        console.log('客户已存在，更新统计信息:', existingUser);
+        // 更新现有客户的订单统计
+        await userService.updateUserStats(existingUser.id, 5000);
+      } else {
+        console.log('创建新客户:', orderInfo);
+        // 创建新客户
+        const newCustomer = await userService.createCustomer({
+          name: orderInfo.senderName,
+          phone: orderInfo.senderPhone,
+          address: orderInfo.senderAddress
+        });
+        
+        if (newCustomer) {
+          // 更新新客户的订单统计
+          await userService.updateUserStats(newCustomer.id, 5000);
+        }
+      }
+    } catch (error) {
+      console.error('保存客户信息失败:', error);
+    }
+  };
 
   const translations = {
     zh: {
@@ -1014,6 +1045,9 @@ const HomePage: React.FC = () => {
                   const result = await packageService.createPackage(packageData);
                   
                   if (result) {
+                    // 自动保存客户信息到用户管理
+                    await saveCustomerToUsers(orderInfo);
+                    
                     // 清除临时订单信息
                     localStorage.removeItem('pendingOrder');
                     alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);

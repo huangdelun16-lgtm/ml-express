@@ -60,7 +60,17 @@ const UserManagement: React.FC = () => {
         // 使用模拟数据
         setUsers(getMockUsers());
       } else {
-        setUsers(data || []);
+        // 合并数据库数据和模拟数据
+        const dbUsers = data || [];
+        const mockUsers = getMockUsers();
+        const allUsers = [...dbUsers, ...mockUsers];
+        
+        // 去重（基于电话）
+        const uniqueUsers = allUsers.filter((user, index, self) => 
+          index === self.findIndex(u => u.phone === user.phone)
+        );
+        
+        setUsers(uniqueUsers);
       }
     } catch (error) {
       console.error('加载用户数据失败:', error);
@@ -444,6 +454,63 @@ const UserManagement: React.FC = () => {
           position: 'relative',
           zIndex: 1
         }}>
+          {/* 统计信息 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '15px',
+            marginBottom: '20px'
+          }}>
+            <div style={{
+              background: 'rgba(52, 152, 219, 0.2)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(52, 152, 219, 0.3)'
+            }}>
+              <h3 style={{ color: '#3498db', margin: '0 0 5px 0', fontSize: '1.5rem' }}>
+                {users.filter(u => u.user_type === 'customer').length}
+              </h3>
+              <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>客户总数</p>
+            </div>
+            <div style={{
+              background: 'rgba(155, 89, 182, 0.2)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(155, 89, 182, 0.3)'
+            }}>
+              <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0', fontSize: '1.5rem' }}>
+                {users.filter(u => u.user_type === 'courier').length}
+              </h3>
+              <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>快递员总数</p>
+            </div>
+            <div style={{
+              background: 'rgba(39, 174, 96, 0.2)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(39, 174, 96, 0.3)'
+            }}>
+              <h3 style={{ color: '#27ae60', margin: '0 0 5px 0', fontSize: '1.5rem' }}>
+                {users.filter(u => u.status === 'active').length}
+              </h3>
+              <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>活跃用户</p>
+            </div>
+            <div style={{
+              background: 'rgba(230, 126, 34, 0.2)',
+              padding: '15px',
+              borderRadius: '10px',
+              textAlign: 'center',
+              border: '1px solid rgba(230, 126, 34, 0.3)'
+            }}>
+              <h3 style={{ color: '#e67e22', margin: '0 0 5px 0', fontSize: '1.5rem' }}>
+                {users.reduce((sum, u) => sum + (u.total_orders || 0), 0)}
+              </h3>
+              <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>总订单数</p>
+            </div>
+          </div>
+
           {/* 搜索和过滤 */}
           <div style={{
             display: 'grid',

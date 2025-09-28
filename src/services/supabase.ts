@@ -145,3 +145,107 @@ export const packageService = {
     return data;
   }
 };
+
+// 用户数据库操作
+export const userService = {
+  // 根据电话查找用户
+  async getUserByPhone(phone: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('phone', phone)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('查找用户失败:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('查找用户异常:', err);
+      return null;
+    }
+  },
+
+  // 创建新用户（客户）
+  async createCustomer(customerData: {
+    name: string;
+    phone: string;
+    email?: string;
+    address: string;
+  }): Promise<any | null> {
+    try {
+      const newId = `USR${Date.now().toString().slice(-6)}`;
+      const userData = {
+        id: newId,
+        name: customerData.name,
+        phone: customerData.phone,
+        email: customerData.email || '',
+        address: customerData.address,
+        user_type: 'customer',
+        status: 'active',
+        registration_date: new Date().toLocaleDateString('zh-CN'),
+        last_login: '从未登录',
+        total_orders: 0,
+        total_spent: 0,
+        rating: 0,
+        notes: '通过下单自动创建'
+      };
+
+      const { data, error } = await supabase
+        .from('users')
+        .insert([userData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('创建客户失败:', error);
+        return null;
+      }
+      
+      console.log('客户创建成功:', data);
+      return data;
+    } catch (err) {
+      console.error('创建客户异常:', err);
+      return null;
+    }
+  },
+
+  // 更新用户订单统计
+  async updateUserStats(userId: string, orderValue: number): Promise<boolean> {
+    try {
+      // 先获取当前用户数据
+      const { data: user, error: fetchError } = await supabase
+        .from('users')
+        .select('total_orders, total_spent')
+        .eq('id', userId)
+        .single();
+      
+      if (fetchError) {
+        console.error('获取用户统计失败:', fetchError);
+        return false;
+      }
+
+      // 更新统计信息
+      const { error } = await supabase
+        .from('users')
+        .update({
+          total_orders: (user.total_orders || 0) + 1,
+          total_spent: (user.total_spent || 0) + orderValue
+        })
+        .eq('id', userId);
+      
+      if (error) {
+        console.error('更新用户统计失败:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('更新用户统计异常:', err);
+      return false;
+    }
+  }
+};
