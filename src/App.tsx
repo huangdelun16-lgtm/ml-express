@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
 import CourierManagement from './pages/CourierManagement';
+import FinanceManagement from './pages/FinanceManagement';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/admin/city-packages" element={<CityPackages />} />
           <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/couriers" element={<CourierManagement />} />
+        <Route path="/admin/finance" element={<FinanceManagement />} />
         </Routes>
       </div>
     </Router>

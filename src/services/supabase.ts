@@ -27,6 +27,23 @@ export interface Package {
   updated_at?: string;
 }
 
+export interface FinanceRecord {
+  id: string;
+  record_type: 'income' | 'expense';
+  category: string;
+  order_id: string;
+  courier_id: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  payment_method: string;
+  reference?: string;
+  record_date: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 测试数据库连接
 export const testConnection = async () => {
   try {
@@ -143,6 +160,97 @@ export const packageService = {
     }
     
     return data;
+  }
+};
+
+// 财务数据库操作
+export const financeService = {
+  async getAllRecords(): Promise<FinanceRecord[]> {
+    try {
+      const { data, error } = await supabase
+        .from('finances')
+        .select('*')
+        .order('record_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('获取财务记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取财务记录异常:', err);
+      return [];
+    }
+  },
+
+  async createRecord(recordData: Omit<FinanceRecord, 'created_at' | 'updated_at'>): Promise<FinanceRecord | null> {
+    try {
+      const payload = {
+        ...recordData,
+        amount: Number(recordData.amount)
+      };
+
+      const { data, error } = await supabase
+        .from('finances')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('创建财务记录失败:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('创建财务记录异常:', err);
+      return null;
+    }
+  },
+
+  async updateRecord(id: string, updateData: Partial<FinanceRecord>): Promise<boolean> {
+    try {
+      const payload: Partial<FinanceRecord> = { ...updateData };
+      if (payload.amount !== undefined) {
+        payload.amount = Number(payload.amount);
+      }
+
+      const { error } = await supabase
+        .from('finances')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新财务记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新财务记录异常:', err);
+      return false;
+    }
+  },
+
+  async deleteRecord(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('finances')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除财务记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除财务记录异常:', err);
+      return false;
+    }
   }
 };
 
