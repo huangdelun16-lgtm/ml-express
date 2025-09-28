@@ -5,22 +5,22 @@ const supabaseKey = 'sb_secret_em8UIH2jM5CVz6fNaUIA-g_2ox69n90';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 包裹数据类型定义
+// 包裹数据类型定义 - 匹配数据库字段名
 export interface Package {
   id: string;
-  senderName: string;
-  senderPhone: string;
-  senderAddress: string;
-  receiverName: string;
-  receiverPhone: string;
-  receiverAddress: string;
-  packageType: string;
+  sender_name: string;
+  sender_phone: string;
+  sender_address: string;
+  receiver_name: string;
+  receiver_phone: string;
+  receiver_address: string;
+  package_type: string;
   weight: string;
   description?: string;
   status: string;
-  createTime: string;
-  pickupTime: string;
-  deliveryTime: string;
+  create_time: string;
+  pickup_time: string;
+  delivery_time: string;
   courier: string;
   price: string;
   created_at?: string;
@@ -113,8 +113,8 @@ export const packageService = {
   async updatePackageStatus(id: string, status: string, pickupTime?: string, deliveryTime?: string): Promise<boolean> {
     const updateData: any = { status };
     
-    if (pickupTime) updateData.pickupTime = pickupTime;
-    if (deliveryTime) updateData.deliveryTime = deliveryTime;
+    if (pickupTime) updateData.pickup_time = pickupTime;
+    if (deliveryTime) updateData.delivery_time = deliveryTime;
     
     const { error } = await supabase
       .from('packages')

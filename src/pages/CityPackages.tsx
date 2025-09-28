@@ -43,19 +43,19 @@ const CityPackages: React.FC = () => {
     const newId = `PKG${String(packages.length + 1).padStart(3, '0')}`;
     const newPkg = {
       id: newId,
-      senderName: newPackage.senderName,
-      senderPhone: newPackage.senderPhone,
-      senderAddress: newPackage.senderAddress,
-      receiverName: newPackage.receiverName,
-      receiverPhone: newPackage.receiverPhone,
-      receiverAddress: newPackage.receiverAddress,
-      packageType: newPackage.packageType,
+      sender_name: newPackage.senderName,
+      sender_phone: newPackage.senderPhone,
+      sender_address: newPackage.senderAddress,
+      receiver_name: newPackage.receiverName,
+      receiver_phone: newPackage.receiverPhone,
+      receiver_address: newPackage.receiverAddress,
+      package_type: newPackage.packageType,
       weight: newPackage.weight,
       description: newPackage.description,
       status: '待取件',
-      createTime: new Date().toLocaleString('zh-CN'),
-      pickupTime: '',
-      deliveryTime: '',
+      create_time: new Date().toLocaleString('zh-CN'),
+      pickup_time: '',
+      delivery_time: '',
       courier: '待分配',
       price: '5000 MMK'
     };
@@ -278,10 +278,10 @@ const CityPackages: React.FC = () => {
                 }}>
                   <div>
                     <h3 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1.2rem' }}>
-                      {pkg.id} - {pkg.packageType}
+                      {pkg.id} - {pkg.package_type}
                     </h3>
                     <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.9rem' }}>
-                      创建时间: {pkg.createTime}
+                      创建时间: {pkg.create_time}
                     </p>
                   </div>
                   <div style={{
@@ -305,19 +305,19 @@ const CityPackages: React.FC = () => {
                   <div>
                     <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>寄件人</h4>
                     <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                      {pkg.senderName} - {pkg.senderPhone}
+                      {pkg.sender_name} - {pkg.sender_phone}
                     </p>
                     <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
-                      {pkg.senderAddress}
+                      {pkg.sender_address}
                     </p>
                   </div>
                   <div>
                     <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>收件人</h4>
                     <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                      {pkg.receiverName} - {pkg.receiverPhone}
+                      {pkg.receiver_name} - {pkg.receiver_phone}
                     </p>
                     <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
-                      {pkg.receiverAddress}
+                      {pkg.receiver_address}
                     </p>
                   </div>
                   <div>

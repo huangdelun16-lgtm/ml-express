@@ -989,22 +989,22 @@ const HomePage: React.FC = () => {
                   const orderInfo = JSON.parse(pendingOrder);
                   const packageId = generateMyanmarPackageId();
                   
-                  // 创建包裹数据
+                  // 创建包裹数据 - 使用数据库字段名
                   const packageData = {
                     id: packageId,
-                    senderName: orderInfo.senderName,
-                    senderPhone: orderInfo.senderPhone,
-                    senderAddress: orderInfo.senderAddress,
-                    receiverName: orderInfo.receiverName,
-                    receiverPhone: orderInfo.receiverPhone,
-                    receiverAddress: orderInfo.receiverAddress,
-                    packageType: orderInfo.packageType,
+                    sender_name: orderInfo.senderName,
+                    sender_phone: orderInfo.senderPhone,
+                    sender_address: orderInfo.senderAddress,
+                    receiver_name: orderInfo.receiverName,
+                    receiver_phone: orderInfo.receiverPhone,
+                    receiver_address: orderInfo.receiverAddress,
+                    package_type: orderInfo.packageType,
                     weight: orderInfo.weight,
                     description: orderInfo.description,
                     status: '待取件',
-                    createTime: new Date().toLocaleString('zh-CN'),
-                    pickupTime: '',
-                    deliveryTime: '',
+                    create_time: new Date().toLocaleString('zh-CN'),
+                    pickup_time: '',
+                    delivery_time: '',
                     courier: '待分配',
                     price: '5000 MMK'
                   };
