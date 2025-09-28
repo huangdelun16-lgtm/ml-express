@@ -50,6 +50,8 @@ const AdminDashboard: React.FC = () => {
   const handleCardClick = (title: string) => {
     if (title === '同城包裹') {
       navigate('/admin/city-packages');
+    } else if (title === '用户管理') {
+      navigate('/admin/users');
     } else {
       alert(`点击了: ${title}`);
     }
