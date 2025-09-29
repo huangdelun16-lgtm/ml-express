@@ -44,6 +44,33 @@ export interface FinanceRecord {
   updated_at?: string;
 }
 
+export interface TrackingEvent {
+  id: string;
+  package_id: string;
+  courier_id?: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  battery_level?: number;
+  note?: string;
+  event_time: string;
+  created_at?: string;
+}
+
+export interface CourierLocation {
+  id: string;
+  courier_id: string;
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  speed?: number;
+  last_update: string;
+  battery_level?: number;
+  status: string;
+  created_at?: string;
+}
+
 // 测试数据库连接
 export const testConnection = async () => {
   try {
@@ -253,6 +280,91 @@ export const financeService = {
       console.error('删除财务记录异常:', err);
       return false;
     }
+  }
+};
+
+export const trackingService = {
+  async getActivePackages() {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('*')
+      .in('status', ['待取件', '已取件', '配送中']);
+
+    if (error) {
+      console.error('获取实时跟踪包裹失败:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  async getActiveCouriers() {
+    const { data, error } = await supabase
+      .from('couriers')
+      .select('*')
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('获取在线快递员失败:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  async getCourierLocations(): Promise<CourierLocation[]> {
+    const { data, error } = await supabase
+      .from('courier_locations')
+      .select('*')
+      .order('last_update', { ascending: false });
+
+    if (error) {
+      console.error('获取快递员位置失败:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  async getTrackingEvents(packageId: string): Promise<TrackingEvent[]> {
+    const { data, error } = await supabase
+      .from('tracking_events')
+      .select('*')
+      .eq('package_id', packageId)
+      .order('event_time', { ascending: false });
+
+    if (error) {
+      console.error('获取包裹轨迹失败:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  async addTrackingEvent(eventData: Omit<TrackingEvent, 'id' | 'created_at'>): Promise<boolean> {
+    const { error } = await supabase
+      .from('tracking_events')
+      .insert([eventData]);
+
+    if (error) {
+      console.error('新增轨迹事件失败:', error);
+      return false;
+    }
+
+    return true;
+  },
+
+  async updateCourierLocation(location: Omit<CourierLocation, 'id' | 'created_at'>): Promise<boolean> {
+    const { error } = await supabase
+      .from('courier_locations')
+      .upsert(location, { onConflict: 'courier_id' });
+
+    if (error) {
+      console.error('更新快递员位置失败:', error);
+      return false;
+    }
+
+    return true;
   }
 };
 

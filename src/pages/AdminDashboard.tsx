@@ -56,6 +56,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/couriers');
     } else if (title === '财务管理') {
       navigate('/admin/finance');
+    } else if (title === '实时跟踪') {
+      navigate('/admin/tracking');
     } else {
       alert(`点击了: ${title}`);
     }

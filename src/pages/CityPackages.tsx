@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, Package } from '../services/supabase';
+import { packageService, Package, supabase } from '../services/supabase';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('list');
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [courierDetail, setCourierDetail] = useState<any>(null);
+  const [courierLoading, setCourierLoading] = useState(false);
 
   // 加载包裹数据
   useEffect(() => {
@@ -119,6 +123,86 @@ const CityPackages: React.FC = () => {
       case '已取消': return '已取消';
       default: return status;
     }
+  };
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedPackage(null);
+    setCourierDetail(null);
+  };
+
+  const loadCourierDetail = async (pkg: Package) => {
+    if (!pkg.courier || pkg.courier === '待分配') {
+      setCourierDetail(null);
+      return;
+    }
+
+    try {
+      setCourierLoading(true);
+      let courierData = null;
+
+      if (pkg.courier.startsWith('COU')) {
+        const { data, error } = await supabase
+          .from('couriers')
+          .select('*')
+          .eq('id', pkg.courier)
+          .single();
+
+        if (!error) {
+          courierData = data;
+        }
+      }
+
+      if (!courierData) {
+        const { data, error } = await supabase
+          .from('couriers')
+          .select('*')
+          .eq('name', pkg.courier)
+          .maybeSingle();
+
+        if (!error) {
+          courierData = data;
+        }
+      }
+
+      setCourierDetail(courierData);
+    } catch (error) {
+      console.error('加载快递员详情失败:', error);
+      setCourierDetail(null);
+    } finally {
+      setCourierLoading(false);
+    }
+  };
+
+  const handleViewDetail = async (pkg: Package) => {
+    setSelectedPackage(pkg);
+    setShowDetailModal(true);
+    await loadCourierDetail(pkg);
+  };
+
+  const renderTimelineItem = (label: string, time?: string) => {
+    const isCompleted = Boolean(time && time.trim() !== '');
+    const dotColor = isCompleted ? '#27ae60' : 'rgba(255, 255, 255, 0.4)';
+    const textColor = isCompleted ? 'white' : 'rgba(255,255,255,0.7)';
+
+    return (
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        <div style={{
+          width: '14px',
+          height: '14px',
+          borderRadius: '50%',
+          background: dotColor,
+          marginTop: '4px',
+          boxShadow: isCompleted ? '0 0 6px rgba(39, 174, 96, 0.6)' : 'none'
+        }}></div>
+        <div>
+          <p style={{ margin: 0, color: textColor, fontWeight: isCompleted ? 600 : 500 }}>{label}</p>
+          <p style={{ margin: '4px 0 0 0', color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
+            {isCompleted ? time : '等待更新'}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -386,7 +470,7 @@ const CityPackages: React.FC = () => {
                     </button>
                   )}
                   <button
-                    onClick={() => alert(`包裹 ${pkg.id} 的详细信息`)}
+                    onClick={() => handleViewDetail(pkg)}
                     style={{
                       background: 'rgba(255, 255, 255, 0.2)',
                       color: 'white',
@@ -635,6 +719,194 @@ const CityPackages: React.FC = () => {
             </div>
           </form>
         </div>
+      )}
+
+      {/* 包裹详情弹窗 */}
+      {showDetailModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(15, 32, 60, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '960px',
+            maxHeight: '90vh',
+            background: 'linear-gradient(145deg, rgba(26, 54, 93, 0.95), rgba(18, 38, 65, 0.92))',
+            borderRadius: '24px',
+            padding: '0 0 30px 0',
+            color: 'white',
+            boxShadow: '0 25px 55px rgba(0,0,0,0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            overflow: 'hidden'
+          }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '24px 30px 0 30px',
+                position: 'sticky',
+                top: 0,
+                background: 'linear-gradient(145deg, rgba(26, 54, 93, 0.95), rgba(18, 38, 65, 0.94))',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                zIndex: 2
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 600 }}>
+                包裹详情 · {selectedPackage.id}
+              </h2>
+              <button
+                onClick={closeDetailModal}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '10px 22px',
+                  borderRadius: '30px',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                关闭
+              </button>
+            </div>
+
+            <div style={{
+              padding: '25px 30px',
+              overflowY: 'auto',
+              maxHeight: 'calc(90vh - 96px)',
+              scrollbarWidth: 'thin'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '20px',
+                marginBottom: '25px'
+              }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                padding: '18px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#A5C7FF', fontSize: '1.05rem' }}>寄件人信息</h3>
+                <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>{selectedPackage.sender_name}</p>
+                <p style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.8)' }}>{selectedPackage.sender_phone}</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>{selectedPackage.sender_address}</p>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                padding: '18px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#A5C7FF', fontSize: '1.05rem' }}>收件人信息</h3>
+                <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>{selectedPackage.receiver_name}</p>
+                <p style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.8)' }}>{selectedPackage.receiver_phone}</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>{selectedPackage.receiver_address}</p>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                padding: '18px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#A5C7FF', fontSize: '1.05rem' }}>包裹信息</h3>
+                <p style={{ margin: '0 0 6px 0' }}>类型：{selectedPackage.package_type}</p>
+                <p style={{ margin: '0 0 6px 0' }}>重量：{selectedPackage.weight}</p>
+                <p style={{ margin: '0 0 6px 0' }}>价格：{selectedPackage.price}</p>
+                <p style={{ margin: '0 0 6px 0' }}>状态：{getStatusText(selectedPackage.status)}</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                  创建时间：{selectedPackage.create_time}
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              padding: '20px',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              marginBottom: '25px'
+            }}>
+              <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.05rem' }}>配送进度</h3>
+              <div style={{ display: 'grid', gap: '14px' }}>
+                {renderTimelineItem('下单完成', selectedPackage.create_time)}
+                {renderTimelineItem('包裹已取件', selectedPackage.pickup_time)}
+                {renderTimelineItem('配送进行中', selectedPackage.status === '配送中' || selectedPackage.status === '已送达' ? selectedPackage.pickup_time || selectedPackage.create_time : '')}
+                {renderTimelineItem('包裹已送达', selectedPackage.delivery_time)}
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              padding: '20px',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
+              <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.05rem' }}>负责快递员</h3>
+              {courierLoading ? (
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)' }}>正在加载快递员详情...</p>
+              ) : selectedPackage.courier === '待分配' || !selectedPackage.courier ? (
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)' }}>尚未分配快递员</p>
+              ) : courierDetail ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '15px'
+                }}>
+                  <div>
+                    <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>{courierDetail.name}</p>
+                    <p style={{ margin: '0 0 6px 0', color: 'rgba(255,255,255,0.8)' }}>{courierDetail.phone}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>{courierDetail.address}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0 0 6px 0' }}>车辆类型：{courierDetail.vehicle_type}</p>
+                    <p style={{ margin: '0 0 6px 0' }}>状态：{courierDetail.status}</p>
+                    <p style={{ margin: 0 }}>总配送：{courierDetail.total_deliveries || 0} 单</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: '0 0 6px 0' }}>加入日期：{courierDetail.join_date}</p>
+                    <p style={{ margin: '0 0 6px 0' }}>最近活跃：{courierDetail.last_active || '暂无'}</p>
+                    <p style={{ margin: 0 }}>评分：{courierDetail.rating || 0} ⭐</p>
+                  </div>
+                  {courierDetail.notes && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <p style={{ margin: '10px 0 0 0', color: 'rgba(255,255,255,0.7)' }}>备注：{courierDetail.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)' }}>
+                  当前包裹记录中的快递员信息暂时无法在系统中找到，可能使用了手写名称。
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       )}
     </div>
   );

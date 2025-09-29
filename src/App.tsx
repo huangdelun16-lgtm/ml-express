@@ -7,6 +7,7 @@ import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
 import CourierManagement from './pages/CourierManagement';
 import FinanceManagement from './pages/FinanceManagement';
+import TrackingPage from './pages/TrackingPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/couriers" element={<CourierManagement />} />
         <Route path="/admin/finance" element={<FinanceManagement />} />
+        <Route path="/admin/tracking" element={<TrackingPage />} />
         </Routes>
       </div>
     </Router>
