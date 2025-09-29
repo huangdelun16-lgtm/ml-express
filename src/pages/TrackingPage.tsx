@@ -173,7 +173,7 @@ const TrackingPage: React.FC = () => {
           onClick={() => navigate('/admin/dashboard')}
           style={{
             background: 'rgba(255, 255, 255, 0.1)',
-            color: 'white',
+          color: 'white',
             border: '1px solid rgba(255,255,255,0.3)',
             padding: '10px 20px',
             borderRadius: '10px',
@@ -303,10 +303,7 @@ const TrackingPage: React.FC = () => {
                         key={`courier-${marker.id}`}
                         position={{ lat: marker.lat, lng: marker.lng }}
                         label={{ text: marker.courierId || '快递员', color: '#ffffff', fontSize: '12px' }}
-                        icon={{
-                          url: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
-                          scaledSize: new window.google.maps.Size(32, 32)
-                        }}
+                        icon="https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png"
                       />
                     ))}
 
@@ -315,10 +312,7 @@ const TrackingPage: React.FC = () => {
                         key={`event-${marker.id}`}
                         position={{ lat: marker.lat, lng: marker.lng }}
                         label={{ text: marker.status, color: '#ffffff', fontSize: '11px' }}
-                        icon={{
-                          url: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
-                          scaledSize: new window.google.maps.Size(28, 28)
-                        }}
+                        icon="https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png"
                       />
                     ))}
 
