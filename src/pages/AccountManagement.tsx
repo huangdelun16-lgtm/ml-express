@@ -202,7 +202,7 @@ const AccountManagement: React.FC = () => {
         >
           <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>新增员工账号</h2>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               <div>
                 <label style={labelStyle}>用户名 *</label>
                 <input
