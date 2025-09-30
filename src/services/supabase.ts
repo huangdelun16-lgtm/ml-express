@@ -651,7 +651,7 @@ export const adminAccountService = {
   },
 
   // 创建新账号
-  async createAccount(accountData: Omit<AdminAccount, 'id' | 'created_at' | 'updated_at'>): Promise<AdminAccount | null> {
+  async createAccount(accountData: Omit<AdminAccount, 'id' | 'status' | 'created_at' | 'updated_at'>): Promise<AdminAccount | null> {
     try {
       const { data, error } = await supabase
         .from('admin_accounts')
