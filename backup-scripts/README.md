@@ -32,6 +32,7 @@ Vultr 服务器 ← 定期备份 ← 主服务
 - 详细的备份策略文档
 - 成本分析和风险评估
 - 实施建议
+- 新增系统设置表备份说明及恢复流程（`system_settings`）
 
 ## 快速开始
 
@@ -63,6 +64,7 @@ sudo ./setup-vultr-backup.sh
 sudo -u backup /backup/backup-database.sh
 sudo -u backup /backup/backup-static.sh
 sudo -u backup /backup/backup-code.sh
+sudo -u backup /backup/backup-settings.sh
 ```
 
 ## 备份计划
@@ -71,6 +73,7 @@ sudo -u backup /backup/backup-code.sh
 - **数据库备份**: 每天凌晨 2:00
 - **静态文件备份**: 每天凌晨 3:00
 - **代码备份**: 每天凌晨 4:00
+- **系统设置备份**: 每天凌晨 2:30
 - **服务监控**: 每 5 分钟
 
 ### 备份保留策略
@@ -118,6 +121,7 @@ sudo -u backup /backup/backup-code.sh
 - `database`: 仅恢复数据库
 - `static`: 仅恢复静态文件
 - `code`: 仅恢复代码
+- `settings`: 恢复系统配置表 `system_settings`
 - `all`: 恢复所有数据
 
 ## 访问备份

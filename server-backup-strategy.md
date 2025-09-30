@@ -102,6 +102,15 @@ fi
 - **定期备份**: Vultr 服务器备份
 - **本地备份**: 开发环境备份
 
+### 4. 系统配置备份
+- **Supabase `system_settings` 表**：存放后台配置、计费规则、通知模板等动态参数。
+- 建议在数据库备份脚本中追加：
+  ```bash
+  pg_dump "$SUPABASE_DB_URL" --table=public.system_settings --data-only --column-inserts \
+    > /backups/db/system_settings-data.sql
+  ```
+- 恢复时先导入基础表结构 `supabase-system-settings-setup.sql`，再执行数据文件。
+
 ### 2. 备份频率
 - **数据库**: 每日备份
 - **静态文件**: 每周备份

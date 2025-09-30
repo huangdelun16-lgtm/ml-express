@@ -71,6 +71,16 @@ export interface CourierLocation {
   created_at?: string;
 }
 
+export interface SystemSetting {
+  id?: string;
+  category: string;
+  settings_key: string;
+  settings_value: any;
+  description?: string;
+  updated_by?: string;
+  updated_at?: string;
+}
+
 // 测试数据库连接
 export const testConnection = async () => {
   try {
@@ -365,6 +375,97 @@ export const trackingService = {
     }
 
     return true;
+  }
+};
+
+export const systemSettingsService = {
+  async getAllSettings(): Promise<SystemSetting[]> {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('settings_key', { ascending: true });
+
+      if (error) {
+        console.error('获取系统设置失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取系统设置异常:', err);
+      return [];
+    }
+  },
+
+  async getSettingsByKeys(keys: string[]): Promise<SystemSetting[]> {
+    if (!keys.length) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .in('settings_key', keys);
+
+      if (error) {
+        console.error('按键获取系统设置失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('按键获取系统设置异常:', err);
+      return [];
+    }
+  },
+
+  async upsertSetting(setting: Omit<SystemSetting, 'id'>): Promise<boolean> {
+    try {
+      const payload = {
+        ...setting,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(payload, { onConflict: 'settings_key' });
+
+      if (error) {
+        console.error(`更新系统设置 ${setting.settings_key} 失败:`, error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error(`更新系统设置 ${setting.settings_key} 异常:`, err);
+      return false;
+    }
+  },
+
+  async upsertSettings(settings: Array<Omit<SystemSetting, 'id'>>): Promise<boolean> {
+    if (!settings.length) return true;
+
+    try {
+      const payload = settings.map(setting => ({
+        ...setting,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(payload, { onConflict: 'settings_key' });
+
+      if (error) {
+        console.error('批量更新系统设置失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('批量更新系统设置异常:', err);
+      return false;
+    }
   }
 };
 

@@ -64,6 +64,10 @@ pg_dump $SUPABASE_DB_URL -t users > $BACKUP_DIR/users_$DATE.sql
 echo "$(date): 备份 couriers 表..." >> $LOG_FILE
 pg_dump $SUPABASE_DB_URL -t couriers > $BACKUP_DIR/couriers_$DATE.sql
 
+# 备份 system_settings 表
+echo "$(date): 备份 system_settings 表..." >> $LOG_FILE
+pg_dump $SUPABASE_DB_URL -t system_settings > $BACKUP_DIR/system_settings_$DATE.sql
+
 # 压缩备份文件
 echo "$(date): 压缩备份文件..." >> $LOG_FILE
 gzip $BACKUP_DIR/*_$DATE.sql
@@ -108,6 +112,29 @@ EOF
 
 # 创建代码备份脚本
 cat > /backup/backup-code.sh << 'EOF'
+# 创建系统设置备份脚本
+cat > /backup/backup-settings.sh << 'EOF'
+#!/bin/bash
+
+# 系统设置表备份脚本
+BACKUP_DIR="/backup/database/daily"
+DATE=$(date +%Y%m%d_%H%M%S)
+LOG_FILE="/backup/logs/settings-backup-$(date +%Y%m%d).log"
+
+SUPABASE_DB_URL="postgresql://postgres:[PASSWORD]@db.uopkyuluxnrewvlmutam.supabase.co:5432/postgres"
+
+echo "$(date): 开始 system_settings 表备份..." >> $LOG_FILE
+
+pg_dump $SUPABASE_DB_URL -t system_settings --data-only --column-inserts \
+  > $BACKUP_DIR/system_settings_data_$DATE.sql
+
+gzip $BACKUP_DIR/system_settings_data_$DATE.sql
+
+find $BACKUP_DIR -name "system_settings_data_*.sql.gz" -mtime +14 -delete
+
+echo "$(date): system_settings 备份完成" >> $LOG_FILE
+EOF
+
 #!/bin/bash
 
 # 代码备份脚本
@@ -169,6 +196,9 @@ cat > /etc/cron.d/market-link-express-backup << 'EOF'
 # MARKET LINK EXPRESS 备份任务
 # 每天凌晨2点备份数据库
 0 2 * * * backup /backup/backup-database.sh
+
+# 每天凌晨2点30分备份系统设置
+30 2 * * * backup /backup/backup-settings.sh
 
 # 每天凌晨3点备份静态文件
 0 3 * * * backup /backup/backup-static.sh

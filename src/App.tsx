@@ -8,6 +8,7 @@ import UserManagement from './pages/UserManagement';
 import CourierManagement from './pages/CourierManagement';
 import FinanceManagement from './pages/FinanceManagement';
 import TrackingPage from './pages/TrackingPage';
+import SystemSettings from './pages/SystemSettings';
 
 function App() {
   return (
@@ -19,9 +20,10 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/city-packages" element={<CityPackages />} />
           <Route path="/admin/users" element={<UserManagement />} />
-        <Route path="/admin/couriers" element={<CourierManagement />} />
-        <Route path="/admin/finance" element={<FinanceManagement />} />
-        <Route path="/admin/tracking" element={<TrackingPage />} />
+          <Route path="/admin/couriers" element={<CourierManagement />} />
+          <Route path="/admin/finance" element={<FinanceManagement />} />
+          <Route path="/admin/tracking" element={<TrackingPage />} />
+          <Route path="/admin/settings" element={<SystemSettings />} />
         </Routes>
       </div>
     </Router>

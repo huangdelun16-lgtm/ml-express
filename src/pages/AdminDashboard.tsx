@@ -58,8 +58,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/finance');
     } else if (title === '实时跟踪') {
       navigate('/admin/tracking');
-    } else {
-      alert(`点击了: ${title}`);
+    } else if (title === '系统设置') {
+      navigate('/admin/settings');
     }
   };
 
