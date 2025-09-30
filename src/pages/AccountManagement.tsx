@@ -19,6 +19,7 @@ const AccountManagement: React.FC = () => {
     email: '',
     department: '',
     position: '',
+    salary: '',
     role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
     hire_date: new Date().toISOString().split('T')[0],
     id_number: '',
@@ -58,6 +59,7 @@ const AccountManagement: React.FC = () => {
     const currentUser = localStorage.getItem('currentUser') || 'admin';
     const result = await adminAccountService.createAccount({
       ...formData,
+      salary: formData.salary ? Number(formData.salary) : undefined,
       created_by: currentUser
     });
 
@@ -73,6 +75,7 @@ const AccountManagement: React.FC = () => {
         email: '',
         department: '',
         position: '',
+        salary: '',
         role: 'operator',
         hire_date: new Date().toISOString().split('T')[0],
         id_number: '',
@@ -99,20 +102,20 @@ const AccountManagement: React.FC = () => {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '12px 14px',
-    borderRadius: '10px',
+    padding: '10px 12px',
+    borderRadius: '8px',
     border: '1px solid rgba(255,255,255,0.25)',
     background: 'rgba(15, 32, 60, 0.55)',
     color: 'white',
-    fontSize: '0.95rem',
+    fontSize: '0.9rem',
     outline: 'none'
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    marginBottom: '6px',
+    marginBottom: '5px',
     color: 'rgba(255,255,255,0.9)',
-    fontSize: '0.9rem',
+    fontSize: '0.85rem',
     fontWeight: 500
   };
 
@@ -191,15 +194,15 @@ const AccountManagement: React.FC = () => {
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '16px',
-            padding: '24px',
+            borderRadius: '14px',
+            padding: '20px',
             border: '1px solid rgba(255,255,255,0.1)',
             marginBottom: '20px'
           }}
         >
-          <h2 style={{ color: 'white', marginBottom: '20px' }}>新增员工账号</h2>
+          <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>新增员工账号</h2>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
                 <label style={labelStyle}>用户名 *</label>
                 <input
@@ -312,6 +315,19 @@ const AccountManagement: React.FC = () => {
                 </select>
               </div>
               <div>
+                <label style={labelStyle}>薪水 (MMK)</label>
+                <input
+                  type="number"
+                  name="salary"
+                  value={formData.salary}
+                  onChange={handleInputChange}
+                  placeholder="例: 500000"
+                  style={inputStyle}
+                  min="0"
+                  step="1000"
+                />
+              </div>
+              <div>
                 <label style={labelStyle}>角色权限 *</label>
                 <select
                   name="role"
@@ -382,14 +398,14 @@ const AccountManagement: React.FC = () => {
                 />
               </div>
             </div>
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>备注</label>
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleInputChange}
                 placeholder="其他备注信息"
-                rows={3}
+                rows={2}
                 style={{ ...inputStyle, resize: 'vertical' }}
               />
             </div>
@@ -399,12 +415,12 @@ const AccountManagement: React.FC = () => {
                 background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                 color: 'white',
                 border: 'none',
-                padding: '12px 32px',
+                padding: '10px 28px',
                 borderRadius: '10px',
                 cursor: 'pointer',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 fontWeight: 600,
-                boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)'
+                boxShadow: '0 6px 16px rgba(56, 161, 105, 0.3)'
               }}
             >
               创建账号

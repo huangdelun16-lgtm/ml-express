@@ -91,6 +91,7 @@ export interface AdminAccount {
   email: string;
   department: string;
   position: string;
+  salary?: number;
   role: 'admin' | 'manager' | 'operator' | 'finance';
   status: 'active' | 'inactive' | 'suspended';
   hire_date: string;
@@ -635,7 +636,7 @@ export const adminAccountService = {
     try {
       const { data, error } = await supabase
         .from('admin_accounts')
-        .select('id, username, employee_name, employee_id, phone, email, department, position, role, status, hire_date, last_login, created_at')
+        .select('id, username, employee_name, employee_id, phone, email, department, position, salary, role, status, hire_date, last_login, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {

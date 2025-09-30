@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS admin_accounts (
   email TEXT NOT NULL,
   department TEXT NOT NULL,
   position TEXT NOT NULL,
+  salary NUMERIC(10, 2),
   role TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'operator', 'finance')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
   hire_date TEXT NOT NULL,
