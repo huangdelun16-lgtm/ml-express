@@ -1,18 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { adminAccountService } from '../services/supabase';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 简单的登录验证
-    if (username === 'admin' && password === 'admin') {
-      navigate('/admin/dashboard');
-    } else {
-      alert('用户名或密码错误');
+    setLoading(true);
+
+    try {
+      // 尝试数据库登录
+      const account = await adminAccountService.login(username, password);
+      
+      if (account) {
+        // 登录成功，保存用户信息到 localStorage
+        localStorage.setItem('currentUser', account.username);
+        localStorage.setItem('currentUserName', account.employee_name);
+        localStorage.setItem('currentUserRole', account.role);
+        navigate('/admin/dashboard');
+      } else {
+        // 如果数据库登录失败，回退到硬编码验证（兼容模式）
+        if (username === 'admin' && password === 'admin') {
+          localStorage.setItem('currentUser', 'admin');
+          localStorage.setItem('currentUserName', '管理员');
+          localStorage.setItem('currentUserRole', 'admin');
+          navigate('/admin/dashboard');
+        } else {
+          alert('用户名或密码错误，或账号已被停用');
+        }
+      }
+    } catch (error) {
+      console.error('登录异常:', error);
+      alert('登录失败，请检查网络连接');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -185,6 +210,7 @@ const AdminLogin: React.FC = () => {
           </div>
           <button
             type="submit"
+            disabled={loading}
             style={{
               width: '100%',
               padding: '15px',
@@ -192,23 +218,28 @@ const AdminLogin: React.FC = () => {
               border: 'none',
               fontSize: '1.1rem',
               fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
+              background: loading ? 'rgba(192, 192, 192, 0.5)' : 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
               color: '#2C3E50',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s ease',
               boxShadow: '0 4px 15px rgba(192, 192, 192, 0.3)',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
+              textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
+              opacity: loading ? 0.7 : 1
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
+              if (!loading) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
+              }
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
+              if (!loading) {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
+              }
             }}
           >
-            登录
+            {loading ? '登录中...' : '登录'}
           </button>
         </form>
         <p style={{ 

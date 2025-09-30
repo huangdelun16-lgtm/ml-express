@@ -665,31 +665,70 @@ const SystemSettings: React.FC = () => {
           <p style={{ opacity: 0.75, fontSize: '0.9rem', lineHeight: 1.5 }}>
             按照功能模块集中管理系统参数，点击分类即可切换对应配置。
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-            {categories.map(category => (
-              <button
-                key={category.id}
-                onClick={() => setActiveTab(category.id)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '4px',
-                  background: activeTab === category.id ? 'rgba(49, 130, 206, 0.35)' : 'transparent',
-                  border: activeTab === category.id ? '1px solid rgba(144,205,244,0.8)' : '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: '14px',
-                  padding: '14px',
-                  color: 'white',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  transition: 'all 0.25s ease'
-                }}
-              >
-                <span style={{ fontSize: '1.3rem' }}>{category.icon}</span>
-                <span style={{ fontWeight: 600 }}>{category.name}</span>
-                <span style={{ opacity: 0.75, fontSize: '0.88rem', lineHeight: 1.4 }}>{category.description}</span>
-              </button>
-            ))}
+          
+          {/* 账号管理快捷入口 */}
+          <div style={{ marginTop: '14px', marginBottom: '14px' }}>
+            <button
+              onClick={() => navigate('/admin/accounts')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '4px',
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(124, 58, 237, 0.3) 100%)',
+                border: '1px solid rgba(167, 139, 250, 0.6)',
+                borderRadius: '14px',
+                padding: '14px',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.3)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+              }}
+            >
+              <span style={{ fontSize: '1.3rem' }}>👥</span>
+              <span style={{ fontWeight: 600 }}>新增账号</span>
+              <span style={{ opacity: 0.85, fontSize: '0.88rem', lineHeight: 1.4 }}>管理员工登录账号与权限</span>
+            </button>
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '14px' }}>
+            <p style={{ opacity: 0.6, fontSize: '0.85rem', marginBottom: '10px' }}>系统配置</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {categories.map(category => (
+                <button
+                  key={category.id}
+                  onClick={() => setActiveTab(category.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    background: activeTab === category.id ? 'rgba(49, 130, 206, 0.35)' : 'transparent',
+                    border: activeTab === category.id ? '1px solid rgba(144,205,244,0.8)' : '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '14px',
+                    padding: '14px',
+                    color: 'white',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.25s ease'
+                  }}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>{category.icon}</span>
+                  <span style={{ fontWeight: 600 }}>{category.name}</span>
+                  <span style={{ opacity: 0.75, fontSize: '0.88rem', lineHeight: 1.4 }}>{category.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

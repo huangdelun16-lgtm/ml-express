@@ -9,6 +9,7 @@ import CourierManagement from './pages/CourierManagement';
 import FinanceManagement from './pages/FinanceManagement';
 import TrackingPage from './pages/TrackingPage';
 import SystemSettings from './pages/SystemSettings';
+import AccountManagement from './pages/AccountManagement';
 
 function App() {
   return (
@@ -24,6 +25,8 @@ function App() {
           <Route path="/admin/finance" element={<FinanceManagement />} />
           <Route path="/admin/tracking" element={<TrackingPage />} />
           <Route path="/admin/settings" element={<SystemSettings />} />
+          <Route path="/admin/system-settings" element={<SystemSettings />} />
+          <Route path="/admin/accounts" element={<AccountManagement />} />
         </Routes>
       </div>
     </Router>

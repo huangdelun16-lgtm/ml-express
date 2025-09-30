@@ -81,6 +81,30 @@ export interface SystemSetting {
   updated_at?: string;
 }
 
+export interface AdminAccount {
+  id?: string;
+  username: string;
+  password?: string;
+  employee_name: string;
+  employee_id: string;
+  phone: string;
+  email: string;
+  department: string;
+  position: string;
+  role: 'admin' | 'manager' | 'operator' | 'finance';
+  status: 'active' | 'inactive' | 'suspended';
+  hire_date: string;
+  id_number?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  address?: string;
+  notes?: string;
+  created_by?: string;
+  last_login?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 测试数据库连接
 export const testConnection = async () => {
   try {
@@ -568,6 +592,124 @@ export const userService = {
       return true;
     } catch (err) {
       console.error('更新用户统计异常:', err);
+      return false;
+    }
+  }
+};
+
+// 管理员账号数据库操作
+export const adminAccountService = {
+  // 登录验证
+  async login(username: string, password: string): Promise<AdminAccount | null> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_accounts')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password)
+        .eq('status', 'active')
+        .single();
+
+      if (error) {
+        console.error('登录失败:', error);
+        return null;
+      }
+
+      // 更新最后登录时间
+      if (data?.id) {
+        await supabase
+          .from('admin_accounts')
+          .update({ last_login: new Date().toISOString() })
+          .eq('id', data.id);
+      }
+
+      return data;
+    } catch (err) {
+      console.error('登录异常:', err);
+      return null;
+    }
+  },
+
+  // 获取所有账号
+  async getAllAccounts(): Promise<AdminAccount[]> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_accounts')
+        .select('id, username, employee_name, employee_id, phone, email, department, position, role, status, hire_date, last_login, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('获取账号列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取账号列表异常:', err);
+      return [];
+    }
+  },
+
+  // 创建新账号
+  async createAccount(accountData: Omit<AdminAccount, 'id' | 'created_at' | 'updated_at'>): Promise<AdminAccount | null> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_accounts')
+        .insert([{
+          ...accountData,
+          status: 'active'
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('创建账号失败:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('创建账号异常:', err);
+      return null;
+    }
+  },
+
+  // 更新账号状态
+  async updateAccountStatus(id: string, status: 'active' | 'inactive' | 'suspended'): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('admin_accounts')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新账号状态失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新账号状态异常:', err);
+      return false;
+    }
+  },
+
+  // 更新账号信息
+  async updateAccount(id: string, updateData: Partial<AdminAccount>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('admin_accounts')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新账号信息失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新账号信息异常:', err);
       return false;
     }
   }
