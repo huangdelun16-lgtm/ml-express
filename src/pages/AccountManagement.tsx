@@ -286,15 +286,30 @@ const AccountManagement: React.FC = () => {
               </div>
               <div>
                 <label style={labelStyle}>职位 *</label>
-                <input
-                  type="text"
+                <select
                   name="position"
                   value={formData.position}
                   onChange={handleInputChange}
-                  placeholder="例: 运营专员"
                   style={inputStyle}
                   required
-                />
+                >
+                  <option value="">请选择职位</option>
+                  <option value="销售">销售</option>
+                  <option value="销售主管">销售主管</option>
+                  <option value="财务">财务</option>
+                  <option value="财务经理">财务经理</option>
+                  <option value="骑手">骑手</option>
+                  <option value="骑手队长">骑手队长</option>
+                  <option value="客服">客服</option>
+                  <option value="客服主管">客服主管</option>
+                  <option value="运营专员">运营专员</option>
+                  <option value="运营经理">运营经理</option>
+                  <option value="技术支持">技术支持</option>
+                  <option value="仓库管理员">仓库管理员</option>
+                  <option value="调度员">调度员</option>
+                  <option value="人事专员">人事专员</option>
+                  <option value="系统管理员">系统管理员</option>
+                </select>
               </div>
               <div>
                 <label style={labelStyle}>角色权限 *</label>
