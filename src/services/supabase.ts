@@ -664,14 +664,20 @@ export const adminAccountService = {
         .single();
 
       if (error) {
-        console.error('创建账号失败:', error);
-        return null;
+        console.error('创建账号失败 - 详细错误:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        // 抛出错误以便在UI层捕获
+        throw new Error(error.message || '创建账号失败');
       }
 
       return data;
-    } catch (err) {
+    } catch (err: any) {
       console.error('创建账号异常:', err);
-      return null;
+      throw err; // 重新抛出错误
     }
   },
 
@@ -712,6 +718,158 @@ export const adminAccountService = {
     } catch (err) {
       console.error('更新账号信息异常:', err);
       return false;
+    }
+  }
+};
+
+// 审计日志数据类型定义
+export interface AuditLog {
+  id?: string;
+  user_id: string;
+  user_name: string;
+  action_type: 'create' | 'update' | 'delete' | 'login' | 'logout' | 'view' | 'export';
+  module: 'packages' | 'users' | 'couriers' | 'finance' | 'settings' | 'accounts' | 'system';
+  target_id?: string;
+  target_name?: string;
+  action_description: string;
+  old_value?: string;
+  new_value?: string;
+  ip_address?: string;
+  user_agent?: string;
+  action_time?: string;
+  created_at?: string;
+}
+
+// 审计日志服务
+export const auditLogService = {
+  // 记录操作日志
+  async log(logData: Omit<AuditLog, 'id' | 'created_at' | 'action_time'>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('audit_logs')
+        .insert([{
+          ...logData,
+          action_time: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error('记录审计日志失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('记录审计日志异常:', err);
+      return false;
+    }
+  },
+
+  // 获取所有日志
+  async getAllLogs(limit: number = 500): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('action_time', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取审计日志异常:', err);
+      return [];
+    }
+  },
+
+  // 根据用户筛选日志
+  async getLogsByUser(userId: string, limit: number = 200): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('action_time', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取用户审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取用户审计日志异常:', err);
+      return [];
+    }
+  },
+
+  // 根据模块筛选日志
+  async getLogsByModule(module: string, limit: number = 200): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('module', module)
+        .order('action_time', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取模块审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取模块审计日志异常:', err);
+      return [];
+    }
+  },
+
+  // 根据操作类型筛选日志
+  async getLogsByActionType(actionType: string, limit: number = 200): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('action_type', actionType)
+        .order('action_time', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取操作类型审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取操作类型审计日志异常:', err);
+      return [];
+    }
+  },
+
+  // 根据时间范围筛选日志
+  async getLogsByDateRange(startDate: string, endDate: string): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .gte('action_time', startDate)
+        .lte('action_time', endDate)
+        .order('action_time', { ascending: false });
+
+      if (error) {
+        console.error('获取时间范围审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取时间范围审计日志异常:', err);
+      return [];
     }
   }
 };

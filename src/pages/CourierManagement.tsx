@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabase';
+import { supabase, auditLogService } from '../services/supabase';
 
 interface Courier {
   id: string;
@@ -29,6 +29,7 @@ const CourierManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [editingCourier, setEditingCourier] = useState<Courier | null>(null);
+  const [importing, setImporting] = useState(false);
   const [courierForm, setCourierForm] = useState({
     name: '',
     phone: '',
@@ -70,8 +71,90 @@ const CourierManagement: React.FC = () => {
     }
   };
 
-  // 模拟快递员数据 - 已完全移除
-  // const getMockCouriers = (): Courier[] => [];
+  // 从账号系统导入骑手
+  const handleImportFromAccounts = async () => {
+    if (!window.confirm('确定要从账号系统导入骑手吗？\n\n将自动导入职位为"骑手"或"骑手队长"的员工账号。')) {
+      return;
+    }
+
+    setImporting(true);
+    try {
+      // 查询职位为骑手或骑手队长的账号
+      const { data: riderAccounts, error: queryError } = await supabase
+        .from('admin_accounts')
+        .select('*')
+        .in('position', ['骑手', '骑手队长'])
+        .eq('status', 'active');
+
+      if (queryError) {
+        console.error('查询骑手账号失败:', queryError);
+        alert('查询失败，请检查数据库连接');
+        return;
+      }
+
+      if (!riderAccounts || riderAccounts.length === 0) {
+        alert('未找到骑手账号\n\n请先在"系统设置 → 账号管理"中创建职位为"骑手"或"骑手队长"的账号');
+        return;
+      }
+
+      // 获取现有快递员，避免重复导入
+      const existingCouriers = couriers.map(c => c.phone);
+      
+      // 转换为快递员数据 - 只使用现有字段
+      const newCouriers = riderAccounts
+        .filter(account => !existingCouriers.includes(account.phone)) // 避免重复
+        .map(account => ({
+          id: `COU${Date.now()}${Math.floor(Math.random() * 1000)}`,
+          name: account.employee_name,
+          phone: account.phone,
+          vehicle_type: account.position === '骑手队长' ? 'car' : 'motorcycle',
+          status: 'active',
+          rating: 5.0
+        }));
+
+      if (newCouriers.length === 0) {
+        alert('所有骑手账号已存在，无需重复导入');
+        return;
+      }
+
+      // 批量插入到couriers表 - 只插入基本字段
+      const { error: insertError } = await supabase
+        .from('couriers')
+        .insert(newCouriers);
+
+      if (insertError) {
+        console.error('导入快递员失败 - 详细错误:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        });
+        alert(`导入失败\n\n错误信息：${insertError.message}\n\n${insertError.hint || '请检查控制台获取详细信息'}`);
+        return;
+      }
+
+      // 记录审计日志
+      const currentUser = localStorage.getItem('currentUser') || 'admin';
+      const currentUserName = localStorage.getItem('currentUserName') || '管理员';
+      await auditLogService.log({
+        user_id: currentUser,
+        user_name: currentUserName,
+        action_type: 'create',
+        module: 'couriers',
+        action_description: `从账号系统导入 ${newCouriers.length} 名骑手`,
+        new_value: JSON.stringify(newCouriers.map(c => c.name))
+      });
+
+      alert(`✅ 导入成功！\n\n共导入 ${newCouriers.length} 名骑手`);
+      await loadCouriers();
+      
+    } catch (error) {
+      console.error('导入骑手异常:', error);
+      alert('导入失败，请稍后重试');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleCreateCourier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,6 +266,9 @@ const CourierManagement: React.FC = () => {
 
   const handleDeleteCourier = async (courierId: string) => {
     if (window.confirm('确定要删除这个快递员吗？')) {
+      // 获取要删除的快递员信息（用于审计日志）
+      const courierToDelete = couriers.find(c => c.id === courierId);
+      
       try {
         const { error } = await supabase
           .from('couriers')
@@ -192,6 +278,21 @@ const CourierManagement: React.FC = () => {
         if (error) {
           console.error('删除快递员失败:', error);
         }
+        
+        // 记录审计日志
+        const currentUser = localStorage.getItem('currentUser') || 'unknown';
+        const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+        
+        await auditLogService.log({
+          user_id: currentUser,
+          user_name: currentUserName,
+          action_type: 'delete',
+          module: 'couriers',
+          target_id: courierId,
+          target_name: `快递员 ${courierToDelete?.name || courierId}`,
+          action_description: `删除快递员，姓名：${courierToDelete?.name || '未知'}，电话：${courierToDelete?.phone || '未知'}`,
+          old_value: JSON.stringify(courierToDelete)
+        });
         
         setCouriers(couriers.filter(c => c.id !== courierId));
       } catch (error) {
@@ -364,6 +465,25 @@ const CourierManagement: React.FC = () => {
             }}
           >
             ➕ 添加快递员
+          </button>
+          <button
+            onClick={handleImportFromAccounts}
+            disabled={importing}
+            style={{
+              background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: importing ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              transition: 'all 0.3s ease',
+              marginLeft: '12px',
+              opacity: importing ? 0.6 : 1,
+              boxShadow: '0 4px 12px rgba(155, 89, 182, 0.3)'
+            }}
+          >
+            {importing ? '导入中...' : '📥 从账号导入骑手'}
           </button>
         </div>
 

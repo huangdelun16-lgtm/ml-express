@@ -56,37 +56,42 @@ const AccountManagement: React.FC = () => {
       return;
     }
 
-    const currentUser = localStorage.getItem('currentUser') || 'admin';
-    const result = await adminAccountService.createAccount({
-      ...formData,
-      salary: formData.salary ? Number(formData.salary) : undefined,
-      created_by: currentUser
-    });
-
-    if (result) {
-      setSuccessMessage('账号创建成功！');
-      setShowForm(false);
-      setFormData({
-        username: '',
-        password: '',
-        employee_name: '',
-        employee_id: '',
-        phone: '',
-        email: '',
-        department: '',
-        position: '',
-        salary: '',
-        role: 'operator',
-        hire_date: new Date().toISOString().split('T')[0],
-        id_number: '',
-        emergency_contact: '',
-        emergency_phone: '',
-        address: '',
-        notes: ''
+    try {
+      const currentUser = localStorage.getItem('currentUser') || 'admin';
+      const result = await adminAccountService.createAccount({
+        ...formData,
+        salary: formData.salary ? Number(formData.salary) : undefined,
+        created_by: currentUser
       });
-      loadAccounts();
-    } else {
-      setErrorMessage('创建失败，用户名或员工ID可能已存在');
+
+      if (result) {
+        setSuccessMessage('账号创建成功！');
+        setShowForm(false);
+        setFormData({
+          username: '',
+          password: '',
+          employee_name: '',
+          employee_id: '',
+          phone: '',
+          email: '',
+          department: '',
+          position: '',
+          salary: '',
+          role: 'operator',
+          hire_date: new Date().toISOString().split('T')[0],
+          id_number: '',
+          emergency_contact: '',
+          emergency_phone: '',
+          address: '',
+          notes: ''
+        });
+        loadAccounts();
+      }
+    } catch (error: any) {
+      console.error('提交错误:', error);
+      // 显示详细错误信息
+      const errorMsg = error.message || '创建失败，用户名或员工ID可能已存在';
+      setErrorMessage(errorMsg);
     }
   };
 
@@ -264,28 +269,37 @@ const AccountManagement: React.FC = () => {
                 />
               </div>
               <div>
-                <label style={labelStyle}>邮箱地址 *</label>
+                <label style={labelStyle}>邮箱地址</label>
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="example@company.com"
+                  placeholder="example@company.com（可选）"
                   style={inputStyle}
-                  required
                 />
               </div>
               <div>
                 <label style={labelStyle}>部门 *</label>
-                <input
-                  type="text"
+                <select
                   name="department"
                   value={formData.department}
                   onChange={handleInputChange}
-                  placeholder="例: 运营部"
                   style={inputStyle}
                   required
-                />
+                >
+                  <option value="">请选择部门</option>
+                  <option value="运营部">运营部</option>
+                  <option value="财务部">财务部</option>
+                  <option value="客服部">客服部</option>
+                  <option value="配送部">配送部</option>
+                  <option value="仓储部">仓储部</option>
+                  <option value="销售部">销售部</option>
+                  <option value="技术部">技术部</option>
+                  <option value="人事部">人事部</option>
+                  <option value="行政部">行政部</option>
+                  <option value="市场部">市场部</option>
+                </select>
               </div>
               <div>
                 <label style={labelStyle}>职位 *</label>

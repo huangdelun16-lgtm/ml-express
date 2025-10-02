@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService } from '../services/supabase';
 
 type TabKey = 'overview' | 'records' | 'analytics';
 type FilterStatus = 'all' | FinanceRecord['status'];
@@ -48,6 +48,7 @@ const categoryOptions = [
   '同城配送',
   '次日配送',
   '快递员佣金',
+  '员工工资',
   '运营支出',
   '车辆维护',
   '营销推广',
@@ -165,7 +166,10 @@ const FinanceManagement: React.FC = () => {
   }, [records, searchTerm, filterStatus, filterType, dateRange]);
 
   const resetForm = () => {
-    setFormData({ ...defaultForm });
+    setFormData({ 
+      ...defaultForm,
+      record_date: new Date().toISOString().slice(0, 10) // 确保日期始终是今天
+    });
     setEditingRecord(null);
   };
 
@@ -195,11 +199,43 @@ const FinanceManagement: React.FC = () => {
 
     try {
       let success = false;
+      const currentUser = localStorage.getItem('currentUser') || 'unknown';
+      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+      
       if (editingRecord) {
         success = await financeService.updateRecord(editingRecord.id, payload);
+        
+        // 记录审计日志 - 更新
+        if (success) {
+          await auditLogService.log({
+            user_id: currentUser,
+            user_name: currentUserName,
+            action_type: 'update',
+            module: 'finance',
+            target_id: editingRecord.id,
+            target_name: `财务记录 ${editingRecord.id}`,
+            action_description: `更新财务记录，类型：${payload.record_type === 'income' ? '收入' : '支出'}，分类：${payload.category}，金额：${payload.amount} ${payload.currency}`,
+            old_value: JSON.stringify(editingRecord),
+            new_value: JSON.stringify(payload)
+          });
+        }
       } else {
         const result = await financeService.createRecord(payload);
         success = Boolean(result);
+        
+        // 记录审计日志 - 创建
+        if (success) {
+          await auditLogService.log({
+            user_id: currentUser,
+            user_name: currentUserName,
+            action_type: 'create',
+            module: 'finance',
+            target_id: payload.id,
+            target_name: `财务记录 ${payload.id}`,
+            action_description: `创建财务记录，类型：${payload.record_type === 'income' ? '收入' : '支出'}，分类：${payload.category}，金额：${payload.amount} ${payload.currency}`,
+            new_value: JSON.stringify(payload)
+          });
+        }
       }
 
       if (success) {
@@ -239,9 +275,27 @@ const FinanceManagement: React.FC = () => {
   const handleDeleteRecord = async (id: string) => {
     if (!window.confirm('确定要删除这条财务记录吗？')) return;
 
+    // 获取要删除的记录信息（用于审计日志）
+    const recordToDelete = records.find(r => r.id === id);
+
     try {
       const success = await financeService.deleteRecord(id);
       if (success) {
+        // 记录审计日志
+        const currentUser = localStorage.getItem('currentUser') || 'unknown';
+        const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+        
+        await auditLogService.log({
+          user_id: currentUser,
+          user_name: currentUserName,
+          action_type: 'delete',
+          module: 'finance',
+          target_id: id,
+          target_name: `财务记录 ${id}`,
+          action_description: `删除财务记录，类型：${recordToDelete?.record_type === 'income' ? '收入' : '支出'}，分类：${recordToDelete?.category || '未知'}，金额：${recordToDelete?.amount || 0} ${recordToDelete?.currency || 'MMK'}`,
+          old_value: JSON.stringify(recordToDelete)
+        });
+        
         await loadRecords();
       } else {
         alert('删除失败，请检查日志');

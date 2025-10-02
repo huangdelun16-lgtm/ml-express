@@ -666,8 +666,8 @@ const SystemSettings: React.FC = () => {
             按照功能模块集中管理系统参数，点击分类即可切换对应配置。
           </p>
           
-          {/* 账号管理快捷入口 */}
-          <div style={{ marginTop: '14px', marginBottom: '14px' }}>
+          {/* 快捷功能入口 */}
+          <div style={{ marginTop: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button
               onClick={() => navigate('/admin/accounts')}
               style={{
@@ -696,8 +696,40 @@ const SystemSettings: React.FC = () => {
               }}
             >
               <span style={{ fontSize: '1.3rem' }}>👥</span>
-              <span style={{ fontWeight: 600 }}>新增账号</span>
+              <span style={{ fontWeight: 600 }}>账号管理</span>
               <span style={{ opacity: 0.85, fontSize: '0.88rem', lineHeight: 1.4 }}>管理员工登录账号与权限</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/admin/supervision')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '4px',
+                background: 'linear-gradient(135deg, rgba(245, 101, 101, 0.3) 0%, rgba(220, 38, 38, 0.3) 100%)',
+                border: '1px solid rgba(252, 165, 165, 0.6)',
+                borderRadius: '14px',
+                padding: '14px',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: '0 4px 12px rgba(245, 101, 101, 0.2)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 101, 101, 0.3)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 101, 101, 0.2)';
+              }}
+            >
+              <span style={{ fontSize: '1.3rem' }}>👁️</span>
+              <span style={{ fontWeight: 600 }}>员工监督</span>
+              <span style={{ opacity: 0.85, fontSize: '0.88rem', lineHeight: 1.4 }}>实时监控员工行为与操作日志</span>
             </button>
           </div>
 
