@@ -7,11 +7,25 @@ const HomePage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   // const [orderData, setOrderData] = useState<any>(null);
 
   // 测试数据库连接
   useEffect(() => {
-    testConnection();
+    const checkConnection = async () => {
+      try {
+        const isConnected = await testConnection();
+        if (!isConnected) {
+          console.warn('数据库连接失败，应用将在离线模式下运行');
+        }
+      } catch (error) {
+        console.error('连接测试出错:', error);
+      }
+    };
+    
+    checkConnection();
   }, []);
 
   // 自动保存客户信息到用户管理
@@ -85,7 +99,8 @@ const HomePage: React.FC = () => {
         receiver: '收件人信息',
         package: '包裹信息',
         submit: '提交订单',
-        cancel: '取消'
+        cancel: '取消',
+        selectOnMap: '在地图中选择'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -133,7 +148,8 @@ const HomePage: React.FC = () => {
         receiver: 'Receiver Information',
         package: 'Package Information',
         submit: 'Submit Order',
-        cancel: 'Cancel'
+        cancel: 'Cancel',
+        selectOnMap: 'Select on Map'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -181,7 +197,8 @@ const HomePage: React.FC = () => {
         receiver: 'လက်ခံသူအချက်အလက်',
         package: 'ထုပ်ပိုးအချက်အလက်',
         submit: 'အမှာတင်ပါ',
-        cancel: 'ပယ်ဖျက်ပါ'
+        cancel: 'ပယ်ဖျက်ပါ',
+        selectOnMap: 'မြေပုံတွင်ရွေးချယ်ပါ'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -311,7 +328,7 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6' }}>
+    <div className="homepage" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6' }}>
       {/* 顶部导航栏 */}
       <nav style={{
         background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
@@ -495,7 +512,7 @@ const HomePage: React.FC = () => {
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2c5282' 
+          color: '#000000' 
         }}>
           {t.features.title}
         </h2>
@@ -507,10 +524,10 @@ const HomePage: React.FC = () => {
           margin: '0 auto'
         }}>
           {[
-            { icon: '🚀', title: t.features.fast, desc: '30分钟内上门取件' },
-            { icon: '🛡️', title: t.features.safe, desc: '全程保险保障' },
-            { icon: '📱', title: t.features.convenient, desc: '在线下单，实时跟踪' },
-            { icon: '💰', title: t.features.affordable, desc: '价格透明，无隐藏费用' }
+            { icon: '⚡', title: t.features.fast, desc: '30分钟内上门取件' },
+        { icon: '🔒', title: t.features.safe, desc: '全程保险保障' },
+        { icon: '📲', title: t.features.convenient, desc: '在线下单，实时跟踪' },
+        { icon: '💎', title: t.features.affordable, desc: '价格透明，无隐藏费用' }
           ].map((feature, index) => (
             <div key={index} style={{
               background: 'white',
@@ -547,7 +564,7 @@ const HomePage: React.FC = () => {
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2c5282' 
+          color: '#000000' 
         }}>
           {t.process.title}
         </h2>
@@ -611,7 +628,7 @@ const HomePage: React.FC = () => {
           textAlign: 'center', 
           fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
           marginBottom: '3rem', 
-          color: '#2c5282' 
+          color: '#000000' 
         }}>
           {t.tracking.title}
         </h2>
@@ -726,25 +743,27 @@ const HomePage: React.FC = () => {
           backdropFilter: 'blur(5px)'
         }}>
           <div style={{
-            background: 'white',
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(15px)',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '15px',
             maxWidth: '500px',
             width: '90%',
             maxHeight: '80vh',
             overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <Logo size="medium" />
             </div>
-            <h2 style={{ color: '#2c5282', marginBottom: '2rem', textAlign: 'center' }}>
+            <h2 style={{ color: 'white', marginBottom: '2rem', textAlign: 'center' }}>
               {t.order.title}
             </h2>
             
             <form onSubmit={handleOrderSubmit}>
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.sender}</h3>
+                <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.sender}</h3>
                 <input
                   type="text"
                   name="senderName"
@@ -777,26 +796,61 @@ const HomePage: React.FC = () => {
                   onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
-                <textarea
-                  name="senderAddress"
-                  placeholder="寄件地址"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    height: '80px',
-                    resize: 'vertical',
-                    transition: 'border-color 0.3s ease'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-                />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    name="senderAddress"
+                    placeholder="寄件地址"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.8rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '8px',
+                      height: '80px',
+                      resize: 'vertical',
+                      transition: 'border-color 0.3s ease',
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      backdropFilter: 'blur(5px)'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapSelectionType('sender');
+                      setShowMapModal(true);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(44, 82, 130, 0.3)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(44, 82, 130, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(44, 82, 130, 0.3)';
+                    }}
+                  >
+                    📍 {t.order.selectOnMap}
+                  </button>
+                </div>
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.receiver}</h3>
+                <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.receiver}</h3>
                 <input
                   type="text"
                   name="receiverName"
@@ -829,40 +883,92 @@ const HomePage: React.FC = () => {
                   onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
-                <textarea
-                  name="receiverAddress"
-                  placeholder="收件地址"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    height: '80px',
-                    resize: 'vertical',
-                    transition: 'border-color 0.3s ease'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-                />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    name="receiverAddress"
+                    placeholder="收件地址"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.8rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '8px',
+                      height: '80px',
+                      resize: 'vertical',
+                      transition: 'border-color 0.3s ease',
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      backdropFilter: 'blur(5px)'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapSelectionType('receiver');
+                      setShowMapModal(true);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(44, 82, 130, 0.3)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(44, 82, 130, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(44, 82, 130, 0.3)';
+                    }}
+                  >
+                    📍 {t.order.selectOnMap}
+                  </button>
+                </div>
               </div>
 
               <div style={{ marginBottom: '2rem' }}>
-                <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{t.order.package}</h3>
+                <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.package}</h3>
                 <select
                   name="packageType"
                   required
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '8px',
                     marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease',
-                    background: 'white'
+                    transition: 'all 0.3s ease',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c5282' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.7rem center',
+                    backgroundSize: '1em',
+                    paddingRight: '2.5rem',
+                    boxShadow: '0 4px 15px rgba(44, 82, 130, 0.1)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(44, 82, 130, 0.6)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(44, 82, 130, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
+                  }}
                 >
                   <option value="文件">文件</option>
                   <option value="衣服">衣服</option>
@@ -1101,6 +1207,145 @@ const HomePage: React.FC = () => {
                   cursor: 'pointer',
                   fontWeight: 'bold',
                   width: window.innerWidth < 768 ? '100%' : 'auto',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 地图选择模态窗口 */}
+      {showMapModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
+            borderRadius: '15px',
+            width: window.innerWidth < 768 ? '95%' : '80%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ color: 'white', marginBottom: '1rem' }}>
+                选择{mapSelectionType === 'sender' ? '寄件' : '收件'}地址
+              </h2>
+            </div>
+            
+            {/* Google Maps 嵌入 */}
+            <div style={{
+              width: '100%',
+              height: '400px',
+              borderRadius: '10px',
+              overflow: 'hidden',
+              marginBottom: '2rem',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3819.8267006275147!2d96.15616731484394!3d16.77708998842677!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30c1eb30c7ea8c85%3A0x5c5c8b5c8b5c8b5c!2sYangon%2C%20Myanmar%20(Burma)!5e0!3m2!1sen!2sus!4v1620000000000!5m2!1sen!2sus"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+
+            {/* 地址输入框 */}
+            <div style={{ marginBottom: '2rem' }}>
+              <input
+                type="text"
+                placeholder="输入详细地址或在地图上点击选择位置"
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  fontSize: '1rem'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)'}
+                onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+              />
+            </div>
+
+            {/* 按钮组 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button
+                onClick={() => {
+                  // 确认选择地址的逻辑
+                  const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                  if (addressInput && addressInput.value) {
+                    // 这里可以添加将地址填入对应表单字段的逻辑
+                    const targetField = mapSelectionType === 'sender' ? 
+                      document.querySelector('textarea[name="senderAddress"]') as HTMLTextAreaElement :
+                      document.querySelector('textarea[name="receiverAddress"]') as HTMLTextAreaElement;
+                    
+                    if (targetField) {
+                      targetField.value = addressInput.value;
+                    }
+                  }
+                  setShowMapModal(false);
+                  setMapSelectionType(null);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                确认选择
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowMapModal(false);
+                  setMapSelectionType(null);
+                }}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
                   transition: 'all 0.3s ease'
                 }}
                 onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}

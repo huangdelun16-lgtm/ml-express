@@ -20,18 +20,32 @@ code {
   min-height: 100vh;
 }
 
+/* 全局h2和h3标题样式 - 仅适用于模态窗口 */
+.modal h2, .modal h3 {
+  color: white !important;
+}
+
+/* 首页h2标题样式 */
+.homepage h2 {
+  color: #000000 !important;
+}
+
 select {
-  background-color: rgba(7, 23, 53, 0.65) !important;
-  color: inherit;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #2c5282;
   border: none;
+  backdrop-filter: blur(10px);
 }
 
 select:focus {
-  background-color: rgba(7, 23, 53, 0.75) !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
   outline: none;
 }
 
 option {
-  background-color: rgba(7, 23, 53, 0.9) !important;
-  color: inherit;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #2c5282;
+  backdrop-filter: blur(10px);
+  padding: 8px;
+  border: none;
 }

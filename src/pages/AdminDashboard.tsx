@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { adminAccountService } from '../services/supabase';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -9,9 +10,77 @@ const AdminDashboard: React.FC = () => {
   // 获取当前用户角色
   const currentUserRole = localStorage.getItem('currentUserRole') || 'operator';
   const currentUserName = localStorage.getItem('currentUserName') || '用户';
+  const currentUser = localStorage.getItem('currentUser') || '';
+
+  // 用户编辑模态框状态
+  const [showUserEditModal, setShowUserEditModal] = useState(false);
+  const [userEditFormData, setUserEditFormData] = useState({
+    username: '',
+    password: '',
+    employee_name: ''
+  });
 
   const handleLogout = () => {
     navigate('/admin/login');
+  };
+
+  // 处理用户信息点击
+  const handleUserInfoClick = () => {
+    setUserEditFormData({
+      username: currentUser,
+      password: '',
+      employee_name: currentUserName
+    });
+    setShowUserEditModal(true);
+  };
+
+  // 处理用户信息更新
+  const handleUpdateUserInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // 获取当前用户的完整信息
+      const accounts = await adminAccountService.getAllAccounts();
+      const currentAccount = accounts.find(account => account.username === currentUser);
+      
+      if (!currentAccount) {
+        alert('未找到当前用户信息');
+        return;
+      }
+
+      const updateData: any = {
+        employee_name: userEditFormData.employee_name
+      };
+
+      // 只有在输入了新密码时才更新密码
+      if (userEditFormData.password.trim()) {
+        updateData.password = userEditFormData.password;
+      }
+
+      // 如果用户名发生变化，也需要更新
+      if (userEditFormData.username !== currentUser) {
+        updateData.username = userEditFormData.username;
+      }
+
+      const success = await adminAccountService.updateAccount(currentAccount.id!, updateData);
+      
+      if (success) {
+        // 更新本地存储
+        localStorage.setItem('currentUser', userEditFormData.username);
+        localStorage.setItem('currentUserName', userEditFormData.employee_name);
+        
+        alert('个人信息更新成功！');
+        setShowUserEditModal(false);
+        
+        // 刷新页面以显示更新后的信息
+        window.location.reload();
+      } else {
+        alert('更新失败，请重试');
+      }
+    } catch (error) {
+      console.error('更新用户信息失败:', error);
+      alert('更新失败，请重试');
+    }
   };
 
   // 所有卡片数据及其权限配置
@@ -198,21 +267,39 @@ const AdminDashboard: React.FC = () => {
           </select>
 
           {/* 用户信息 */}
-          <div style={{ 
-            textAlign: 'right',
-            background: 'rgba(255, 255, 255, 0.1)',
-            padding: '10px 16px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-          }}>
+          <div 
+            onClick={handleUserInfoClick}
+            style={{ 
+              textAlign: 'right',
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '10px 16px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+            }}
+          >
             <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{currentUserName}</div>
             <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px' }}>
               {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : 'System Admin')}
               {currentUserRole === 'manager' && (language === 'zh' ? '经理' : 'Manager')}
               {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : 'Operator')}
               {currentUserRole === 'finance' && (language === 'zh' ? '财务' : 'Finance')}
+            </div>
+            <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px' }}>
+              点击编辑个人信息
             </div>
           </div>
           
@@ -362,6 +449,172 @@ const AdminDashboard: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* 用户编辑模态框 */}
+      {showUserEditModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            borderRadius: '20px',
+            padding: '30px',
+            width: '90%',
+            maxWidth: '500px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+          }}>
+            <h2 style={{ 
+              color: 'white', 
+              marginBottom: '25px', 
+              textAlign: 'center',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>
+              编辑个人信息
+            </h2>
+            
+            <form onSubmit={handleUpdateUserInfo}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  color: 'white', 
+                  marginBottom: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600'
+                }}>
+                  用户名
+                </label>
+                <input
+                  type="text"
+                  value={userEditFormData.username}
+                  onChange={(e) => setUserEditFormData({
+                    ...userEditFormData,
+                    username: e.target.value
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '1rem'
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  color: 'white', 
+                  marginBottom: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600'
+                }}>
+                  员工姓名
+                </label>
+                <input
+                  type="text"
+                  value={userEditFormData.employee_name}
+                  onChange={(e) => setUserEditFormData({
+                    ...userEditFormData,
+                    employee_name: e.target.value
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '1rem'
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  color: 'white', 
+                  marginBottom: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600'
+                }}>
+                  新密码 (留空则不修改)
+                </label>
+                <input
+                  type="password"
+                  value={userEditFormData.password}
+                  onChange={(e) => setUserEditFormData({
+                    ...userEditFormData,
+                    password: e.target.value
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '1rem'
+                  }}
+                  placeholder="输入新密码"
+                />
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '15px', 
+                justifyContent: 'flex-end' 
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowUserEditModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  保存更改
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

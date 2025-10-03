@@ -109,9 +109,10 @@ export interface AdminAccount {
 // 测试数据库连接
 export const testConnection = async () => {
   try {
-    const { error } = await supabase
+    // 使用更简单的查询来测试连接
+    const { data, error } = await supabase
       .from('packages')
-      .select('count')
+      .select('id')
       .limit(1);
     
     if (error) {
@@ -123,6 +124,11 @@ export const testConnection = async () => {
     return true;
   } catch (err) {
     console.error('数据库连接异常:', err);
+    // 如果是网络错误，返回false但不阻止应用运行
+    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+      console.warn('网络连接问题，将使用离线模式');
+      return false;
+    }
     return false;
   }
 };
@@ -400,6 +406,154 @@ export const trackingService = {
     }
 
     return true;
+  },
+
+  // 新增：模拟骑手位置上报（用于测试和演示）
+  async simulateCourierMovement(courierId: string, packageId?: string): Promise<boolean> {
+    try {
+      // 仰光市区的一些真实坐标点（模拟配送路线）
+      const yangonRoutes = [
+        { lat: 16.8661, lng: 96.1951, location: '仰光市政厅' },
+        { lat: 16.7967, lng: 96.1610, location: '昂山市场' },
+        { lat: 16.8409, lng: 96.1735, location: '苏雷宝塔' },
+        { lat: 16.8700, lng: 96.1300, location: '茵雅湖' },
+        { lat: 16.8200, lng: 96.1400, location: '皇家湖' },
+        { lat: 16.7800, lng: 96.1200, location: '仰光大学' },
+        { lat: 16.9000, lng: 96.1800, location: '北奥卡拉帕' },
+        { lat: 16.7500, lng: 96.1100, location: '南达贡' }
+      ];
+
+      // 随机选择一个位置点
+      const randomPoint = yangonRoutes[Math.floor(Math.random() * yangonRoutes.length)];
+      
+      // 添加一些随机偏移，模拟真实移动
+      const lat = randomPoint.lat + (Math.random() - 0.5) * 0.01;
+      const lng = randomPoint.lng + (Math.random() - 0.5) * 0.01;
+
+      // 更新骑手位置
+      const locationData: Omit<CourierLocation, 'id' | 'created_at'> = {
+        courier_id: courierId,
+        latitude: lat,
+        longitude: lng,
+        heading: Math.floor(Math.random() * 360),
+        speed: Math.floor(Math.random() * 50) + 10, // 10-60 km/h
+        last_update: new Date().toISOString(),
+        battery_level: Math.floor(Math.random() * 30) + 70, // 70-100%
+        status: 'active'
+      };
+
+      await this.updateCourierLocation(locationData);
+
+      // 如果有关联包裹，添加跟踪事件
+      if (packageId) {
+        const eventData: Omit<TrackingEvent, 'id' | 'created_at'> = {
+          package_id: packageId,
+          courier_id: courierId,
+          status: '配送中',
+          latitude: lat,
+          longitude: lng,
+          speed: locationData.speed,
+          battery_level: locationData.battery_level,
+          note: `骑手正在 ${randomPoint.location} 附近配送`,
+          event_time: new Date().toISOString()
+        };
+
+        await this.addTrackingEvent(eventData);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('模拟骑手移动失败:', error);
+      return false;
+    }
+  },
+
+  // 新增：批量初始化骑手位置数据
+  async initializeCourierLocations(): Promise<boolean> {
+    try {
+      // 获取所有活跃骑手
+      const couriers = await this.getActiveCouriers();
+      
+      if (couriers.length === 0) {
+        console.log('没有找到活跃的骑手');
+        return false;
+      }
+
+      // 为每个骑手生成初始位置
+      const promises = couriers.map(courier => 
+        this.simulateCourierMovement(courier.id)
+      );
+
+      await Promise.all(promises);
+      console.log(`已为 ${couriers.length} 名骑手初始化位置数据`);
+      return true;
+    } catch (error) {
+      console.error('初始化骑手位置失败:', error);
+      return false;
+    }
+  },
+
+  // 新增：获取骑手详细信息（包含位置）
+  async getCourierWithLocation(courierId: string): Promise<any> {
+    try {
+      const [courierResult, locationResult] = await Promise.all([
+        supabase.from('couriers').select('*').eq('id', courierId).single(),
+        supabase.from('courier_locations').select('*').eq('courier_id', courierId).single()
+      ]);
+
+      if (courierResult.error) {
+        console.error('获取骑手信息失败:', courierResult.error);
+        return null;
+      }
+
+      return {
+        ...courierResult.data,
+        location: locationResult.data || null
+      };
+    } catch (error) {
+      console.error('获取骑手详细信息失败:', error);
+      return null;
+    }
+  },
+
+  // 新增：为包裹分配骑手并开始跟踪
+  async assignCourierToPackage(packageId: string, courierId: string): Promise<boolean> {
+    try {
+      // 更新包裹的骑手分配
+      const { error: updateError } = await supabase
+        .from('packages')
+        .update({ 
+          courier: courierId,
+          status: '已取件'
+        })
+        .eq('id', packageId);
+
+      if (updateError) {
+        console.error('分配骑手失败:', updateError);
+        return false;
+      }
+
+      // 添加取件事件
+      const eventData: Omit<TrackingEvent, 'id' | 'created_at'> = {
+        package_id: packageId,
+        courier_id: courierId,
+        status: '已取件',
+        latitude: 16.8661, // 默认取件点（仰光市政厅）
+        longitude: 96.1951,
+        note: '骑手已取件，开始配送',
+        event_time: new Date().toISOString()
+      };
+
+      await this.addTrackingEvent(eventData);
+
+      // 开始模拟骑手移动
+      await this.simulateCourierMovement(courierId, packageId);
+
+      return true;
+    } catch (error) {
+      console.error('分配骑手并开始跟踪失败:', error);
+      return false;
+    }
   }
 };
 
