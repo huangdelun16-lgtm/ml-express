@@ -133,17 +133,18 @@ const AdminDashboard: React.FC = () => {
   const cardData = allCardData.filter(card => card.roles.includes(currentUserRole));
 
   const handleCardClick = (title: string) => {
-    if (title === '同城包裹') {
+    // 根据卡片标题（支持中英文）导航到对应页面
+    if (title === '同城包裹' || title === 'City Packages') {
       navigate('/admin/city-packages');
-    } else if (title === '用户管理') {
+    } else if (title === '用户管理' || title === 'User Management') {
       navigate('/admin/users');
-    } else if (title === '快递员管理') {
+    } else if (title === '快递员管理' || title === 'Courier Management') {
       navigate('/admin/couriers');
-    } else if (title === '财务管理') {
+    } else if (title === '财务管理' || title === 'Finance Management') {
       navigate('/admin/finance');
-    } else if (title === '实时跟踪') {
+    } else if (title === '实时跟踪' || title === 'Real-time Tracking') {
       navigate('/admin/tracking');
-    } else if (title === '系统设置') {
+    } else if (title === '系统设置' || title === 'System Settings') {
       navigate('/admin/settings');
     }
   };

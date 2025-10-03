@@ -282,7 +282,7 @@ const CityPackages: React.FC = () => {
       }}>
         <div>
           <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            {language === 'zh' ? '同城包裹管理' : 'City Package Management'}
+            {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
             {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
@@ -336,7 +336,7 @@ const CityPackages: React.FC = () => {
             transition: 'all 0.3s ease'
           }}
         >
-          包裹列表
+          {language === 'zh' ? '包裹列表' : language === 'en' ? 'Package List' : 'ပက်ကေ့ဂျ်စာရင်း'}
         </button>
         <button
           onClick={() => setActiveTab('create')}
@@ -749,7 +749,7 @@ const CityPackages: React.FC = () => {
                   e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
                 }}
               >
-                创建包裹
+                {language === 'zh' ? '创建包裹' : language === 'en' ? 'Create Package' : 'ပက်ကေ့ဂျ်ဖန်တီးရန်'}
               </button>
             </div>
           </form>

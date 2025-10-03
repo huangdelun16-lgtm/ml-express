@@ -10,6 +10,7 @@ const HomePage: React.FC = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
+  const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   // const [orderData, setOrderData] = useState<any>(null);
 
   // 测试数据库连接
@@ -100,7 +101,21 @@ const HomePage: React.FC = () => {
         package: '包裹信息',
         submit: '提交订单',
         cancel: '取消',
-        selectOnMap: '在地图中选择'
+        selectOnMap: '在地图中选择',
+        senderName: '寄件人姓名',
+        senderPhone: '联系电话',
+        senderAddress: '寄件地址',
+        receiverName: '收件人姓名',
+        receiverPhone: '联系电话',
+        receiverAddress: '收件地址',
+        packageType: '包裹类型',
+        packageDescription: '包裹描述',
+        packageWeight: '重量',
+        mapTitle: '选择地址',
+        mapTip: '💡 提示：点击地图标注位置，系统将自动填充地址。您可在此基础上补充门牌号等详细信息。',
+        mapPlaceholder: '输入详细地址或在地图上点击选择位置',
+        confirmSelection: '确认选择',
+        getMyLocation: '获取我的位置'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -149,7 +164,21 @@ const HomePage: React.FC = () => {
         package: 'Package Information',
         submit: 'Submit Order',
         cancel: 'Cancel',
-        selectOnMap: 'Select on Map'
+        selectOnMap: 'Select on Map',
+        senderName: 'Sender Name',
+        senderPhone: 'Contact Phone',
+        senderAddress: 'Sender Address',
+        receiverName: 'Receiver Name',
+        receiverPhone: 'Contact Phone',
+        receiverAddress: 'Receiver Address',
+        packageType: 'Package Type',
+        packageDescription: 'Package Description',
+        packageWeight: 'Weight',
+        mapTitle: 'Select Address',
+        mapTip: '💡 Tip: Click on the map to mark location, the system will automatically fill in the address. You can add house numbers and other details.',
+        mapPlaceholder: 'Enter detailed address or click on the map to select location',
+        confirmSelection: 'Confirm Selection',
+        getMyLocation: 'Get My Location'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -198,7 +227,21 @@ const HomePage: React.FC = () => {
         package: 'ထုပ်ပိုးအချက်အလက်',
         submit: 'အမှာတင်ပါ',
         cancel: 'ပယ်ဖျက်ပါ',
-        selectOnMap: 'မြေပုံတွင်ရွေးချယ်ပါ'
+        selectOnMap: 'မြေပုံတွင်ရွေးချယ်ပါ',
+        senderName: 'ပို့သူအမည်',
+        senderPhone: 'ဆက်သွယ်ရေးဖုန်းနံပါတ်',
+        senderAddress: 'ပို့သူလိပ်စာ',
+        receiverName: 'လက်ခံသူအမည်',
+        receiverPhone: 'ဆက်သွယ်ရေးဖုန်းနံပါတ်',
+        receiverAddress: 'လက်ခံသူလိပ်စာ',
+        packageType: 'ထုပ်ပိုးအမျိုးအစား',
+        packageDescription: 'ထုပ်ပိုးဖော်ပြချက်',
+        packageWeight: 'အလေးချိန်',
+        mapTitle: 'ရွေးချယ်ပါ',
+        mapTip: '💡 အကြံပြုချက်: မြေပုံပေါ်တွင် နေရာကို နှိပ်ပြီး လိပ်စာကို အလိုအလျောက် ဖြည့်စွက်ပါ။ သင်သည် အိမ်နံပါတ်နှင့် အသေးစိတ်အချက်အလက်များကို ထပ်မံ ဖြည့်စွက်နိုင်သည်။',
+        mapPlaceholder: 'အသေးစိတ်လိပ်စာ ထည့်ပါ သို့မဟုတ် မြေပုံပေါ်တွင် နေရာကို ရွေးချယ်ပါ',
+        confirmSelection: 'ရွေးချယ်မှုကို အတည်ပြုပါ',
+        getMyLocation: 'ကျွန်ုပ်၏တည်နေရာကို ရယူပါ'
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
@@ -767,7 +810,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="text"
                   name="senderName"
-                  placeholder="寄件人姓名"
+                  placeholder={t.order.senderName}
                   required
                   style={{
                     width: '100%',
@@ -783,7 +826,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="tel"
                   name="senderPhone"
-                  placeholder="联系电话"
+                  placeholder={t.order.senderPhone}
                   required
                   style={{
                     width: '100%',
@@ -799,7 +842,7 @@ const HomePage: React.FC = () => {
                 <div style={{ position: 'relative' }}>
                   <textarea
                     name="senderAddress"
-                    placeholder="寄件地址"
+                    placeholder={t.order.senderAddress}
                     required
                     style={{
                       width: '100%',
@@ -854,7 +897,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="text"
                   name="receiverName"
-                  placeholder="收件人姓名"
+                  placeholder={t.order.receiverName}
                   required
                   style={{
                     width: '100%',
@@ -870,7 +913,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="tel"
                   name="receiverPhone"
-                  placeholder="联系电话"
+                  placeholder={t.order.receiverPhone}
                   required
                   style={{
                     width: '100%',
@@ -886,7 +929,7 @@ const HomePage: React.FC = () => {
                 <div style={{ position: 'relative' }}>
                   <textarea
                     name="receiverAddress"
-                    placeholder="收件地址"
+                    placeholder={t.order.receiverAddress}
                     required
                     style={{
                       width: '100%',
@@ -978,7 +1021,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="text"
                   name="description"
-                  placeholder="包裹描述"
+                  placeholder={t.order.packageDescription}
                   required
                   style={{
                     width: '100%',
@@ -994,7 +1037,7 @@ const HomePage: React.FC = () => {
                 <input
                   type="text"
                   name="weight"
-                  placeholder="重量（kg）"
+                  placeholder={t.order.packageWeight}
                   required
                   style={{
                     width: '100%',
@@ -1232,7 +1275,7 @@ const HomePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1000
+          zIndex: 2000
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
@@ -1247,7 +1290,7 @@ const HomePage: React.FC = () => {
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{ color: 'white', marginBottom: '1rem' }}>
-                选择{mapSelectionType === 'sender' ? '寄件' : '收件'}地址
+                选择{mapSelectionType === 'sender' ? t.order.sender : t.order.receiver}
               </h2>
             </div>
             
@@ -1258,24 +1301,219 @@ const HomePage: React.FC = () => {
               borderRadius: '10px',
               overflow: 'hidden',
               marginBottom: '2rem',
-              border: '2px solid rgba(255, 255, 255, 0.3)'
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              position: 'relative'
             }}>
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3819.8267006275147!2d96.15616731484394!3d16.77708998842677!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30c1eb30c7ea8c85%3A0x5c5c8b5c8b5c8b5c!2sYangon%2C%20Myanmar%20(Burma)!5e0!3m2!1sen!2sus!4v1620000000000!5m2!1sen!2sus"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+              {/* 交互式地图容器 */}
+              <div 
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative',
+                  cursor: 'crosshair'
+                }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  
+                  // 将点击位置转换为大致的经纬度坐标（仰光地区）
+                  // 这是一个简化的转换，实际应用中需要更精确的地图API
+                  const lat = 16.7758 + (0.5 - y / rect.height) * 0.1; // 仰光纬度范围
+                  const lng = 96.1561 + (x / rect.width - 0.5) * 0.1; // 仰光经度范围
+                  
+                  setMapClickPosition({ lat, lng });
+                  
+                  // 模拟反向地理编码获取地址
+                  const simulateReverseGeocode = async () => {
+                    try {
+                      // 模拟地址数据
+                      const addresses = [
+                        '仰光市中心商业区',
+                        '仰光大学附近',
+                        '茵雅湖畔',
+                        '昂山市场周边',
+                        '仰光国际机场附近',
+                        '皇家湖公园旁',
+                        '仰光火车站区域'
+                      ];
+                      
+                      const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
+                      const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                      
+                      // 自动填充到地址输入框
+                      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                      if (addressInput) {
+                        addressInput.value = fullAddress;
+                        addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                        addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                      }
+                      
+                      // 更新选中位置
+                      setSelectedLocation({ lat, lng, address: fullAddress });
+                      
+                    } catch (error) {
+                      console.error('地址获取失败:', error);
+                    }
+                  };
+                  
+                  simulateReverseGeocode();
+                }}
+              >
+                {/* 地图替代方案 - 使用静态地图图片 */}
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '10px',
+                position: 'relative'
+              }}>
+                {/* 地图图标 */}
+                <div style={{
+                  fontSize: '4rem',
+                  marginBottom: '1rem',
+                  opacity: 0.7
+                }}>
+                  🗺️
+                </div>
+                
+                {/* 地图说明文字 */}
+                <div style={{
+                  textAlign: 'center',
+                  color: '#4a5568',
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem'
+                }}>
+                  {language === 'zh' ? '地图选择区域' : 
+                   language === 'en' ? 'Map Selection Area' : 
+                   'မြေပုံရွေးချယ်နေရာ'}
+                </div>
+                
+                {/* 操作提示 */}
+                <div style={{
+                  textAlign: 'center',
+                  color: '#718096',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.4'
+                }}>
+                  {language === 'zh' ? '点击下方地址输入框输入地址\n或使用右上角定位按钮获取当前位置' : 
+                   language === 'en' ? 'Click the address input below to enter address\nor use the location button to get current position' : 
+                   'လိပ်စာထည့်ရန် အောက်ပါလိပ်စာအကွက်ကို နှိပ်ပါ\nသို့မဟုတ် လက်ရှိတည်နေရာရယူရန် တည်နေရာခလုတ်ကို အသုံးပြုပါ'}
+                </div>
+                
+                {/* 装饰性地图网格 */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundImage: `
+                    linear-gradient(rgba(74, 85, 104, 0.1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(74, 85, 104, 0.1) 1px, transparent 1px)
+                  `,
+                  backgroundSize: '20px 20px',
+                  borderRadius: '10px',
+                  pointerEvents: 'none'
+                }} />
+              </div>
+                
+                {/* 点击标记 */}
+                {mapClickPosition && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${((mapClickPosition.lng - 96.1061) / 0.1 + 0.5) * 100}%`,
+                      top: `${(0.5 - (mapClickPosition.lat - 16.7258) / 0.1) * 100}%`,
+                      transform: 'translate(-50%, -100%)',
+                      fontSize: '24px',
+                      color: '#e53e3e',
+                      textShadow: '0 0 3px white',
+                      zIndex: 5,
+                      animation: 'bounce 0.5s ease-in-out'
+                    }}
+                  >
+                    📍
+                  </div>
+                )}
+              </div>
+              
+              {/* 自动定位按钮 */}
+              <button
+                onClick={async () => {
+                  if (navigator.geolocation) {
+                    try {
+                      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                          enableHighAccuracy: true,
+                          timeout: 10000,
+                          maximumAge: 60000
+                        });
+                      });
+                      
+                      const { latitude, longitude } = position.coords;
+                      
+                      // 简单显示坐标，用户可以手动输入地址
+                      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                      if (addressInput) {
+                        addressInput.value = `纬度: ${latitude.toFixed(6)}, 经度: ${longitude.toFixed(6)}`;
+                      }
+                      alert(`已获取您的位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请在地址框中输入详细地址`);
+                      
+                    } catch (error) {
+                      alert('无法获取您的位置，请检查浏览器权限设置');
+                    }
+                  } else {
+                    alert('您的浏览器不支持地理定位功能');
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '50px',
+                  height: '50px',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 15px rgba(56, 161, 105, 0.3)',
+                  transition: 'all 0.3s ease',
+                  zIndex: 10
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(56, 161, 105, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(56, 161, 105, 0.3)';
+                }}
+                title={t.order.getMyLocation}
+              >
+                📍
+              </button>
             </div>
 
             {/* 地址输入框 */}
             <div style={{ marginBottom: '2rem' }}>
+              <div style={{ marginBottom: '0.5rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                {t.order.mapTip}
+              </div>
               <input
                 type="text"
-                placeholder="输入详细地址或在地图上点击选择位置"
+                placeholder={t.order.mapPlaceholder}
                 style={{
                   width: '100%',
                   padding: '1rem',
@@ -1284,7 +1522,8 @@ const HomePage: React.FC = () => {
                   background: 'rgba(255, 255, 255, 0.1)',
                   backdropFilter: 'blur(10px)',
                   color: 'white',
-                  fontSize: '1rem'
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
                 }}
                 onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)'}
                 onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
@@ -1302,18 +1541,39 @@ const HomePage: React.FC = () => {
                 onClick={() => {
                   // 确认选择地址的逻辑
                   const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
-                  if (addressInput && addressInput.value) {
-                    // 这里可以添加将地址填入对应表单字段的逻辑
+                  if (addressInput && addressInput.value.trim()) {
+                    // 获取完整地址（包含用户补充的详细信息）
+                    const completeAddress = addressInput.value.trim();
+                    
+                    // 将地址填入对应的表单字段
                     const targetField = mapSelectionType === 'sender' ? 
                       document.querySelector('textarea[name="senderAddress"]') as HTMLTextAreaElement :
                       document.querySelector('textarea[name="receiverAddress"]') as HTMLTextAreaElement;
                     
                     if (targetField) {
-                      targetField.value = addressInput.value;
+                      targetField.value = completeAddress;
+                      // 添加视觉反馈
+                      targetField.style.borderColor = '#38a169';
+                      targetField.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                      
+                      // 短暂显示成功提示
+                      setTimeout(() => {
+                        targetField.style.borderColor = '#e2e8f0';
+                        targetField.style.boxShadow = 'none';
+                      }, 2000);
                     }
+                    
+                    // 显示成功消息
+                    alert(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
+                    
+                    // 清理状态并关闭模态窗口
+                    setMapClickPosition(null);
+                    setSelectedLocation(null);
+                    setShowMapModal(false);
+                    setMapSelectionType(null);
+                  } else {
+                    alert('⚠️ 请先在地图上点击选择位置，或在地址框中输入地址信息');
                   }
-                  setShowMapModal(false);
-                  setMapSelectionType(null);
                 }}
                 style={{
                   background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
@@ -1329,7 +1589,7 @@ const HomePage: React.FC = () => {
                 onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                 onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                确认选择
+                {t.order.confirmSelection}
               </button>
               
               <button

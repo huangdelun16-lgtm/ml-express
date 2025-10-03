@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService } from '../services/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Courier {
   id: string;
@@ -22,6 +23,7 @@ interface Courier {
 
 const CourierManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
@@ -393,13 +395,14 @@ const CourierManagement: React.FC = () => {
               margin: '0 0 10px 0',
               textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
             }}>
-              🚚 快递员管理
+              {language === 'zh' ? '快递员管理' : language === 'en' ? 'Courier Management' : 'စာပို့သမားစီမံခန့်ခွဲမှု'}
             </h1>
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '1.1rem',
-              margin: 0
-            }}>
+            <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)', color: 'white' }}>
+              {language === 'zh' ? '管理快递员信息和业绩' : 
+               language === 'en' ? 'Manage courier information and performance' : 
+               'စာပို့သမားအချက်အလက်နှင့် စွမ်းဆောင်ရည်ကို စီမံခန့်ခွဲပါ'}
+            </p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
               管理快递员信息、状态和配送记录
             </p>
           </div>
