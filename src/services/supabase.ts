@@ -106,6 +106,30 @@ export interface AdminAccount {
   updated_at?: string;
 }
 
+export interface DeliveryStore {
+  id?: string;
+  store_name: string;
+  store_code: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  email?: string;
+  manager_name: string;
+  manager_phone: string;
+  store_type: 'hub' | 'branch' | 'pickup_point';
+  status: 'active' | 'inactive' | 'maintenance';
+  operating_hours: string;
+  service_area_radius: number;
+  capacity: number;
+  current_load: number;
+  facilities: string[];
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 测试数据库连接
 export const testConnection = async () => {
   try {
@@ -712,6 +736,143 @@ export const adminAccountService = {
     } catch (err) {
       console.error('更新账号信息异常:', err);
       return false;
+    }
+  }
+};
+
+// 快递店数据库操作
+export const deliveryStoreService = {
+  // 获取所有快递店
+  async getAllStores(): Promise<DeliveryStore[]> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('获取快递店列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取快递店列表异常:', err);
+      return [];
+    }
+  },
+
+  // 创建新快递店
+  async createStore(storeData: Omit<DeliveryStore, 'id' | 'current_load' | 'status' | 'created_at' | 'updated_at'>): Promise<DeliveryStore | null> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .insert([{
+          ...storeData,
+          current_load: 0,
+          status: 'active' // Status is set internally
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('创建快递店失败:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('创建快递店异常:', err);
+      return null;
+    }
+  },
+
+  // 更新快递店状态
+  async updateStoreStatus(id: string, status: 'active' | 'inactive' | 'maintenance'): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_stores')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新快递店状态失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新快递店状态异常:', err);
+      return false;
+    }
+  },
+
+  // 更新快递店负载
+  async updateStoreLoad(id: string, load: number): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_stores')
+        .update({ current_load: load })
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新快递店负载失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新快递店负载异常:', err);
+      return false;
+    }
+  },
+
+  // 更新快递店信息
+  async updateStore(id: string, updateData: Partial<DeliveryStore>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_stores')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新快递店信息失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新快递店信息异常:', err);
+      return false;
+    }
+  },
+
+  // 根据位置查找附近的快递店
+  async getNearbyStores(latitude: number, longitude: number, radius: number = 10): Promise<DeliveryStore[]> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('status', 'active');
+
+      if (error) {
+        console.error('查找附近快递店失败:', error);
+        return [];
+      }
+
+      // 简单的距离计算（实际项目中建议使用PostGIS）
+      const nearbyStores = (data || []).filter(store => {
+        const distance = Math.sqrt(
+          Math.pow(store.latitude - latitude, 2) + 
+          Math.pow(store.longitude - longitude, 2)
+        ) * 111; // 粗略转换为公里
+        return distance <= radius;
+      });
+
+      return nearbyStores;
+    } catch (err) {
+      console.error('查找附近快递店异常:', err);
+      return [];
     }
   }
 };

@@ -28,6 +28,12 @@ const AdminDashboard: React.FC = () => {
       icon: '🚚'
     },
     {
+      title: '快递店管理',
+      description: '配送网点、自提点和分拣中心',
+      color: '#38a169',
+      icon: '🏪'
+    },
+    {
       title: '财务管理',
       description: '收入统计和佣金管理',
       color: '#3182ce',
@@ -54,6 +60,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/users');
     } else if (title === '快递员管理') {
       navigate('/admin/couriers');
+    } else if (title === '快递店管理') {
+      navigate('/admin/delivery-stores');
     } else if (title === '财务管理') {
       navigate('/admin/finance');
     } else if (title === '实时跟踪') {
