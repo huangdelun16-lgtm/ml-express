@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // 用户数据类型定义
 interface User {
@@ -23,6 +24,7 @@ interface User {
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState('list');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,10 +300,12 @@ const UserManagement: React.FC = () => {
       }}>
         <div>
           <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            用户管理
+            {language === 'zh' ? '用户管理' : language === 'en' ? 'User Management' : 'အသုံးပြုသူစီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            管理客户、快递员和管理员账户
+            {language === 'zh' ? '管理客户、快递员和管理员账户' : 
+             language === 'en' ? 'Manage customer, courier and admin accounts' : 
+             'ဖောက်သည်၊ စာပို့သမားနှင့် စီမံခန့်ခွဲသူအကောင့်များကို စီမံခန့်ခွဲပါ'}
           </p>
         </div>
         <button
@@ -352,7 +356,7 @@ const UserManagement: React.FC = () => {
             transition: 'all 0.3s ease'
           }}
         >
-          用户列表
+          {language === 'zh' ? '用户列表' : language === 'en' ? 'User List' : 'အသုံးပြုသူစာရင်း'}
         </button>
         <button
           onClick={() => setActiveTab('create')}

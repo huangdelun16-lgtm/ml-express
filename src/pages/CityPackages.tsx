@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, Package, supabase } from '../services/supabase';
+import { packageService, Package, supabase, auditLogService } from '../services/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState('list');
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,20 @@ const CityPackages: React.FC = () => {
     // 保存到数据库
     const result = await packageService.createPackage(newPkg);
     if (result) {
+      // 记录审计日志
+      const currentUser = localStorage.getItem('currentUser') || 'unknown';
+      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+      await auditLogService.log({
+        user_id: currentUser,
+        user_name: currentUserName,
+        action_type: 'create',
+        module: 'packages',
+        target_id: newId,
+        target_name: `包裹 ${newId} (${newPackage.receiverName})`,
+        action_description: `创建新包裹，收件人：${newPackage.receiverName}，电话：${newPackage.receiverPhone}，类型：${newPackage.packageType}`,
+        new_value: JSON.stringify(newPkg)
+      });
+      
       // 重新加载数据
       await loadPackages();
       setNewPackage({
@@ -84,6 +100,10 @@ const CityPackages: React.FC = () => {
   };
 
   const updatePackageStatus = async (id: string, newStatus: string) => {
+    // 获取当前包裹信息（用于审计日志）
+    const currentPkg = packages.find(p => p.id === id);
+    const oldStatus = currentPkg?.status || '未知';
+    
     let pickupTime = '';
     let deliveryTime = '';
     
@@ -98,6 +118,21 @@ const CityPackages: React.FC = () => {
     const success = await packageService.updatePackageStatus(id, newStatus, pickupTime, deliveryTime);
     
     if (success) {
+      // 记录审计日志
+      const currentUser = localStorage.getItem('currentUser') || 'unknown';
+      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+      await auditLogService.log({
+        user_id: currentUser,
+        user_name: currentUserName,
+        action_type: 'update',
+        module: 'packages',
+        target_id: id,
+        target_name: `包裹 ${id}`,
+        action_description: `更新包裹状态：${oldStatus} → ${newStatus}`,
+        old_value: oldStatus,
+        new_value: newStatus
+      });
+      
       // 重新加载数据
       await loadPackages();
     }
@@ -247,10 +282,10 @@ const CityPackages: React.FC = () => {
       }}>
         <div>
           <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            同城包裹管理
+            {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            管理曼德勒同城快递包裹
+            {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
           </p>
         </div>
         <button
@@ -275,7 +310,7 @@ const CityPackages: React.FC = () => {
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          ← 返回管理后台
+          ← {language === 'zh' ? '返回管理后台' : 'Back to Dashboard'}
         </button>
       </div>
 
@@ -301,7 +336,7 @@ const CityPackages: React.FC = () => {
             transition: 'all 0.3s ease'
           }}
         >
-          包裹列表
+          {language === 'zh' ? '包裹列表' : language === 'en' ? 'Package List' : 'ပက်ကေ့ဂျ်စာရင်း'}
         </button>
         <button
           onClick={() => setActiveTab('create')}
@@ -714,7 +749,7 @@ const CityPackages: React.FC = () => {
                   e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
                 }}
               >
-                创建包裹
+                {language === 'zh' ? '创建包裹' : language === 'en' ? 'Create Package' : 'ပက်ကေ့ဂျ်ဖန်တီးရန်'}
               </button>
             </div>
           </form>
