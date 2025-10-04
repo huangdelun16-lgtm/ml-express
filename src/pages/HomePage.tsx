@@ -1,5 +1,53 @@
 import React, { useState, useEffect } from 'react';
+import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import { packageService, testConnection, userService } from '../services/supabase';
+
+// 错误边界组件
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Google Maps Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          width: '100%',
+          height: '300px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
+          border: '2px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: '10px',
+          color: '#4a5568'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+          <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
+          <p style={{ margin: '0', opacity: 0.8, textAlign: 'center' }}>
+            Google Maps API 配置问题<br/>
+            请检查 API Key 设置
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const HomePage: React.FC = () => {
   const [language, setLanguage] = useState('zh');
@@ -1360,89 +1408,36 @@ const HomePage: React.FC = () => {
                   simulateReverseGeocode();
                 }}
               >
-                {/* 地图替代方案 - 使用静态地图图片 */}
-              <div style={{
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '10px',
-                position: 'relative'
-              }}>
-                {/* 地图图标 */}
-                <div style={{
-                  fontSize: '4rem',
-                  marginBottom: '1rem',
-                  opacity: 0.7
-                }}>
-                  🗺️
-                </div>
-                
-                {/* 地图说明文字 */}
-                <div style={{
-                  textAlign: 'center',
-                  color: '#4a5568',
-                  fontSize: '1.1rem',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem'
-                }}>
-                  {language === 'zh' ? '地图选择区域' : 
-                   language === 'en' ? 'Map Selection Area' : 
-                   'မြေပုံရွေးချယ်နေရာ'}
-                </div>
-                
-                {/* 操作提示 */}
-                <div style={{
-                  textAlign: 'center',
-                  color: '#718096',
-                  fontSize: '0.9rem',
-                  lineHeight: '1.4'
-                }}>
-                  {language === 'zh' ? '点击下方地址输入框输入地址\n或使用右上角定位按钮获取当前位置' : 
-                   language === 'en' ? 'Click the address input below to enter address\nor use the location button to get current position' : 
-                   'လိပ်စာထည့်ရန် အောက်ပါလိပ်စာအကွက်ကို နှိပ်ပါ\nသို့မဟုတ် လက်ရှိတည်နေရာရယူရန် တည်နေရာခလုတ်ကို အသုံးပြုပါ'}
-                </div>
-                
-                {/* 装饰性地图网格 */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundImage: `
-                    linear-gradient(rgba(74, 85, 104, 0.1) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(74, 85, 104, 0.1) 1px, transparent 1px)
-                  `,
-                  backgroundSize: '20px 20px',
-                  borderRadius: '10px',
-                  pointerEvents: 'none'
-                }} />
-              </div>
-                
-                {/* 点击标记 */}
-                {mapClickPosition && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${((mapClickPosition.lng - 96.1061) / 0.1 + 0.5) * 100}%`,
-                      top: `${(0.5 - (mapClickPosition.lat - 16.7258) / 0.1) * 100}%`,
-                      transform: 'translate(-50%, -100%)',
-                      fontSize: '24px',
-                      color: '#e53e3e',
-                      textShadow: '0 0 3px white',
-                      zIndex: 5,
-                      animation: 'bounce 0.5s ease-in-out'
-                    }}
-                  >
-                    📍
-                  </div>
-                )}
-              </div>
+                {/* 真正的Google Maps */}
+                <ErrorBoundary>
+                  <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
+                    <GoogleMap
+                      mapContainerStyle={{ width: '100%', height: '100%' }}
+                      center={{ lat: 16.8661, lng: 96.1951 }} // 仰光中心
+                      zoom={12}
+                      onClick={(e) => {
+                        if (e.latLng) {
+                          const lat = e.latLng.lat();
+                          const lng = e.latLng.lng();
+                          setMapClickPosition({ lat, lng });
+                          
+                          // 显示坐标信息
+                          const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                          if (addressInput) {
+                            addressInput.value = `纬度: ${lat.toFixed(6)}, 经度: ${lng.toFixed(6)}`;
+                          }
+                        }
+                      }}
+                    >
+                      {mapClickPosition && (
+                        <Marker
+                          position={{ lat: mapClickPosition.lat, lng: mapClickPosition.lng }}
+                          title="选择的位置"
+                        />
+                      )}
+                    </GoogleMap>
+                  </LoadScript>
+                </ErrorBoundary>
               
               {/* 自动定位按钮 */}
               <button
@@ -1504,6 +1499,7 @@ const HomePage: React.FC = () => {
               >
                 📍
               </button>
+            </div>
             </div>
 
             {/* 地址输入框 */}

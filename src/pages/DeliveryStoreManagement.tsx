@@ -3,6 +3,53 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore } from '../services/supabase';
 
+// 错误边界组件
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Google Maps Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          width: '100%',
+          height: '400px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+          <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
+          <p style={{ margin: '0', opacity: 0.8, textAlign: 'center' }}>
+            Google Maps API 配置问题<br/>
+            请检查 API Key 设置
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const [stores, setStores] = useState<DeliveryStore[]>([]);
@@ -437,23 +484,25 @@ const DeliveryStoreManagement: React.FC = () => {
               <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '10px' }}>
                 点击地图选择位置，或手动输入经纬度
               </p>
-              <LoadScript googleMapsApiKey="AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY">
-                <GoogleMap
-                  mapContainerStyle={mapContainerStyle}
-                  center={mapCenter}
-                  zoom={12}
-                  onClick={handleMapClick}
-                >
-                  {formData.latitude && formData.longitude && (
-                    <Marker
-                      position={{
-                        lat: Number(formData.latitude),
-                        lng: Number(formData.longitude)
-                      }}
-                    />
-                  )}
-                </GoogleMap>
-              </LoadScript>
+              <ErrorBoundary>
+                <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
+                  <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={mapCenter}
+                    zoom={12}
+                    onClick={handleMapClick}
+                  >
+                    {formData.latitude && formData.longitude && (
+                      <Marker
+                        position={{
+                          lat: Number(formData.latitude),
+                          lng: Number(formData.longitude)
+                        }}
+                      />
+                    )}
+                  </GoogleMap>
+                </LoadScript>
+              </ErrorBoundary>
             </div>
 
             <button
@@ -556,35 +605,37 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
-          <LoadScript googleMapsApiKey="AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY">
-            <GoogleMap
-              mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
-              center={mapCenter}
-              zoom={12}
-            >
-              {stores.map((store) => (
-                <Marker
-                  key={store.id}
-                  position={{ lat: store.latitude, lng: store.longitude }}
-                  onClick={() => setSelectedStore(store)}
-                />
-              ))}
-              {selectedStore && (
-                <InfoWindow
-                  position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
-                  onCloseClick={() => setSelectedStore(null)}
-                >
-                  <div style={{ color: '#000' }}>
-                    <h3 style={{ margin: '0 0 8px 0' }}>{selectedStore.store_name}</h3>
-                    <p style={{ margin: '0 0 4px 0' }}>{selectedStore.address}</p>
-                    <p style={{ margin: '0 0 4px 0' }}>📞 {selectedStore.phone}</p>
-                    <p style={{ margin: '0 0 4px 0' }}>👤 {selectedStore.manager_name}</p>
-                    <p style={{ margin: '0' }}>⏰ {selectedStore.operating_hours}</p>
-                  </div>
-                </InfoWindow>
-              )}
-            </GoogleMap>
-          </LoadScript>
+          <ErrorBoundary>
+            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
+                center={mapCenter}
+                zoom={12}
+              >
+                {stores.map((store) => (
+                  <Marker
+                    key={store.id}
+                    position={{ lat: store.latitude, lng: store.longitude }}
+                    onClick={() => setSelectedStore(store)}
+                  />
+                ))}
+                {selectedStore && (
+                  <InfoWindow
+                    position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
+                    onCloseClick={() => setSelectedStore(null)}
+                  >
+                    <div style={{ color: '#000' }}>
+                      <h3 style={{ margin: '0 0 8px 0' }}>{selectedStore.store_name}</h3>
+                      <p style={{ margin: '0 0 4px 0' }}>{selectedStore.address}</p>
+                      <p style={{ margin: '0 0 4px 0' }}>📞 {selectedStore.phone}</p>
+                      <p style={{ margin: '0 0 4px 0' }}>👤 {selectedStore.manager_name}</p>
+                      <p style={{ margin: '0' }}>⏰ {selectedStore.operating_hours}</p>
+                    </div>
+                  </InfoWindow>
+                )}
+              </GoogleMap>
+            </LoadScript>
+          </ErrorBoundary>
         </div>
       </div>
     </div>
