@@ -165,16 +165,12 @@ export const getCourierLocations = async (courierIds?: string[]): Promise<{
   error?: string;
 }> => {
   try {
+    // 仅查询位置表，避免因外键名不匹配导致的关系错误；
+    // 骑手详细信息在上层通过 trackingService.getActiveCouriers() 获取并前端关联。
     let query = supabase
       .from('courier_locations')
-      .select(`
-        *,
-        couriers!courier_locations_courier_id_fkey (
-          name,
-          phone,
-          vehicle_type
-        )
-      `);
+      .select('*')
+      .order('last_update', { ascending: false });
 
     if (courierIds && courierIds.length > 0) {
       query = query.in('courier_id', courierIds);

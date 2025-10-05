@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { trackingService, TrackingEvent, CourierLocation, Package } from '../services/supabase';
 import { getCourierLocations } from '../api/courierLocation';
+import { useCourierLocationRealtime } from './useSupabaseRealtime';
 
 export interface UseRealTimeTrackingOptions {
   refreshInterval?: number; // 数据刷新间隔（毫秒）
@@ -19,12 +20,12 @@ export interface RealTimeTrackingState {
 }
 
 /**
- * 实时跟踪自定义Hook
+ * 实时跟踪自定义Hook（混合模式：实时推送 + 智能轮询）
  * 提供自动数据刷新和状态管理
  */
 export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) => {
   const {
-    refreshInterval = 15000, // 默认15秒刷新一次
+    refreshInterval = 30000, // 优化：增加到30秒，因为有实时推送补充
     autoRefresh = true,
     selectedPackageId
   } = options;
@@ -41,15 +42,63 @@ export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) =>
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  const lastDataHashRef = useRef<string>(''); // 用于检测数据变化
 
-  // 加载所有数据
-  const loadData = useCallback(async () => {
+  // 计算数据哈希值，用于检测变化
+  const calculateDataHash = useCallback((data: any) => {
+    return JSON.stringify({
+      courierCount: data.courierLocations?.length || 0,
+      packageCount: data.packages?.length || 0,
+      lastCourierUpdate: data.courierLocations?.[0]?.last_update || '',
+      courierStatuses: data.courierLocations?.map((c: any) => `${c.courier_id}:${c.status}`).join(',') || ''
+    });
+  }, []);
+
+  // 处理实时位置更新
+  const handleRealtimeLocationUpdate = useCallback((updatedLocation: any) => {
+    if (!mountedRef.current) return;
+
+    setState(prev => {
+      const existingIndex = prev.courierLocations.findIndex(
+        loc => loc.courier_id === updatedLocation.courier_id
+      );
+
+      let newCourierLocations;
+      if (updatedLocation.deleted) {
+        // 删除离线骑手
+        newCourierLocations = prev.courierLocations.filter(
+          loc => loc.courier_id !== updatedLocation.courier_id
+        );
+      } else if (existingIndex >= 0) {
+        // 更新现有骑手
+        newCourierLocations = [...prev.courierLocations];
+        newCourierLocations[existingIndex] = updatedLocation;
+      } else {
+        // 添加新骑手
+        newCourierLocations = [...prev.courierLocations, updatedLocation];
+      }
+
+      console.log(`🔔 实时更新: 骑手 ${updatedLocation.courier_id} -> ${updatedLocation.status || 'deleted'}`);
+
+      return {
+        ...prev,
+        courierLocations: newCourierLocations,
+        lastUpdate: new Date()
+      };
+    });
+  }, []);
+
+  // 启用实时订阅
+  useCourierLocationRealtime(handleRealtimeLocationUpdate);
+
+  // 加载所有数据（优化版本）
+  const loadData = useCallback(async (forceRefresh = false) => {
     if (!mountedRef.current) return;
 
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      // 并行加载数据
+      // 并行加载数据，优化性能
       const [packagesResult, courierLocationsResult, couriersResult, trackingEventsResult] = await Promise.allSettled([
         trackingService.getActivePackages(),
         getCourierLocations(),
@@ -96,15 +145,27 @@ export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) =>
         errors.push(`跟踪事件数据加载失败: ${trackingEventsResult.reason}`);
       }
 
-      setState({
-        packages,
-        courierLocations,
-        couriers,
-        trackingEvents,
-        loading: false,
-        error: errors.length > 0 ? errors.join('; ') : null,
-        lastUpdate: new Date()
-      });
+      const newData = { packages, courierLocations, couriers, trackingEvents };
+      const newDataHash = calculateDataHash(newData);
+
+      // 智能更新：只有数据真正变化时才更新状态
+      if (forceRefresh || newDataHash !== lastDataHashRef.current) {
+        lastDataHashRef.current = newDataHash;
+        
+        setState({
+          packages,
+          courierLocations,
+          couriers,
+          trackingEvents,
+          loading: false,
+          error: errors.length > 0 ? errors.join('; ') : null,
+          lastUpdate: new Date()
+        });
+
+        console.log(`🔄 轮询更新: ${courierLocations.length} 个在线骑手`);
+      } else {
+        setState(prev => ({ ...prev, loading: false }));
+      }
 
     } catch (error) {
       if (!mountedRef.current) return;
@@ -116,7 +177,7 @@ export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) =>
         error: error instanceof Error ? error.message : '数据加载失败'
       }));
     }
-  }, [selectedPackageId]);
+  }, [selectedPackageId, calculateDataHash]);
 
   // 手动刷新数据
   const refreshData = useCallback(() => {
@@ -164,9 +225,13 @@ export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) =>
     }
   }, [state.courierLocations, loadData]);
 
-  // 设置自动刷新
+  // 设置自动刷新（优化版本 - 混合模式）
   useEffect(() => {
     if (autoRefresh && refreshInterval > 0) {
+      // 立即加载一次数据
+      loadData(true);
+      
+      // 设置较长的轮询间隔，因为有实时推送补充
       intervalRef.current = setInterval(() => {
         loadData();
       }, refreshInterval);
