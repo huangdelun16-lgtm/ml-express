@@ -107,6 +107,13 @@ const AdminDashboard: React.FC = () => {
       roles: ['admin', 'manager'] // 仅管理员和经理可访问
     },
     {
+      title: language === 'zh' ? '快递店管理' : 'Delivery Store Management',
+      description: language === 'zh' ? '配送网点、自提点和分拣中心' : 'Distribution points, pickup points and sorting centers',
+      color: '#38a169',
+      icon: '🏪',
+      roles: ['admin', 'manager'] // 管理员和经理可访问
+    },
+    {
       title: language === 'zh' ? '财务管理' : 'Finance Management',
       description: language === 'zh' ? '收入统计和佣金管理' : 'Income statistics and commission management',
       color: '#3182ce',
@@ -140,6 +147,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/users');
     } else if (title === '快递员管理' || title === 'Courier Management') {
       navigate('/admin/couriers');
+    } else if (title === '快递店管理' || title === 'Delivery Store Management') {
+      navigate('/admin/delivery-stores');
     } else if (title === '财务管理' || title === 'Finance Management') {
       navigate('/admin/finance');
     } else if (title === '实时跟踪' || title === 'Real-time Tracking') {

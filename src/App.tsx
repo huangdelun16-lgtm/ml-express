@@ -10,6 +10,7 @@ import FinanceManagement from './pages/FinanceManagement';
 import TrackingPage from './pages/TrackingPage';
 import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
+import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import { LanguageProvider } from './contexts/LanguageContext';
 
@@ -30,6 +31,7 @@ function App() {
             <Route path="/admin/settings" element={<SystemSettings />} />
             <Route path="/admin/system-settings" element={<SystemSettings />} />
             <Route path="/admin/accounts" element={<AccountManagement />} />
+            <Route path="/admin/delivery-stores" element={<DeliveryStoreManagement />} />
             <Route path="/admin/supervision" element={<EmployeeSupervision />} />
           </Routes>
         </div>

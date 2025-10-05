@@ -4,6 +4,53 @@ import { LoadScript, GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { trackingService, TrackingEvent, CourierLocation, Package } from '../services/supabase';
 import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
 
+// 错误边界组件
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Google Maps Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          width: '100%',
+          height: '400px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(15,32,60,0.6)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+          <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
+          <p style={{ margin: '0', opacity: 0.8, textAlign: 'center' }}>
+            Google Maps API 配置问题<br/>
+            请检查 API Key 设置
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 interface PackageWithStatus extends Package {
   tracking_events?: TrackingEvent[];
   courier_location?: CourierLocation | null;
@@ -39,10 +86,7 @@ const TrackingPage: React.FC = () => {
     selectedPackageId: selectedPackageId || undefined
   });
 
-  const googleMapsApiKey = useMemo(() => {
-    // 直接使用硬编码的API密钥，确保地图能够加载
-    return 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
-  }, []);
+  const googleMapsApiKey = useMemo(() => process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY", []);
   
   useEffect(() => {
     document.title = '实时跟踪 | 管理后台';
@@ -641,7 +685,8 @@ const TrackingPage: React.FC = () => {
               height: '400px'
             }}>
               {googleMapsApiKey ? (
-                <LoadScript googleMapsApiKey={googleMapsApiKey}>
+                <ErrorBoundary>
+                  <LoadScript googleMapsApiKey={googleMapsApiKey}>
                   <GoogleMap
                     mapContainerStyle={mapContainerStyle}
                     center={mapCenter}
@@ -685,6 +730,7 @@ const TrackingPage: React.FC = () => {
                     )}
                   </GoogleMap>
                 </LoadScript>
+                </ErrorBoundary>
               ) : (
                 <div style={{ ...mapContainerStyle, background: 'rgba(15,32,60,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '0 20px' }}>
