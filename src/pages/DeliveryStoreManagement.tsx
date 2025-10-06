@@ -258,7 +258,8 @@ const DeliveryStoreManagement: React.FC = () => {
       if (result) {
         setSuccessMessage('快递店信息更新成功！');
         setShowForm(false);
-        cancelEdit();
+        setEditingStore(null);
+        setIsEditing(false);
         loadStores();
       } else {
         setErrorMessage('更新失败，请重试');
@@ -382,7 +383,10 @@ const DeliveryStoreManagement: React.FC = () => {
             onClick={() => {
               if (showForm) {
                 if (isEditing) {
-                  cancelEdit();
+                  setEditingStore(null);
+                  setIsEditing(false);
+                  setShowForm(false);
+                  resetForm();
                 } else {
                   setShowForm(false);
                   resetForm();
