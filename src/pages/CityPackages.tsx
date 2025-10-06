@@ -13,6 +13,11 @@ const CityPackages: React.FC = () => {
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [courierDetail, setCourierDetail] = useState<any>(null);
   const [courierLoading, setCourierLoading] = useState(false);
+  
+  // 新增状态管理
+  const [showPickupCodeModal, setShowPickupCodeModal] = useState(false);
+  const [showDeliveryScanModal, setShowDeliveryScanModal] = useState(false);
+  const [showUploadPhotoModal, setShowUploadPhotoModal] = useState(false);
 
   // 加载包裹数据
   useEffect(() => {
@@ -454,7 +459,8 @@ const CityPackages: React.FC = () => {
                 <div style={{
                   display: 'flex',
                   gap: '10px',
-                  flexWrap: 'wrap'
+                  flexWrap: 'wrap',
+                  marginBottom: '15px'
                 }}>
                   {pkg.status === '待取件' && (
                     <button
@@ -517,6 +523,111 @@ const CityPackages: React.FC = () => {
                     }}
                   >
                     查看详情
+                  </button>
+                </div>
+
+                {/* 功能操作按钮 */}
+                <div style={{
+                  display: 'flex',
+                  gap: '10px',
+                  flexWrap: 'wrap',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+                  paddingTop: '15px'
+                }}>
+                  <button
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      setShowPickupCodeModal(true);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(44, 82, 130, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 82, 130, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(44, 82, 130, 0.3)';
+                    }}
+                  >
+                    🔑 寄件码
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      setShowDeliveryScanModal(true);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(39, 174, 96, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(39, 174, 96, 0.3)';
+                    }}
+                  >
+                    📱 送件扫码
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      setShowUploadPhotoModal(true);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(155, 89, 182, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(155, 89, 182, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(155, 89, 182, 0.3)';
+                    }}
+                  >
+                    📸 上传照片
                   </button>
                 </div>
               </div>
@@ -942,6 +1053,454 @@ const CityPackages: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
+
+      {/* 寄件码模态框 */}
+      {showPickupCodeModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(15, 32, 60, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(26, 54, 93, 0.95), rgba(18, 38, 65, 0.92))',
+            borderRadius: '20px',
+            padding: '30px',
+            color: 'white',
+            boxShadow: '0 25px 55px rgba(0,0,0,0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+                🔑 寄件码
+              </h2>
+              <button
+                onClick={() => setShowPickupCodeModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '25px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF' }}>
+                客户下单二维码
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '10px',
+                marginBottom: '15px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: '200px'
+              }}>
+                <div style={{
+                  width: '180px',
+                  height: '180px',
+                  background: '#f8f9fa',
+                  border: '2px dashed #2c5282',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  color: '#2c5282',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
+                  <div>二维码</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                    {selectedPackage.id}
+                  </div>
+                </div>
+              </div>
+              <p style={{ 
+                margin: 0, 
+                color: 'rgba(255,255,255,0.8)', 
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                客户下单时生成的二维码<br/>
+                快递员可扫描此码进行取件<br/>
+                请妥善保管此二维码
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 送件扫码模态框 */}
+      {showDeliveryScanModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(15, 32, 60, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(26, 54, 93, 0.95), rgba(18, 38, 65, 0.92))',
+            borderRadius: '20px',
+            padding: '30px',
+            color: 'white',
+            boxShadow: '0 25px 55px rgba(0,0,0,0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+                📱 送件扫码
+              </h2>
+              <button
+                onClick={() => setShowDeliveryScanModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '25px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ margin: '0 0 20px 0', color: '#A5C7FF' }}>
+                送件扫码窗口
+              </h3>
+              
+              {/* 扫码框 */}
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '10px',
+                marginBottom: '20px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: '200px'
+              }}>
+                <div style={{
+                  width: '200px',
+                  height: '200px',
+                  border: '3px solid #27ae60',
+                  borderRadius: '15px',
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  background: 'rgba(39, 174, 96, 0.1)'
+                }}>
+                  {/* 四角标识 */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    width: '20px',
+                    height: '20px',
+                    borderTop: '4px solid #27ae60',
+                    borderLeft: '4px solid #27ae60',
+                    borderRadius: '2px'
+                  }}></div>
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    width: '20px',
+                    height: '20px',
+                    borderTop: '4px solid #27ae60',
+                    borderRight: '4px solid #27ae60',
+                    borderRadius: '2px'
+                  }}></div>
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    left: '10px',
+                    width: '20px',
+                    height: '20px',
+                    borderBottom: '4px solid #27ae60',
+                    borderLeft: '4px solid #27ae60',
+                    borderRadius: '2px'
+                  }}></div>
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    right: '10px',
+                    width: '20px',
+                    height: '20px',
+                    borderBottom: '4px solid #27ae60',
+                    borderRight: '4px solid #27ae60',
+                    borderRadius: '2px'
+                  }}></div>
+                  
+                  <div style={{
+                    color: '#27ae60',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
+                    <div>扫码区域</div>
+                  </div>
+                </div>
+              </div>
+
+              <p style={{ 
+                margin: '0 0 20px 0', 
+                color: '#27ae60', 
+                fontSize: '0.9rem',
+                fontWeight: '500'
+              }}>
+                请将二维码放入扫描框内
+              </p>
+
+              {/* 送件二维码 */}
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '10px',
+                marginBottom: '15px'
+              }}>
+                <h4 style={{ margin: '0 0 15px 0', color: '#27ae60', fontSize: '1.1rem' }}>
+                  送件二维码
+                </h4>
+                <div style={{
+                  width: '150px',
+                  height: '150px',
+                  background: '#f8f9fa',
+                  border: '2px dashed #27ae60',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  color: '#27ae60',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  margin: '0 auto 15px auto'
+                }}>
+                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
+                  <div>送件码</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                    {selectedPackage.id}
+                  </div>
+                </div>
+                <p style={{ 
+                  margin: 0, 
+                  color: '#666', 
+                  fontSize: '0.8rem',
+                  lineHeight: '1.4'
+                }}>
+                  店长扫描此码确认送达<br/>
+                  包裹ID: {selectedPackage.id}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 上传照片模态框 */}
+      {showUploadPhotoModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(15, 32, 60, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(26, 54, 93, 0.95), rgba(18, 38, 65, 0.92))',
+            borderRadius: '20px',
+            padding: '30px',
+            color: 'white',
+            boxShadow: '0 25px 55px rgba(0,0,0,0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+                📸 上传照片
+              </h2>
+              <button
+                onClick={() => setShowUploadPhotoModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '25px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF' }}>
+                📸 包裹送达留底证明
+              </h3>
+              
+              <p style={{ 
+                margin: '0 0 20px 0', 
+                color: 'rgba(255,255,255,0.8)', 
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                请拍摄包裹送达证明照片<br/>
+                系统将自动记录当前位置<br/>
+                完成后可获得KM积分
+              </p>
+
+              {/* 包裹信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '15px',
+                borderRadius: '10px',
+                marginBottom: '20px',
+                textAlign: 'left'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#A5C7FF', fontSize: '1rem' }}>
+                  包裹信息
+                </h4>
+                <p style={{ margin: '0 0 5px 0', fontSize: '0.9rem' }}>
+                  包裹编号: {selectedPackage.id}
+                </p>
+                <p style={{ margin: '0 0 5px 0', fontSize: '0.9rem' }}>
+                  收件人: {selectedPackage.receiver_name}
+                </p>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                  地址: {selectedPackage.receiver_address}
+                </p>
+              </div>
+
+              {/* 拍照按钮 */}
+              <button
+                onClick={() => {
+                  // 模拟拍照功能
+                  alert('拍照功能已触发！\n系统将自动记录GPS位置信息');
+                  setShowUploadPhotoModal(false);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '15px 30px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: '0 auto',
+                  boxShadow: '0 4px 15px rgba(155, 89, 182, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(155, 89, 182, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(155, 89, 182, 0.3)';
+                }}
+              >
+                📷 拍照上传送达证明
+              </button>
+
+              <p style={{ 
+                margin: '15px 0 0 0', 
+                color: 'rgba(255,255,255,0.6)', 
+                fontSize: '0.8rem',
+                fontStyle: 'italic',
+                lineHeight: '1.4'
+              }}>
+                💡 提示: 请确保照片清晰显示包裹和收件地址<br/>
+                拍照后系统将自动记录GPS位置信息
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
