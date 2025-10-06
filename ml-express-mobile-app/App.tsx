@@ -21,6 +21,7 @@ import CourierManagementScreen from './screens/CourierManagementScreen';
 import FinanceManagementScreen from './screens/FinanceManagementScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import MyTasksScreen from './screens/MyTasksScreen';
+import MyStatisticsScreen from './screens/MyStatisticsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
