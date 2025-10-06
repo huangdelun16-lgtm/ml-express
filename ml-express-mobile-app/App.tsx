@@ -20,7 +20,7 @@ import PackageManagementScreen from './screens/PackageManagementScreen';
 import CourierManagementScreen from './screens/CourierManagementScreen';
 import FinanceManagementScreen from './screens/FinanceManagementScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import MyStatisticsScreen from './screens/MyStatisticsScreen';
+import MyTasksScreen from './screens/MyTasksScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -114,7 +114,7 @@ function CourierTabs() {
     >
       <Tab.Screen
         name="MyTasks"
-        component={CourierHomeScreen}
+        component={MyTasksScreen}
         options={{
           tabBarLabel: '我的任务',
           tabBarIcon: ({ color }) => (

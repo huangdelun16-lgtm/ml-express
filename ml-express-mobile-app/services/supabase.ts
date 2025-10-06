@@ -165,12 +165,14 @@ export const packageService = {
     id: string, 
     status: string, 
     pickupTime?: string, 
-    deliveryTime?: string
+    deliveryTime?: string,
+    courierName?: string
   ): Promise<boolean> {
     const updateData: any = { status };
     
     if (pickupTime) updateData.pickup_time = pickupTime;
     if (deliveryTime) updateData.delivery_time = deliveryTime;
+    if (courierName) updateData.courier = courierName;
     
     const { error } = await supabase
       .from('packages')

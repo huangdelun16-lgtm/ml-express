@@ -128,16 +128,23 @@ export default function ScanScreen({ navigation }: any) {
   const confirmPickup = async (packageData: any) => {
     try {
       const pickupTime = new Date().toLocaleString('zh-CN');
+      
+      // 获取当前骑手账号（这里需要从登录状态或用户信息中获取）
+      // 暂时使用模拟的骑手账号，实际应该从用户登录状态获取
+      const currentCourierName = '骑手账号'; // TODO: 从用户登录状态获取实际骑手账号
+      
       const success = await packageService.updatePackageStatus(
         packageData.id,
         '已取件',
-        pickupTime
+        pickupTime,
+        undefined, // deliveryTime
+        currentCourierName
       );
 
       if (success) {
         Alert.alert(
           '取件成功！',
-          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}`,
+          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}\n负责骑手：${currentCourierName}`,
           [
             { text: '确定', onPress: () => setScanned(false) }
           ]
