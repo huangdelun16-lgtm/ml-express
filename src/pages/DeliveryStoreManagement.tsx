@@ -839,6 +839,17 @@ const DeliveryStoreManagement: React.FC = () => {
                     key={store.id}
                     position={{ lat: store.latitude, lng: store.longitude }}
                     onClick={() => setSelectedStore(store)}
+                    icon={{
+                      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+                          <circle cx="20" cy="16" r="6" fill="white"/>
+                          <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#e74c3c">店</text>
+                        </svg>
+                      `),
+                      scaledSize: new window.google.maps.Size(40, 40),
+                      anchor: new window.google.maps.Point(20, 40)
+                    }}
                   />
                 ))}
                 {selectedStore && (
@@ -846,12 +857,70 @@ const DeliveryStoreManagement: React.FC = () => {
                     position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
                     onCloseClick={() => setSelectedStore(null)}
                   >
-                    <div style={{ color: '#000' }}>
-                      <h3 style={{ margin: '0 0 8px 0' }}>{selectedStore.store_name}</h3>
-                      <p style={{ margin: '0 0 4px 0' }}>{selectedStore.address}</p>
-                      <p style={{ margin: '0 0 4px 0' }}>📞 {selectedStore.phone}</p>
-                      <p style={{ margin: '0 0 4px 0' }}>👤 {selectedStore.manager_name}</p>
-                      <p style={{ margin: '0' }}>⏰ {selectedStore.operating_hours}</p>
+                    <div style={{ 
+                      color: '#000', 
+                      padding: '8px',
+                      minWidth: '200px',
+                      fontFamily: 'Arial, sans-serif'
+                    }}>
+                      <h3 style={{ 
+                        margin: '0 0 8px 0', 
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        color: '#2c5282'
+                      }}>
+                        {selectedStore.store_name}
+                      </h3>
+                      <p style={{ 
+                        margin: '0 0 6px 0', 
+                        fontSize: '14px',
+                        color: '#4a5568'
+                      }}>
+                        📍 {selectedStore.address}
+                      </p>
+                      <p style={{ 
+                        margin: '0 0 6px 0', 
+                        fontSize: '14px',
+                        color: '#4a5568',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ color: '#e53e3e' }}>📞</span> {selectedStore.phone}
+                      </p>
+                      <p style={{ 
+                        margin: '0 0 6px 0', 
+                        fontSize: '14px',
+                        color: '#4a5568',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ color: '#805ad5' }}>👤</span> {selectedStore.manager_name}
+                      </p>
+                      <p style={{ 
+                        margin: '0 0 6px 0', 
+                        fontSize: '14px',
+                        color: '#4a5568',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ color: '#e53e3e' }}>⏰</span> {selectedStore.operating_hours}
+                      </p>
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '4px 8px',
+                        background: selectedStore.status === 'active' ? '#c6f6d5' : '#fed7d7',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: selectedStore.status === 'active' ? '#22543d' : '#742a2a',
+                        fontWeight: '500'
+                      }}>
+                        {selectedStore.status === 'active' && '🟢 营业中'}
+                        {selectedStore.status === 'inactive' && '🔴 暂停营业'}
+                        {selectedStore.status === 'maintenance' && '🟡 维护中'}
+                      </div>
                     </div>
                   </InfoWindow>
                 )}
@@ -1221,6 +1290,17 @@ const DeliveryStoreManagement: React.FC = () => {
                         position={{
                           lat: Number(formData.latitude),
                           lng: Number(formData.longitude)
+                        }}
+                        icon={{
+                          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
+                              <circle cx="20" cy="16" r="6" fill="white"/>
+                              <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
+                            </svg>
+                          `),
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 40)
                         }}
                       />
                     )}
