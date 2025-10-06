@@ -18,6 +18,7 @@ const CityPackages: React.FC = () => {
   const [showPickupCodeModal, setShowPickupCodeModal] = useState(false);
   const [showDeliveryScanModal, setShowDeliveryScanModal] = useState(false);
   const [showUploadPhotoModal, setShowUploadPhotoModal] = useState(false);
+  const [deliveryScanTab, setDeliveryScanTab] = useState('pickup');
 
   // 加载包裹数据
   useEffect(() => {
@@ -510,125 +511,56 @@ const CityPackages: React.FC = () => {
                       标记已送达
                     </button>
                   )}
-                  <button
-                    onClick={() => handleViewDetail(pkg)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '8px 16px',
-                      borderRadius: '5px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    查看详情
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => handleViewDetail(pkg)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        padding: '8px 16px',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      查看详情
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedPackage(pkg);
+                        setShowDeliveryScanModal(true);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(39, 174, 96, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(39, 174, 96, 0.3)';
+                      }}
+                    >
+                      📱 送件扫码
+                    </button>
+                  </div>
                 </div>
 
-                {/* 功能操作按钮 */}
-                <div style={{
-                  display: 'flex',
-                  gap: '10px',
-                  flexWrap: 'wrap',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-                  paddingTop: '15px'
-                }}>
-                  <button
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setShowPickupCodeModal(true);
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 8px rgba(44, 82, 130, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 82, 130, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(44, 82, 130, 0.3)';
-                    }}
-                  >
-                    🔑 寄件码
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setShowDeliveryScanModal(true);
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 8px rgba(39, 174, 96, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(39, 174, 96, 0.3)';
-                    }}
-                  >
-                    📱 送件扫码
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setShowUploadPhotoModal(true);
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 8px rgba(155, 89, 182, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(155, 89, 182, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(155, 89, 182, 0.3)';
-                    }}
-                  >
-                    📸 上传照片
-                  </button>
                 </div>
               </div>
                 ))
@@ -1255,167 +1187,372 @@ const CityPackages: React.FC = () => {
               marginBottom: '20px'
             }}>
               <h3 style={{ margin: '0 0 20px 0', color: '#A5C7FF' }}>
-                送件扫码窗口
+                送件扫码 - 多功能窗口
               </h3>
               
-              {/* 扫码框 */}
+              {/* 功能选择标签 */}
               <div style={{
-                background: 'white',
-                padding: '20px',
-                borderRadius: '10px',
-                marginBottom: '20px',
                 display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                minHeight: '200px'
+                gap: '10px',
+                marginBottom: '20px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+                paddingBottom: '15px'
               }}>
+                <button
+                  onClick={() => setDeliveryScanTab('pickup')}
+                  style={{
+                    background: deliveryScanTab === 'pickup' ? '#2c5282' : 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  🔑 寄件码
+                </button>
+                <button
+                  onClick={() => setDeliveryScanTab('camera')}
+                  style={{
+                    background: deliveryScanTab === 'camera' ? '#27ae60' : 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  📷 摄像机
+                </button>
+                <button
+                  onClick={() => setDeliveryScanTab('upload')}
+                  style={{
+                    background: deliveryScanTab === 'upload' ? '#9b59b6' : 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  📸 上传照片
+                </button>
+              </div>
+              
+              {/* 寄件码功能 */}
+              {deliveryScanTab === 'pickup' && (
                 <div style={{
-                  width: '200px',
-                  height: '200px',
-                  border: '3px solid #27ae60',
-                  borderRadius: '15px',
-                  position: 'relative',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  background: 'rgba(39, 174, 96, 0.1)'
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  marginBottom: '15px'
                 }}>
-                  {/* 四角标识 */}
+                  <h4 style={{ margin: '0 0 15px 0', color: '#2c5282', fontSize: '1.1rem' }}>
+                    客户下单条形码
+                  </h4>
                   <div style={{
-                    position: 'absolute',
-                    top: '10px',
-                    left: '10px',
-                    width: '20px',
-                    height: '20px',
-                    borderTop: '4px solid #27ae60',
-                    borderLeft: '4px solid #27ae60',
-                    borderRadius: '2px'
-                  }}></div>
-                  <div style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    width: '20px',
-                    height: '20px',
-                    borderTop: '4px solid #27ae60',
-                    borderRight: '4px solid #27ae60',
-                    borderRadius: '2px'
-                  }}></div>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '10px',
-                    left: '10px',
-                    width: '20px',
-                    height: '20px',
-                    borderBottom: '4px solid #27ae60',
-                    borderLeft: '4px solid #27ae60',
-                    borderRadius: '2px'
-                  }}></div>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '10px',
-                    right: '10px',
-                    width: '20px',
-                    height: '20px',
-                    borderBottom: '4px solid #27ae60',
-                    borderRight: '4px solid #27ae60',
-                    borderRadius: '2px'
-                  }}></div>
-                  
-                  <div style={{
-                    color: '#27ae60',
+                    width: '300px',
+                    height: '120px',
+                    background: '#f8f9fa',
+                    border: '2px dashed #2c5282',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    color: '#2c5282',
                     fontSize: '14px',
                     fontWeight: '500',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
-                    <div>扫码区域</div>
-                  </div>
-                </div>
-              </div>
-
-              <p style={{ 
-                margin: '0 0 20px 0', 
-                color: '#27ae60', 
-                fontSize: '0.9rem',
-                fontWeight: '500'
-              }}>
-                请将二维码放入扫描框内
-              </p>
-
-              {/* 送件条形码 */}
-              <div style={{
-                background: 'white',
-                padding: '20px',
-                borderRadius: '10px',
-                marginBottom: '15px'
-              }}>
-                <h4 style={{ margin: '0 0 15px 0', color: '#27ae60', fontSize: '1.1rem' }}>
-                  送件条形码
-                </h4>
-                <div style={{
-                  width: '250px',
-                  height: '100px',
-                  background: '#f8f9fa',
-                  border: '2px dashed #27ae60',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  color: '#27ae60',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  margin: '0 auto 15px auto',
-                  position: 'relative'
-                }}>
-                  {/* 送件条形码样式 */}
-                  <div style={{
-                    width: '200px',
-                    height: '50px',
-                    background: 'white',
-                    border: '1px solid #27ae60',
-                    borderRadius: '5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '8px',
+                    margin: '0 auto 15px auto',
                     position: 'relative'
                   }}>
-                    {/* 模拟送件条形码线条 */}
+                    {/* 条形码样式 */}
                     <div style={{
+                      width: '250px',
+                      height: '60px',
+                      background: 'white',
+                      border: '1px solid #2c5282',
+                      borderRadius: '5px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '2px',
-                      height: '35px'
+                      justifyContent: 'center',
+                      marginBottom: '10px',
+                      position: 'relative'
                     }}>
-                      {Array.from({ length: 15 }, (_, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            width: i % 2 === 0 ? '2px' : '1px',
-                            height: i % 3 === 0 ? '35px' : '25px',
-                            backgroundColor: '#27ae60',
-                            borderRadius: '1px'
-                          }}
-                        />
-                      ))}
+                      {/* 模拟条形码线条 */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        height: '40px'
+                      }}>
+                        {Array.from({ length: 20 }, (_, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: i % 3 === 0 ? '3px' : '1px',
+                              height: i % 4 === 0 ? '40px' : '30px',
+                              backgroundColor: '#2c5282',
+                              borderRadius: '1px'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                      {selectedPackage.id}
                     </div>
                   </div>
-                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                    {selectedPackage.id}
-                  </div>
+                  <p style={{ 
+                    margin: 0, 
+                    color: '#666', 
+                    fontSize: '0.8rem',
+                    lineHeight: '1.4'
+                  }}>
+                    客户下单时生成的条形码<br/>
+                    快递员可扫描此码进行取件<br/>
+                    请妥善保管此条形码
+                  </p>
                 </div>
-                <p style={{ 
-                  margin: 0, 
-                  color: '#666', 
-                  fontSize: '0.8rem',
-                  lineHeight: '1.4'
+              )}
+
+              {/* 摄像机功能 */}
+              {deliveryScanTab === 'camera' && (
+                <div style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  marginBottom: '15px'
                 }}>
-                  店长扫描此码确认送达<br/>
-                  包裹ID: {selectedPackage.id}
-                </p>
-              </div>
+                  <h4 style={{ margin: '0 0 15px 0', color: '#27ae60', fontSize: '1.1rem' }}>
+                    摄像机扫码和拍照
+                  </h4>
+                  
+                  {/* 扫码框 */}
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    border: '3px solid #27ae60',
+                    borderRadius: '15px',
+                    position: 'relative',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    background: 'rgba(39, 174, 96, 0.1)',
+                    margin: '0 auto 15px auto'
+                  }}>
+                    {/* 四角标识 */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '10px',
+                      left: '10px',
+                      width: '20px',
+                      height: '20px',
+                      borderTop: '4px solid #27ae60',
+                      borderLeft: '4px solid #27ae60',
+                      borderRadius: '2px'
+                    }}></div>
+                    <div style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      width: '20px',
+                      height: '20px',
+                      borderTop: '4px solid #27ae60',
+                      borderRight: '4px solid #27ae60',
+                      borderRadius: '2px'
+                    }}></div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '10px',
+                      width: '20px',
+                      height: '20px',
+                      borderBottom: '4px solid #27ae60',
+                      borderLeft: '4px solid #27ae60',
+                      borderRadius: '2px'
+                    }}></div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      right: '10px',
+                      width: '20px',
+                      height: '20px',
+                      borderBottom: '4px solid #27ae60',
+                      borderRight: '4px solid #27ae60',
+                      borderRadius: '2px'
+                    }}></div>
+                    
+                    <div style={{
+                      color: '#27ae60',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📷</div>
+                      <div>扫码/拍照区域</div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    justifyContent: 'center',
+                    marginBottom: '15px'
+                  }}>
+                    <button
+                      onClick={() => alert('启动扫码功能')}
+                      style={{
+                        background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      📱 扫码
+                    </button>
+                    <button
+                      onClick={() => alert('启动拍照功能')}
+                      style={{
+                        background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      📷 拍照
+                    </button>
+                  </div>
+
+                  <p style={{ 
+                    margin: 0, 
+                    color: '#666', 
+                    fontSize: '0.8rem',
+                    lineHeight: '1.4',
+                    textAlign: 'center'
+                  }}>
+                    可以扫描二维码或拍照记录<br/>
+                    支持实时扫码和照片拍摄
+                  </p>
+                </div>
+              )}
+
+              {/* 上传照片功能 */}
+              {deliveryScanTab === 'upload' && (
+                <div style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  marginBottom: '15px'
+                }}>
+                  <h4 style={{ margin: '0 0 15px 0', color: '#9b59b6', fontSize: '1.1rem' }}>
+                    上传照片 - 生成内存图片
+                  </h4>
+                  
+                  {/* 照片上传区域 */}
+                  <div style={{
+                    width: '100%',
+                    height: '200px',
+                    border: '2px dashed #9b59b6',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    background: 'rgba(155, 89, 182, 0.1)',
+                    marginBottom: '15px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(155, 89, 182, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(155, 89, 182, 0.1)';
+                  }}
+                  onClick={() => alert('选择照片文件')}
+                  >
+                    <div style={{
+                      color: '#9b59b6',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '48px', marginBottom: '10px' }}>📸</div>
+                      <div>点击上传照片</div>
+                      <div style={{ fontSize: '12px', marginTop: '5px', opacity: 0.7 }}>
+                        支持 JPG, PNG, GIF 格式
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    justifyContent: 'center',
+                    marginBottom: '15px'
+                  }}>
+                    <button
+                      onClick={() => alert('从相册选择')}
+                      style={{
+                        background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      📁 从相册选择
+                    </button>
+                    <button
+                      onClick={() => alert('生成内存图片')}
+                      style={{
+                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      💾 生成内存图片
+                    </button>
+                  </div>
+
+                  <p style={{ 
+                    margin: 0, 
+                    color: '#666', 
+                    fontSize: '0.8rem',
+                    lineHeight: '1.4',
+                    textAlign: 'center'
+                  }}>
+                    上传照片后可以生成内存中的图片<br/>
+                    用于记录和证明送达情况
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
