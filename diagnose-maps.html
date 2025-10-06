@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Maps API Key 详细诊断</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        #map { width: 100%; height: 400px; margin: 20px 0; }
+        .log { background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Google Maps API Key 详细诊断</h1>
+    
+    <div id="status" class="status warning">正在检查API Key...</div>
+    
+    <div id="map"></div>
+    
+    <div class="log" id="log">
+        <h3>诊断日志：</h3>
+        <div id="logContent"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('logContent');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function updateStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        // 检查当前域名
+        const currentDomain = window.location.hostname;
+        log(`当前域名: ${currentDomain}`);
+        log(`当前完整URL: ${window.location.href}`);
+        
+        // 检查API Key格式
+        if (API_KEY.startsWith('AIza')) {
+            log(`✅ API Key格式正确: ${API_KEY.substring(0, 10)}...`);
+        } else {
+            log(`❌ API Key格式错误: ${API_KEY}`);
+        }
+        
+        // 尝试加载Google Maps
+        function initMap() {
+            log('✅ Google Maps API 加载成功！');
+            updateStatus('✅ Google Maps API 加载成功！', 'success');
+            
+            try {
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                    zoom: 12
+                });
+                
+                new google.maps.Marker({
+                    position: { lat: 16.8661, lng: 96.1951 },
+                    map: map,
+                    title: '仰光中心'
+                });
+                
+                log('✅ 地图初始化成功！');
+            } catch (error) {
+                log(`❌ 地图初始化失败: ${error.message}`);
+                updateStatus('❌ 地图初始化失败', 'error');
+            }
+        }
+        
+        function handleError(error) {
+            log(`❌ Google Maps API 加载失败！`);
+            log(`错误类型: ${error.type || '未知'}`);
+            log(`错误消息: ${error.message || '无详细信息'}`);
+            updateStatus('❌ Google Maps API 加载失败！请检查控制台日志', 'error');
+        }
+        
+        // 监听Google Maps加载事件
+        window.gm_authFailure = function() {
+            log('❌ Google Maps 认证失败 - API Key可能无效或受限');
+            updateStatus('❌ API Key认证失败', 'error');
+        };
+        
+        // 加载Google Maps脚本
+        log('正在加载Google Maps脚本...');
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = handleError;
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
+

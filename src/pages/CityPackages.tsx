@@ -1115,7 +1115,7 @@ const CityPackages: React.FC = () => {
               marginBottom: '20px'
             }}>
               <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF' }}>
-                客户下单二维码
+                客户下单条形码
               </h3>
               <div style={{
                 background: 'white',
@@ -1128,8 +1128,8 @@ const CityPackages: React.FC = () => {
                 minHeight: '200px'
               }}>
                 <div style={{
-                  width: '180px',
-                  height: '180px',
+                  width: '300px',
+                  height: '120px',
                   background: '#f8f9fa',
                   border: '2px dashed #2c5282',
                   borderRadius: '10px',
@@ -1139,10 +1139,42 @@ const CityPackages: React.FC = () => {
                   alignItems: 'center',
                   color: '#2c5282',
                   fontSize: '14px',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  position: 'relative'
                 }}>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
-                  <div>二维码</div>
+                  {/* 条形码样式 */}
+                  <div style={{
+                    width: '250px',
+                    height: '60px',
+                    background: 'white',
+                    border: '1px solid #2c5282',
+                    borderRadius: '5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '10px',
+                    position: 'relative'
+                  }}>
+                    {/* 模拟条形码线条 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      height: '40px'
+                    }}>
+                      {Array.from({ length: 20 }, (_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            width: i % 3 === 0 ? '3px' : '1px',
+                            height: i % 4 === 0 ? '40px' : '30px',
+                            backgroundColor: '#2c5282',
+                            borderRadius: '1px'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                   <div style={{ fontSize: '12px', marginTop: '4px' }}>
                     {selectedPackage.id}
                   </div>
@@ -1154,9 +1186,9 @@ const CityPackages: React.FC = () => {
                 fontSize: '0.9rem',
                 lineHeight: '1.5'
               }}>
-                客户下单时生成的二维码<br/>
+                客户下单时生成的条形码<br/>
                 快递员可扫描此码进行取件<br/>
-                请妥善保管此二维码
+                请妥善保管此条形码
               </p>
             </div>
           </div>
@@ -1311,7 +1343,7 @@ const CityPackages: React.FC = () => {
                 请将二维码放入扫描框内
               </p>
 
-              {/* 送件二维码 */}
+              {/* 送件条形码 */}
               <div style={{
                 background: 'white',
                 padding: '20px',
@@ -1319,11 +1351,11 @@ const CityPackages: React.FC = () => {
                 marginBottom: '15px'
               }}>
                 <h4 style={{ margin: '0 0 15px 0', color: '#27ae60', fontSize: '1.1rem' }}>
-                  送件二维码
+                  送件条形码
                 </h4>
                 <div style={{
-                  width: '150px',
-                  height: '150px',
+                  width: '250px',
+                  height: '100px',
                   background: '#f8f9fa',
                   border: '2px dashed #27ae60',
                   borderRadius: '10px',
@@ -1334,10 +1366,42 @@ const CityPackages: React.FC = () => {
                   color: '#27ae60',
                   fontSize: '14px',
                   fontWeight: '500',
-                  margin: '0 auto 15px auto'
+                  margin: '0 auto 15px auto',
+                  position: 'relative'
                 }}>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
-                  <div>送件码</div>
+                  {/* 送件条形码样式 */}
+                  <div style={{
+                    width: '200px',
+                    height: '50px',
+                    background: 'white',
+                    border: '1px solid #27ae60',
+                    borderRadius: '5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '8px',
+                    position: 'relative'
+                  }}>
+                    {/* 模拟送件条形码线条 */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      height: '35px'
+                    }}>
+                      {Array.from({ length: 15 }, (_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            width: i % 2 === 0 ? '2px' : '1px',
+                            height: i % 3 === 0 ? '35px' : '25px',
+                            backgroundColor: '#27ae60',
+                            borderRadius: '1px'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                   <div style={{ fontSize: '12px', marginTop: '4px' }}>
                     {selectedPackage.id}
                   </div>
