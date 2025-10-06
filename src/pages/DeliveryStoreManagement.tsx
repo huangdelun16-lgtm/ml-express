@@ -146,7 +146,7 @@ const DeliveryStoreManagement: React.FC = () => {
       latitude: store.latitude.toString(),
       longitude: store.longitude.toString(),
       phone: store.phone,
-      email: store.email,
+      email: store.email || '',
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
       store_type: store.store_type,
@@ -235,13 +235,13 @@ const DeliveryStoreManagement: React.FC = () => {
     
     if (isEditing && editingStore) {
       // 编辑模式
-      const result = await deliveryStoreService.updateStore(editingStore.id, {
+      const result = await deliveryStoreService.updateStore(editingStore.id!, {
         ...formData,
         latitude: Number(formData.latitude),
         longitude: Number(formData.longitude),
         service_area_radius: Number(formData.service_area_radius),
         capacity: Number(formData.capacity),
-        updated_by: currentUser
+        updated_at: new Date().toISOString()
       });
 
       if (result) {
