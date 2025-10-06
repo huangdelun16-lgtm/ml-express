@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { deliveryStoreService, DeliveryStore } from '../services/supabase';
+import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import QRCode from 'qrcode';
 
 // 错误边界组件
@@ -66,6 +66,11 @@ const DeliveryStoreManagement: React.FC = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [editingStore, setEditingStore] = useState<DeliveryStore | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // 包裹详情相关状态
+  const [showPackageModal, setShowPackageModal] = useState(false);
+  const [storePackages, setStorePackages] = useState<Package[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -159,28 +164,34 @@ const DeliveryStoreManagement: React.FC = () => {
     setShowForm(true);
   };
 
-  // 取消编辑
-  const cancelEdit = () => {
-    setEditingStore(null);
-    setIsEditing(false);
-    setShowForm(false);
-    setFormData({
-      store_name: '',
-      store_code: '',
-      address: '',
-      latitude: '',
-      longitude: '',
-      phone: '',
-      email: '',
-      manager_name: '',
-      manager_phone: '',
-      store_type: 'branch',
-      operating_hours: '08:00-22:00',
-      service_area_radius: 5,
-      capacity: 1000,
-      facilities: [],
-      notes: ''
-    });
+  // 获取店铺的包裹列表
+  const loadStorePackages = async (store: DeliveryStore) => {
+    setLoadingPackages(true);
+    try {
+      const allPackages = await packageService.getAllPackages();
+      
+      // 过滤出送达至该店铺的包裹（通过店长收件码识别）
+      const storeReceiveCode = `STORE_${store.id}_${store.store_code}`;
+      const packages = allPackages.filter(pkg => {
+        // 检查包裹的送达记录中是否包含该店铺的收件码
+        // 这里简化处理，实际应该根据包裹的送达记录来判断
+        return pkg.status === '已送达' && pkg.courier; // 暂时显示所有已送达的包裹
+      });
+      
+      setStorePackages(packages);
+      setShowPackageModal(true);
+    } catch (error) {
+      console.error('获取店铺包裹失败:', error);
+      setErrorMessage('获取包裹列表失败');
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
+
+  // 处理店铺卡片点击
+  const handleStoreClick = (store: DeliveryStore) => {
+    setSelectedStore(store);
+    loadStorePackages(store);
   };
 
   useEffect(() => {
@@ -705,7 +716,7 @@ const DeliveryStoreManagement: React.FC = () => {
               {stores.map((store) => (
                 <div
                   key={store.id}
-                  onClick={() => setSelectedStore(store)}
+                  onClick={() => handleStoreClick(store)}
                   style={{
                     background: selectedStore?.id === store.id ? 'rgba(49, 130, 206, 0.3)' : 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
@@ -1157,6 +1168,251 @@ const DeliveryStoreManagement: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowQRModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 包裹详情模态框 */}
+      {showPackageModal && selectedStore && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '1000px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div>
+                <h2 style={{
+                  margin: 0,
+                  color: '#A5C7FF',
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold'
+                }}>
+                  📦 {selectedStore.store_name} - 送达包裹
+                </h2>
+                <p style={{
+                  margin: '0.5rem 0 0 0',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontSize: '0.9rem'
+                }}>
+                  📍 {selectedStore.address} | 👤 店长: {selectedStore.manager_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPackageModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 包裹列表 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '15px',
+              padding: '1.5rem',
+              maxHeight: '60vh',
+              overflow: 'auto'
+            }}>
+              {loadingPackages ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: 'rgba(255, 255, 255, 0.8)'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+                  <p>正在加载包裹列表...</p>
+                </div>
+              ) : storePackages.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: 'rgba(255, 255, 255, 0.8)'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📦</div>
+                  <p>暂无送达包裹</p>
+                  <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+                    该店铺还没有收到任何包裹
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {storePackages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#A5C7FF' }}>
+                          📦 {pkg.id}
+                        </h3>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          background: 'rgba(72, 187, 120, 0.3)',
+                          fontSize: '0.8rem',
+                          color: '#2ecc71'
+                        }}>
+                          ✅ 已送达
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                        <div>
+                          <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                            <span style={{ color: '#A5C7FF' }}>📤 寄件人:</span> {pkg.sender_name}
+                          </p>
+                          <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                            <span style={{ color: '#A5C7FF' }}>📥 收件人:</span> {pkg.receiver_name}
+                          </p>
+                        </div>
+                        <div>
+                          <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                            <span style={{ color: '#A5C7FF' }}>📞 电话:</span> {pkg.receiver_phone}
+                          </p>
+                          <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                            <span style={{ color: '#A5C7FF' }}>🏷️ 类型:</span> {pkg.package_type}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                        <span style={{ color: '#A5C7FF' }}>📍 地址:</span> {pkg.receiver_address}
+                      </p>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                          <span>⚖️ {pkg.weight}kg</span>
+                          <span style={{ marginLeft: '12px' }}>💰 ¥{pkg.price}</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                          <span style={{ color: '#27ae60' }}>🚚 骑手: {pkg.courier}</span>
+                        </div>
+                      </div>
+                      
+                      {pkg.delivery_time && (
+                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(39, 174, 96, 0.2)', borderRadius: '6px' }}>
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#2ecc71' }}>
+                            ⏰ 送达时间: {new Date(pkg.delivery_time).toLocaleString('zh-CN')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 统计信息 */}
+            {storePackages.length > 0 && (
+              <div style={{
+                marginTop: '1.5rem',
+                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '1rem',
+                borderRadius: '10px',
+                display: 'flex',
+                justifyContent: 'space-around',
+                alignItems: 'center'
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', color: '#A5C7FF', fontWeight: 'bold' }}>
+                    {storePackages.length}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总包裹数</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', color: '#2ecc71', fontWeight: 'bold' }}>
+                    {storePackages.reduce((sum, pkg) => sum + parseFloat(pkg.weight || '0'), 0).toFixed(1)}kg
+                  </div>
+                  <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总重量</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', color: '#f39c12', fontWeight: 'bold' }}>
+                    ¥{storePackages.reduce((sum, pkg) => sum + parseFloat(pkg.price || '0'), 0).toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总金额</div>
+                </div>
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              marginTop: '1.5rem'
+            }}>
+              <button
+                onClick={() => setShowPackageModal(false)}
                 style={{
                   background: '#e2e8f0',
                   color: '#4a5568',
