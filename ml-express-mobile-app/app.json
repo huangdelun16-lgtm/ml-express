@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Market Link Express",
+    "slug": "MLExpressApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2c5282"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.marketlinkexpress.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2c5282"
+      },
+      "package": "com.marketlinkexpress.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ml-express-app"
+      }
+    }
+  }
+}

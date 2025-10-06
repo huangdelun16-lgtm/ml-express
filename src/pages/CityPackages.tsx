@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { packageService, Package, supabase, auditLogService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import QRCode from 'qrcode';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +20,24 @@ const CityPackages: React.FC = () => {
   const [showDeliveryScanModal, setShowDeliveryScanModal] = useState(false);
   const [showUploadPhotoModal, setShowUploadPhotoModal] = useState(false);
   const [deliveryScanTab, setDeliveryScanTab] = useState('pickup');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+
+  // 生成二维码
+  const generateQRCode = async (orderId: string) => {
+    try {
+      const qrCodeUrl = await QRCode.toDataURL(orderId, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#2c5282',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataUrl(qrCodeUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+    }
+  };
 
   // 加载包裹数据
   useEffect(() => {
@@ -531,6 +550,7 @@ const CityPackages: React.FC = () => {
                       onClick={() => {
                         setSelectedPackage(pkg);
                         setShowDeliveryScanModal(true);
+                        generateQRCode(pkg.id);
                       }}
                       style={{
                         background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
@@ -1255,11 +1275,11 @@ const CityPackages: React.FC = () => {
                   marginBottom: '15px'
                 }}>
                   <h4 style={{ margin: '0 0 15px 0', color: '#2c5282', fontSize: '1.1rem' }}>
-                    客户下单条形码
+                    客户下单二维码
                   </h4>
                   <div style={{
-                    width: '300px',
-                    height: '120px',
+                    width: '250px',
+                    height: '250px',
                     background: '#f8f9fa',
                     border: '2px dashed #2c5282',
                     borderRadius: '10px',
@@ -1273,40 +1293,35 @@ const CityPackages: React.FC = () => {
                     margin: '0 auto 15px auto',
                     position: 'relative'
                   }}>
-                    {/* 条形码样式 */}
-                    <div style={{
-                      width: '250px',
-                      height: '60px',
-                      background: 'white',
-                      border: '1px solid #2c5282',
-                      borderRadius: '5px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '10px',
-                      position: 'relative'
-                    }}>
-                      {/* 模拟条形码线条 */}
+                    {/* 二维码显示 */}
+                    {qrCodeDataUrl ? (
+                      <img 
+                        src={qrCodeDataUrl} 
+                        alt="订单二维码" 
+                        style={{
+                          width: '180px',
+                          height: '180px',
+                          borderRadius: '8px',
+                          boxShadow: '0 2px 8px rgba(44, 82, 130, 0.2)'
+                        }}
+                      />
+                    ) : (
                       <div style={{
+                        width: '180px',
+                        height: '180px',
+                        background: 'white',
+                        border: '1px solid #2c5282',
+                        borderRadius: '8px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '2px',
-                        height: '40px'
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        color: '#666'
                       }}>
-                        {Array.from({ length: 20 }, (_, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              width: i % 3 === 0 ? '3px' : '1px',
-                              height: i % 4 === 0 ? '40px' : '30px',
-                              backgroundColor: '#2c5282',
-                              borderRadius: '1px'
-                            }}
-                          />
-                        ))}
+                        正在生成二维码...
                       </div>
-                    </div>
-                    <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                    )}
+                    <div style={{ fontSize: '12px', marginTop: '8px', fontWeight: '600' }}>
                       {selectedPackage.id}
                     </div>
                   </div>
@@ -1316,9 +1331,9 @@ const CityPackages: React.FC = () => {
                     fontSize: '0.8rem',
                     lineHeight: '1.4'
                   }}>
-                    客户下单时生成的条形码<br/>
+                    客户下单时生成的二维码<br/>
                     快递员可扫描此码进行取件<br/>
-                    请妥善保管此条形码
+                    请妥善保管此二维码
                   </p>
                 </div>
               )}

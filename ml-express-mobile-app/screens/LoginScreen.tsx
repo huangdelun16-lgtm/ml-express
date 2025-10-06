@@ -1,0 +1,231 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform
+} from 'react-native';
+import { adminAccountService, auditLogService } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useApp } from '../contexts/AppContext';
+
+export default function LoginScreen({ navigation }: any) {
+  const { language } = useApp();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('提示', '请输入用户名和密码');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const account = await adminAccountService.login(username, password);
+      
+      if (account) {
+        // 保存用户信息
+        await AsyncStorage.setItem('currentUser', account.username);
+        await AsyncStorage.setItem('currentUserName', account.employee_name);
+        await AsyncStorage.setItem('currentUserRole', account.role);
+        
+        // 记录登录日志
+        await auditLogService.log({
+          user_id: account.username,
+          user_name: account.employee_name,
+          action_type: 'login',
+          module: 'system',
+          action_description: `移动端登录，角色：${account.role}`
+        });
+        
+        // 跳转到管理系统
+        navigation.navigate('Main');
+      } else {
+        Alert.alert('登录失败', '用户名或密码错误，或账号已被停用');
+      }
+    } catch (error) {
+      console.error('登录异常:', error);
+      Alert.alert('登录失败', '请检查网络连接');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <View style={styles.content}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>ML</Text>
+          </View>
+          <Text style={styles.title}>MARKET LINK EXPRESS</Text>
+          <Text style={styles.subtitle}>快递管理系统</Text>
+        </View>
+
+        {/* 输入框 */}
+        <View style={styles.formContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder={language === 'zh' ? '用户名' : 'Username'}
+            placeholderTextColor="#999"
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            editable={!loading}
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder={language === 'zh' ? '密码' : 'Password'}
+            placeholderTextColor="#999"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!loading}
+            onSubmitEditing={handleLogin}
+          />
+
+          {/* 登录按钮 */}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>{language === 'zh' ? '登录' : 'Login'}</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* 提示 */}
+          <Text style={styles.hint}>
+            {language === 'zh' ? '默认账号: admin / admin' : 'Default: admin / admin'}
+          </Text>
+
+          {/* 返回客户专区按钮 */}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>
+              {language === 'zh' ? '← 返回客户专区' : '← Back to Customer Zone'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#2c5282',
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 50,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#C0C0C0',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 400,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  button: {
+    backgroundColor: '#C0C0C0',
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#2C3E50',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  hint: {
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginTop: 20,
+  },
+  backButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  backButtonText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});
