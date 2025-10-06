@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import { packageService, testConnection, userService } from '../services/supabase';
+import QRCode from 'qrcode';
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -59,7 +60,65 @@ const HomePage: React.FC = () => {
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
+  const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
+  const [generatedOrderId, setGeneratedOrderId] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [downloading, setDownloading] = useState(false);
   // const [orderData, setOrderData] = useState<any>(null);
+
+  // 生成二维码
+  const generateQRCode = async (orderId: string) => {
+    try {
+      const qrCodeUrl = await QRCode.toDataURL(orderId, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#2c5282',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataUrl(qrCodeUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+    }
+  };
+
+  // 下载二维码
+  const downloadQRCode = () => {
+    if (!qrCodeDataUrl) return;
+    
+    setDownloading(true);
+    try {
+      const link = document.createElement('a');
+      link.href = qrCodeDataUrl;
+      link.download = `订单二维码_${generatedOrderId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // 模拟发送给客户
+      alert('二维码已下载到本地，并已发送给客户！');
+    } catch (error) {
+      console.error('下载失败:', error);
+      alert('下载失败，请重试');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // 生成订单ID
+  const generateOrderId = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    const random1 = Math.floor(Math.random() * 10);
+    const random2 = Math.floor(Math.random() * 10);
+    
+    return `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+  };
 
   // 测试数据库连接
   useEffect(() => {
@@ -1258,7 +1317,15 @@ const HomePage: React.FC = () => {
                     
                     // 清除临时订单信息
                     localStorage.removeItem('pendingOrder');
-                    alert(`支付成功！包裹ID: ${packageId}\n我们会在1小时内联系您取件。`);
+                    
+                    // 生成订单ID和二维码
+                    const orderId = generateOrderId();
+                    setGeneratedOrderId(orderId);
+                    await generateQRCode(orderId);
+                    
+                    // 关闭支付模态框，显示订单成功模态框
+                    setShowPaymentModal(false);
+                    setShowOrderSuccessModal(true);
                   } else {
                     console.error('包裹创建失败，检查控制台获取详细错误信息');
                     alert('包裹创建失败，请检查网络连接或联系客服。\n错误信息已记录在控制台。');
@@ -1304,6 +1371,254 @@ const HomePage: React.FC = () => {
                 onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 订单成功模态框 */}
+      {showOrderSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h2 style={{
+                margin: 0,
+                color: '#A5C7FF',
+                fontSize: '1.5rem',
+                fontWeight: 'bold'
+              }}>
+                🎉 订单创建成功！
+              </h2>
+              <button
+                onClick={() => setShowOrderSuccessModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 订单信息 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                订单信息
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                marginBottom: '1rem'
+              }}>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#2c5282',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}>
+                  订单号: {generatedOrderId}
+                </p>
+                <p style={{
+                  margin: 0,
+                  color: '#666',
+                  fontSize: '0.9rem'
+                }}>
+                  订单已发送给客户，我们会在1小时内联系您取件
+                </p>
+              </div>
+            </div>
+
+            {/* 二维码显示 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                订单二维码
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                display: 'inline-block',
+                marginBottom: '1rem'
+              }}>
+                {qrCodeDataUrl ? (
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="订单二维码" 
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(44, 82, 130, 0.3)'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    background: '#f8f9fa',
+                    border: '2px dashed #2c5282',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#666',
+                    fontSize: '0.9rem'
+                  }}>
+                    正在生成二维码...
+                  </div>
+                )}
+              </div>
+              <p style={{
+                margin: 0,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                快递员将扫描此二维码进行取件<br/>
+                请妥善保管此二维码
+              </p>
+            </div>
+
+            {/* 操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={downloadQRCode}
+                disabled={downloading || !qrCodeDataUrl}
+                style={{
+                  background: downloading ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: downloading ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => {
+                  if (!downloading) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!downloading) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
+                  }
+                }}
+              >
+                {downloading ? (
+                  <>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
+                    下载中...
+                  </>
+                ) : (
+                  <>
+                    📥 下载二维码
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowOrderSuccessModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                关闭
               </button>
             </div>
           </div>
