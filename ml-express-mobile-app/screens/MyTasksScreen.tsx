@@ -39,6 +39,7 @@ interface Package {
 
 const MyTasksScreen: React.FC = () => {
   const [packages, setPackages] = useState<Package[]>([]);
+  const [groupedPackages, setGroupedPackages] = useState<{[key: string]: Package[]}>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
@@ -59,6 +60,60 @@ const MyTasksScreen: React.FC = () => {
   // 模拟当前骑手账号，实际应该从登录状态获取
   const currentCourierName = '骑手账号';
 
+  // 按日期分组包裹
+  const groupPackagesByDate = (packages: Package[]) => {
+    const grouped: {[key: string]: Package[]} = {};
+    
+    packages.forEach(pkg => {
+      let dateKey = '';
+      
+      if (pkg.delivery_time) {
+        // 如果有送达时间，按送达时间分组
+        const deliveryDate = new Date(pkg.delivery_time);
+        dateKey = deliveryDate.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      } else if (pkg.pickup_time) {
+        // 如果有取件时间，按取件时间分组
+        const pickupDate = new Date(pkg.pickup_time);
+        dateKey = pickupDate.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      } else {
+        // 否则按创建时间分组
+        const createDate = new Date(pkg.create_time);
+        dateKey = createDate.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      }
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(pkg);
+    });
+    
+    // 按日期排序（最新的在前）
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      const dateA = new Date(a.replace(/\//g, '-'));
+      const dateB = new Date(b.replace(/\//g, '-'));
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    const sortedGrouped: {[key: string]: Package[]} = {};
+    sortedKeys.forEach(key => {
+      sortedGrouped[key] = grouped[key];
+    });
+    
+    return sortedGrouped;
+  };
+
   useEffect(() => {
     loadMyPackages();
   }, []);
@@ -68,13 +123,17 @@ const MyTasksScreen: React.FC = () => {
       setLoading(true);
       const allPackages = await packageService.getAllPackages();
       
-      // 过滤出分配给当前骑手的包裹
+      // 过滤出分配给当前骑手的包裹（包括已送达的包裹）
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === currentCourierName && 
-        (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中')
+        (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
       );
       
       setPackages(myPackages);
+      
+      // 按日期分组包裹
+      const grouped = groupPackagesByDate(myPackages);
+      setGroupedPackages(grouped);
     } catch (error) {
       console.error('加载我的任务失败:', error);
       Alert.alert('加载失败', '无法加载任务列表，请重试');
@@ -257,7 +316,7 @@ const MyTasksScreen: React.FC = () => {
                   );
                   
                   // 刷新任务列表
-                  fetchMyTasks();
+                  await loadMyPackages();
                   
                   console.log('包裹状态已更新为已送达:', selectedPackage.id);
                 }
@@ -491,15 +550,67 @@ const MyTasksScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>您当前没有分配的包裹任务</Text>
         </View>
       ) : (
-        <FlatList
-          data={packages}
-          renderItem={renderPackageItem}
-          keyExtractor={(item) => item.id}
+        <ScrollView
+          style={styles.scrollContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          contentContainerStyle={styles.listContainer}
-        />
+        >
+          {Object.keys(groupedPackages).map((dateKey) => (
+            <View key={dateKey} style={styles.dateSection}>
+              <View style={styles.dateHeader}>
+                <Text style={styles.dateTitle}>{dateKey}</Text>
+                <Text style={styles.dateSubtitle}>
+                  {groupedPackages[dateKey].length} 个包裹
+                </Text>
+              </View>
+              
+              {groupedPackages[dateKey].map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.packageCard}
+                  onPress={() => handlePackagePress(item)}
+                >
+                  <View style={styles.packageHeader}>
+                    <Text style={styles.packageId}>{item.id}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                      <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.packageInfo}>
+                    <Text style={styles.infoLabel}>收件人：</Text>
+                    <Text style={styles.infoValue}>{item.receiver_name}</Text>
+                  </View>
+                  
+                  <View style={styles.packageInfo}>
+                    <Text style={styles.infoLabel}>收件地址：</Text>
+                    <Text style={styles.infoValue}>{item.receiver_address}</Text>
+                  </View>
+                  
+                  <View style={styles.packageInfo}>
+                    <Text style={styles.infoLabel}>包裹类型：</Text>
+                    <Text style={styles.infoValue}>{item.package_type}</Text>
+                  </View>
+                  
+                  <View style={styles.packageInfo}>
+                    <Text style={styles.infoLabel}>重量：</Text>
+                    <Text style={styles.infoValue}>{item.weight}kg</Text>
+                  </View>
+                  
+                  {item.delivery_time && (
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.infoLabel}>送达时间：</Text>
+                      <Text style={styles.infoValue}>
+                        {new Date(item.delivery_time).toLocaleString('zh-CN')}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
       )}
 
       {showDetailModal && renderDetailModal()}
@@ -1126,6 +1237,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+  },
+  // 日期分组相关样式
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  dateSection: {
+    marginBottom: 24,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  dateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c5282',
+  },
+  dateSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    backgroundColor: '#f0f4f8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
 });
 
