@@ -63,6 +63,9 @@ const DeliveryStoreManagement: React.FC = () => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [editingStore, setEditingStore] = useState<DeliveryStore | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -121,6 +124,77 @@ const DeliveryStoreManagement: React.FC = () => {
     }
   };
 
+  // 打开地图选择
+  const openMapSelection = () => {
+    setShowMapModal(true);
+  };
+
+  // 地图点击处理
+  const handleMapClick = (event: any) => {
+    const lat = event.latLng.lat();
+    const lng = event.latLng.lng();
+    
+    setFormData(prev => ({
+      ...prev,
+      latitude: lat.toString(),
+      longitude: lng.toString()
+    }));
+  };
+
+  // 确认地图选择
+  const confirmMapSelection = () => {
+    setShowMapModal(false);
+    setSuccessMessage('位置已选择，请填写其他信息');
+  };
+
+  // 编辑店铺
+  const editStore = (store: DeliveryStore) => {
+    setEditingStore(store);
+    setIsEditing(true);
+    setFormData({
+      store_name: store.store_name,
+      store_code: store.store_code,
+      address: store.address,
+      latitude: store.latitude.toString(),
+      longitude: store.longitude.toString(),
+      phone: store.phone,
+      email: store.email,
+      manager_name: store.manager_name,
+      manager_phone: store.manager_phone,
+      store_type: store.store_type,
+      operating_hours: store.operating_hours,
+      service_area_radius: store.service_area_radius,
+      capacity: store.capacity,
+      facilities: store.facilities || [],
+      notes: store.notes || ''
+    });
+    setShowForm(true);
+  };
+
+  // 取消编辑
+  const cancelEdit = () => {
+    setEditingStore(null);
+    setIsEditing(false);
+    setShowForm(false);
+    setFormData({
+      store_name: '',
+      store_code: '',
+      address: '',
+      latitude: '',
+      longitude: '',
+      phone: '',
+      email: '',
+      manager_name: '',
+      manager_phone: '',
+      store_type: 'branch',
+      operating_hours: '08:00-22:00',
+      service_area_radius: 5,
+      capacity: 1000,
+      facilities: [],
+      notes: ''
+    });
+  };
+
   useEffect(() => {
     loadStores();
   }, []);
@@ -170,22 +244,45 @@ const DeliveryStoreManagement: React.FC = () => {
     }
 
     const currentUser = localStorage.getItem('currentUser') || 'admin';
-    const result = await deliveryStoreService.createStore({
-      ...formData,
-      latitude: Number(formData.latitude),
-      longitude: Number(formData.longitude),
-      service_area_radius: Number(formData.service_area_radius),
-      capacity: Number(formData.capacity),
-      created_by: currentUser
-    });
+    
+    if (isEditing && editingStore) {
+      // 编辑模式
+      const result = await deliveryStoreService.updateStore(editingStore.id, {
+        ...formData,
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
+        service_area_radius: Number(formData.service_area_radius),
+        capacity: Number(formData.capacity),
+        updated_by: currentUser
+      });
 
-    if (result) {
-      setSuccessMessage('快递店创建成功！');
-      setShowForm(false);
-      resetForm();
-      loadStores();
+      if (result) {
+        setSuccessMessage('快递店信息更新成功！');
+        setShowForm(false);
+        cancelEdit();
+        loadStores();
+      } else {
+        setErrorMessage('更新失败，请重试');
+      }
     } else {
-      setErrorMessage('创建失败，店铺代码可能已存在');
+      // 创建模式
+      const result = await deliveryStoreService.createStore({
+        ...formData,
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
+        service_area_radius: Number(formData.service_area_radius),
+        capacity: Number(formData.capacity),
+        created_by: currentUser
+      });
+
+      if (result) {
+        setSuccessMessage('快递店创建成功！');
+        setShowForm(false);
+        resetForm();
+        loadStores();
+      } else {
+        setErrorMessage('创建失败，店铺代码可能已存在');
+      }
     }
   };
 
@@ -283,7 +380,18 @@ const DeliveryStoreManagement: React.FC = () => {
             ← 返回仪表板
           </button>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (showForm) {
+                if (isEditing) {
+                  cancelEdit();
+                } else {
+                  setShowForm(false);
+                  resetForm();
+                }
+              } else {
+                setShowForm(true);
+              }
+            }}
             style={{
               background: showForm ? 'rgba(245, 101, 101, 0.8)' : 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
               color: 'white',
@@ -294,7 +402,7 @@ const DeliveryStoreManagement: React.FC = () => {
               boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)'
             }}
           >
-            {showForm ? '取消' : '+ 新增快递店'}
+            {showForm ? (isEditing ? '取消编辑' : '取消') : '+ 新增快递店'}
           </button>
         </div>
       </div>
@@ -326,7 +434,9 @@ const DeliveryStoreManagement: React.FC = () => {
             marginBottom: '20px'
           }}
         >
-          <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>新增快递店</h2>
+          <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>
+            {isEditing ? '编辑快递店' : '新增快递店'}
+          </h2>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               <div>
@@ -521,31 +631,48 @@ const DeliveryStoreManagement: React.FC = () => {
               />
             </div>
 
-            {/* Google Maps 地图选择位置 */}
+            {/* 地图位置选择按钮 */}
             <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>地图位置选择</label>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '10px' }}>
-                点击地图选择位置，或手动输入经纬度
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                <button
+                  type="button"
+                  onClick={openMapSelection}
+                  style={{
+                    background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(44, 82, 130, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(44, 82, 130, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 82, 130, 0.3)';
+                  }}
+                >
+                  🗺️ 选择地图位置
+                </button>
+                {formData.latitude && formData.longitude && (
+                  <span style={{ color: '#27ae60', fontSize: '0.9rem', fontWeight: '500' }}>
+                    ✅ 位置已选择 ({formData.latitude}, {formData.longitude})
+                  </span>
+                )}
+              </div>
+              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
+                点击按钮打开地图窗口，在地图上点击选择位置
               </p>
-              <ErrorBoundary>
-                <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={mapCenter}
-                    zoom={12}
-                    onClick={handleMapClick}
-                  >
-                    {formData.latitude && formData.longitude && (
-                      <Marker
-                        position={{
-                          lat: Number(formData.latitude),
-                          lng: Number(formData.longitude)
-                        }}
-                      />
-                    )}
-                  </GoogleMap>
-                </LoadScript>
-              </ErrorBoundary>
             </div>
 
             <button
@@ -562,7 +689,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 boxShadow: '0 6px 16px rgba(56, 161, 105, 0.3)'
               }}
             >
-              创建快递店
+              {isEditing ? '更新快递店' : '创建快递店'}
             </button>
           </form>
         </div>
@@ -662,6 +789,37 @@ const DeliveryStoreManagement: React.FC = () => {
                       }}
                     >
                       📱 店长收件码
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        editStore(store);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 6px rgba(44, 82, 130, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(44, 82, 130, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(44, 82, 130, 0.3)';
+                      }}
+                    >
+                      ✏️ 编辑
                     </button>
                   </div>
                 </div>
@@ -957,6 +1115,214 @@ const DeliveryStoreManagement: React.FC = () => {
                 onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 地图选择模态框 */}
+      {showMapModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h2 style={{
+                margin: 0,
+                color: '#A5C7FF',
+                fontSize: '1.5rem',
+                fontWeight: 'bold'
+              }}>
+                🗺️ 选择店铺位置
+              </h2>
+              <button
+                onClick={() => setShowMapModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 地图说明 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1rem',
+              borderRadius: '10px',
+              marginBottom: '1.5rem'
+            }}>
+              <p style={{
+                margin: 0,
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                📍 在地图上点击选择店铺位置<br/>
+                🎯 点击后会自动设置经纬度坐标<br/>
+                ✅ 选择完成后点击"确认位置"按钮
+              </p>
+            </div>
+
+            {/* 地图容器 */}
+            <div style={{
+              width: '100%',
+              height: '400px',
+              borderRadius: '15px',
+              overflow: 'hidden',
+              marginBottom: '1.5rem',
+              border: '2px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <ErrorBoundary>
+                <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={mapCenter}
+                    zoom={12}
+                    onClick={handleMapClick}
+                  >
+                    {formData.latitude && formData.longitude && (
+                      <Marker
+                        position={{
+                          lat: Number(formData.latitude),
+                          lng: Number(formData.longitude)
+                        }}
+                      />
+                    )}
+                  </GoogleMap>
+                </LoadScript>
+              </ErrorBoundary>
+            </div>
+
+            {/* 位置信息 */}
+            {formData.latitude && formData.longitude && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '1rem',
+                borderRadius: '10px',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#A5C7FF',
+                  fontSize: '1.1rem'
+                }}>
+                  已选择位置
+                </h3>
+                <p style={{
+                  margin: 0,
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '0.9rem'
+                }}>
+                  纬度: {formData.latitude}<br/>
+                  经度: {formData.longitude}
+                </p>
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={confirmMapSelection}
+                disabled={!formData.latitude || !formData.longitude}
+                style={{
+                  background: (!formData.latitude || !formData.longitude) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: (!formData.latitude || !formData.longitude) ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => {
+                  if (formData.latitude && formData.longitude) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (formData.latitude && formData.longitude) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
+                  }
+                }}
+              >
+                ✅ 确认位置
+              </button>
+              <button
+                onClick={() => setShowMapModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                取消
               </button>
             </div>
           </div>
