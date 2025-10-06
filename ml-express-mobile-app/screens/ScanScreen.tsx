@@ -43,6 +43,12 @@ export default function ScanScreen({ navigation }: any) {
 
   const searchPackage = async (packageId: string) => {
     try {
+      // 检查是否是店长收件码
+      if (packageId.startsWith('STORE_')) {
+        await handleStoreReceiveCode(packageId);
+        return;
+      }
+
       const packages = await packageService.getAllPackages();
       const foundPackage = packages.find(p => p.id === packageId);
 
@@ -86,6 +92,34 @@ export default function ScanScreen({ navigation }: any) {
       }
     } catch (error) {
       Alert.alert('错误', '查询包裹失败', [
+        { text: '确定', onPress: () => setScanned(false) }
+      ]);
+    }
+  };
+
+  const handleStoreReceiveCode = async (receiveCode: string) => {
+    try {
+      // 解析收件码: STORE_{store_id}_{store_code}
+      const parts = receiveCode.split('_');
+      if (parts.length !== 3) {
+        Alert.alert('收件码格式错误', '无法识别此收件码', [
+          { text: '确定', onPress: () => setScanned(false) }
+        ]);
+        return;
+      }
+
+      const storeId = parts[1];
+      const storeCode = parts[2];
+
+      Alert.alert(
+        '店长收件码',
+        `店铺代码：${storeCode}\n收件码：${receiveCode}\n\n骑手送件时必须扫描此码确认送达`,
+        [
+          { text: '确定', onPress: () => setScanned(false) }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('错误', '处理收件码失败', [
         { text: '确定', onPress: () => setScanned(false) }
       ]);
     }

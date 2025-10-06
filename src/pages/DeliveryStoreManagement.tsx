@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore } from '../services/supabase';
+import QRCode from 'qrcode';
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -59,6 +60,9 @@ const DeliveryStoreManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<DeliveryStore | null>(null);
   const [mapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 曼德勒中心
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -77,6 +81,45 @@ const DeliveryStoreManagement: React.FC = () => {
     facilities: [] as string[],
     notes: ''
   });
+
+  // 生成店长收件码二维码
+  const generateStoreQRCode = async (store: DeliveryStore) => {
+    try {
+      // 生成唯一的收件码
+      const receiveCode = `STORE_${store.id}_${store.store_code}`;
+      const qrCodeUrl = await QRCode.toDataURL(receiveCode, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#2c5282',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataUrl(qrCodeUrl);
+      setCurrentStoreQR(store);
+      setShowQRModal(true);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+      setErrorMessage('生成二维码失败');
+    }
+  };
+
+  // 下载二维码
+  const downloadQRCode = () => {
+    if (!qrCodeDataUrl || !currentStoreQR) return;
+    
+    try {
+      const link = document.createElement('a');
+      link.href = qrCodeDataUrl;
+      link.download = `店长收件码_${currentStoreQR.store_name}_${currentStoreQR.store_code}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('下载失败:', error);
+      setErrorMessage('下载失败，请重试');
+    }
+  };
 
   useEffect(() => {
     loadStores();
@@ -588,6 +631,39 @@ const DeliveryStoreManagement: React.FC = () => {
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
                   </div>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateStoreQRCode(store);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 6px rgba(39, 174, 96, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(39, 174, 96, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(39, 174, 96, 0.3)';
+                      }}
+                    >
+                      📱 店长收件码
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -638,6 +714,254 @@ const DeliveryStoreManagement: React.FC = () => {
           </ErrorBoundary>
         </div>
       </div>
+
+      {/* 店长收件码二维码模态框 */}
+      {showQRModal && currentStoreQR && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h2 style={{
+                margin: 0,
+                color: '#A5C7FF',
+                fontSize: '1.5rem',
+                fontWeight: 'bold'
+              }}>
+                📱 店长收件码
+              </h2>
+              <button
+                onClick={() => setShowQRModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 店铺信息 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                店铺信息
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                marginBottom: '1rem'
+              }}>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#2c5282',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}>
+                  店铺名称: {currentStoreQR.store_name}
+                </p>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#2c5282',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}>
+                  店铺代码: {currentStoreQR.store_code}
+                </p>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#666',
+                  fontSize: '0.9rem'
+                }}>
+                  地址: {currentStoreQR.address}
+                </p>
+                <p style={{
+                  margin: 0,
+                  color: '#666',
+                  fontSize: '0.9rem'
+                }}>
+                  店长: {currentStoreQR.manager_name} ({currentStoreQR.manager_phone})
+                </p>
+              </div>
+            </div>
+
+            {/* 二维码显示 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                收件码二维码
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                display: 'inline-block',
+                marginBottom: '1rem'
+              }}>
+                {qrCodeDataUrl ? (
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="店长收件码" 
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(44, 82, 130, 0.3)'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    background: '#f8f9fa',
+                    border: '2px dashed #2c5282',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#666',
+                    fontSize: '0.9rem'
+                  }}>
+                    正在生成二维码...
+                  </div>
+                )}
+              </div>
+              <p style={{
+                margin: 0,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                骑手送件时必须扫描此二维码<br/>
+                确认包裹送达至该店铺<br/>
+                请妥善保管此收件码
+              </p>
+            </div>
+
+            {/* 操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={downloadQRCode}
+                disabled={!qrCodeDataUrl}
+                style={{
+                  background: !qrCodeDataUrl ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: !qrCodeDataUrl ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
+                  }
+                }}
+              >
+                📥 下载收件码
+              </button>
+              <button
+                onClick={() => setShowQRModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
