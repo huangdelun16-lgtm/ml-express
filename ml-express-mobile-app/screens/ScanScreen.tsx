@@ -47,20 +47,38 @@ export default function ScanScreen({ navigation }: any) {
       const foundPackage = packages.find(p => p.id === packageId);
 
       if (foundPackage) {
-        Alert.alert(
-          '找到包裹！',
-          `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}`,
-          [
-            { text: '取消', onPress: () => setScanned(false) },
-            {
-              text: '查看详情',
-              onPress: () => {
-                navigation.navigate('PackageDetail', { package: foundPackage });
-                setScanned(false);
+        // 检查包裹状态
+        if (foundPackage.status === '已取件') {
+          Alert.alert(
+            '包裹已取件',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
+            [
+              { text: '确定', onPress: () => setScanned(false) }
+            ]
+          );
+        } else if (foundPackage.status === '待取件') {
+          Alert.alert(
+            '确认取件',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n是否确认取件？`,
+            [
+              { text: '取消', onPress: () => setScanned(false) },
+              {
+                text: '确认取件',
+                onPress: async () => {
+                  await confirmPickup(foundPackage);
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        } else {
+          Alert.alert(
+            '包裹状态异常',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
+            [
+              { text: '确定', onPress: () => setScanned(false) }
+            ]
+          );
+        }
       } else {
         Alert.alert('未找到', '该包裹不存在或未分配给你', [
           { text: '确定', onPress: () => setScanned(false) }
@@ -68,6 +86,35 @@ export default function ScanScreen({ navigation }: any) {
       }
     } catch (error) {
       Alert.alert('错误', '查询包裹失败', [
+        { text: '确定', onPress: () => setScanned(false) }
+      ]);
+    }
+  };
+
+  const confirmPickup = async (packageData: any) => {
+    try {
+      const pickupTime = new Date().toLocaleString('zh-CN');
+      const success = await packageService.updatePackageStatus(
+        packageData.id,
+        '已取件',
+        pickupTime
+      );
+
+      if (success) {
+        Alert.alert(
+          '取件成功！',
+          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}`,
+          [
+            { text: '确定', onPress: () => setScanned(false) }
+          ]
+        );
+      } else {
+        Alert.alert('取件失败', '更新包裹状态失败，请重试', [
+          { text: '确定', onPress: () => setScanned(false) }
+        ]);
+      }
+    } catch (error) {
+      Alert.alert('取件失败', '网络错误，请重试', [
         { text: '确定', onPress: () => setScanned(false) }
       ]);
     }

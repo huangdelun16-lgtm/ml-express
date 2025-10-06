@@ -42,6 +42,13 @@ const CityPackages: React.FC = () => {
   // 加载包裹数据
   useEffect(() => {
     loadPackages();
+    
+    // 设置定时刷新，每30秒刷新一次包裹状态
+    const refreshInterval = setInterval(() => {
+      loadPackages();
+    }, 30000);
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const loadPackages = async () => {
@@ -305,13 +312,44 @@ const CityPackages: React.FC = () => {
         position: 'relative',
         zIndex: 1
       }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
-          </h1>
-          <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+              {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
+            </h1>
+            <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+              {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
+            </p>
+          </div>
+          <button
+            onClick={loadPackages}
+            style={{
+              background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)',
+              transition: 'all 0.3s ease',
+              textShadow: 'none'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
+            }}
+          >
+            🔄 {language === 'zh' ? '刷新状态' : 'Refresh Status'}
+          </button>
         </div>
         <button
           onClick={() => navigate('/admin/dashboard')}
