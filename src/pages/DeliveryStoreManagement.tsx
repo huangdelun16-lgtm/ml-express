@@ -129,18 +129,6 @@ const DeliveryStoreManagement: React.FC = () => {
     setShowMapModal(true);
   };
 
-  // 地图点击处理
-  const handleMapClick = (event: any) => {
-    const lat = event.latLng.lat();
-    const lng = event.latLng.lng();
-    
-    setFormData(prev => ({
-      ...prev,
-      latitude: lat.toString(),
-      longitude: lng.toString()
-    }));
-  };
-
   // 确认地图选择
   const confirmMapSelection = () => {
     setShowMapModal(false);
