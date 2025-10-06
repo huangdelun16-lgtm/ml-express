@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -56,6 +56,7 @@ const MyTasksScreen: React.FC = () => {
   const [showScanModal, setShowScanModal] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scannedData, setScannedData] = useState<string | null>(null);
+  const scannedOnce = useRef(false); // 跟踪是否已经扫描过一次
 
   // 模拟当前骑手账号，实际应该从登录状态获取
   const currentCourierName = '骑手账号';
@@ -287,6 +288,14 @@ const MyTasksScreen: React.FC = () => {
 
   // 扫码功能处理函数
   const handleScanCode = (data: string) => {
+    // 如果已经扫描过一次，直接返回，避免重复扫描
+    if (scannedOnce.current) {
+      return;
+    }
+    
+    // 标记已经扫描过一次
+    scannedOnce.current = true;
+    
     setScannedData(data);
     setScanning(false);
     setShowScanModal(false);
@@ -348,11 +357,13 @@ const MyTasksScreen: React.FC = () => {
   const handleStartScan = () => {
     setScanning(true);
     setScannedData(null);
+    scannedOnce.current = false; // 重置扫描状态，允许新的扫描
   };
 
   const handleStopScan = () => {
     setScanning(false);
     setShowScanModal(false);
+    scannedOnce.current = false; // 重置扫描状态，为下次扫描做准备
   };
 
   const renderPackageItem = ({ item }: { item: Package }) => (
