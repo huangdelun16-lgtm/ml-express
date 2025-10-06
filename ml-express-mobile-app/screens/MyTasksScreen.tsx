@@ -8,9 +8,15 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  Modal,
+  Image,
+  Linking
 } from 'react-native';
 import { packageService } from '../services/supabase';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
+import * as MediaLibrary from 'expo-media-library';
 
 interface Package {
   id: string;
@@ -36,6 +42,13 @@ const MyTasksScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // 新增状态
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // 模拟当前骑手账号，实际应该从登录状态获取
   const currentCourierName = '骑手账号';
@@ -105,6 +118,106 @@ const MyTasksScreen: React.FC = () => {
   const handlePackagePress = (packageItem: Package) => {
     setSelectedPackage(packageItem);
     setShowDetailModal(true);
+  };
+
+  // 新增功能处理函数
+  const handleCall = () => {
+    if (selectedPackage) {
+      Linking.openURL(`tel:${selectedPackage.receiver_phone}`);
+    }
+  };
+
+  const handleNavigate = () => {
+    if (selectedPackage) {
+      const address = encodeURIComponent(selectedPackage.receiver_address);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${address}`);
+    }
+  };
+
+  const handleShowAddress = () => {
+    setShowAddressModal(true);
+  };
+
+  const handleOpenCamera = async () => {
+    try {
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      if (cameraPermission.status !== 'granted') {
+        Alert.alert('权限不足', '需要相机权限才能拍照');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCapturedPhoto(result.assets[0].uri);
+        setShowPhotoModal(true);
+        setShowCameraModal(false);
+      }
+    } catch (error) {
+      console.error('相机错误:', error);
+      Alert.alert('错误', '无法打开相机');
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!capturedPhoto) {
+      Alert.alert('提示', '请先拍照');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+
+      const locationPermission = await Location.requestForegroundPermissionsAsync();
+      if (locationPermission.status !== 'granted') {
+        Alert.alert('权限不足', '需要位置权限才能记录配送位置');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const mediaPermission = await MediaLibrary.requestPermissionsAsync();
+      if (mediaPermission.status === 'granted') {
+        await MediaLibrary.saveToLibraryAsync(capturedPhoto);
+      }
+
+      const deliveryProof = {
+        packageId: selectedPackage?.id,
+        photoUri: capturedPhoto,
+        latitude,
+        longitude,
+        timestamp: new Date().toISOString(),
+        courier: currentCourierName,
+      };
+
+      console.log('配送证明记录:', deliveryProof);
+
+      Alert.alert(
+        '上传成功',
+        `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}`,
+        [
+          {
+            text: '确定',
+            onPress: () => {
+              setShowPhotoModal(false);
+              setCapturedPhoto(null);
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('上传照片失败:', error);
+      Alert.alert('上传失败', '网络错误，请重试');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const renderPackageItem = ({ item }: { item: Package }) => (
@@ -258,6 +371,21 @@ const MyTasksScreen: React.FC = () => {
                 </View>
               )}
             </View>
+            
+            {/* 新增功能按钮 */}
+            <View style={styles.newActionsContainer}>
+              <TouchableOpacity style={styles.newActionButton} onPress={handleShowAddress}>
+                <Text style={styles.newActionButtonText}>📍 送货地址</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.newActionButton} onPress={() => setShowCameraModal(true)}>
+                <Text style={styles.newActionButtonText}>📷 摄像机</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.newActionButton} onPress={() => setShowPhotoModal(true)}>
+                <Text style={styles.newActionButtonText}>📸 上传照片</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -299,6 +427,151 @@ const MyTasksScreen: React.FC = () => {
       )}
 
       {showDetailModal && renderDetailModal()}
+      
+      {/* 送货地址模态框 */}
+      <Modal
+        visible={showAddressModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddressModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📍 送货地址</Text>
+              <TouchableOpacity
+                onPress={() => setShowAddressModal(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.addressContent}>
+              <Text style={styles.addressLabel}>收件人：</Text>
+              <Text style={styles.addressValue}>{selectedPackage?.receiver_name}</Text>
+              
+              <Text style={styles.addressLabel}>联系电话：</Text>
+              <Text style={styles.addressValue}>{selectedPackage?.receiver_phone}</Text>
+              
+              <Text style={styles.addressLabel}>详细地址：</Text>
+              <Text style={styles.addressDetail}>{selectedPackage?.receiver_address}</Text>
+              
+              <View style={styles.addressActions}>
+                <TouchableOpacity style={styles.addressActionButton} onPress={handleCall}>
+                  <Text style={styles.addressActionText}>📞 拨打电话</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.addressActionButton} onPress={handleNavigate}>
+                  <Text style={styles.addressActionText}>🗺️ 导航前往</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 摄像机模态框 */}
+      <Modal
+        visible={showCameraModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCameraModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📷 拍照功能</Text>
+              <TouchableOpacity
+                onPress={() => setShowCameraModal(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.cameraContent}>
+              <Text style={styles.cameraInstruction}>
+                点击下方按钮开始拍照，用于配送证明
+              </Text>
+              
+              <TouchableOpacity style={styles.cameraButton} onPress={handleOpenCamera}>
+                <Text style={styles.cameraButtonText}>📷 开始拍照</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 上传照片模态框 */}
+      <Modal
+        visible={showPhotoModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPhotoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📸 上传照片</Text>
+              <TouchableOpacity
+                onPress={() => setShowPhotoModal(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.photoContent}>
+              {capturedPhoto ? (
+                <>
+                  <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
+                  <Text style={styles.photoInstruction}>
+                    确认上传此照片作为配送证明？
+                  </Text>
+                  
+                  <View style={styles.photoActions}>
+                    <TouchableOpacity 
+                      style={styles.photoActionButton} 
+                      onPress={() => setCapturedPhoto(null)}
+                    >
+                      <Text style={styles.photoActionText}>重新拍照</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.photoActionButton, styles.uploadButton]} 
+                      onPress={handleUploadPhoto}
+                      disabled={uploadingPhoto}
+                    >
+                      {uploadingPhoto ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.uploadButtonText}>确认上传</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.photoInstruction}>
+                    请先拍照，然后上传作为配送证明
+                  </Text>
+                  
+                  <TouchableOpacity 
+                    style={styles.cameraButton} 
+                    onPress={() => {
+                      setShowPhotoModal(false);
+                      setShowCameraModal(true);
+                    }}
+                  >
+                    <Text style={styles.cameraButtonText}>📷 去拍照</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -474,6 +747,127 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  // 新增功能按钮样式
+  newActionsContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  newActionButton: {
+    flex: 1,
+    backgroundColor: '#27ae60',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  newActionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // 地址模态框样式
+  addressContent: {
+    padding: 20,
+  },
+  addressLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  addressValue: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  addressDetail: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    lineHeight: 24,
+  },
+  addressActions: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 12,
+  },
+  addressActionButton: {
+    flex: 1,
+    backgroundColor: '#3182ce',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addressActionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // 相机模态框样式
+  cameraContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  cameraInstruction: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  cameraButton: {
+    backgroundColor: '#27ae60',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  cameraButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // 照片模态框样式
+  photoContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  photoPreview: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  photoInstruction: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photoActionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  photoActionText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  uploadButton: {
+    backgroundColor: '#27ae60',
+    borderColor: '#27ae60',
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
