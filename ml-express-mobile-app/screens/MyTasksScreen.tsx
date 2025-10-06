@@ -232,21 +232,58 @@ const MyTasksScreen: React.FC = () => {
     setScanning(false);
     setShowScanModal(false);
     
-    // 处理扫码结果
-    Alert.alert(
-      '扫码成功',
-      `扫描结果: ${data}`,
-      [
-        {
-          text: '确定',
-          onPress: () => {
-            // 这里可以根据扫码结果进行相应处理
-            // 比如更新包裹状态、记录配送信息等
-            console.log('扫码结果:', data);
+    // 检查是否是店长收件码
+    if (data.startsWith('STORE_')) {
+      // 解析店长收件码
+      const storeInfo = data.replace('STORE_', '');
+      const [storeId, storeName] = storeInfo.split('_');
+      
+      Alert.alert(
+        '✅ 已送达',
+        `包裹已成功送达至：\n\n🏪 店铺：${storeName}\n📦 包裹ID：${selectedPackage?.id}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
+        [
+          {
+            text: '确定',
+            onPress: async () => {
+              try {
+                // 更新包裹状态为"已送达"
+                if (selectedPackage) {
+                  await packageService.updatePackageStatus(
+                    selectedPackage.id, 
+                    '已送达',
+                    undefined, // pickupTime
+                    new Date().toISOString(), // deliveryTime
+                    currentCourierName
+                  );
+                  
+                  // 刷新任务列表
+                  fetchMyTasks();
+                  
+                  console.log('包裹状态已更新为已送达:', selectedPackage.id);
+                }
+              } catch (error) {
+                console.error('更新包裹状态失败:', error);
+                Alert.alert('错误', '更新包裹状态失败，请重试');
+              }
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } else {
+      // 处理其他类型的扫码结果
+      Alert.alert(
+        '扫码成功',
+        `扫描结果: ${data}`,
+        [
+          {
+            text: '确定',
+            onPress: () => {
+              console.log('扫码结果:', data);
+            }
+          }
+        ]
+      );
+    }
   };
 
   const handleStartScan = () => {
