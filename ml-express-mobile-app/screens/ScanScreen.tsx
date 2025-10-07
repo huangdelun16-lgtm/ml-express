@@ -19,6 +19,9 @@ export default function ScanScreen({ navigation }: any) {
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // 添加处理状态
+  const scannedDataRef = useRef<string | null>(null); // 添加ref来跟踪已扫描的数据
+  const lastScanTimeRef = useRef<number>(0); // 添加时间戳防止快速重复扫描
 
   // 加载当前骑手信息 - 必须在所有条件渲染之前
   useEffect(() => {
@@ -34,6 +37,15 @@ export default function ScanScreen({ navigation }: any) {
     } catch (error) {
       console.error('加载骑手信息失败:', error);
     }
+  };
+
+  // 重置扫描状态
+  const resetScanState = () => {
+    console.log('重置扫描状态');
+    setScanned(false);
+    setIsProcessing(false);
+    scannedDataRef.current = null;
+    lastScanTimeRef.current = 0; // 重置时间戳
   };
 
   // 检查相机权限状态
@@ -76,9 +88,41 @@ export default function ScanScreen({ navigation }: any) {
   }
 
   const handleBarCodeScanned = async ({ data }: any) => {
-    if (scanned) return;
+    const currentTime = Date.now();
+    
+    // 多重检查防止重复扫描
+    if (scanned || isProcessing) {
+      console.log('扫描被阻止：已扫描或正在处理中');
+      return;
+    }
+    
+    // 检查是否扫描了相同的数据
+    if (scannedDataRef.current === data) {
+      console.log('扫描被阻止：相同数据已处理');
+      return;
+    }
+    
+    // 防抖：如果距离上次扫描时间少于2秒，忽略
+    if (currentTime - lastScanTimeRef.current < 2000) {
+      console.log('扫描被阻止：防抖保护');
+      return;
+    }
+    
+    console.log('开始处理扫描数据:', data);
+    
+    // 设置处理状态和时间戳
     setScanned(true);
-    await searchPackage(data);
+    setIsProcessing(true);
+    scannedDataRef.current = data;
+    lastScanTimeRef.current = currentTime;
+    
+    try {
+      await searchPackage(data);
+    } catch (error) {
+      console.error('扫描处理错误:', error);
+      // 发生错误时重置状态
+      resetScanState();
+    }
   };
 
   const searchPackage = async (packageId: string) => {
@@ -99,7 +143,7 @@ export default function ScanScreen({ navigation }: any) {
             '包裹已取件',
             `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
             [
-              { text: '确定', onPress: () => setScanned(false) }
+              { text: '确定', onPress: resetScanState }
             ]
           );
         } else if (foundPackage.status === '待取件') {
@@ -107,7 +151,7 @@ export default function ScanScreen({ navigation }: any) {
             '确认取件',
             `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n是否确认取件？`,
             [
-              { text: '取消', onPress: () => setScanned(false) },
+              { text: '取消', onPress: resetScanState },
               {
                 text: '确认取件',
                 onPress: async () => {
@@ -121,18 +165,18 @@ export default function ScanScreen({ navigation }: any) {
             '包裹状态异常',
             `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
             [
-              { text: '确定', onPress: () => setScanned(false) }
+              { text: '确定', onPress: resetScanState }
             ]
           );
         }
       } else {
         Alert.alert('未找到', '该包裹不存在或未分配给你', [
-          { text: '确定', onPress: () => setScanned(false) }
+          { text: '确定', onPress: resetScanState }
         ]);
       }
     } catch (error) {
       Alert.alert('错误', '查询包裹失败', [
-        { text: '确定', onPress: () => setScanned(false) }
+        { text: '确定', onPress: resetScanState }
       ]);
     }
   };
@@ -143,7 +187,7 @@ export default function ScanScreen({ navigation }: any) {
       const parts = receiveCode.split('_');
       if (parts.length !== 3) {
         Alert.alert('收件码格式错误', '无法识别此收件码', [
-          { text: '确定', onPress: () => setScanned(false) }
+          { text: '确定', onPress: resetScanState }
         ]);
         return;
       }
@@ -155,12 +199,12 @@ export default function ScanScreen({ navigation }: any) {
         '店长收件码',
         `店铺代码：${storeCode}\n收件码：${receiveCode}\n\n骑手送件时必须扫描此码确认送达`,
         [
-          { text: '确定', onPress: () => setScanned(false) }
+          { text: '确定', onPress: resetScanState }
         ]
       );
     } catch (error) {
       Alert.alert('错误', '处理收件码失败', [
-        { text: '确定', onPress: () => setScanned(false) }
+        { text: '确定', onPress: resetScanState }
       ]);
     }
   };
@@ -186,17 +230,17 @@ export default function ScanScreen({ navigation }: any) {
           '取件成功！',
           `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}\n负责骑手：${courierName}`,
           [
-            { text: '确定', onPress: () => setScanned(false) }
+            { text: '确定', onPress: resetScanState }
           ]
         );
       } else {
         Alert.alert('取件失败', '更新包裹状态失败，请重试', [
-          { text: '确定', onPress: () => setScanned(false) }
+          { text: '确定', onPress: resetScanState }
         ]);
       }
     } catch (error) {
       Alert.alert('取件失败', '网络错误，请重试', [
-        { text: '确定', onPress: () => setScanned(false) }
+        { text: '确定', onPress: resetScanState }
       ]);
     }
   };
@@ -277,7 +321,7 @@ export default function ScanScreen({ navigation }: any) {
             {scanned && (
               <TouchableOpacity 
                 style={styles.rescanButton}
-                onPress={() => setScanned(false)}
+                onPress={resetScanState}
               >
                 <Text style={styles.rescanText}>重新扫描</Text>
               </TouchableOpacity>
