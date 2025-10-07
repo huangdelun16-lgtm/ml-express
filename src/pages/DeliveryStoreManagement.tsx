@@ -156,6 +156,14 @@ const DeliveryStoreManagement: React.FC = () => {
     setMapError(null);
     setMapLoading(true);
     setShowMapModal(true);
+    
+    // 设置超时机制，30秒后如果还没加载完成就显示错误
+    setTimeout(() => {
+      if (mapLoading) {
+        setMapLoading(false);
+        setMapError('地图加载超时，可能是网络问题或API配置问题。请尝试手动输入坐标或联系管理员。');
+      }
+    }, 30000);
   };
 
   // 地图加载成功回调
@@ -174,10 +182,14 @@ const DeliveryStoreManagement: React.FC = () => {
     if (error && error.message) {
       if (error.message.includes('quota') || error.message.includes('billing')) {
         errorMessage = 'Google Maps API配额已用完，请联系管理员设置付费账户';
-      } else if (error.message.includes('key')) {
+      } else if (error.message.includes('key') || error.message.includes('API_KEY')) {
         errorMessage = 'Google Maps API密钥无效，请联系管理员检查配置';
-      } else if (error.message.includes('network')) {
+      } else if (error.message.includes('network') || error.message.includes('timeout')) {
         errorMessage = '网络连接失败，请检查网络后重试';
+      } else if (error.message.includes('referer') || error.message.includes('domain')) {
+        errorMessage = 'API密钥域名限制，请联系管理员添加当前域名';
+      } else {
+        errorMessage = `地图加载失败: ${error.message}`;
       }
     }
     
@@ -1775,8 +1787,8 @@ const DeliveryStoreManagement: React.FC = () => {
                     <button
                       onClick={() => {
                         // 手动输入坐标的备用方案
-                        const lat = prompt('请输入纬度 (latitude):');
-                        const lng = prompt('请输入经度 (longitude):');
+                        const lat = prompt('请输入纬度 (latitude):\n例如: 21.9588');
+                        const lng = prompt('请输入经度 (longitude):\n例如: 96.0891');
                         if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
                           setFormData(prev => ({
                             ...prev,
@@ -1785,6 +1797,8 @@ const DeliveryStoreManagement: React.FC = () => {
                           }));
                           setShowMapModal(false);
                           setSuccessMessage('位置已手动设置');
+                        } else if (lat && lng) {
+                          alert('请输入有效的数字坐标');
                         }
                       }}
                       style={{
@@ -1799,6 +1813,42 @@ const DeliveryStoreManagement: React.FC = () => {
                       }}
                     >
                       📍 手动输入坐标
+                    </button>
+                    <button
+                      onClick={() => {
+                        // 使用预设的常用位置
+                        const locations = [
+                          { name: '曼德勒市中心', lat: '21.9588', lng: '96.0891' },
+                          { name: '仰光市中心', lat: '16.8661', lng: '96.1951' },
+                          { name: '内比都', lat: '19.7633', lng: '96.0785' }
+                        ];
+                        
+                        const choice = prompt(`请选择预设位置:\n1. 曼德勒市中心\n2. 仰光市中心\n3. 内比都\n\n请输入数字 (1-3):`);
+                        const index = parseInt(choice || '0') - 1;
+                        
+                        if (index >= 0 && index < locations.length) {
+                          const location = locations[index];
+                          setFormData(prev => ({
+                            ...prev,
+                            latitude: location.lat,
+                            longitude: location.lng
+                          }));
+                          setShowMapModal(false);
+                          setSuccessMessage(`已选择${location.name}位置`);
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      🏙️ 选择预设位置
                     </button>
                   </div>
                 </div>
