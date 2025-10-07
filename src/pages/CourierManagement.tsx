@@ -23,7 +23,7 @@ interface Courier {
 
 const CourierManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');

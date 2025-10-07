@@ -5,7 +5,7 @@ import { adminAccountService } from '../services/supabase';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   
   // 获取当前用户角色
   const currentUserRole = localStorage.getItem('currentUserRole') || 'operator';

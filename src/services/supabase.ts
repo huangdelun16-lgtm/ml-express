@@ -152,7 +152,7 @@ export interface AuditLog {
 export const testConnection = async () => {
   try {
     // 使用更简单的查询来测试连接
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('packages')
       .select('id')
       .limit(1);

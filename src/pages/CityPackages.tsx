@@ -6,7 +6,7 @@ import QRCode from 'qrcode';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState('list');
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);

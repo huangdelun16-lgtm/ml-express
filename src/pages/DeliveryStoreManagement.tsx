@@ -174,7 +174,6 @@ const DeliveryStoreManagement: React.FC = () => {
       const allPackages = await packageService.getAllPackages();
       
       // 过滤出送达至该店铺的包裹（通过店长收件码识别）
-      const storeReceiveCode = `STORE_${store.id}_${store.store_code}`;
       const packages = allPackages.filter(pkg => {
         // 检查包裹的送达记录中是否包含该店铺的收件码
         // 这里简化处理，实际应该根据包裹的送达记录来判断

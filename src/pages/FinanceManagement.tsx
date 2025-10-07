@@ -101,6 +101,19 @@ const FinanceManagement: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const calculateSummary = () => {
+      const totalIncome = records.reduce((sum, record) => sum + (record.amount || 0), 0);
+      const totalExpense = records.filter(r => r.type === 'expense').reduce((sum, record) => sum + (record.amount || 0), 0);
+      const totalRevenue = totalIncome - totalExpense;
+      
+      setSummary({
+        totalIncome,
+        totalExpense,
+        totalRevenue,
+        recordCount: records.length
+      });
+    };
+    
     calculateSummary();
   }, [records]);
 
@@ -114,25 +127,6 @@ const FinanceManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateSummary = () => {
-    const totalIncome = records
-      .filter((record) => record.record_type === 'income' && record.status === 'completed')
-      .reduce((sum, record) => sum + (record.amount || 0), 0);
-    const totalExpense = records
-      .filter((record) => record.record_type === 'expense' && record.status === 'completed')
-      .reduce((sum, record) => sum + (record.amount || 0), 0);
-    const pendingPayments = records
-      .filter((record) => record.status === 'pending')
-      .reduce((sum, record) => sum + (record.amount || 0), 0);
-
-    setSummary({
-      totalIncome,
-      totalExpense,
-      netProfit: totalIncome - totalExpense,
-      pendingPayments
-    });
   };
 
   const filteredRecords = useMemo(() => {

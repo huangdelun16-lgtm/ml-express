@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadScript, GoogleMap, Marker, Polyline } from '@react-google-maps/api';
-import { trackingService, TrackingEvent, CourierLocation, Package } from '../services/supabase';
+import { TrackingEvent, CourierLocation, Package } from '../services/supabase';
 import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
 
 // 错误边界组件
@@ -49,11 +49,6 @@ class ErrorBoundary extends React.Component<
 
     return this.props.children;
   }
-}
-
-interface PackageWithStatus extends Package {
-  tracking_events?: TrackingEvent[];
-  courier_location?: CourierLocation | null;
 }
 
 const mapContainerStyle: React.CSSProperties = {
@@ -176,16 +171,6 @@ const TrackingPage: React.FC = () => {
       lastUpdate: location.last_update
     }));
   }, [courierLocations]);
-
-  // 计算包裹事件标记
-  const packageEventMarkers = useMemo(() => {
-    return trackingEvents.map(event => ({
-      id: event.id,
-      position: { lat: event.latitude, lng: event.longitude },
-      title: event.status,
-      time: event.event_time
-    }));
-  }, [trackingEvents]);
 
   // 处理选择包裹
   const handleSelectPackage = useCallback((packageId: string) => {

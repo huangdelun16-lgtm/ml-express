@@ -24,7 +24,7 @@ interface User {
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState('list');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
