@@ -62,6 +62,11 @@ const MyTasksScreen: React.FC = () => {
   // 当前骑手信息状态
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');
+  
+  // 日期过滤状态
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
 
   // 按日期分组包裹
   const groupPackagesByDate = (packages: Package[]) => {
@@ -70,43 +75,71 @@ const MyTasksScreen: React.FC = () => {
     packages.forEach(pkg => {
       let dateKey = '';
       
-      if (pkg.delivery_time) {
-        // 如果有送达时间，按送达时间分组
-        const deliveryDate = new Date(pkg.delivery_time);
-        dateKey = deliveryDate.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-      } else if (pkg.pickup_time) {
-        // 如果有取件时间，按取件时间分组
-        const pickupDate = new Date(pkg.pickup_time);
-        dateKey = pickupDate.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-      } else {
-        // 否则按创建时间分组
-        const createDate = new Date(pkg.create_time);
-        dateKey = createDate.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
+      try {
+        if (pkg.delivery_time) {
+          // 如果有送达时间，按送达时间分组
+          const deliveryDate = new Date(pkg.delivery_time);
+          if (!isNaN(deliveryDate.getTime())) {
+            dateKey = deliveryDate.toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          }
+        } else if (pkg.pickup_time) {
+          // 如果有取件时间，按取件时间分组
+          const pickupDate = new Date(pkg.pickup_time);
+          if (!isNaN(pickupDate.getTime())) {
+            dateKey = pickupDate.toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          }
+        } else if (pkg.created_at) {
+          // 否则按创建时间分组
+          const createDate = new Date(pkg.created_at);
+          if (!isNaN(createDate.getTime())) {
+            dateKey = createDate.toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          }
+        }
+        
+        // 如果日期解析失败，使用默认日期
+        if (!dateKey) {
+          dateKey = '未知日期';
+        }
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(pkg);
+      } catch (error) {
+        console.error('日期解析错误:', error, pkg);
+        // 使用默认分组
+        const defaultKey = '未知日期';
+        if (!grouped[defaultKey]) {
+          grouped[defaultKey] = [];
+        }
+        grouped[defaultKey].push(pkg);
       }
-      
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(pkg);
     });
     
     // 按日期排序（最新的在前）
     const sortedKeys = Object.keys(grouped).sort((a, b) => {
-      const dateA = new Date(a.replace(/\//g, '-'));
-      const dateB = new Date(b.replace(/\//g, '-'));
-      return dateB.getTime() - dateA.getTime();
+      if (a === '未知日期') return 1;
+      if (b === '未知日期') return -1;
+      
+      try {
+        const dateA = new Date(a.replace(/\//g, '-'));
+        const dateB = new Date(b.replace(/\//g, '-'));
+        return dateB.getTime() - dateA.getTime();
+      } catch (error) {
+        return 0;
+      }
     });
     
     const sortedGrouped: {[key: string]: Package[]} = {};
@@ -152,6 +185,20 @@ const MyTasksScreen: React.FC = () => {
       // 按日期分组包裹
       const grouped = groupPackagesByDate(myPackages);
       setGroupedPackages(grouped);
+      
+      // 更新可用日期列表
+      const dates = Object.keys(grouped).sort((a, b) => {
+        if (a === '未知日期') return 1;
+        if (b === '未知日期') return -1;
+        try {
+          const dateA = new Date(a.replace(/\//g, '-'));
+          const dateB = new Date(b.replace(/\//g, '-'));
+          return dateB.getTime() - dateA.getTime();
+        } catch (error) {
+          return 0;
+        }
+      });
+      setAvailableDates(dates);
     } catch (error) {
       console.error('加载我的任务失败:', error);
       Alert.alert('加载失败', '无法加载任务列表，请重试');
@@ -572,15 +619,25 @@ const MyTasksScreen: React.FC = () => {
           <Text style={styles.headerTitle}>我的任务</Text>
           <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName || '加载中...'}</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={onRefresh}
-          disabled={refreshing}
-        >
-          <Text style={styles.refreshButtonText}>
-            {refreshing ? '🔄' : '🔄'} 刷新
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.dateButtonText}>
+              📅 日期
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={onRefresh}
+            disabled={refreshing}
+          >
+            <Text style={styles.refreshButtonText}>
+              {refreshing ? '🔄' : '🔄'} 刷新
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {packages.length === 0 ? (
@@ -596,64 +653,158 @@ const MyTasksScreen: React.FC = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {Object.keys(groupedPackages).map((dateKey) => (
-            <View key={dateKey} style={styles.dateSection}>
-              <View style={styles.dateHeader}>
-                <Text style={styles.dateTitle}>{dateKey}</Text>
-                <Text style={styles.dateSubtitle}>
-                  {groupedPackages[dateKey].length} 个包裹
-                </Text>
-              </View>
-              
-              {groupedPackages[dateKey].map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.packageCard}
-                  onPress={() => handlePackagePress(item)}
-                >
-                  <View style={styles.packageHeader}>
-                    <Text style={styles.packageId}>{item.id}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                      <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.packageInfo}>
-                    <Text style={styles.infoLabel}>收件人：</Text>
-                    <Text style={styles.infoValue}>{item.receiver_name}</Text>
-                  </View>
-                  
-                  <View style={styles.packageInfo}>
-                    <Text style={styles.infoLabel}>收件地址：</Text>
-                    <Text style={styles.infoValue}>{item.receiver_address}</Text>
-                  </View>
-                  
-                  <View style={styles.packageInfo}>
-                    <Text style={styles.infoLabel}>包裹类型：</Text>
-                    <Text style={styles.infoValue}>{item.package_type}</Text>
-                  </View>
-                  
-                  <View style={styles.packageInfo}>
-                    <Text style={styles.infoLabel}>重量：</Text>
-                    <Text style={styles.infoValue}>{item.weight}kg</Text>
-                  </View>
-                  
-                  {item.delivery_time && (
-                    <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>送达时间：</Text>
-                      <Text style={styles.infoValue}>
-                        {new Date(item.delivery_time).toLocaleString('zh-CN')}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+          {/* 显示选中的日期过滤 */}
+          {selectedDate && (
+            <View style={styles.filterInfo}>
+              <Text style={styles.filterText}>
+                显示日期：{selectedDate} ({groupedPackages[selectedDate]?.length || 0} 个包裹)
+              </Text>
+              <TouchableOpacity 
+                style={styles.clearFilterButton}
+                onPress={() => setSelectedDate(null)}
+              >
+                <Text style={styles.clearFilterText}>清除过滤</Text>
+              </TouchableOpacity>
             </View>
-          ))}
+          )}
+          
+          {(selectedDate ? [selectedDate] : Object.keys(groupedPackages)).map((dateKey) => {
+            if (!groupedPackages[dateKey]) return null;
+            
+            return (
+              <View key={dateKey} style={styles.dateSection}>
+                <View style={styles.dateHeader}>
+                  <Text style={styles.dateTitle}>{dateKey}</Text>
+                  <Text style={styles.dateSubtitle}>
+                    {groupedPackages[dateKey].length} 个包裹
+                  </Text>
+                </View>
+                
+                {groupedPackages[dateKey].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.packageCard}
+                    onPress={() => handlePackagePress(item)}
+                  >
+                    <View style={styles.packageHeader}>
+                      <Text style={styles.packageId}>{item.id}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                        <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.infoLabel}>收件人：</Text>
+                      <Text style={styles.infoValue}>{item.receiver_name}</Text>
+                    </View>
+                    
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.infoLabel}>收件地址：</Text>
+                      <Text style={styles.infoValue}>{item.receiver_address}</Text>
+                    </View>
+                    
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.infoLabel}>包裹类型：</Text>
+                      <Text style={styles.infoValue}>{item.package_type}</Text>
+                    </View>
+                    
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.infoLabel}>重量：</Text>
+                      <Text style={styles.infoValue}>{item.weight}kg</Text>
+                    </View>
+                    
+                    {item.delivery_time && (
+                      <View style={styles.packageInfo}>
+                        <Text style={styles.infoLabel}>送达时间：</Text>
+                        <Text style={styles.infoValue}>
+                          {new Date(item.delivery_time).toLocaleString('zh-CN')}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          })}
         </ScrollView>
       )}
 
       {showDetailModal && renderDetailModal()}
+      
+      {/* 日期选择器模态框 */}
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📅 选择日期</Text>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.dateList}>
+              <TouchableOpacity
+                style={[
+                  styles.dateItem,
+                  !selectedDate && styles.selectedDateItem
+                ]}
+                onPress={() => {
+                  setSelectedDate(null);
+                  setShowDatePicker(false);
+                }}
+              >
+                <Text style={[
+                  styles.dateItemText,
+                  !selectedDate && styles.selectedDateItemText
+                ]}>
+                  全部日期
+                </Text>
+                <Text style={[
+                  styles.dateItemCount,
+                  !selectedDate && styles.selectedDateItemCount
+                ]}>
+                  {packages.length} 个包裹
+                </Text>
+              </TouchableOpacity>
+              
+              {availableDates.map((date) => (
+                <TouchableOpacity
+                  key={date}
+                  style={[
+                    styles.dateItem,
+                    selectedDate === date && styles.selectedDateItem
+                  ]}
+                  onPress={() => {
+                    setSelectedDate(date);
+                    setShowDatePicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.dateItemText,
+                    selectedDate === date && styles.selectedDateItemText
+                  ]}>
+                    {date}
+                  </Text>
+                  <Text style={[
+                    styles.dateItemCount,
+                    selectedDate === date && styles.selectedDateItemCount
+                  ]}>
+                    {groupedPackages[date]?.length || 0} 个包裹
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       
       {/* 送货地址模态框 */}
       <Modal
@@ -893,6 +1044,24 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  dateButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   refreshButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
@@ -904,6 +1073,61 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: 'white',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  filterInfo: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    margin: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  filterText: {
+    color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  clearFilterButton: {
+    backgroundColor: '#ff5722',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  clearFilterText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dateList: {
+    maxHeight: 400,
+  },
+  dateItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedDateItem: {
+    backgroundColor: '#e3f2fd',
+  },
+  dateItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedDateItemText: {
+    color: '#1976d2',
+    fontWeight: '600',
+  },
+  dateItemCount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedDateItemCount: {
+    color: '#1976d2',
     fontWeight: '600',
   },
   headerTitle: {
