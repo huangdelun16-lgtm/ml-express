@@ -85,7 +85,6 @@ const DeliveryStoreManagement: React.FC = () => {
   // 地图加载状态管理
   const [mapLoading, setMapLoading] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
   
   // 包裹详情相关状态
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -162,7 +161,6 @@ const DeliveryStoreManagement: React.FC = () => {
   // 地图加载成功回调
   const onMapLoad = useCallback(() => {
     setMapLoading(false);
-    setMapsLoaded(true);
     setMapError(null);
   }, []);
 
@@ -170,7 +168,6 @@ const DeliveryStoreManagement: React.FC = () => {
   const onMapError = useCallback((error: any) => {
     console.error('Google Maps 加载失败:', error);
     setMapLoading(false);
-    setMapsLoaded(false);
     setMapError('地图加载失败，请检查网络连接或刷新页面重试');
   }, []);
 
@@ -1859,14 +1856,14 @@ const DeliveryStoreManagement: React.FC = () => {
             }}>
               <button
                 onClick={confirmMapSelection}
-                disabled={!formData.latitude || !formData.longitude || mapLoading || mapError}
+                disabled={!formData.latitude || !formData.longitude || mapLoading || !!mapError}
                 style={{
-                  background: (!formData.latitude || !formData.longitude || mapLoading || mapError) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  background: (!formData.latitude || !formData.longitude || mapLoading || !!mapError) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '1rem 2rem',
                   borderRadius: '10px',
-                  cursor: (!formData.latitude || !formData.longitude || mapLoading || mapError) ? 'not-allowed' : 'pointer',
+                  cursor: (!formData.latitude || !formData.longitude || mapLoading || !!mapError) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   fontSize: '1rem',
                   boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
