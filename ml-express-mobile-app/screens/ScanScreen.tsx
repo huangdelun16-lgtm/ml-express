@@ -18,6 +18,7 @@ export default function ScanScreen({ navigation }: any) {
   const [showManualInput, setShowManualInput] = useState(false);
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // 加载当前骑手信息 - 必须在所有条件渲染之前
   useEffect(() => {
@@ -35,8 +36,28 @@ export default function ScanScreen({ navigation }: any) {
     }
   };
 
+  // 检查相机权限状态
+  useEffect(() => {
+    if (permission) {
+      console.log('相机权限状态:', permission.granted);
+      if (!permission.granted) {
+        setCameraError('相机权限未授予');
+      } else {
+        setCameraError(null);
+      }
+    }
+  }, [permission]);
+
   if (!permission) {
-    return <View />;
+    return (
+      <View style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Text style={styles.permissionText}>📷</Text>
+          <Text style={styles.permissionTitle}>正在检查相机权限...</Text>
+          <Text style={styles.permissionDesc}>请稍候</Text>
+        </View>
+      </View>
+    );
   }
 
   if (!permission.granted) {
@@ -207,21 +228,47 @@ export default function ScanScreen({ navigation }: any) {
       {/* 扫码界面 */}
       {!showManualInput ? (
         <>
-          <CameraView
-            style={styles.camera}
-            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'],
-            }}
-          >
-            {/* 扫描框 */}
-            <View style={styles.scanFrame}>
-              <View style={[styles.corner, styles.cornerTopLeft]} />
-              <View style={[styles.corner, styles.cornerTopRight]} />
-              <View style={[styles.corner, styles.cornerBottomLeft]} />
-              <View style={[styles.corner, styles.cornerBottomRight]} />
+          {cameraError ? (
+            <View style={styles.cameraErrorContainer}>
+              <Text style={styles.cameraErrorIcon}>📷</Text>
+              <Text style={styles.cameraErrorTitle}>相机启动失败</Text>
+              <Text style={styles.cameraErrorDesc}>{cameraError}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={() => {
+                  setCameraError(null);
+                  // 重新请求权限
+                  requestPermission();
+                }}
+              >
+                <Text style={styles.retryButtonText}>重试</Text>
+              </TouchableOpacity>
             </View>
-          </CameraView>
+          ) : (
+            <CameraView
+              style={styles.camera}
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'],
+              }}
+              onCameraReady={() => {
+                console.log('相机已准备就绪');
+                setCameraError(null);
+              }}
+              onMountError={(error) => {
+                console.error('相机挂载错误:', error);
+                setCameraError('相机无法启动，请检查设备权限');
+              }}
+            >
+              {/* 扫描框 */}
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.cornerTopLeft]} />
+                <View style={[styles.corner, styles.cornerTopRight]} />
+                <View style={[styles.corner, styles.cornerBottomLeft]} />
+                <View style={[styles.corner, styles.cornerBottomRight]} />
+              </View>
+            </CameraView>
+          )}
 
           <View style={styles.instructions}>
             <Text style={styles.instructionText}>
@@ -294,6 +341,42 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  cameraErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 40,
+  },
+  cameraErrorIcon: {
+    fontSize: 64,
+    marginBottom: 20,
+  },
+  cameraErrorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  cameraErrorDesc: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scanFrame: {
     flex: 1,

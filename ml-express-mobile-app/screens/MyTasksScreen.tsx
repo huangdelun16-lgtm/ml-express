@@ -568,8 +568,19 @@ const MyTasksScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>我的任务</Text>
-        <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName || '加载中...'}</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>我的任务</Text>
+          <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName || '加载中...'}</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={onRefresh}
+          disabled={refreshing}
+        >
+          <Text style={styles.refreshButtonText}>
+            {refreshing ? '🔄' : '🔄'} 刷新
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {packages.length === 0 ? (
@@ -875,6 +886,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#2c5282',
     padding: 20,
     paddingTop: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  refreshButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 24,
