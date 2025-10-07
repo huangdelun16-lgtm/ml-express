@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Package {
   id: string;
@@ -58,8 +59,9 @@ const MyTasksScreen: React.FC = () => {
   const [scannedData, setScannedData] = useState<string | null>(null);
   const scannedOnce = useRef(false); // 跟踪是否已经扫描过一次
 
-  // 模拟当前骑手账号，实际应该从登录状态获取
-  const currentCourierName = '骑手账号';
+  // 当前骑手信息状态
+  const [currentCourierName, setCurrentCourierName] = useState('');
+  const [currentCourierId, setCurrentCourierId] = useState('');
 
   // 按日期分组包裹
   const groupPackagesByDate = (packages: Package[]) => {
@@ -117,16 +119,31 @@ const MyTasksScreen: React.FC = () => {
 
   useEffect(() => {
     loadMyPackages();
+    loadCurrentCourierInfo();
   }, []);
+
+  const loadCurrentCourierInfo = async () => {
+    try {
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      const userId = await AsyncStorage.getItem('currentUser') || '';
+      setCurrentCourierName(userName);
+      setCurrentCourierId(userId);
+    } catch (error) {
+      console.error('加载骑手信息失败:', error);
+    }
+  };
 
   const loadMyPackages = async () => {
     try {
       setLoading(true);
       const allPackages = await packageService.getAllPackages();
       
+      // 获取当前骑手信息
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      
       // 过滤出分配给当前骑手的包裹（包括已送达的包裹）
       const myPackages = allPackages.filter(pkg => 
-        pkg.courier === currentCourierName && 
+        pkg.courier === userName && 
         (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
       );
       
@@ -316,12 +333,13 @@ const MyTasksScreen: React.FC = () => {
               try {
                 // 更新包裹状态为"已送达"
                 if (selectedPackage) {
+                  const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
                   await packageService.updatePackageStatus(
                     selectedPackage.id, 
                     '已送达',
                     undefined, // pickupTime
                     new Date().toISOString(), // deliveryTime
-                    currentCourierName
+                    userName
                   );
                   
                   // 刷新任务列表
@@ -551,7 +569,7 @@ const MyTasksScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>我的任务</Text>
-        <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName}</Text>
+        <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName || '加载中...'}</Text>
       </View>
 
       {packages.length === 0 ? (

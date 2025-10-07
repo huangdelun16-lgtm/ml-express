@@ -9,12 +9,15 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { packageService } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ScanScreen({ navigation }: any) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const [currentCourierName, setCurrentCourierName] = useState('');
+  const [currentCourierId, setCurrentCourierId] = useState('');
 
   if (!permission) {
     return <View />;
@@ -34,6 +37,22 @@ export default function ScanScreen({ navigation }: any) {
       </View>
     );
   }
+
+  // 加载当前骑手信息
+  useEffect(() => {
+    loadCurrentCourierInfo();
+  }, []);
+
+  const loadCurrentCourierInfo = async () => {
+    try {
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      const userId = await AsyncStorage.getItem('currentUser') || '';
+      setCurrentCourierName(userName);
+      setCurrentCourierId(userId);
+    } catch (error) {
+      console.error('加载骑手信息失败:', error);
+    }
+  };
 
   const handleBarCodeScanned = async ({ data }: any) => {
     if (scanned) return;
@@ -129,22 +148,22 @@ export default function ScanScreen({ navigation }: any) {
     try {
       const pickupTime = new Date().toLocaleString('zh-CN');
       
-      // 获取当前骑手账号（这里需要从登录状态或用户信息中获取）
-      // 暂时使用模拟的骑手账号，实际应该从用户登录状态获取
-      const currentCourierName = '骑手账号'; // TODO: 从用户登录状态获取实际骑手账号
+      // 使用实际的骑手账号信息
+      const courierName = currentCourierName || '未知骑手';
+      const courierId = currentCourierId || 'unknown';
       
       const success = await packageService.updatePackageStatus(
         packageData.id,
         '已取件',
         pickupTime,
         undefined, // deliveryTime
-        currentCourierName
+        courierName
       );
 
       if (success) {
         Alert.alert(
           '取件成功！',
-          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}\n负责骑手：${currentCourierName}`,
+          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}\n负责骑手：${courierName}`,
           [
             { text: '确定', onPress: () => setScanned(false) }
           ]

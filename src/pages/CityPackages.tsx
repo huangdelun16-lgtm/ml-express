@@ -208,6 +208,7 @@ const CityPackages: React.FC = () => {
       setCourierLoading(true);
       let courierData = null;
 
+      // 首先尝试通过ID查找（如果courier字段是ID格式）
       if (pkg.courier.startsWith('COU')) {
         const { data, error } = await supabase
           .from('couriers')
@@ -220,6 +221,7 @@ const CityPackages: React.FC = () => {
         }
       }
 
+      // 如果通过ID没找到，尝试通过姓名查找
       if (!courierData) {
         const { data, error } = await supabase
           .from('couriers')
@@ -229,6 +231,36 @@ const CityPackages: React.FC = () => {
 
         if (!error) {
           courierData = data;
+        }
+      }
+
+      // 如果couriers表中没找到，尝试从admin_accounts表中查找
+      if (!courierData) {
+        const { data, error } = await supabase
+          .from('admin_accounts')
+          .select('*')
+          .eq('employee_name', pkg.courier)
+          .in('position', ['骑手', '骑手队长'])
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (!error && data) {
+          // 将admin_accounts数据转换为courier格式
+          courierData = {
+            id: data.id,
+            name: data.employee_name,
+            phone: data.phone,
+            email: data.email,
+            address: data.address || '',
+            vehicle_type: data.position === '骑手队长' ? 'car' : 'motorcycle',
+            license_number: data.id_number || '',
+            status: data.status,
+            join_date: data.hire_date,
+            last_active: data.last_login || '',
+            total_deliveries: 0,
+            rating: 5.0,
+            notes: data.notes || ''
+          };
         }
       }
 
