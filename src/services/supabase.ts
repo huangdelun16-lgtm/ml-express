@@ -1025,6 +1025,26 @@ export const deliveryStoreService = {
     }
   },
 
+  // 删除快递店
+  async deleteStore(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_stores')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除快递店失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除快递店异常:', err);
+      return false;
+    }
+  },
+
   // 根据位置查找附近的快递店
   async getNearbyStores(latitude: number, longitude: number, radius: number = 10): Promise<DeliveryStore[]> {
     try {

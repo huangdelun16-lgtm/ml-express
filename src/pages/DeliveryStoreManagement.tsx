@@ -68,9 +68,6 @@ const DeliveryStoreManagement: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   
   // 包裹详情相关状态
-  const [showPackageModal, setShowPackageModal] = useState(false);
-  const [storePackages, setStorePackages] = useState<Package[]>([]);
-  const [loadingPackages, setLoadingPackages] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [storagePackages, setStoragePackages] = useState<Package[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(false);
@@ -284,6 +281,54 @@ const DeliveryStoreManagement: React.FC = () => {
       } else {
         setErrorMessage('创建失败，店铺代码可能已存在');
       }
+    }
+  };
+
+  // 删除店铺
+  const handleDeleteStore = async (store: DeliveryStore) => {
+    if (!window.confirm(`确定要删除店铺 "${store.store_name}" 吗？\n\n此操作不可撤销！`)) {
+      return;
+    }
+
+    try {
+      const result = await deliveryStoreService.deleteStore(store.id!);
+      if (result) {
+        setSuccessMessage(`店铺 "${store.store_name}" 已成功删除`);
+        loadStores();
+      } else {
+        setErrorMessage('删除店铺失败，请重试');
+      }
+    } catch (error) {
+      console.error('删除店铺失败:', error);
+      setErrorMessage('删除店铺失败，请重试');
+    }
+  };
+
+  // 关闭/暂停店铺
+  const handleCloseStore = async (store: DeliveryStore) => {
+    const action = store.status === 'active' ? '暂停营业' : '恢复营业';
+    const newStatus = store.status === 'active' ? 'inactive' : 'active';
+    
+    if (!window.confirm(`确定要${action}店铺 "${store.store_name}" 吗？`)) {
+      return;
+    }
+
+    try {
+      const result = await deliveryStoreService.updateStore(store.id!, {
+        ...store,
+        status: newStatus as 'active' | 'inactive' | 'maintenance',
+        updated_at: new Date().toISOString()
+      });
+      
+      if (result) {
+        setSuccessMessage(`店铺 "${store.store_name}" 已${action}`);
+        loadStores();
+      } else {
+        setErrorMessage(`${action}店铺失败，请重试`);
+      }
+    } catch (error) {
+      console.error(`${action}店铺失败:`, error);
+      setErrorMessage(`${action}店铺失败，请重试`);
     }
   };
 
@@ -855,6 +900,76 @@ const DeliveryStoreManagement: React.FC = () => {
                       }}
                     >
                       📦 入库
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseStore(store);
+                      }}
+                      style={{
+                        background: store.status === 'active' 
+                          ? 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)'
+                          : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: store.status === 'active' 
+                          ? '0 2px 6px rgba(243, 156, 18, 0.3)'
+                          : '0 2px 6px rgba(39, 174, 96, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = store.status === 'active' 
+                          ? '0 4px 8px rgba(243, 156, 18, 0.4)'
+                          : '0 4px 8px rgba(39, 174, 96, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = store.status === 'active' 
+                          ? '0 2px 6px rgba(243, 156, 18, 0.3)'
+                          : '0 2px 6px rgba(39, 174, 96, 0.3)';
+                      }}
+                    >
+                      {store.status === 'active' ? '⏸️ 暂停' : '▶️ 恢复'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteStore(store);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 6px rgba(231, 76, 60, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(231, 76, 60, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(231, 76, 60, 0.3)';
+                      }}
+                    >
+                      🗑️ 删除
                     </button>
                   </div>
                 </div>
