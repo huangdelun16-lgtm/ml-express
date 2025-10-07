@@ -168,7 +168,20 @@ const DeliveryStoreManagement: React.FC = () => {
   const onMapError = useCallback((error: any) => {
     console.error('Google Maps 加载失败:', error);
     setMapLoading(false);
-    setMapError('地图加载失败，请检查网络连接或刷新页面重试');
+    
+    // 根据错误类型提供不同的提示
+    let errorMessage = '地图加载失败，请重试';
+    if (error && error.message) {
+      if (error.message.includes('quota') || error.message.includes('billing')) {
+        errorMessage = 'Google Maps API配额已用完，请联系管理员设置付费账户';
+      } else if (error.message.includes('key')) {
+        errorMessage = 'Google Maps API密钥无效，请联系管理员检查配置';
+      } else if (error.message.includes('network')) {
+        errorMessage = '网络连接失败，请检查网络后重试';
+      }
+    }
+    
+    setMapError(errorMessage);
   }, []);
 
   // 确认地图选择
@@ -1738,26 +1751,56 @@ const DeliveryStoreManagement: React.FC = () => {
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c' }}>地图加载失败</h3>
                   <p style={{ margin: '0 0 1rem 0', opacity: 0.8 }}>{mapError}</p>
-                  <button
-                    onClick={() => {
-                      setMapError(null);
-                      setMapLoading(true);
-                      // 强制重新加载地图
-                      window.location.reload();
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: '500'
-                    }}
-                  >
-                    🔄 重新加载
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        setMapError(null);
+                        setMapLoading(true);
+                        // 强制重新加载地图
+                        window.location.reload();
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      🔄 重新加载
+                    </button>
+                    <button
+                      onClick={() => {
+                        // 手动输入坐标的备用方案
+                        const lat = prompt('请输入纬度 (latitude):');
+                        const lng = prompt('请输入经度 (longitude):');
+                        if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+                          setFormData(prev => ({
+                            ...prev,
+                            latitude: lat,
+                            longitude: lng
+                          }));
+                          setShowMapModal(false);
+                          setSuccessMessage('位置已手动设置');
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      📍 手动输入坐标
+                    </button>
+                  </div>
                 </div>
               ) : mapLoading ? (
                 <div style={{
