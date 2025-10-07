@@ -328,19 +328,50 @@ const MyTasksScreen: React.FC = () => {
 
       console.log('配送证明记录:', deliveryProof);
 
-      Alert.alert(
-        '上传成功',
-        `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}`,
-        [
-          {
-            text: '确定',
-            onPress: () => {
-              setShowPhotoModal(false);
-              setCapturedPhoto(null);
-            }
-          }
-        ]
-      );
+      // 上传照片成功后，自动更新包裹状态为"已送达"
+      if (selectedPackage) {
+        const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+        
+        const success = await packageService.updatePackageStatus(
+          selectedPackage.id,
+          '已送达',
+          undefined, // pickupTime
+          new Date().toISOString(), // deliveryTime
+          userName
+        );
+
+        if (success) {
+          Alert.alert(
+            '配送完成！',
+            `包裹已成功送达\n\n📦 包裹编号：${selectedPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
+            [
+              {
+                text: '确定',
+                onPress: async () => {
+                  setShowPhotoModal(false);
+                  setCapturedPhoto(null);
+                  // 刷新任务列表
+                  await loadMyPackages();
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '照片上传成功',
+            `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`,
+            [
+              {
+                text: '确定',
+                onPress: () => {
+                  setShowPhotoModal(false);
+                  setCapturedPhoto(null);
+                }
+              }
+            ]
+          );
+        }
+      }
 
     } catch (error) {
       console.error('上传照片失败:', error);
