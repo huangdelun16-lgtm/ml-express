@@ -1,8 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import QRCode from 'qrcode';
+
+// 添加CSS动画样式
+const spinAnimation = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// 注入CSS样式
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = spinAnimation;
+  document.head.appendChild(style);
+}
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -66,6 +81,11 @@ const DeliveryStoreManagement: React.FC = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [editingStore, setEditingStore] = useState<DeliveryStore | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // 地图加载状态管理
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
   
   // 包裹详情相关状态
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -134,8 +154,25 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 打开地图选择
   const openMapSelection = () => {
+    setMapError(null);
+    setMapLoading(true);
     setShowMapModal(true);
   };
+
+  // 地图加载成功回调
+  const onMapLoad = useCallback(() => {
+    setMapLoading(false);
+    setMapsLoaded(true);
+    setMapError(null);
+  }, []);
+
+  // 地图加载失败回调
+  const onMapError = useCallback((error: any) => {
+    console.error('Google Maps 加载失败:', error);
+    setMapLoading(false);
+    setMapsLoaded(false);
+    setMapError('地图加载失败，请检查网络连接或刷新页面重试');
+  }, []);
 
   // 确认地图选择
   const confirmMapSelection = () => {
@@ -1685,38 +1722,107 @@ const DeliveryStoreManagement: React.FC = () => {
               borderRadius: '15px',
               overflow: 'hidden',
               marginBottom: '1.5rem',
-              border: '2px solid rgba(255, 255, 255, 0.2)'
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              position: 'relative'
             }}>
-              <ErrorBoundary>
-                <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
-                  <GoogleMap
-                    mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={mapCenter}
-                    zoom={12}
-                    onClick={handleMapClick}
+              {mapError ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(231, 76, 60, 0.1)',
+                  color: 'white',
+                  textAlign: 'center',
+                  padding: '2rem'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c' }}>地图加载失败</h3>
+                  <p style={{ margin: '0 0 1rem 0', opacity: 0.8 }}>{mapError}</p>
+                  <button
+                    onClick={() => {
+                      setMapError(null);
+                      setMapLoading(true);
+                      // 强制重新加载地图
+                      window.location.reload();
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '500'
+                    }}
                   >
-                    {formData.latitude && formData.longitude && (
-                      <Marker
-                        position={{
-                          lat: Number(formData.latitude),
-                          lng: Number(formData.longitude)
-                        }}
-                        icon={{
-                          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
-                              <circle cx="20" cy="16" r="6" fill="white"/>
-                              <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
-                            </svg>
-                          `),
-                          scaledSize: new window.google.maps.Size(40, 40),
-                          anchor: new window.google.maps.Point(20, 40)
-                        }}
-                      />
-                    )}
-                  </GoogleMap>
-                </LoadScript>
-              </ErrorBoundary>
+                    🔄 重新加载
+                  </button>
+                </div>
+              ) : mapLoading ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>正在加载地图...</h3>
+                  <p style={{ margin: '0', opacity: 0.8 }}>请稍候，正在连接Google Maps服务</p>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                    borderTop: '3px solid #3498db',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    marginTop: '1rem'
+                  }}></div>
+                </div>
+              ) : (
+                <ErrorBoundary>
+                  <LoadScript 
+                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}
+                    onLoad={onMapLoad}
+                    onError={onMapError}
+                  >
+                    <GoogleMap
+                      mapContainerStyle={{ width: '100%', height: '100%' }}
+                      center={mapCenter}
+                      zoom={12}
+                      onClick={handleMapClick}
+                      onLoad={onMapLoad}
+                    >
+                      {formData.latitude && formData.longitude && (
+                        <Marker
+                          position={{
+                            lat: Number(formData.latitude),
+                            lng: Number(formData.longitude)
+                          }}
+                          icon={{
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                              <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
+                                <circle cx="20" cy="16" r="6" fill="white"/>
+                                <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
+                              </svg>
+                            `),
+                            scaledSize: new window.google.maps.Size(40, 40),
+                            anchor: new window.google.maps.Point(20, 40)
+                          }}
+                        />
+                      )}
+                    </GoogleMap>
+                  </LoadScript>
+                </ErrorBoundary>
+              )}
             </div>
 
             {/* 位置信息 */}
@@ -1753,14 +1859,14 @@ const DeliveryStoreManagement: React.FC = () => {
             }}>
               <button
                 onClick={confirmMapSelection}
-                disabled={!formData.latitude || !formData.longitude}
+                disabled={!formData.latitude || !formData.longitude || mapLoading || mapError}
                 style={{
-                  background: (!formData.latitude || !formData.longitude) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  background: (!formData.latitude || !formData.longitude || mapLoading || mapError) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '1rem 2rem',
                   borderRadius: '10px',
-                  cursor: (!formData.latitude || !formData.longitude) ? 'not-allowed' : 'pointer',
+                  cursor: (!formData.latitude || !formData.longitude || mapLoading || mapError) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   fontSize: '1rem',
                   boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
@@ -1770,7 +1876,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   gap: '0.5rem'
                 }}
                 onMouseOver={(e) => {
-                  if (formData.latitude && formData.longitude) {
+                  if (formData.latitude && formData.longitude && !mapLoading && !mapError) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
                   }
@@ -1782,7 +1888,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   }
                 }}
               >
-                ✅ 确认位置
+                {mapLoading ? '⏳ 加载中...' : mapError ? '❌ 加载失败' : '✅ 确认位置'}
               </button>
               <button
                 onClick={() => setShowMapModal(false)}
