@@ -19,6 +19,22 @@ export default function ScanScreen({ navigation }: any) {
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');
 
+  // 加载当前骑手信息 - 必须在所有条件渲染之前
+  useEffect(() => {
+    loadCurrentCourierInfo();
+  }, []);
+
+  const loadCurrentCourierInfo = async () => {
+    try {
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      const userId = await AsyncStorage.getItem('currentUser') || '';
+      setCurrentCourierName(userName);
+      setCurrentCourierId(userId);
+    } catch (error) {
+      console.error('加载骑手信息失败:', error);
+    }
+  };
+
   if (!permission) {
     return <View />;
   }
@@ -37,22 +53,6 @@ export default function ScanScreen({ navigation }: any) {
       </View>
     );
   }
-
-  // 加载当前骑手信息
-  useEffect(() => {
-    loadCurrentCourierInfo();
-  }, []);
-
-  const loadCurrentCourierInfo = async () => {
-    try {
-      const userName = await AsyncStorage.getItem('currentUserName') || '';
-      const userId = await AsyncStorage.getItem('currentUser') || '';
-      setCurrentCourierName(userName);
-      setCurrentCourierId(userId);
-    } catch (error) {
-      console.error('加载骑手信息失败:', error);
-    }
-  };
 
   const handleBarCodeScanned = async ({ data }: any) => {
     if (scanned) return;
