@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadScript, GoogleMap, Marker, Polyline } from '@react-google-maps/api';
-import { TrackingEvent, CourierLocation, Package } from '../services/supabase';
 import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
 
 // 错误边界组件

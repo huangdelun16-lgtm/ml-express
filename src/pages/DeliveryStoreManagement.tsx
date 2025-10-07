@@ -167,29 +167,6 @@ const DeliveryStoreManagement: React.FC = () => {
     setShowForm(true);
   };
 
-  // 获取店铺的包裹列表
-  const loadStorePackages = async (store: DeliveryStore) => {
-    setLoadingPackages(true);
-    try {
-      const allPackages = await packageService.getAllPackages();
-      
-      // 过滤出送达至该店铺的包裹（通过店长收件码识别）
-      const packages = allPackages.filter(pkg => {
-        // 检查包裹的送达记录中是否包含该店铺的收件码
-        // 这里简化处理，实际应该根据包裹的送达记录来判断
-        return pkg.status === '已送达' && pkg.courier; // 暂时显示所有已送达的包裹
-      });
-      
-      setStorePackages(packages);
-      setShowPackageModal(true);
-    } catch (error) {
-      console.error('获取店铺包裹失败:', error);
-      setErrorMessage('获取包裹列表失败');
-    } finally {
-      setLoadingPackages(false);
-    }
-  };
-
   // 获取入库包裹列表（骑手送来的包裹）
   const loadStoragePackages = async (store: DeliveryStore) => {
     setLoadingStorage(true);

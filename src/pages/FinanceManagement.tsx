@@ -103,14 +103,15 @@ const FinanceManagement: React.FC = () => {
   useEffect(() => {
     const calculateSummary = () => {
       const totalIncome = records.reduce((sum, record) => sum + (record.amount || 0), 0);
-      const totalExpense = records.filter(r => r.type === 'expense').reduce((sum, record) => sum + (record.amount || 0), 0);
-      const totalRevenue = totalIncome - totalExpense;
+      const totalExpense = records.filter(r => r.record_type === 'expense').reduce((sum, record) => sum + (record.amount || 0), 0);
+      const netProfit = totalIncome - totalExpense;
+      const pendingPayments = records.filter(r => r.status === 'pending').reduce((sum, record) => sum + (record.amount || 0), 0);
       
       setSummary({
         totalIncome,
         totalExpense,
-        totalRevenue,
-        recordCount: records.length
+        netProfit,
+        pendingPayments
       });
     };
     

@@ -58,6 +58,7 @@ const HomePage: React.FC = () => {
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
   const [generatedOrderId, setGeneratedOrderId] = useState('');
