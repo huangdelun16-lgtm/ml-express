@@ -262,15 +262,6 @@ const AdminLogin: React.FC = () => {
             {loading ? '登录中...' : '登录'}
           </button>
         </form>
-        <p style={{ 
-          color: 'rgba(255, 255, 255, 0.8)', 
-          textAlign: 'center', 
-          marginTop: '20px',
-          fontSize: '0.9rem',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-        }}>
-          默认账号: admin / admin
-        </p>
         
         {/* 退出按钮 */}
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
