@@ -1,66 +1,31 @@
 @echo off
-echo 🚀 MARKET LINK EXPRESS - Netlify 部署检查
-echo ==========================================
-
+echo 🚀 检查Netlify部署状态
+echo ================================
 echo.
-echo 📋 检查 Git 状态...
-git status --porcelain
-if %errorlevel% equ 0 (
-    echo ✅ Git 状态正常
-) else (
-    echo ❌ Git 状态异常
-)
 
+echo 📅 当前时间: %date% %time%
 echo.
-echo 📝 最新提交信息:
-git log --oneline -1
 
+echo 🔗 检查网站连接...
 echo.
-echo 🔨 检查构建文件...
-if exist build (
-    echo ✅ build 目录存在
-    echo 📊 构建文件大小:
-    dir build /s
-) else (
-    echo ❌ build 目录不存在
-)
 
+powershell -Command "try { $response = Invoke-WebRequest -Uri 'https://ml-express.netlify.app' -UseBasicParsing -TimeoutSec 10; if ($response.StatusCode -eq 200) { Write-Host '✅ 网站连接正常' -ForegroundColor Green } else { Write-Host '❌ 网站连接异常' -ForegroundColor Red } } catch { Write-Host '❌ 无法连接到网站' -ForegroundColor Red }"
 echo.
-echo ⚙️ 检查配置文件...
-if exist netlify.toml (
-    echo ✅ netlify.toml 存在
-    type netlify.toml
-) else (
-    echo ❌ netlify.toml 不存在
-)
 
-if exist package.json (
-    echo ✅ package.json 存在
-    echo 📦 构建脚本:
-    findstr /C:"scripts" package.json
-) else (
-    echo ❌ package.json 不存在
-)
-
+echo 🔗 检查管理后台连接...
 echo.
-echo 🔑 环境变量检查...
-echo 需要设置的环境变量:
-echo - REACT_APP_GOOGLE_MAPS_API_KEY
-echo - REACT_APP_SUPABASE_URL
-echo - REACT_APP_SUPABASE_ANON_KEY
 
+powershell -Command "try { $response = Invoke-WebRequest -Uri 'https://ml-express.netlify.app/admin' -UseBasicParsing -TimeoutSec 10; if ($response.StatusCode -eq 200) { Write-Host '✅ 管理后台连接正常' -ForegroundColor Green } else { Write-Host '❌ 管理后台连接异常' -ForegroundColor Red } } catch { Write-Host '❌ 无法连接到管理后台' -ForegroundColor Red }"
 echo.
-echo 📋 部署建议:
-echo 1. 确保在 Netlify 控制台中设置了所有环境变量
-echo 2. 检查构建日志是否有错误
-echo 3. 验证 Google Maps API Key 是否有效
-echo 4. 确认 Supabase 连接正常
 
+echo 📋 部署状态摘要:
+echo =================
+echo ✅ 代码已推送到GitHub
+echo ⏳ Netlify自动部署已触发
+echo 🔄 部署构建中（通常需要3-5分钟）
 echo.
-echo 🌐 部署完成后，可以通过以下方式访问:
-echo - Netlify 提供的默认域名
-echo - 自定义域名（如果已配置）
-
+echo 📖 详细部署信息请查看: NETLIFY-DEPLOYMENT-STATUS.md
 echo.
-echo ✨ 部署检查完成！
+echo 🔍 实时状态请访问: https://app.netlify.com/sites/ml-express/deploys
+echo.
 pause

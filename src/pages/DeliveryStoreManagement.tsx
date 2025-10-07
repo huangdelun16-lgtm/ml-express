@@ -1872,7 +1872,7 @@ const DeliveryStoreManagement: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
                         <div>
                           <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 600 }}>
-                            📦 {pkg.tracking_number}
+                            📦 {pkg.id}
                           </h4>
                           <p style={{ margin: '0', fontSize: '0.85rem', opacity: 0.8 }}>
                             {pkg.sender_name} → {pkg.receiver_name}
@@ -1900,11 +1900,11 @@ const DeliveryStoreManagement: React.FC = () => {
                           <span style={{ color: '#38a169' }}>📏</span> 重量: {pkg.weight}kg
                         </div>
                         <div>
-                          <span style={{ color: '#d69e2e' }}>💰</span> 费用: ¥{pkg.shipping_fee}
+                          <span style={{ color: '#d69e2e' }}>💰</span> 费用: ¥{pkg.price}
                         </div>
                       </div>
                       
-                      {pkg.notes && (
+                      {pkg.description && (
                         <div style={{
                           marginTop: '8px',
                           padding: '8px',
@@ -1913,7 +1913,7 @@ const DeliveryStoreManagement: React.FC = () => {
                           fontSize: '0.8rem',
                           opacity: 0.8
                         }}>
-                          <span style={{ color: '#4299e1' }}>📝</span> 备注: {pkg.notes}
+                          <span style={{ color: '#4299e1' }}>📝</span> 备注: {pkg.description}
                         </div>
                       )}
                     </div>
