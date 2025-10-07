@@ -68,6 +68,9 @@ const DeliveryStoreManagement: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   
   // 包裹详情相关状态
+  const [showPackageModal, setShowPackageModal] = useState(false);
+  const [storePackages, setStorePackages] = useState<Package[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [storagePackages, setStoragePackages] = useState<Package[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(false);
