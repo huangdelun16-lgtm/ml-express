@@ -399,31 +399,40 @@ const MyTasksScreen: React.FC = () => {
     if (data.startsWith('STORE_')) {
       // 解析店长收件码
       const storeInfo = data.replace('STORE_', '');
-      const [storeId, storeName] = storeInfo.split('_');
+      const [storeId, timestamp] = storeInfo.split('_');
       
       Alert.alert(
         '✅ 已送达',
-        `包裹已成功送达至：\n\n🏪 店铺：${storeName}\n📦 包裹ID：${selectedPackage?.id}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
+        `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
         [
           {
             text: '确定',
             onPress: async () => {
               try {
-                // 更新包裹状态为"已送达"
+                // 更新包裹状态为"已送达"，并记录店铺信息
                 if (selectedPackage) {
                   const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+                  
+                  // 构造店铺信息
+                  const storeReceiveInfo = {
+                    storeId: storeId,
+                    storeName: `店铺${storeId}`, // 这里可以根据storeId查询店铺名称
+                    receiveCode: data
+                  };
+                  
                   await packageService.updatePackageStatus(
                     selectedPackage.id, 
                     '已送达',
                     undefined, // pickupTime
                     new Date().toISOString(), // deliveryTime
-                    userName
+                    userName,
+                    storeReceiveInfo
                   );
                   
                   // 刷新任务列表
                   await loadMyPackages();
                   
-                  console.log('包裹状态已更新为已送达:', selectedPackage.id);
+                  console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId);
                 }
               } catch (error) {
                 console.error('更新包裹状态失败:', error);

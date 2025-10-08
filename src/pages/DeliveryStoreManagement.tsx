@@ -93,6 +93,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [storagePackages, setStoragePackages] = useState<Package[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(false);
+  const [currentStorageStore, setCurrentStorageStore] = useState<DeliveryStore | null>(null);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -115,8 +116,8 @@ const DeliveryStoreManagement: React.FC = () => {
   // 生成店长收件码二维码
   const generateStoreQRCode = async (store: DeliveryStore) => {
     try {
-      // 生成唯一的收件码
-      const receiveCode = `STORE_${store.id}_${store.store_code}`;
+      // 生成唯一的收件码，使用店铺ID确保唯一性
+      const receiveCode = `STORE_${store.id}_${Date.now()}`;
       const qrCodeUrl = await QRCode.toDataURL(receiveCode, {
         width: 200,
         margin: 2,
@@ -232,14 +233,17 @@ const DeliveryStoreManagement: React.FC = () => {
     try {
       const allPackages = await packageService.getAllPackages();
       
-      // 过滤出送达至该店铺的包裹（骑手送来的包裹）
+      // 过滤出送达至该特定店铺的包裹
       const packages = allPackages.filter(pkg => {
-        // 检查包裹的送达记录中是否包含该店铺的收件码
-        // 这里简化处理，实际应该根据包裹的送达记录来判断
-        return pkg.status === '已送达' && pkg.courier && pkg.delivery_time; // 已送达且有送达时间的包裹
+        // 检查包裹是否送达至当前店铺
+        return pkg.status === '已送达' && 
+               pkg.courier && 
+               pkg.delivery_time &&
+               pkg.delivery_store_id === store.id; // 只显示送达至当前店铺的包裹
       });
       
       setStoragePackages(packages);
+      setCurrentStorageStore(store);
       setShowStorageModal(true);
     } catch (error) {
       console.error('获取入库包裹失败:', error);
@@ -2038,9 +2042,11 @@ const DeliveryStoreManagement: React.FC = () => {
               color: 'white'
             }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700 }}>📦 入库包裹管理</h2>
+                <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700 }}>
+                  📦 {currentStorageStore ? `${currentStorageStore.store_name} - 入库包裹` : '入库包裹管理'}
+                </h2>
                 <p style={{ margin: '6px 0 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
-                  骑手送来的包裹信息
+                  {currentStorageStore ? `骑手送到 ${currentStorageStore.store_name} 的包裹信息` : '骑手送来的包裹信息'}
                 </p>
               </div>
               <button
@@ -2134,7 +2140,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📦</div>
                 <h3 style={{ margin: '0 0 8px 0' }}>暂无入库包裹</h3>
                 <p style={{ margin: 0, opacity: 0.7 }}>
-                  骑手还没有送包裹到这家店铺
+                  {currentStorageStore ? `骑手还没有送包裹到 ${currentStorageStore.store_name}` : '骑手还没有送包裹到这家店铺'}
                 </p>
               </div>
             ) : (

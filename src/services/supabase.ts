@@ -25,6 +25,10 @@ export interface Package {
   price: string;
   created_at?: string;
   updated_at?: string;
+  // 新增字段：店铺关联
+  delivery_store_id?: string; // 送达店铺ID
+  delivery_store_name?: string; // 送达店铺名称
+  store_receive_code?: string; // 店铺收件码
 }
 
 export interface FinanceRecord {
@@ -237,11 +241,26 @@ export const packageService = {
   },
 
   // 更新包裹状态
-  async updatePackageStatus(id: string, status: string, pickupTime?: string, deliveryTime?: string): Promise<boolean> {
+  async updatePackageStatus(
+    id: string, 
+    status: string, 
+    pickupTime?: string, 
+    deliveryTime?: string, 
+    courierName?: string,
+    storeInfo?: { storeId: string, storeName: string, receiveCode: string }
+  ): Promise<boolean> {
     const updateData: any = { status };
     
     if (pickupTime) updateData.pickup_time = pickupTime;
     if (deliveryTime) updateData.delivery_time = deliveryTime;
+    if (courierName) updateData.courier = courierName;
+    
+    // 如果是送达状态且有店铺信息，记录店铺关联
+    if (status === '已送达' && storeInfo) {
+      updateData.delivery_store_id = storeInfo.storeId;
+      updateData.delivery_store_name = storeInfo.storeName;
+      updateData.store_receive_code = storeInfo.receiveCode;
+    }
     
     const { error } = await supabase
       .from('packages')
