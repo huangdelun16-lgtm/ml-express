@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, Package, supabase, auditLogService } from '../services/supabase';
+import { packageService, Package, supabase, auditLogService, deliveryPhotoService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 
@@ -207,28 +207,32 @@ const CityPackages: React.FC = () => {
   const findPackagePhotos = async (packageId: string) => {
     try {
       setPhotoLoading(true);
-      // 这里应该从数据库或存储中获取照片
-      // 暂时使用模拟数据
-      const mockPhotos = [
-        {
-          id: '1',
-          url: 'https://via.placeholder.com/300x200/27ae60/ffffff?text=送达图片1',
-          timestamp: new Date().toLocaleString('zh-CN'),
-          courier: '骑手A',
-          location: '曼德勒市中心'
-        },
-        {
-          id: '2', 
-          url: 'https://via.placeholder.com/300x200/3498db/ffffff?text=送达图片2',
-          timestamp: new Date().toLocaleString('zh-CN'),
-          courier: '骑手A',
-          location: '曼德勒市中心'
-        }
-      ];
-      setPackagePhotos(mockPhotos);
+      
+      // 从数据库获取真实照片
+      const photos = await deliveryPhotoService.getPackagePhotos(packageId);
+      
+      if (photos.length === 0) {
+        // 如果没有照片，显示空状态
+        setPackagePhotos([]);
+        setShowPhotoModal(true);
+        return;
+      }
+
+      // 转换数据格式以匹配UI
+      const formattedPhotos = photos.map((photo, index) => ({
+        id: photo.id.toString(),
+        url: photo.photo_base64 ? `data:image/jpeg;base64,${photo.photo_base64}` : photo.photo_url,
+        timestamp: new Date(photo.upload_time).toLocaleString('zh-CN'),
+        courier: photo.courier_name,
+        location: photo.location_name || `${photo.latitude?.toFixed(4)}, ${photo.longitude?.toFixed(4)}`
+      }));
+
+      setPackagePhotos(formattedPhotos);
       setShowPhotoModal(true);
     } catch (error) {
       console.error('查找包裹照片失败:', error);
+      setPackagePhotos([]);
+      setShowPhotoModal(true);
     } finally {
       setPhotoLoading(false);
     }

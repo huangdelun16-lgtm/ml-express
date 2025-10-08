@@ -11,7 +11,7 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { packageService, auditLogService, Package } from '../services/supabase';
+import { packageService, auditLogService, Package, deliveryPhotoService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -84,6 +84,29 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     }
   };
 
+  // 将图片转换为base64
+  const convertImageToBase64 = async (imageUri: string): Promise<string> => {
+    try {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          // 移除data:image/jpeg;base64,前缀
+          const base64Data = base64String.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('转换图片为base64失败:', error);
+      return '';
+    }
+  };
+
   // 上传照片功能
   const handleUploadPhoto = async () => {
     if (!capturedPhoto) {
@@ -120,6 +143,23 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
       // 获取当前骑手信息
       const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+
+      // 将照片转换为base64（用于存储）
+      const photoBase64 = await convertImageToBase64(capturedPhoto);
+
+      // 保存配送照片到数据库
+      const photoSaved = await deliveryPhotoService.saveDeliveryPhoto({
+        packageId: currentPackage.id,
+        photoBase64: photoBase64,
+        courierName: userName,
+        latitude: latitude,
+        longitude: longitude,
+        locationName: '配送位置'
+      });
+
+      if (!photoSaved) {
+        console.log('照片保存失败，但继续更新包裹状态');
+      }
 
       // 更新包裹状态为"已送达"并记录店铺信息
       console.log('开始更新包裹状态:', {

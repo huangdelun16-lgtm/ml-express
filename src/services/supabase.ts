@@ -1249,3 +1249,85 @@ export const auditLogService = {
     }
   }
 };
+
+// 配送照片服务
+export const deliveryPhotoService = {
+  // 保存配送照片
+  async saveDeliveryPhoto(photoData: {
+    packageId: string;
+    photoUrl?: string;
+    photoBase64?: string;
+    courierName: string;
+    courierId?: string;
+    latitude?: number;
+    longitude?: number;
+    locationName?: string;
+  }): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_photos')
+        .insert([{
+          package_id: photoData.packageId,
+          photo_url: photoData.photoUrl,
+          photo_base64: photoData.photoBase64,
+          courier_name: photoData.courierName,
+          courier_id: photoData.courierId,
+          latitude: photoData.latitude,
+          longitude: photoData.longitude,
+          location_name: photoData.locationName,
+          upload_time: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error('保存配送照片失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('保存配送照片异常:', err);
+      return false;
+    }
+  },
+
+  // 获取包裹的配送照片
+  async getPackagePhotos(packageId: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_photos')
+        .select('*')
+        .eq('package_id', packageId)
+        .order('upload_time', { ascending: false });
+
+      if (error) {
+        console.error('获取包裹照片失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取包裹照片异常:', err);
+      return [];
+    }
+  },
+
+  // 删除配送照片
+  async deleteDeliveryPhoto(photoId: number): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('delivery_photos')
+        .delete()
+        .eq('id', photoId);
+
+      if (error) {
+        console.error('删除配送照片失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除配送照片异常:', err);
+      return false;
+    }
+  }
+};
