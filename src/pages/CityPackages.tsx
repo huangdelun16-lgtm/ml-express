@@ -21,6 +21,13 @@ const CityPackages: React.FC = () => {
   const [showUploadPhotoModal, setShowUploadPhotoModal] = useState(false);
   const [deliveryScanTab, setDeliveryScanTab] = useState('pickup');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  
+  // 新增功能状态
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [packagePhotos, setPackagePhotos] = useState<any[]>([]);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -60,6 +67,76 @@ const CityPackages: React.FC = () => {
       console.error('加载包裹数据失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 计算包裹统计信息
+  const getPackageStatistics = () => {
+    const total = packages.length;
+    const pending = packages.filter(p => p.status === '待取件').length;
+    const pickedUp = packages.filter(p => p.status === '已取件').length;
+    const delivering = packages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
+    const delivered = packages.filter(p => p.status === '已送达').length;
+    const cancelled = packages.filter(p => p.status === '已取消').length;
+
+    return {
+      total,
+      pending,
+      pickedUp,
+      delivering,
+      delivered,
+      cancelled
+    };
+  };
+
+  // 按日期过滤包裹
+  const getFilteredPackages = () => {
+    if (!selectedDate) return packages;
+    
+    return packages.filter(pkg => {
+      const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+      return pkgDate === selectedDate;
+    });
+  };
+
+  // 获取可用日期列表
+  const getAvailableDates = () => {
+    const dates = new Set<string>();
+    packages.forEach(pkg => {
+      const date = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+      dates.add(date);
+    });
+    return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  };
+
+  // 查找包裹照片
+  const findPackagePhotos = async (packageId: string) => {
+    try {
+      setPhotoLoading(true);
+      // 这里应该从数据库或存储中获取照片
+      // 暂时使用模拟数据
+      const mockPhotos = [
+        {
+          id: '1',
+          url: 'https://via.placeholder.com/300x200/27ae60/ffffff?text=配送照片1',
+          timestamp: new Date().toLocaleString('zh-CN'),
+          courier: '骑手A',
+          location: '曼德勒市中心'
+        },
+        {
+          id: '2', 
+          url: 'https://via.placeholder.com/300x200/3498db/ffffff?text=配送照片2',
+          timestamp: new Date().toLocaleString('zh-CN'),
+          courier: '骑手A',
+          location: '曼德勒市中心'
+        }
+      ];
+      setPackagePhotos(mockPhotos);
+      setShowPhotoModal(true);
+    } catch (error) {
+      console.error('查找包裹照片失败:', error);
+    } finally {
+      setPhotoLoading(false);
     }
   };
 
@@ -352,36 +429,135 @@ const CityPackages: React.FC = () => {
             <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
               {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
             </p>
+            
+            {/* 包裹统计信息 */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '20px', 
+              marginTop: '15px',
+              flexWrap: 'wrap'
+            }}>
+              {(() => {
+                const stats = getPackageStatistics();
+                return (
+                  <>
+                    <div style={{ 
+                      background: 'rgba(255, 255, 255, 0.1)', 
+                      padding: '8px 16px', 
+                      borderRadius: '20px',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>总包裹: </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{stats.total}</span>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(243, 156, 18, 0.2)', 
+                      padding: '8px 16px', 
+                      borderRadius: '20px',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(243, 156, 18, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>待取件: </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#f39c12' }}>{stats.pending}</span>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(52, 152, 219, 0.2)', 
+                      padding: '8px 16px', 
+                      borderRadius: '20px',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(52, 152, 219, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已取件: </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#3498db' }}>{stats.pickedUp}</span>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(155, 89, 182, 0.2)', 
+                      padding: '8px 16px', 
+                      borderRadius: '20px',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(155, 89, 182, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>配送中: </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#9b59b6' }}>{stats.delivering}</span>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(39, 174, 96, 0.2)', 
+                      padding: '8px 16px', 
+                      borderRadius: '20px',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(39, 174, 96, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已送达: </span>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#27ae60' }}>{stats.delivered}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
-          <button
-            onClick={loadPackages}
-            style={{
-              background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-              color: 'white',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)',
-              transition: 'all 0.3s ease',
-              textShadow: 'none'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
-            }}
-          >
-            🔄 {language === 'zh' ? '刷新状态' : 'Refresh Status'}
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => setShowDatePicker(true)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                textShadow: 'none'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              📅 {language === 'zh' ? '日期筛选' : 'Date Filter'}
+              {selectedDate && <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({selectedDate})</span>}
+            </button>
+            
+            <button
+              onClick={loadPackages}
+              style={{
+                background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)',
+                transition: 'all 0.3s ease',
+                textShadow: 'none'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
+              }}
+            >
+              🔄 {language === 'zh' ? '刷新状态' : 'Refresh Status'}
+            </button>
+          </div>
         </div>
         <button
           onClick={() => navigate('/admin/dashboard')}
@@ -472,12 +648,30 @@ const CityPackages: React.FC = () => {
               display: 'grid',
               gap: '15px'
             }}>
-              {packages.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
-                  <p>暂无包裹数据</p>
-                </div>
-              ) : (
-                packages.map((pkg) => (
+              {(() => {
+                const filteredPackages = getFilteredPackages();
+                return filteredPackages.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+                    <p>{selectedDate ? `所选日期 ${selectedDate} 暂无包裹数据` : '暂无包裹数据'}</p>
+                    {selectedDate && (
+                      <button
+                        onClick={() => setSelectedDate(null)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          marginTop: '10px'
+                        }}
+                      >
+                        清除日期筛选
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  filteredPackages.map((pkg) => (
               <div key={pkg.id} style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
@@ -614,6 +808,35 @@ const CityPackages: React.FC = () => {
                       }}
                     >
                       查看详情
+                    </button>
+                    
+                    <button
+                      onClick={() => findPackagePhotos(pkg.id)}
+                      style={{
+                        background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(230, 126, 34, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
+                      }}
+                    >
+                      🔍 查找照片
                     </button>
                     
                     <button
@@ -1794,6 +2017,217 @@ const CityPackages: React.FC = () => {
                 拍照后系统将自动记录GPS位置信息
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 日期选择器模态框 */}
+      {showDatePicker && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                📅 选择日期
+              </h2>
+              <button
+                onClick={() => setShowDatePicker(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <button
+                onClick={() => {
+                  setSelectedDate(null);
+                  setShowDatePicker(false);
+                }}
+                style={{
+                  background: selectedDate === null ? 'rgba(39, 174, 96, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  width: '100%',
+                  marginBottom: '10px',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                全部日期 ({packages.length} 个包裹)
+              </button>
+              
+              {getAvailableDates().map((date) => {
+                const datePackages = packages.filter(pkg => {
+                  const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                  return pkgDate === date;
+                }).length;
+                
+                return (
+                  <button
+                    key={date}
+                    onClick={() => {
+                      setSelectedDate(date);
+                      setShowDatePicker(false);
+                    }}
+                    style={{
+                      background: selectedDate === date ? 'rgba(39, 174, 96, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      padding: '12px 20px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      width: '100%',
+                      marginBottom: '10px',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    {date} ({datePackages} 个包裹)
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 照片查看模态框 */}
+      {showPhotoModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                📸 包裹配送照片
+              </h2>
+              <button
+                onClick={() => setShowPhotoModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            {photoLoading ? (
+              <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+                <p>正在加载照片...</p>
+              </div>
+            ) : packagePhotos.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+                <p>暂无配送照片</p>
+                <p style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '10px' }}>
+                  骑手送件完成后上传的照片将显示在这里
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {packagePhotos.map((photo) => (
+                  <div key={photo.id} style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '10px',
+                    padding: '15px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}>
+                    <img 
+                      src={photo.url} 
+                      alt={`配送照片 ${photo.id}`}
+                      style={{
+                        width: '100%',
+                        height: '200px',
+                        objectFit: 'cover',
+                        borderRadius: '8px',
+                        marginBottom: '10px'
+                      }}
+                    />
+                    <div style={{ color: 'white' }}>
+                      <p style={{ margin: '0 0 5px 0', fontSize: '0.9rem' }}>
+                        <strong>上传时间:</strong> {photo.timestamp}
+                      </p>
+                      <p style={{ margin: '0 0 5px 0', fontSize: '0.9rem' }}>
+                        <strong>上传骑手:</strong> {photo.courier}
+                      </p>
+                      <p style={{ margin: '0', fontSize: '0.9rem' }}>
+                        <strong>拍摄位置:</strong> {photo.location}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
