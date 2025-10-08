@@ -63,8 +63,8 @@ const AdminLogin: React.FC = () => {
 
   // LOGO组件
   const Logo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => {
-    const logoSize = size === 'small' ? '40px' : size === 'large' ? '80px' : '60px';
-    const textSize = size === 'small' ? '0.8rem' : size === 'large' ? '1.2rem' : '1rem';
+    const logoSize = size === 'small' ? '80px' : size === 'large' ? '160px' : '120px';
+    const textSize = size === 'small' ? '1rem' : size === 'large' ? '1.8rem' : '1.4rem';
     
     return (
       <div 

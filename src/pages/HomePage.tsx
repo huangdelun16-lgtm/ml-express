@@ -414,7 +414,7 @@ const HomePage: React.FC = () => {
 
   // LOGO组件
   const Logo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => {
-    const logoSize = size === 'small' ? '40px' : size === 'large' ? '80px' : '60px';
+    const logoSize = size === 'small' ? '80px' : size === 'large' ? '160px' : '120px';
     
     return (
       <div 
@@ -443,7 +443,7 @@ const HomePage: React.FC = () => {
         {/* 公司名称 - 放大字体 */}
         <div style={{
           color: 'white',
-          fontSize: size === 'small' ? '1.2rem' : size === 'large' ? '2rem' : '1.5rem',
+          fontSize: size === 'small' ? '1.4rem' : size === 'large' ? '2.4rem' : '2rem',
           fontWeight: 'bold',
           textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
         }}>
