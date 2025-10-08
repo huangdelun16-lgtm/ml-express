@@ -34,6 +34,9 @@ const CityPackages: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Package | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  
+  // 状态过滤功能状态
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -95,22 +98,30 @@ const CityPackages: React.FC = () => {
     };
   };
 
-  // 按日期过滤包裹
+  // 按日期和状态过滤包裹
   const getFilteredPackages = () => {
-    if (!selectedDate) {
-      // 如果没有选择日期，按创建时间倒序排列
-      return [...packages].sort((a, b) => {
-        const dateA = new Date(a.created_at || a.create_time).getTime();
-        const dateB = new Date(b.created_at || b.create_time).getTime();
-        return dateB - dateA;
+    let filteredPackages = [...packages];
+    
+    // 按状态过滤
+    if (selectedStatus) {
+      filteredPackages = filteredPackages.filter(pkg => {
+        if (selectedStatus === '配送中') {
+          return pkg.status === '配送中' || pkg.status === '配送进行中';
+        }
+        return pkg.status === selectedStatus;
       });
     }
     
-    return packages.filter(pkg => {
-      const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
-      return pkgDate === selectedDate;
-    }).sort((a, b) => {
-      // 同一天内按时间倒序排列
+    // 按日期过滤
+    if (selectedDate) {
+      filteredPackages = filteredPackages.filter(pkg => {
+        const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+        return pkgDate === selectedDate;
+      });
+    }
+    
+    // 按创建时间倒序排列
+    return filteredPackages.sort((a, b) => {
       const dateA = new Date(a.created_at || a.create_time).getTime();
       const dateB = new Date(b.created_at || b.create_time).getTime();
       return dateB - dateA;
@@ -144,6 +155,23 @@ const CityPackages: React.FC = () => {
     } else {
       return dateStr;
     }
+  };
+
+  // 处理状态卡片点击
+  const handleStatusClick = (status: string) => {
+    if (selectedStatus === status) {
+      // 如果点击的是当前选中的状态，则取消选择
+      setSelectedStatus(null);
+    } else {
+      // 否则选择新状态
+      setSelectedStatus(status);
+    }
+  };
+
+  // 清除所有过滤
+  const clearAllFilters = () => {
+    setSelectedStatus(null);
+    setSelectedDate(null);
   };
 
   // 查找包裹照片
@@ -277,10 +305,10 @@ const CityPackages: React.FC = () => {
               {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
             </p>
             
-            {/* 包裹统计信息 */}
+            {/* 包裹统计信息 - 可点击过滤器 */}
             <div style={{ 
               display: 'flex', 
-              gap: '20px', 
+              gap: '15px', 
               marginTop: '15px',
               flexWrap: 'wrap'
             }}>
@@ -288,53 +316,88 @@ const CityPackages: React.FC = () => {
                 const stats = getPackageStatistics();
                 return (
                   <>
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.1)', 
-                      padding: '8px 16px', 
-                      borderRadius: '20px',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
-                    }}>
+                    <div 
+                      onClick={() => handleStatusClick('all')}
+                      style={{ 
+                        background: selectedStatus === 'all' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)', 
+                        padding: '12px 20px', 
+                        borderRadius: '25px',
+                        backdropFilter: 'blur(10px)',
+                        border: selectedStatus === 'all' ? '2px solid rgba(255, 255, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: selectedStatus === 'all' ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: selectedStatus === 'all' ? '0 4px 15px rgba(255, 255, 255, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>总包裹: </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{stats.total}</span>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(243, 156, 18, 0.2)', 
-                      padding: '8px 16px', 
-                      borderRadius: '20px',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(243, 156, 18, 0.3)'
-                    }}>
+                    <div 
+                      onClick={() => handleStatusClick('待取件')}
+                      style={{ 
+                        background: selectedStatus === '待取件' ? 'rgba(243, 156, 18, 0.4)' : 'rgba(243, 156, 18, 0.2)', 
+                        padding: '12px 20px', 
+                        borderRadius: '25px',
+                        backdropFilter: 'blur(10px)',
+                        border: selectedStatus === '待取件' ? '2px solid rgba(243, 156, 18, 0.6)' : '1px solid rgba(243, 156, 18, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: selectedStatus === '待取件' ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: selectedStatus === '待取件' ? '0 4px 15px rgba(243, 156, 18, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>待取件: </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#f39c12' }}>{stats.pending}</span>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(52, 152, 219, 0.2)', 
-                      padding: '8px 16px', 
-                      borderRadius: '20px',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(52, 152, 219, 0.3)'
-                    }}>
+                    <div 
+                      onClick={() => handleStatusClick('已取件')}
+                      style={{ 
+                        background: selectedStatus === '已取件' ? 'rgba(52, 152, 219, 0.4)' : 'rgba(52, 152, 219, 0.2)', 
+                        padding: '12px 20px', 
+                        borderRadius: '25px',
+                        backdropFilter: 'blur(10px)',
+                        border: selectedStatus === '已取件' ? '2px solid rgba(52, 152, 219, 0.6)' : '1px solid rgba(52, 152, 219, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: selectedStatus === '已取件' ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: selectedStatus === '已取件' ? '0 4px 15px rgba(52, 152, 219, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已取件: </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#3498db' }}>{stats.pickedUp}</span>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(155, 89, 182, 0.2)', 
-                      padding: '8px 16px', 
-                      borderRadius: '20px',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(155, 89, 182, 0.3)'
-                    }}>
+                    <div 
+                      onClick={() => handleStatusClick('配送中')}
+                      style={{ 
+                        background: selectedStatus === '配送中' ? 'rgba(155, 89, 182, 0.4)' : 'rgba(155, 89, 182, 0.2)', 
+                        padding: '12px 20px', 
+                        borderRadius: '25px',
+                        backdropFilter: 'blur(10px)',
+                        border: selectedStatus === '配送中' ? '2px solid rgba(155, 89, 182, 0.6)' : '1px solid rgba(155, 89, 182, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: selectedStatus === '配送中' ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: selectedStatus === '配送中' ? '0 4px 15px rgba(155, 89, 182, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>配送中: </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#9b59b6' }}>{stats.delivering}</span>
                     </div>
-                    <div style={{ 
-                      background: 'rgba(39, 174, 96, 0.2)', 
-                      padding: '8px 16px', 
-                      borderRadius: '20px',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(39, 174, 96, 0.3)'
-                    }}>
+                    <div 
+                      onClick={() => handleStatusClick('已送达')}
+                      style={{ 
+                        background: selectedStatus === '已送达' ? 'rgba(39, 174, 96, 0.4)' : 'rgba(39, 174, 96, 0.2)', 
+                        padding: '12px 20px', 
+                        borderRadius: '25px',
+                        backdropFilter: 'blur(10px)',
+                        border: selectedStatus === '已送达' ? '2px solid rgba(39, 174, 96, 0.6)' : '1px solid rgba(39, 174, 96, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: selectedStatus === '已送达' ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: selectedStatus === '已送达' ? '0 4px 15px rgba(39, 174, 96, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已送达: </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#27ae60' }}>{stats.delivered}</span>
                     </div>
@@ -453,12 +516,72 @@ const CityPackages: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
+            {/* 过滤状态提示 */}
+            {(selectedStatus || selectedDate) && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: '15px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                marginBottom: '10px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ color: 'white', fontSize: '0.9rem' }}>
+                    <span style={{ opacity: 0.8 }}>当前筛选: </span>
+                    {selectedStatus && selectedStatus !== 'all' && (
+                      <span style={{ 
+                        background: getStatusColor(selectedStatus), 
+                        padding: '4px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '0.8rem',
+                        marginRight: '8px'
+                      }}>
+                        {getStatusText(selectedStatus)}
+                      </span>
+                    )}
+                    {selectedDate && (
+                      <span style={{ 
+                        background: 'rgba(52, 152, 219, 0.3)', 
+                        padding: '4px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '0.8rem'
+                      }}>
+                        {formatDateDisplay(selectedDate)}
+                      </span>
+                    )}
+                    <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                      ({getFilteredPackages().length} 个包裹)
+                    </span>
+                  </div>
+                  <button
+                    onClick={clearAllFilters}
+                    style={{
+                      background: 'rgba(231, 76, 60, 0.2)',
+                      color: '#e74c3c',
+                      border: '1px solid rgba(231, 76, 60, 0.3)',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    ✕ 清除筛选
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {getFilteredPackages().length === 0 ? (
               <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
-                <p>{selectedDate ? `所选日期 ${selectedDate} 暂无包裹数据` : '暂无包裹数据'}</p>
-                {selectedDate && (
+                <p>{
+                  selectedStatus || selectedDate 
+                    ? `没有找到符合条件的包裹` 
+                    : '暂无包裹数据'
+                }</p>
+                {(selectedStatus || selectedDate) && (
                   <button
-                    onClick={() => setSelectedDate(null)}
+                    onClick={clearAllFilters}
                     style={{
                       background: 'rgba(255, 255, 255, 0.1)',
                       color: 'white',
@@ -469,7 +592,7 @@ const CityPackages: React.FC = () => {
                       marginTop: '10px'
                     }}
                   >
-                    清除日期筛选
+                    清除所有筛选
                   </button>
                 )}
               </div>
