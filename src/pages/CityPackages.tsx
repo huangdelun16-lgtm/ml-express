@@ -37,6 +37,9 @@ const CityPackages: React.FC = () => {
   
   // 状态过滤功能状态
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  
+  // 寄件码功能状态
+  const [selectedPackageForPickup, setSelectedPackageForPickup] = useState<Package | null>(null);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -172,6 +175,20 @@ const CityPackages: React.FC = () => {
   const clearAllFilters = () => {
     setSelectedStatus(null);
     setSelectedDate(null);
+  };
+  
+  // 显示寄件码
+  const showPickupCode = async (pkg: Package) => {
+    setSelectedPackageForPickup(pkg);
+    await generateQRCode(pkg.id);
+    setShowPickupCodeModal(true);
+  };
+  
+  // 关闭寄件码模态框
+  const closePickupCodeModal = () => {
+    setShowPickupCodeModal(false);
+    setSelectedPackageForPickup(null);
+    setQrCodeDataUrl('');
   };
 
   // 查找包裹照片
@@ -776,7 +793,38 @@ const CityPackages: React.FC = () => {
                     </div>
                     
                     {/* 右侧功能按钮 */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => showPickupCode(pkg)}
+                        style={{
+                          background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px 18px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '500',
+                          minHeight: '40px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(142, 68, 173, 0.3)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(142, 68, 173, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(142, 68, 173, 0.3)';
+                        }}
+                      >
+                        📱 寄件码
+                      </button>
+                      
                       <button
                         onClick={() => handleViewDetail(pkg)}
                         style={{
@@ -842,6 +890,144 @@ const CityPackages: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 寄件码模态框 */}
+      {showPickupCodeModal && selectedPackageForPickup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                📱 寄件码
+              </h2>
+              <button
+                onClick={closePickupCodeModal}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ color: 'white', margin: '0 0 15px 0', fontSize: '1.1rem' }}>
+                📦 包裹信息
+              </h3>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', marginBottom: '15px' }}>
+                <p style={{ margin: '5px 0' }}><strong>包裹编号:</strong> {selectedPackageForPickup.id}</p>
+                <p style={{ margin: '5px 0' }}><strong>包裹类型:</strong> {selectedPackageForPickup.package_type}</p>
+                <p style={{ margin: '5px 0' }}><strong>寄件人:</strong> {selectedPackageForPickup.sender_name}</p>
+                <p style={{ margin: '5px 0' }}><strong>收件人:</strong> {selectedPackageForPickup.receiver_name}</p>
+              </div>
+              
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '10px',
+                marginBottom: '15px'
+              }}>
+                {qrCodeDataUrl ? (
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="寄件码二维码" 
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      margin: '0 auto',
+                      display: 'block'
+                    }}
+                  />
+                ) : (
+                  <div style={{ 
+                    width: '200px', 
+                    height: '200px', 
+                    background: '#f0f0f0', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    margin: '0 auto',
+                    borderRadius: '8px'
+                  }}>
+                    <p style={{ color: '#666', margin: 0 }}>生成中...</p>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                padding: '15px',
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <h4 style={{ color: '#A5C7FF', margin: '0 0 10px 0', fontSize: '0.9rem' }}>
+                  💡 使用说明
+                </h4>
+                <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', textAlign: 'left' }}>
+                  <p style={{ margin: '5px 0' }}>• 骑手取件时扫描此二维码</p>
+                  <p style={{ margin: '5px 0' }}>• 确认包裹信息后完成取件</p>
+                  <p style={{ margin: '5px 0' }}>• 二维码包含包裹唯一标识</p>
+                  <p style={{ margin: '5px 0' }}>• 请妥善保管，避免泄露</p>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                onClick={closePickupCodeModal}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 查询单号模态框 */}
       {showSearchModal && (
