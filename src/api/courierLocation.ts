@@ -248,8 +248,10 @@ export const getCourierTrackingHistory = async (
 };
 
 // 导出默认对象
-export default {
+const courierLocationService = {
   updateCourierLocation,
   getCourierLocations,
   getCourierTrackingHistory
 };
+
+export default courierLocationService;

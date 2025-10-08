@@ -88,8 +88,8 @@ const DeliveryStoreManagement: React.FC = () => {
   
   // 包裹详情相关状态
   const [showPackageModal, setShowPackageModal] = useState(false);
-  const [storePackages, setStorePackages] = useState<Package[]>([]);
-  const [loadingPackages, setLoadingPackages] = useState(false);
+  // const [storePackages, setStorePackages] = useState<Package[]>([]); // 暂时未使用
+  // const [loadingPackages, setLoadingPackages] = useState(false); // 暂时未使用
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [storagePackages, setStoragePackages] = useState<Package[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(false);
@@ -1490,7 +1490,7 @@ const DeliveryStoreManagement: React.FC = () => {
               maxHeight: '60vh',
               overflow: 'auto'
             }}>
-              {loadingPackages ? (
+              {false ? ( // loadingPackages 暂时禁用
                 <div style={{
                   textAlign: 'center',
                   padding: '2rem',
@@ -1499,7 +1499,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
                   <p>正在加载包裹列表...</p>
                 </div>
-              ) : storePackages.length === 0 ? (
+              ) : storagePackages.length === 0 ? (
                 <div style={{
                   textAlign: 'center',
                   padding: '2rem',
@@ -1513,7 +1513,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {storePackages.map((pkg) => (
+                  {storagePackages.map((pkg) => (
                     <div
                       key={pkg.id}
                       style={{
@@ -1586,7 +1586,7 @@ const DeliveryStoreManagement: React.FC = () => {
             </div>
 
             {/* 统计信息 */}
-            {storePackages.length > 0 && (
+            {storagePackages.length > 0 && (
               <div style={{
                 marginTop: '1.5rem',
                 background: 'rgba(255, 255, 255, 0.1)',
@@ -1598,19 +1598,19 @@ const DeliveryStoreManagement: React.FC = () => {
               }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', color: '#A5C7FF', fontWeight: 'bold' }}>
-                    {storePackages.length}
+                    {storagePackages.length}
                   </div>
                   <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总包裹数</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', color: '#2ecc71', fontWeight: 'bold' }}>
-                    {storePackages.reduce((sum, pkg) => sum + parseFloat(pkg.weight || '0'), 0).toFixed(1)}kg
+                    {storagePackages.reduce((sum, pkg) => sum + parseFloat(pkg.weight || '0'), 0).toFixed(1)}kg
                   </div>
                   <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总重量</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', color: '#f39c12', fontWeight: 'bold' }}>
-                    ¥{storePackages.reduce((sum, pkg) => sum + parseFloat(pkg.price || '0'), 0).toFixed(2)}
+                    ¥{storagePackages.reduce((sum, pkg) => sum + parseFloat(pkg.price || '0'), 0).toFixed(2)}
                   </div>
                   <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>总金额</div>
                 </div>
