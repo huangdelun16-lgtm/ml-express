@@ -227,6 +227,33 @@ const DeliveryStoreManagement: React.FC = () => {
     setShowForm(true);
   };
 
+  // 转发包裹功能
+  const handleForwardPackage = async (pkg: Package) => {
+    try {
+      // 更新包裹状态为"待派送"
+      const success = await packageService.updatePackageStatus(
+        pkg.id,
+        '待派送',
+        pkg.pickup_time,
+        undefined, // 清除delivery_time，因为包裹还在中转站
+        pkg.courier
+      );
+
+      if (success) {
+        setSuccessMessage(`包裹 ${pkg.id} 已标记为待派送，等待骑手取件`);
+        // 刷新包裹列表
+        if (currentStorageStore) {
+          loadStoragePackages(currentStorageStore);
+        }
+      } else {
+        setErrorMessage('转发包裹失败，请重试');
+      }
+    } catch (error) {
+      console.error('转发包裹失败:', error);
+      setErrorMessage('转发包裹失败，请重试');
+    }
+  };
+
   // 获取入库包裹列表（骑手送来的包裹）
   const loadStoragePackages = async (store: DeliveryStore) => {
     if (!store.id) {
@@ -1446,7 +1473,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   fontSize: '1.5rem',
                   fontWeight: 'bold'
                 }}>
-                  📦 {selectedStore.store_name} - 送达包裹
+                  📦 {selectedStore.store_name} - 中转站包裹
                 </h2>
                 <p style={{
                   margin: '0.5rem 0 0 0',
@@ -1507,10 +1534,10 @@ const DeliveryStoreManagement: React.FC = () => {
                   padding: '2rem',
                   color: 'rgba(255, 255, 255, 0.8)'
                 }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📦</div>
-                  <p>暂无送达包裹</p>
+                  <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🏪</div>
+                  <p>暂无中转站包裹</p>
                   <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-                    该店铺还没有收到任何包裹
+                    该店铺还没有收到任何中转包裹
                   </p>
                 </div>
               ) : (
@@ -1534,11 +1561,11 @@ const DeliveryStoreManagement: React.FC = () => {
                           <span style={{
                             padding: '4px 8px',
                             borderRadius: '6px',
-                            background: 'rgba(72, 187, 120, 0.3)',
+                            background: 'rgba(255, 193, 7, 0.3)',
                             fontSize: '0.8rem',
-                            color: '#2ecc71'
+                            color: '#ffc107'
                           }}>
-                            ✅ 已送达
+                            🏪 已到达中转站
                           </span>
                           {pkg.sender_code && (
                             <span style={{
@@ -1583,15 +1610,35 @@ const DeliveryStoreManagement: React.FC = () => {
                           <span>⚖️ {pkg.weight}kg</span>
                           <span style={{ marginLeft: '12px' }}>💰 ¥{pkg.price}</span>
                         </div>
-                        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
-                          <span style={{ color: '#27ae60' }}>🚚 骑手: {pkg.courier}</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleForwardPackage(pkg);
+                            }}
+                            style={{
+                              background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'
+                          >
+                            🚚 转发包裹
+                          </button>
                         </div>
                       </div>
                       
                       {pkg.delivery_time && (
-                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(39, 174, 96, 0.2)', borderRadius: '6px' }}>
-                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#2ecc71' }}>
-                            ⏰ 送达时间: {new Date(pkg.delivery_time).toLocaleString('zh-CN')}
+                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255, 193, 7, 0.2)', borderRadius: '6px' }}>
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#ffc107' }}>
+                            ⏰ 到达中转站时间: {new Date(pkg.delivery_time).toLocaleString('zh-CN')}
                           </p>
                         </div>
                       )}
