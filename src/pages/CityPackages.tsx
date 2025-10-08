@@ -679,30 +679,30 @@ const CityPackages: React.FC = () => {
               getFilteredPackages().map((pkg) => (
                 <div key={pkg.id} style={{
                   background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                  padding: '20px',
+                  borderRadius: '8px',
+                  padding: '12px',
                   border: '1px solid rgba(255, 255, 255, 0.2)'
                 }}>
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    marginBottom: '15px'
+                    marginBottom: '10px'
                   }}>
                     <div>
-                      <h3 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1.2rem' }}>
+                      <h3 style={{ color: 'white', margin: '0 0 3px 0', fontSize: '1.1rem' }}>
                         {pkg.id} - {pkg.package_type}
                       </h3>
-                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.9rem' }}>
+                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
                         创建时间: {pkg.create_time}
                       </p>
                     </div>
                     <div style={{
                       background: getStatusColor(pkg.status),
                       color: 'white',
-                      padding: '5px 15px',
-                      borderRadius: '20px',
-                      fontSize: '0.9rem',
+                      padding: '4px 12px',
+                      borderRadius: '15px',
+                      fontSize: '0.8rem',
                       fontWeight: 'bold'
                     }}>
                       {getStatusText(pkg.status)}
@@ -711,19 +711,19 @@ const CityPackages: React.FC = () => {
 
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '15px',
-                    marginBottom: '15px'
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '10px',
+                    marginBottom: '10px'
                   }}>
                     <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>寄件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>寄件人</h4>
+                      <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
                         {pkg.sender_name} - {pkg.sender_phone}
                       </p>
                     </div>
                     <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>收件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>收件人</h4>
+                      <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
                         {pkg.receiver_name} - {pkg.receiver_phone}
                       </p>
                     </div>
@@ -733,12 +733,12 @@ const CityPackages: React.FC = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
-                    gap: '15px',
+                    gap: '10px',
                     flexWrap: 'wrap',
-                    marginTop: '15px'
+                    marginTop: '8px'
                   }}>
                     {/* 左侧状态操作按钮 */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       {pkg.status === '待取件' && (
                         <button
                           onClick={() => updatePackageStatus(pkg.id, '已取件')}
@@ -746,12 +746,12 @@ const CityPackages: React.FC = () => {
                             background: '#3498db',
                             color: 'white',
                             border: 'none',
-                            padding: '10px 18px',
-                            borderRadius: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '5px',
                             cursor: 'pointer',
-                            fontSize: '0.9rem',
+                            fontSize: '0.8rem',
                             fontWeight: '500',
-                            minHeight: '40px',
+                            minHeight: '32px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
@@ -805,23 +805,23 @@ const CityPackages: React.FC = () => {
                     </div>
                     
                     {/* 右侧功能按钮 */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <button
                         onClick={() => showPickupCode(pkg)}
                         style={{
                           background: 'rgba(255, 255, 255, 0.2)',
                           color: 'white',
                           border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '10px 18px',
-                          borderRadius: '6px',
+                          padding: '8px 14px',
+                          borderRadius: '5px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem',
+                          fontSize: '0.8rem',
                           fontWeight: '500',
-                          minHeight: '40px',
+                          minHeight: '32px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
+                          gap: '4px',
                           backdropFilter: 'blur(10px)',
                           transition: 'all 0.3s ease',
                           position: 'relative',
@@ -847,12 +847,12 @@ const CityPackages: React.FC = () => {
                           background: 'rgba(255, 255, 255, 0.2)',
                           color: 'white',
                           border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '10px 18px',
-                          borderRadius: '6px',
+                          padding: '8px 14px',
+                          borderRadius: '5px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem',
+                          fontSize: '0.8rem',
                           fontWeight: '500',
-                          minHeight: '40px',
+                          minHeight: '32px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -874,16 +874,16 @@ const CityPackages: React.FC = () => {
                           background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
                           color: 'white',
                           border: 'none',
-                          padding: '10px 18px',
-                          borderRadius: '6px',
+                          padding: '8px 14px',
+                          borderRadius: '5px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem',
+                          fontSize: '0.8rem',
                           fontWeight: '500',
-                          minHeight: '40px',
+                          minHeight: '32px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
+                          gap: '4px',
                           boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
                           transition: 'all 0.3s ease'
                         }}
