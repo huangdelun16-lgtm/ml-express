@@ -983,7 +983,7 @@ export const deliveryStoreService = {
   },
 
   // 创建新快递店
-  async createStore(storeData: Omit<DeliveryStore, 'id' | 'current_load' | 'status' | 'created_at' | 'updated_at'>): Promise<DeliveryStore | null> {
+  async createStore(storeData: Omit<DeliveryStore, 'id' | 'current_load' | 'status' | 'created_at' | 'updated_at'>): Promise<{ success: boolean; data?: DeliveryStore; error?: string }> {
     try {
       const { data, error } = await supabase
         .from('delivery_stores')
@@ -997,13 +997,21 @@ export const deliveryStoreService = {
 
       if (error) {
         console.error('创建快递店失败:', error);
-        return null;
+        // 检查是否是唯一约束错误
+        if (error.code === '23505') {
+          if (error.message.includes('store_code')) {
+            return { success: false, error: '店铺代码已存在，请使用其他代码' };
+          } else if (error.message.includes('store_name')) {
+            return { success: false, error: '店铺名称已存在，请使用其他名称' };
+          }
+        }
+        return { success: false, error: '创建失败，请重试' };
       }
 
-      return data;
+      return { success: true, data };
     } catch (err) {
       console.error('创建快递店异常:', err);
-      return null;
+      return { success: false, error: '创建失败，请重试' };
     }
   },
 

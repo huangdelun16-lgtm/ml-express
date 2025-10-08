@@ -94,6 +94,9 @@ const DeliveryStoreManagement: React.FC = () => {
   const [storagePackages, setStoragePackages] = useState<Package[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(false);
   const [currentStorageStore, setCurrentStorageStore] = useState<DeliveryStore | null>(null);
+  
+  // 添加重试状态
+  const [retryCount, setRetryCount] = useState(0);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -287,11 +290,25 @@ const DeliveryStoreManagement: React.FC = () => {
     loadStores();
   }, []);
 
-  const loadStores = async () => {
-    setLoading(true);
-    const data = await deliveryStoreService.getAllStores();
-    setStores(data);
-    setLoading(false);
+  const loadStores = async (isRetry = false) => {
+    try {
+      setLoading(true);
+      if (!isRetry) {
+        setErrorMessage(null); // 清除之前的错误信息
+      }
+      const data = await deliveryStoreService.getAllStores();
+      setStores(data);
+      setRetryCount(0); // 重置重试计数
+    } catch (error) {
+      console.error('加载快递店列表失败:', error);
+      setErrorMessage('加载快递店列表失败，请刷新页面重试');
+      setStores([]); // 设置空数组避免undefined
+      if (!isRetry) {
+        setRetryCount(prev => prev + 1);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -364,13 +381,13 @@ const DeliveryStoreManagement: React.FC = () => {
         created_by: currentUser
       });
 
-      if (result) {
+      if (result.success) {
         setSuccessMessage('快递店创建成功！');
         setShowForm(false);
         resetForm();
         loadStores();
       } else {
-        setErrorMessage('创建失败，店铺代码可能已存在');
+        setErrorMessage(result.error || '创建失败，请重试');
       }
     }
   };
@@ -559,7 +576,28 @@ const DeliveryStoreManagement: React.FC = () => {
             color: 'white'
           }}
         >
-          {errorMessage || successMessage}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{errorMessage || successMessage}</span>
+            {errorMessage && errorMessage.includes('加载快递店列表失败') && (
+              <button
+                onClick={() => loadStores(true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  color: 'white',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  marginLeft: '12px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              >
+                🔄 重试
+              </button>
+            )}
+          </div>
         </div>
       )}
 
