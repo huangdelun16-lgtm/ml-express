@@ -150,9 +150,47 @@ export default function CourierManagementScreen({ navigation }: any) {
     try {
       await courierService.updateCourierStatus(courierId, newStatus);
       await loadCouriers();
+      Alert.alert('成功', `骑手状态已更新为${getStatusText(newStatus)}`);
     } catch (error) {
-      Alert.alert('错误', '状态更新失败');
+      console.error('更新骑手状态失败:', error);
+      Alert.alert('错误', '状态更新失败，请重试');
     }
+  };
+
+  // 分配任务给骑手
+  const assignTaskToCourier = async (courierId: string) => {
+    try {
+      // 这里应该调用API分配任务
+      Alert.alert('任务分配', '正在为骑手分配新任务...');
+    } catch (error) {
+      Alert.alert('错误', '任务分配失败');
+    }
+  };
+
+  // 联系骑手
+  const contactCourier = (phone: string) => {
+    Alert.alert(
+      '联系骑手',
+      `是否要拨打 ${phone}？`,
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '拨打', onPress: () => {
+          // 这里应该调用电话功能
+          console.log('拨打电话:', phone);
+        }}
+      ]
+    );
+  };
+
+  // 查看骑手位置
+  const viewCourierLocation = (courierId: string, courierName: string) => {
+    Alert.alert(
+      '位置追踪',
+      `正在追踪 ${courierName} 的实时位置...`,
+      [
+        { text: '确定', style: 'default' }
+      ]
+    );
   };
 
   // 筛选骑手
@@ -252,6 +290,37 @@ export default function CourierManagementScreen({ navigation }: any) {
         <Text style={styles.currentTasks}>
           📦 {language === 'zh' ? `当前任务: ${item.currentPackages?.length || 0} 个` : `Current Tasks: ${item.currentPackages?.length || 0}`}
         </Text>
+
+        {/* 快捷操作按钮 */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#3498db' }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              contactCourier(item.phone);
+            }}
+          >
+            <Text style={styles.actionButtonText}>📞</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#27ae60' }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              assignTaskToCourier(item.id);
+            }}
+          >
+            <Text style={styles.actionButtonText}>📋</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: '#e67e22' }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              viewCourierLocation(item.id, item.name);
+            }}
+          >
+            <Text style={styles.actionButtonText}>📍</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 箭头 */}
@@ -523,6 +592,41 @@ export default function CourierManagementScreen({ navigation }: any) {
                         <Text style={styles.statusControlText}>{getStatusText(status)}</Text>
                       </TouchableOpacity>
                     ))}
+                  </View>
+                </View>
+
+                {/* 快捷操作 */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardTitle}>快捷操作</Text>
+                  <View style={styles.quickActionsGrid}>
+                    <TouchableOpacity
+                      style={[styles.quickActionCard, { backgroundColor: '#3498db' }]}
+                      onPress={() => contactCourier(selectedCourier.phone)}
+                    >
+                      <Text style={styles.quickActionIcon}>📞</Text>
+                      <Text style={styles.quickActionLabel}>联系骑手</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.quickActionCard, { backgroundColor: '#27ae60' }]}
+                      onPress={() => assignTaskToCourier(selectedCourier.id)}
+                    >
+                      <Text style={styles.quickActionIcon}>📋</Text>
+                      <Text style={styles.quickActionLabel}>分配任务</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.quickActionCard, { backgroundColor: '#e67e22' }]}
+                      onPress={() => viewCourierLocation(selectedCourier.id, selectedCourier.name)}
+                    >
+                      <Text style={styles.quickActionIcon}>📍</Text>
+                      <Text style={styles.quickActionLabel}>位置追踪</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.quickActionCard, { backgroundColor: '#9b59b6' }]}
+                      onPress={() => Alert.alert('工作记录', `查看 ${selectedCourier.name} 的工作记录`)}
+                    >
+                      <Text style={styles.quickActionIcon}>📊</Text>
+                      <Text style={styles.quickActionLabel}>工作记录</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </ScrollView>
@@ -1842,8 +1946,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     width: '100%',
-    maxWidth: 420,
-    maxHeight: '90%',
+    maxWidth: '95%',
+    maxHeight: '95%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -2071,5 +2175,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  // 新增的卡片操作按钮样式
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    color: '#fff',
+  },
+  // 详情弹窗快捷操作样式
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickActionCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
