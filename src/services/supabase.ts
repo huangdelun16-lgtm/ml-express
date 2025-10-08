@@ -1005,6 +1005,12 @@ export const deliveryStoreService = {
             return { success: false, error: '店铺名称已存在，请使用其他名称' };
           }
         }
+        // 检查是否是检查约束错误
+        if (error.code === '23514') {
+          if (error.message.includes('store_type_check')) {
+            return { success: false, error: '店铺类型无效，请联系管理员更新数据库约束' };
+          }
+        }
         return { success: false, error: '创建失败，请重试' };
       }
 
