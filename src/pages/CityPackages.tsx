@@ -212,14 +212,14 @@ const CityPackages: React.FC = () => {
       const mockPhotos = [
         {
           id: '1',
-          url: 'https://via.placeholder.com/300x200/27ae60/ffffff?text=配送照片1',
+          url: 'https://via.placeholder.com/300x200/27ae60/ffffff?text=送达图片1',
           timestamp: new Date().toLocaleString('zh-CN'),
           courier: '骑手A',
           location: '曼德勒市中心'
         },
         {
           id: '2', 
-          url: 'https://via.placeholder.com/300x200/3498db/ffffff?text=配送照片2',
+          url: 'https://via.placeholder.com/300x200/3498db/ffffff?text=送达图片2',
           timestamp: new Date().toLocaleString('zh-CN'),
           courier: '骑手A',
           location: '曼德勒市中心'
@@ -1425,7 +1425,7 @@ const CityPackages: React.FC = () => {
               marginBottom: '25px'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-                📸 包裹配送照片
+                🖼️ 包裹送达图片
               </h2>
               <button
                 onClick={() => setShowPhotoModal(false)}
@@ -1450,9 +1450,9 @@ const CityPackages: React.FC = () => {
               </div>
             ) : packagePhotos.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
-                <p>暂无配送照片</p>
+                <p>暂无送达图片</p>
                 <p style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '10px' }}>
-                  骑手送件完成后上传的照片将显示在这里
+                  骑手送达包裹后拍摄的留底图片将显示在这里
                 </p>
               </div>
             ) : (
@@ -1466,7 +1466,7 @@ const CityPackages: React.FC = () => {
                   }}>
                     <img 
                       src={photo.url} 
-                      alt={`配送照片 ${photo.id}`}
+                      alt={`送达图片 ${photo.id}`}
                       style={{
                         width: '100%',
                         height: '200px',
@@ -1554,7 +1554,7 @@ const CityPackages: React.FC = () => {
                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
                   }}
                 >
-                  📸 照片
+                  🖼️ 图片
                 </button>
                 <button
                   onClick={closeDetailModal}
