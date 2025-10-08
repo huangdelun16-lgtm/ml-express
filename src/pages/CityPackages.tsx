@@ -817,7 +817,9 @@ const CityPackages: React.FC = () => {
                   }}
                 >
                   <option value="文件">文件</option>
-                  <option value="包裹">包裹</option>
+                  <option value="标准件（45x60x15cm）以内">标准件（45x60x15cm）以内</option>
+                  <option value="超重件（10 KG）以上">超重件（10 KG）以上</option>
+                  <option value="超规件（45x60x15cm）以上">超规件（45x60x15cm）以上</option>
                   <option value="易碎品">易碎品</option>
                 </select>
                 <input
@@ -835,6 +837,15 @@ const CityPackages: React.FC = () => {
                     fontSize: '1rem'
                   }}
                 />
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: '#e74c3c',
+                  marginTop: '0.5rem',
+                  textAlign: 'center',
+                  fontStyle: 'italic'
+                }}>
+                  ***如实物和包裹信息内容不一致会导致报价失误***
+                </div>
               </div>
               <textarea
                 placeholder="包裹描述 (可选)"

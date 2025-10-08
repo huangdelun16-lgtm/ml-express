@@ -1122,9 +1122,10 @@ const HomePage: React.FC = () => {
                   }}
                 >
                   <option value="文件">文件</option>
-                  <option value="衣服">衣服</option>
+                  <option value="标准件（45x60x15cm）以内">标准件（45x60x15cm）以内</option>
+                  <option value="超重件（10 KG）以上">超重件（10 KG）以上</option>
+                  <option value="超规件（45x60x15cm）以上">超规件（45x60x15cm）以上</option>
                   <option value="易碎品">易碎品</option>
-                  <option value="食品">食品</option>
                 </select>
                 <input
                   type="text"
@@ -1157,6 +1158,15 @@ const HomePage: React.FC = () => {
                   onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                 />
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: '#e74c3c',
+                  marginTop: '0.5rem',
+                  textAlign: 'center',
+                  fontStyle: 'italic'
+                }}>
+                  ***如实物和包裹信息内容不一致会导致报价失误***
+                </div>
               </div>
 
               <div style={{ 
