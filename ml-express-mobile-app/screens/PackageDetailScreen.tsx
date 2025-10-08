@@ -69,7 +69,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7, // 降低质量以提高性能
+        exif: false, // 禁用EXIF数据以提高性能
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -79,7 +80,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       }
     } catch (error) {
       console.error('相机错误:', error);
-      Alert.alert('错误', '无法打开相机');
+      Alert.alert('错误', '无法打开相机，请重试');
     }
   };
 
@@ -97,49 +98,76 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       const locationPermission = await Location.requestForegroundPermissionsAsync();
       if (locationPermission.status !== 'granted') {
         Alert.alert('权限不足', '需要位置权限才能记录配送位置');
+        setUploadingPhoto(false);
         return;
       }
 
       // 获取当前位置
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 5000,
+        distanceInterval: 1,
+      });
       const { latitude, longitude } = location.coords;
 
-      // 保存照片到相册
+      // 保存照片到相册（异步执行，不阻塞主流程）
       const mediaPermission = await MediaLibrary.requestPermissionsAsync();
       if (mediaPermission.status === 'granted') {
-        await MediaLibrary.saveToLibraryAsync(capturedPhoto);
+        MediaLibrary.saveToLibraryAsync(capturedPhoto).catch(error => {
+          console.log('保存到相册失败:', error);
+        });
       }
 
-      // 记录配送证明
-      const deliveryProof = {
-        packageId: currentPackage.id,
-        photoUri: capturedPhoto,
-        latitude,
-        longitude,
-        timestamp: new Date().toISOString(),
-        courier: '骑手账号', // TODO: 从用户登录状态获取
-      };
+      // 获取当前骑手信息
+      const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
 
-      console.log('配送证明记录:', deliveryProof);
-
-      Alert.alert(
-        '上传成功',
-        `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}`,
-        [
-          {
-            text: '确定',
-            onPress: () => {
-              setShowPhotoModal(false);
-              setCapturedPhoto(null);
-            }
-          }
-        ]
+      // 更新包裹状态为"已送达"并记录店铺信息
+      const success = await packageService.updatePackageStatus(
+        currentPackage.id,
+        '已送达',
+        undefined, // pickupTime
+        new Date().toISOString(), // deliveryTime
+        userName // courierName
       );
+
+      if (success) {
+        // 记录配送证明
+        const deliveryProof = {
+          packageId: currentPackage.id,
+          photoUri: capturedPhoto,
+          latitude,
+          longitude,
+          timestamp: new Date().toISOString(),
+          courier: userName,
+        };
+
+        console.log('配送证明记录:', deliveryProof);
+
+        // 更新本地状态
+        setCurrentPackage({ ...currentPackage, status: '已送达' });
+
+        Alert.alert(
+          '配送完成！',
+          `包裹已成功送达\n📦 包裹编号：${currentPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
+          [
+            {
+              text: '确定',
+              onPress: () => {
+                setShowPhotoModal(false);
+                setCapturedPhoto(null);
+                setUploadingPhoto(false);
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('照片上传成功', `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`);
+        setUploadingPhoto(false);
+      }
 
     } catch (error) {
       console.error('上传照片失败:', error);
       Alert.alert('上传失败', '网络错误，请重试');
-    } finally {
       setUploadingPhoto(false);
     }
   };
@@ -302,8 +330,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={styles.newActionButtonText}>📍 送货地址</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.newActionButton} onPress={() => setShowCameraModal(true)}>
-            <Text style={styles.newActionButtonText}>📷 摄像机</Text>
+          <TouchableOpacity style={styles.newActionButton} onPress={() => navigation.navigate('ScanScreen', { packageId: currentPackage.id })}>
+            <Text style={styles.newActionButtonText}>📱 扫码</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.newActionButton} onPress={() => setShowPhotoModal(true)}>
@@ -465,7 +493,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                   <View style={styles.photoActions}>
                     <TouchableOpacity 
                       style={styles.photoActionButton} 
-                      onPress={() => setCapturedPhoto(null)}
+                      onPress={() => {
+                        setCapturedPhoto(null);
+                        setShowPhotoModal(false);
+                        setShowCameraModal(true);
+                      }}
+                      disabled={uploadingPhoto}
                     >
                       <Text style={styles.photoActionText}>重新拍照</Text>
                     </TouchableOpacity>
@@ -476,7 +509,10 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                       disabled={uploadingPhoto}
                     >
                       {uploadingPhoto ? (
-                        <ActivityIndicator color="#fff" />
+                        <View style={styles.loadingContainer}>
+                          <ActivityIndicator color="#fff" size="small" />
+                          <Text style={styles.uploadButtonText}>上传中...</Text>
+                        </View>
                       ) : (
                         <Text style={styles.uploadButtonText}>确认上传</Text>
                       )}
@@ -795,5 +831,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
