@@ -116,16 +116,33 @@ export default function CustomerZoneScreen({ navigation }: any) {
         return;
       }
 
+      // 使用更高精度的位置获取设置
       let currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.BestForNavigation, // 使用最高精度
+        timeInterval: 1000, // 1秒间隔
+        distanceInterval: 1, // 1米间隔
       });
       
-      const { latitude, longitude } = currentLocation.coords;
+      const { latitude, longitude, accuracy } = currentLocation.coords;
+      
+      // 检查位置精度，如果精度太差则提示用户
+      if (accuracy && accuracy > 100) {
+        Alert.alert(
+          '位置精度较低', 
+          `当前位置精度为 ${accuracy.toFixed(0)} 米，可能不够准确。建议在开阔区域重新获取位置。`,
+          [
+            { text: '重新获取', onPress: () => getCurrentLocation() },
+            { text: '使用当前位置', onPress: () => confirmLocation() }
+          ]
+        );
+      }
       
       setMapRegion(prev => ({
         ...prev,
         latitude,
         longitude,
+        latitudeDelta: 0.01, // 缩小地图范围以显示更精确的位置
+        longitudeDelta: 0.01,
       }));
 
       // 设置当前位置为选中位置
@@ -133,23 +150,42 @@ export default function CustomerZoneScreen({ navigation }: any) {
         latitude,
         longitude,
         address: language === 'zh' 
-          ? `当前位置: 纬度 ${latitude.toFixed(6)}, 经度 ${longitude.toFixed(6)}`
+          ? `当前位置: 纬度 ${latitude.toFixed(6)}, 经度 ${longitude.toFixed(6)} (精度: ${accuracy?.toFixed(0)}米)`
           : language === 'en'
-          ? `Current Location: Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}`
-          : `လက်ရှိတည်နေရာ: လတ္တီတွဒ် ${latitude.toFixed(6)}, လောင်ဂျီတွဒ် ${longitude.toFixed(6)}`
+          ? `Current Location: Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)} (Accuracy: ${accuracy?.toFixed(0)}m)`
+          : `လက်ရှိတည်နေရာ: လတ္တီတွဒ် ${latitude.toFixed(6)}, လောင်ဂျီတွဒ် ${longitude.toFixed(6)} (တိကျမှု: ${accuracy?.toFixed(0)}မီတာ)`
       });
 
       Alert.alert(
-        t.locationSuccess, 
-        t.locationSuccessMessage
-          .replace('{latitude}', latitude.toFixed(6))
-          .replace('{longitude}', longitude.toFixed(6))
-          .replace('{accuracy}', (currentLocation.coords.accuracy?.toFixed(0) || '0'))
+        '位置获取成功', 
+        `纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n精度: ${accuracy?.toFixed(0)}米`
       );
 
     } catch (error) {
       console.error('获取位置失败:', error);
       Alert.alert(t.getLocationFailed, t.getLocationErrorMessage);
+    }
+  };
+
+  // 确认使用当前位置
+  const confirmLocation = () => {
+    if (selectedLocation) {
+      if (mapType === 'sender') {
+        setOrderForm(prev => ({
+          ...prev,
+          senderAddress: selectedLocation.address,
+          senderLatitude: selectedLocation.latitude,
+          senderLongitude: selectedLocation.longitude,
+        }));
+      } else {
+        setOrderForm(prev => ({
+          ...prev,
+          receiverAddress: selectedLocation.address,
+          receiverLatitude: selectedLocation.latitude,
+          receiverLongitude: selectedLocation.longitude,
+        }));
+      }
+      setShowMapModal(false);
     }
   };
 
@@ -653,7 +689,13 @@ export default function CustomerZoneScreen({ navigation }: any) {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>{t.packageType} *</Text>
                   <View style={styles.packageTypeGrid}>
-                    {['文件', '小件', '中件', '大件', '易碎品', '食品'].map(type => (
+                    {[
+                      '文件',
+                      '标准件（45x60x15cm）以内',
+                      '超重件（10 KG）以上',
+                      '超规件（45x60x15cm）以上',
+                      '易碎品'
+                    ].map(type => (
                       <TouchableOpacity
                         key={type}
                         style={[
@@ -682,6 +724,9 @@ export default function CustomerZoneScreen({ navigation }: any) {
                     placeholder="例如：2.5"
                     keyboardType="decimal-pad"
                   />
+                  <Text style={styles.noteText}>
+                    ***如实物和包裹信息内容不一致会导致报价失误***
+                  </Text>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -1462,6 +1507,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 8,
+  },
+  noteText: {
+    fontSize: 12,
+    color: '#e74c3c',
+    marginTop: 6,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   textInput: {
     borderWidth: 1,
