@@ -91,11 +91,23 @@ const CityPackages: React.FC = () => {
 
   // 按日期过滤包裹
   const getFilteredPackages = () => {
-    if (!selectedDate) return packages;
+    if (!selectedDate) {
+      // 如果没有选择日期，按创建时间倒序排列
+      return [...packages].sort((a, b) => {
+        const dateA = new Date(a.created_at || a.create_time).getTime();
+        const dateB = new Date(b.created_at || b.create_time).getTime();
+        return dateB - dateA;
+      });
+    }
     
     return packages.filter(pkg => {
       const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
       return pkgDate === selectedDate;
+    }).sort((a, b) => {
+      // 同一天内按时间倒序排列
+      const dateA = new Date(a.created_at || a.create_time).getTime();
+      const dateB = new Date(b.created_at || b.create_time).getTime();
+      return dateB - dateA;
     });
   };
 
@@ -106,7 +118,26 @@ const CityPackages: React.FC = () => {
       const date = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
       dates.add(date);
     });
-    return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    return Array.from(dates).sort((a, b) => {
+      // 按日期倒序排列（最新的在前）
+      return new Date(b).getTime() - new Date(a).getTime();
+    });
+  };
+
+  // 格式化日期显示
+  const formatDateDisplay = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return `今天 (${dateStr})`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `昨天 (${dateStr})`;
+    } else {
+      return dateStr;
+    }
   };
 
   // 查找包裹照片
@@ -172,6 +203,11 @@ const CityPackages: React.FC = () => {
   const handleViewDetail = async (pkg: Package) => {
     setSelectedPackage(pkg);
     setShowDetailModal(true);
+  };
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedPackage(null);
   };
 
   return (
@@ -288,7 +324,7 @@ const CityPackages: React.FC = () => {
               }}
             >
               📅 {language === 'zh' ? '日期筛选' : 'Date Filter'}
-              {selectedDate && <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({selectedDate})</span>}
+              {selectedDate && <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({formatDateDisplay(selectedDate)})</span>}
             </button>
             
             <button
@@ -410,69 +446,102 @@ const CityPackages: React.FC = () => {
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '10px',
-                    flexWrap: 'wrap'
+                    alignItems: 'flex-end',
+                    gap: '15px',
+                    flexWrap: 'wrap',
+                    marginTop: '15px'
                   }}>
-                    {pkg.status === '待取件' && (
-                      <button
-                        onClick={() => updatePackageStatus(pkg.id, '已取件')}
-                        style={{
-                          background: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem'
-                        }}
-                      >
-                        标记已取件
-                      </button>
-                    )}
-                    {pkg.status === '已取件' && (
-                      <button
-                        onClick={() => updatePackageStatus(pkg.id, '配送中')}
-                        style={{
-                          background: '#9b59b6',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem'
-                        }}
-                      >
-                        开始配送
-                      </button>
-                    )}
-                    {pkg.status === '配送中' && (
-                      <button
-                        onClick={() => updatePackageStatus(pkg.id, '已送达')}
-                        style={{
-                          background: '#27ae60',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem'
-                        }}
-                      >
-                        标记已送达
-                      </button>
-                    )}
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    {/* 左侧状态操作按钮 */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      {pkg.status === '待取件' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '已取件')}
+                          style={{
+                            background: '#3498db',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 18px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: '500',
+                            minHeight: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          标记已取件
+                        </button>
+                      )}
+                      {pkg.status === '已取件' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '配送中')}
+                          style={{
+                            background: '#9b59b6',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 18px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: '500',
+                            minHeight: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          开始配送
+                        </button>
+                      )}
+                      {pkg.status === '配送中' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '已送达')}
+                          style={{
+                            background: '#27ae60',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 18px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: '500',
+                            minHeight: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          标记已送达
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* 右侧功能按钮 */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <button
                         onClick={() => handleViewDetail(pkg)}
                         style={{
                           background: 'rgba(255, 255, 255, 0.2)',
                           color: 'white',
                           border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          padding: '10px 18px',
+                          borderRadius: '6px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem'
+                          fontSize: '0.9rem',
+                          fontWeight: '500',
+                          minHeight: '40px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                         }}
                       >
                         查看详情
@@ -484,16 +553,26 @@ const CityPackages: React.FC = () => {
                           background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
                           color: 'white',
                           border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          padding: '10px 18px',
+                          borderRadius: '6px',
                           cursor: 'pointer',
                           fontSize: '0.9rem',
                           fontWeight: '500',
+                          minHeight: '40px',
                           display: 'flex',
                           alignItems: 'center',
+                          justifyContent: 'center',
                           gap: '6px',
                           boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
                           transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(230, 126, 34, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
                         }}
                       >
                         🔍 查找照片
@@ -606,10 +685,22 @@ const CityPackages: React.FC = () => {
                       fontSize: '1rem',
                       width: '100%',
                       marginBottom: '10px',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}
                   >
-                    {date} ({datePackages} 个包裹)
+                    <span>{formatDateDisplay(date)}</span>
+                    <span style={{ 
+                      background: 'rgba(255, 255, 255, 0.2)', 
+                      padding: '4px 8px', 
+                      borderRadius: '12px',
+                      fontSize: '0.8rem'
+                    }}>
+                      {datePackages} 个包裹
+                    </span>
                   </button>
                 );
               })}
@@ -714,6 +805,186 @@ const CityPackages: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 包裹详情模态框 */}
+      {showDetailModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                📦 包裹详情
+              </h2>
+              <button
+                onClick={closeDetailModal}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {/* 基本信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
+                  📋 基本信息
+                </h3>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>包裹编号:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.id}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>包裹类型:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.package_type}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>重量:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.weight}kg</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>状态:</span>
+                    <span style={{ 
+                      color: 'white', 
+                      fontWeight: '500',
+                      background: getStatusColor(selectedPackage.status),
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '0.9rem'
+                    }}>
+                      {getStatusText(selectedPackage.status)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>创建时间:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.create_time}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 寄件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
+                  📤 寄件人信息
+                </h3>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>姓名:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.sender_name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>电话:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.sender_phone}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>地址:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.sender_address}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 收件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
+                  📥 收件人信息
+                </h3>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>姓名:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.receiver_name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>电话:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.receiver_phone}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>地址:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.receiver_address}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 配送信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
+                  🚚 配送信息
+                </h3>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>负责骑手:</span>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.courier || '待分配'}</span>
+                  </div>
+                  {selectedPackage.pickup_time && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)' }}>取件时间:</span>
+                      <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.pickup_time}</span>
+                    </div>
+                  )}
+                  {selectedPackage.delivery_time && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)' }}>送达时间:</span>
+                      <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.delivery_time}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
