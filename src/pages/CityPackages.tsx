@@ -919,7 +919,8 @@ const CityPackages: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          padding: '20px'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
@@ -928,7 +929,11 @@ const CityPackages: React.FC = () => {
             border: '1px solid rgba(255, 255, 255, 0.12)',
             maxWidth: '500px',
             width: '100%',
-            textAlign: 'center'
+            maxHeight: '90vh',
+            overflow: 'auto',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <div style={{
               display: 'flex',
@@ -1062,7 +1067,15 @@ const CityPackages: React.FC = () => {
               </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '15px', 
+              justifyContent: 'center', 
+              flexWrap: 'wrap',
+              marginTop: '20px',
+              paddingTop: '20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
               <button
                 onClick={saveQRCode}
                 disabled={!qrCodeDataUrl}
