@@ -230,20 +230,33 @@ const DeliveryStoreManagement: React.FC = () => {
     setShowForm(true);
   };
 
+  // 生成中转码
+  const generateTransferCode = (packageId: string, storeId: string) => {
+    // 格式：TC + 店铺ID前3位 + 包裹ID后4位 + 时间戳后3位
+    const storePrefix = storeId.substring(0, 3).toUpperCase();
+    const packageSuffix = packageId.substring(packageId.length - 4);
+    const timeSuffix = Date.now().toString().slice(-3);
+    return `TC${storePrefix}${packageSuffix}${timeSuffix}`;
+  };
+
   // 转发包裹功能
   const handleForwardPackage = async (pkg: Package) => {
     try {
-      // 更新包裹状态为"待派送"
+      // 生成中转码
+      const transferCode = generateTransferCode(pkg.id, currentStorageStore?.id || 'DEFAULT');
+      
+      // 更新包裹状态为"待派送"，并添加中转码
       const success = await packageService.updatePackageStatus(
         pkg.id,
         '待派送',
         pkg.pickup_time,
         undefined, // 清除delivery_time，因为包裹还在中转站
-        pkg.courier
+        pkg.courier,
+        transferCode // 添加中转码
       );
 
       if (success) {
-        setSuccessMessage(`包裹 ${pkg.id} 已标记为待派送，等待骑手取件`);
+        setSuccessMessage(`包裹 ${pkg.id} 已标记为待派送，中转码: ${transferCode}`);
         // 刷新包裹列表
         if (currentStorageStore) {
           loadStoragePackages(currentStorageStore);
@@ -2304,6 +2317,11 @@ const DeliveryStoreManagement: React.FC = () => {
                         <div>
                           <span style={{ color: '#d69e2e' }}>💰</span> 费用: ¥{pkg.price}
                         </div>
+                        {pkg.transfer_code && (
+                          <div style={{ gridColumn: '1 / -1', marginTop: '4px', padding: '4px 8px', background: 'rgba(155, 89, 182, 0.2)', borderRadius: '4px', border: '1px solid rgba(155, 89, 182, 0.3)' }}>
+                            <span style={{ color: '#9b59b6' }}>🔄</span> 中转码: {pkg.transfer_code}
+                          </div>
+                        )}
                       </div>
                       
                       {pkg.description && (
