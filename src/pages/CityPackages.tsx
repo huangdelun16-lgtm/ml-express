@@ -475,7 +475,41 @@ const CityPackages: React.FC = () => {
             </button>
             
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => {
+                try {
+                  // 添加加载状态，防止页面闪烁
+                  const button = document.querySelector('[data-back-button]') as HTMLButtonElement;
+                  if (button) {
+                    button.style.opacity = '0.7';
+                    button.style.pointerEvents = 'none';
+                    button.style.transform = 'scale(0.98)';
+                  }
+                  
+                  // 确保页面样式不会丢失
+                  const body = document.body;
+                  if (body) {
+                    body.style.transition = 'background-color 0.3s ease';
+                  }
+                  
+                  // 延迟跳转，确保按钮状态更新
+                  setTimeout(() => {
+                    navigate('/admin/dashboard', { 
+                      replace: true,
+                      state: { fromCityPackages: true }
+                    });
+                  }, 150);
+                } catch (error) {
+                  console.error('导航错误:', error);
+                  // 如果导航失败，恢复按钮状态
+                  const button = document.querySelector('[data-back-button]') as HTMLButtonElement;
+                  if (button) {
+                    button.style.opacity = '1';
+                    button.style.pointerEvents = 'auto';
+                    button.style.transform = 'scale(1)';
+                  }
+                }
+              }}
+              data-back-button
               style={{
                 background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
                 color: 'white',
@@ -490,7 +524,23 @@ const CityPackages: React.FC = () => {
                 gap: '0.5rem',
                 boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)',
                 transition: 'all 0.3s ease',
-                textShadow: 'none'
+                textShadow: 'none',
+                position: 'relative',
+                overflow: 'hidden',
+                minWidth: '120px',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                if (e.currentTarget.style.pointerEvents !== 'none') {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(231, 76, 60, 0.4)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (e.currentTarget.style.pointerEvents !== 'none') {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(231, 76, 60, 0.3)';
+                }
               }}
             >
               ← {language === 'zh' ? '返回后台' : 'Back to Admin'}
