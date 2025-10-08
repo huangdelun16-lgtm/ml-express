@@ -1903,8 +1903,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 20,
+    paddingHorizontal: 5,
+    paddingVertical: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -1948,7 +1948,8 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     width: '100%',
     maxWidth: '100%',
-    maxHeight: '100%',
+    height: '90%',
+    maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -2075,7 +2076,7 @@ const styles = StyleSheet.create({
   detailContainer: {
     flex: 1,
     paddingVertical: 16,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   detailCard: {
     backgroundColor: '#f8f9fa',
@@ -2109,13 +2110,13 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   statBox: {
     flex: 1,
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     alignItems: 'center',
   },
   statBoxNumber: {
@@ -2131,8 +2132,8 @@ const styles = StyleSheet.create({
   taskItem: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    padding: 8,
+    marginBottom: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#2c5282',
   },
@@ -2160,11 +2161,11 @@ const styles = StyleSheet.create({
   },
   statusControls: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   statusControlButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     opacity: 0.7,
@@ -2204,20 +2205,20 @@ const styles = StyleSheet.create({
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   quickActionCard: {
     width: '48%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   quickActionIcon: {
     fontSize: 20,
