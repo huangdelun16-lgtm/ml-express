@@ -200,6 +200,8 @@ export const packageService = {
       updateData.store_receive_code = storeInfo.receiveCode;
     }
     
+    console.log('更新包裹数据:', { id, updateData });
+    
     const { error } = await supabase
       .from('packages')
       .update(updateData)
@@ -210,6 +212,7 @@ export const packageService = {
       return false;
     }
     
+    console.log('包裹状态更新成功');
     return true;
   }
 };

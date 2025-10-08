@@ -122,6 +122,13 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
 
       // 更新包裹状态为"已送达"并记录店铺信息
+      console.log('开始更新包裹状态:', {
+        packageId: currentPackage.id,
+        status: '已送达',
+        deliveryTime: new Date().toISOString(),
+        courierName: userName
+      });
+
       const success = await packageService.updatePackageStatus(
         currentPackage.id,
         '已送达',
@@ -129,6 +136,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         new Date().toISOString(), // deliveryTime
         userName // courierName
       );
+
+      console.log('包裹状态更新结果:', success);
 
       if (success) {
         // 记录配送证明
@@ -330,7 +339,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={styles.newActionButtonText}>📍 送货地址</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.newActionButton} onPress={() => navigation.navigate('ScanScreen', { packageId: currentPackage.id })}>
+          <TouchableOpacity style={styles.newActionButton} onPress={() => navigation.navigate('Scan', { packageId: currentPackage.id })}>
             <Text style={styles.newActionButtonText}>📱 扫码</Text>
           </TouchableOpacity>
           
