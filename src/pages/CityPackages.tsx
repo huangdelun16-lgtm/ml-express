@@ -868,36 +868,6 @@ const CityPackages: React.FC = () => {
                         查看详情
                       </button>
                       
-                      <button
-                        onClick={() => findPackagePhotos(pkg.id)}
-                        style={{
-                          background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 14px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          fontWeight: '500',
-                          minHeight: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(230, 126, 34, 0.4)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
-                        }}
-                      >
-                        🔍 查找照片
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1557,21 +1527,51 @@ const CityPackages: React.FC = () => {
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
                 📦 包裹详情
               </h2>
-              <button
-                onClick={closeDetailModal}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ✕ 关闭
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  onClick={() => findPackagePhotos(selectedPackage.id)}
+                  style={{
+                    background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(230, 126, 34, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
+                  }}
+                >
+                  📸 照片
+                </button>
+                <button
+                  onClick={closeDetailModal}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  ✕ 关闭
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gap: '20px' }}>
