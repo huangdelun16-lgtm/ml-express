@@ -289,6 +289,28 @@ export const packageService = {
     }
     
     return data;
+  },
+
+  // 获取特定店铺的入库包裹
+  async getPackagesByStore(storeId: string): Promise<Package[]> {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('delivery_store_id', storeId)
+        .eq('status', '已送达')
+        .order('delivery_time', { ascending: false });
+
+      if (error) {
+        console.error(`获取店铺 ${storeId} 包裹失败:`, error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error(`获取店铺 ${storeId} 包裹异常:`, err);
+      return [];
+    }
   }
 };
 

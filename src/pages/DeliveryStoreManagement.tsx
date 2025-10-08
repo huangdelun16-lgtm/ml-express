@@ -229,22 +229,20 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 获取入库包裹列表（骑手送来的包裹）
   const loadStoragePackages = async (store: DeliveryStore) => {
+    if (!store.id) {
+      setErrorMessage('店铺信息不完整，无法加载包裹');
+      return;
+    }
     setLoadingStorage(true);
+    setCurrentStorageStore(store);
+    setShowStorageModal(true);
     try {
-      const allPackages = await packageService.getAllPackages();
+      // 直接从数据库获取属于该店铺的包裹
+      const packages = await packageService.getPackagesByStore(store.id);
       
-      // 过滤出送达至该特定店铺的包裹
-      const packages = allPackages.filter(pkg => {
-        // 检查包裹是否送达至当前店铺
-        return pkg.status === '已送达' && 
-               pkg.courier && 
-               pkg.delivery_time &&
-               pkg.delivery_store_id === store.id; // 只显示送达至当前店铺的包裹
-      });
+      console.log(`店铺 ${store.store_name} (ID: ${store.id}) - 获取到 ${packages.length} 个入库包裹`);
       
       setStoragePackages(packages);
-      setCurrentStorageStore(store);
-      setShowStorageModal(true);
     } catch (error) {
       console.error('获取入库包裹失败:', error);
       setErrorMessage('获取入库包裹列表失败');
