@@ -1628,7 +1628,7 @@ const DeliveryStoreManagement: React.FC = () => {
                               transition: 'all 0.3s ease'
                             }}
                             onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-                            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'
+                            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                           >
                             🚚 转发包裹
                           </button>
