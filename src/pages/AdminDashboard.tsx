@@ -165,41 +165,16 @@ const AdminDashboard: React.FC = () => {
     
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* LOGO图标 */}
-        <div style={{
-          width: logoSize,
-          height: logoSize,
-          background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 50%, #A8A8A8 100%)',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5)',
-          border: '1px solid rgba(255,255,255,0.2)'
-        }}>
-          {/* ML字母 */}
-          <div style={{
-            color: '#2C3E50',
-            fontWeight: 'bold',
-            fontSize: size === 'small' ? '16px' : size === 'large' ? '28px' : '20px',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-            letterSpacing: '-1px'
-          }}>
-            ML
-          </div>
-          {/* 卡车图标 */}
-          <div style={{
-            position: 'absolute',
-            bottom: '2px',
-            right: '2px',
-            width: size === 'small' ? '8px' : size === 'large' ? '16px' : '12px',
-            height: size === 'small' ? '6px' : size === 'large' ? '12px' : '8px',
-            background: '#2C3E50',
-            borderRadius: '1px',
-            opacity: 0.8
-          }}></div>
-        </div>
+        {/* LOGO图片 */}
+        <img 
+          src="/logo.png" 
+          alt="ML Express Logo"
+          style={{
+            width: logoSize,
+            height: logoSize,
+            objectFit: 'contain'
+          }}
+        />
         
         {/* 公司名称 */}
         <div style={{
