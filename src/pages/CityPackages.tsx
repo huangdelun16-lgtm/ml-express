@@ -190,6 +190,18 @@ const CityPackages: React.FC = () => {
     setSelectedPackageForPickup(null);
     setQrCodeDataUrl('');
   };
+  
+  // 保存二维码
+  const saveQRCode = () => {
+    if (qrCodeDataUrl && selectedPackageForPickup) {
+      const link = document.createElement('a');
+      link.download = `寄件码_${selectedPackageForPickup.id}.png`;
+      link.href = qrCodeDataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   // 查找包裹照片
   const findPackagePhotos = async (packageId: string) => {
@@ -797,9 +809,9 @@ const CityPackages: React.FC = () => {
                       <button
                         onClick={() => showPickupCode(pkg)}
                         style={{
-                          background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+                          background: 'rgba(255, 255, 255, 0.2)',
                           color: 'white',
-                          border: 'none',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
                           padding: '10px 18px',
                           borderRadius: '6px',
                           cursor: 'pointer',
@@ -810,16 +822,20 @@ const CityPackages: React.FC = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 8px rgba(142, 68, 173, 0.3)',
-                          transition: 'all 0.3s ease'
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease',
+                          position: 'relative',
+                          overflow: 'hidden'
                         }}
                         onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
                           e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(142, 68, 173, 0.4)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 255, 255, 0.2)';
                         }}
                         onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                           e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(142, 68, 173, 0.3)';
+                          e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
                         📱 寄件码
@@ -958,33 +974,72 @@ const CityPackages: React.FC = () => {
               
               <div style={{
                 background: 'white',
-                padding: '20px',
-                borderRadius: '10px',
-                marginBottom: '15px'
+                padding: '25px',
+                borderRadius: '15px',
+                marginBottom: '20px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                border: '2px solid rgba(255, 255, 255, 0.2)',
+                position: 'relative'
               }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: 'rgba(0, 0, 0, 0.1)',
+                  color: '#666',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.7rem',
+                  fontWeight: '500'
+                }}>
+                  {selectedPackageForPickup?.id}
+                </div>
+                
                 {qrCodeDataUrl ? (
-                  <img 
-                    src={qrCodeDataUrl} 
-                    alt="寄件码二维码" 
-                    style={{
-                      width: '200px',
-                      height: '200px',
-                      margin: '0 auto',
-                      display: 'block'
-                    }}
-                  />
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <img 
+                      src={qrCodeDataUrl} 
+                      alt="寄件码二维码" 
+                      style={{
+                        width: '220px',
+                        height: '220px',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <p style={{
+                      color: '#666',
+                      fontSize: '0.8rem',
+                      margin: 0,
+                      textAlign: 'center'
+                    }}>
+                      扫描此二维码完成取件
+                    </p>
+                  </div>
                 ) : (
                   <div style={{ 
-                    width: '200px', 
-                    height: '200px', 
-                    background: '#f0f0f0', 
+                    width: '220px', 
+                    height: '220px', 
+                    background: 'linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%)', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
                     margin: '0 auto',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
+                    border: '2px dashed #ccc'
                   }}>
-                    <p style={{ color: '#666', margin: 0 }}>生成中...</p>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        fontSize: '2rem',
+                        marginBottom: '10px'
+                      }}>⏳</div>
+                      <p style={{ color: '#666', margin: 0, fontSize: '0.9rem' }}>生成中...</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1007,7 +1062,44 @@ const CityPackages: React.FC = () => {
               </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={saveQRCode}
+                disabled={!qrCodeDataUrl}
+                style={{
+                  background: qrCodeDataUrl ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)' : 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  cursor: qrCodeDataUrl ? 'pointer' : 'not-allowed',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: qrCodeDataUrl ? '0 4px 12px rgba(39, 174, 96, 0.3)' : 'none',
+                  transition: 'all 0.3s ease',
+                  opacity: qrCodeDataUrl ? 1 : 0.6,
+                  minWidth: '140px',
+                  justifyContent: 'center'
+                }}
+                onMouseOver={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
+                  }
+                }}
+              >
+                💾 保存二维码
+              </button>
+              
               <button
                 onClick={closePickupCodeModal}
                 style={{
@@ -1019,10 +1111,23 @@ const CityPackages: React.FC = () => {
                   cursor: 'pointer',
                   fontSize: '1rem',
                   fontWeight: '500',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  minWidth: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                关闭
+                ✕ 退出
               </button>
             </div>
           </div>
