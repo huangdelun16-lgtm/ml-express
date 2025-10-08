@@ -145,9 +145,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
 
       // 将照片转换为base64（用于存储）
+      console.log('开始转换照片为base64...');
       const photoBase64 = await convertImageToBase64(capturedPhoto);
+      console.log('照片base64转换完成，长度:', photoBase64.length);
 
       // 保存配送照片到数据库
+      console.log('开始保存照片到数据库...');
       const photoSaved = await deliveryPhotoService.saveDeliveryPhoto({
         packageId: currentPackage.id,
         photoBase64: photoBase64,
@@ -157,8 +160,11 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         locationName: '配送位置'
       });
 
+      console.log('照片保存结果:', photoSaved);
       if (!photoSaved) {
         console.log('照片保存失败，但继续更新包裹状态');
+      } else {
+        console.log('照片保存成功！');
       }
 
       // 更新包裹状态为"已送达"并记录店铺信息

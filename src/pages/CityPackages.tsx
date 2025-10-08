@@ -207,11 +207,15 @@ const CityPackages: React.FC = () => {
   const findPackagePhotos = async (packageId: string) => {
     try {
       setPhotoLoading(true);
+      console.log('开始查找包裹照片，包裹ID:', packageId);
       
       // 从数据库获取真实照片
       const photos = await deliveryPhotoService.getPackagePhotos(packageId);
+      console.log('从数据库获取的照片数量:', photos.length);
+      console.log('照片数据:', photos);
       
       if (photos.length === 0) {
+        console.log('没有找到照片，显示空状态');
         // 如果没有照片，显示空状态
         setPackagePhotos([]);
         setShowPhotoModal(true);
@@ -227,6 +231,7 @@ const CityPackages: React.FC = () => {
         location: photo.location_name || `${photo.latitude?.toFixed(4)}, ${photo.longitude?.toFixed(4)}`
       }));
 
+      console.log('格式化后的照片数据:', formattedPhotos);
       setPackagePhotos(formattedPhotos);
       setShowPhotoModal(true);
     } catch (error) {
