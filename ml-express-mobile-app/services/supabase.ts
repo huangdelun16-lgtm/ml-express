@@ -25,6 +25,10 @@ export interface Package {
   price: string;
   created_at?: string;
   updated_at?: string;
+  // 新增店铺相关字段
+  delivery_store_id?: string;
+  delivery_store_name?: string;
+  store_receive_code?: string;
 }
 
 export interface AdminAccount {
@@ -85,6 +89,20 @@ export interface RouteOptimization {
   total_distance: number;
   estimated_time: number;
   priority_score: number;
+}
+
+// 快递店数据类型
+export interface DeliveryStore {
+  id: string;
+  store_name: string;
+  manager_name: string;
+  manager_phone: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  status: 'active' | 'inactive' | 'maintenance';
+  created_at: string;
+  updated_at: string;
 }
 
 // 管理员账号服务
@@ -166,13 +184,21 @@ export const packageService = {
     status: string, 
     pickupTime?: string, 
     deliveryTime?: string,
-    courierName?: string
+    courierName?: string,
+    storeInfo?: { storeId: string, storeName: string, receiveCode: string }
   ): Promise<boolean> {
     const updateData: any = { status };
     
     if (pickupTime) updateData.pickup_time = pickupTime;
     if (deliveryTime) updateData.delivery_time = deliveryTime;
     if (courierName) updateData.courier = courierName;
+    
+    // 如果是送达状态且有店铺信息，记录店铺信息
+    if (status === '已送达' && storeInfo) {
+      updateData.delivery_store_id = storeInfo.storeId;
+      updateData.delivery_store_name = storeInfo.storeName;
+      updateData.store_receive_code = storeInfo.receiveCode;
+    }
     
     const { error } = await supabase
       .from('packages')
@@ -422,6 +448,49 @@ export const routeService = {
     } catch (err) {
       console.error('分配包裹异常:', err);
       return false;
+    }
+  }
+};
+
+// 快递店服务
+export const deliveryStoreService = {
+  async getAllStores(): Promise<DeliveryStore[]> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取快递店列表失败:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error('获取快递店列表异常:', err);
+      return [];
+    }
+  },
+
+  async getStoreById(storeId: string): Promise<DeliveryStore | null> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('id', storeId)
+        .single();
+      
+      if (error) {
+        console.error('获取快递店详情失败:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('获取快递店详情异常:', err);
+      return null;
     }
   }
 };

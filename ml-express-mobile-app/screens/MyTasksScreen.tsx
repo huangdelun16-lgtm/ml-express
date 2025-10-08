@@ -13,7 +13,7 @@ import {
   Image,
   Linking
 } from 'react-native';
-import { packageService } from '../services/supabase';
+import { packageService, deliveryStoreService } from '../services/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
@@ -382,7 +382,7 @@ const MyTasksScreen: React.FC = () => {
   };
 
   // 扫码功能处理函数
-  const handleScanCode = (data: string) => {
+  const handleScanCode = async (data: string) => {
     // 如果已经扫描过一次，直接返回，避免重复扫描
     if (scannedOnce.current) {
       return;
@@ -401,47 +401,102 @@ const MyTasksScreen: React.FC = () => {
       const storeInfo = data.replace('STORE_', '');
       const [storeId, timestamp] = storeInfo.split('_');
       
-      Alert.alert(
-        '✅ 已送达',
-        `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
-        [
-          {
-            text: '确定',
-            onPress: async () => {
-              try {
-                // 更新包裹状态为"已送达"，并记录店铺信息
-                if (selectedPackage) {
-                  const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
-                  
-                  // 构造店铺信息
-                  const storeReceiveInfo = {
-                    storeId: storeId,
-                    storeName: `店铺${storeId}`, // 这里可以根据storeId查询店铺名称
-                    receiveCode: data
-                  };
-                  
-                  await packageService.updatePackageStatus(
-                    selectedPackage.id, 
-                    '已送达',
-                    undefined, // pickupTime
-                    new Date().toISOString(), // deliveryTime
-                    userName,
-                    storeReceiveInfo
-                  );
-                  
-                  // 刷新任务列表
-                  await loadMyPackages();
-                  
-                  console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId);
+      try {
+        // 查询店铺详细信息
+        const storeDetails = await deliveryStoreService.getStoreById(storeId);
+        const storeName = storeDetails ? storeDetails.store_name : `店铺${storeId}`;
+        
+        Alert.alert(
+          '✅ 已送达',
+          `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n🏪 送达店铺：${storeName}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
+          [
+            {
+              text: '确定',
+              onPress: async () => {
+                try {
+                  // 更新包裹状态为"已送达"，并记录店铺信息
+                  if (selectedPackage) {
+                    const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+                    
+                    // 构造店铺信息
+                    const storeReceiveInfo = {
+                      storeId: storeId,
+                      storeName: storeName,
+                      receiveCode: data
+                    };
+                    
+                    const success = await packageService.updatePackageStatus(
+                      selectedPackage.id, 
+                      '已送达',
+                      undefined, // pickupTime
+                      new Date().toISOString(), // deliveryTime
+                      userName,
+                      storeReceiveInfo
+                    );
+                    
+                    if (success) {
+                      // 刷新任务列表
+                      await loadMyPackages();
+                      console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId, '店铺名称:', storeName);
+                    } else {
+                      Alert.alert('错误', '更新包裹状态失败，请重试');
+                    }
+                  }
+                } catch (error) {
+                  console.error('更新包裹状态失败:', error);
+                  Alert.alert('错误', '更新包裹状态失败，请重试');
                 }
-              } catch (error) {
-                console.error('更新包裹状态失败:', error);
-                Alert.alert('错误', '更新包裹状态失败，请重试');
               }
             }
-          }
-        ]
-      );
+          ]
+        );
+      } catch (error) {
+        console.error('查询店铺信息失败:', error);
+        Alert.alert(
+          '✅ 已送达',
+          `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n🏪 送达店铺：店铺${storeId}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
+          [
+            {
+              text: '确定',
+              onPress: async () => {
+                try {
+                  // 更新包裹状态为"已送达"，并记录店铺信息
+                  if (selectedPackage) {
+                    const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+                    
+                    // 构造店铺信息（使用默认名称）
+                    const storeReceiveInfo = {
+                      storeId: storeId,
+                      storeName: `店铺${storeId}`,
+                      receiveCode: data
+                    };
+                    
+                    const success = await packageService.updatePackageStatus(
+                      selectedPackage.id, 
+                      '已送达',
+                      undefined, // pickupTime
+                      new Date().toISOString(), // deliveryTime
+                      userName,
+                      storeReceiveInfo
+                    );
+                    
+                    if (success) {
+                      // 刷新任务列表
+                      await loadMyPackages();
+                      console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId);
+                    } else {
+                      Alert.alert('错误', '更新包裹状态失败，请重试');
+                    }
+                  }
+                } catch (error) {
+                  console.error('更新包裹状态失败:', error);
+                  Alert.alert('错误', '更新包裹状态失败，请重试');
+                }
+              }
+            }
+          ]
+        );
+      }
     } else {
       // 处理其他类型的扫码结果
       Alert.alert(
