@@ -82,7 +82,7 @@ const DeliveryStoreManagement: React.FC = () => {
     email: '',
     manager_name: '',
     manager_phone: '',
-    store_type: 'branch' as 'hub' | 'branch' | 'pickup_point',
+    store_type: 'branch' as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
     operating_hours: '08:00-22:00',
     service_area_radius: 5,
     capacity: 1000,

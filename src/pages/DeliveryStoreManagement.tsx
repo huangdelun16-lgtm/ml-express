@@ -105,7 +105,7 @@ const DeliveryStoreManagement: React.FC = () => {
     email: '',
     manager_name: '',
     manager_phone: '',
-    store_type: 'branch' as 'hub' | 'branch' | 'pickup_point',
+    store_type: 'branch' as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
     operating_hours: '08:00-22:00',
     service_area_radius: 5,
     capacity: 1000,
@@ -217,7 +217,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: store.email || '',
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
-      store_type: store.store_type,
+      store_type: store.store_type as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
       operating_hours: store.operating_hours,
       service_area_radius: store.service_area_radius,
       capacity: store.capacity,
@@ -434,7 +434,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: '',
       manager_name: '',
       manager_phone: '',
-      store_type: 'branch',
+      store_type: 'branch' as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
       operating_hours: '08:00-22:00',
       service_area_radius: 5,
       capacity: 1000,
@@ -615,6 +615,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   <option value="hub">分拣中心 (Hub)</option>
                   <option value="branch">配送点 (Branch)</option>
                   <option value="pickup_point">自提点 (Pickup Point)</option>
+                  <option value="transit_station">中转站 (Transit Station)</option>
                 </select>
               </div>
               <div>
@@ -894,7 +895,7 @@ const DeliveryStoreManagement: React.FC = () => {
                     <span>⏰ {store.operating_hours}</span>
                   </div>
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', opacity: 0.6 }}>
-                    <span>类型: {store.store_type === 'hub' ? '分拣中心' : store.store_type === 'branch' ? '配送点' : '自提点'}</span>
+                    <span>类型: {store.store_type === 'hub' ? '分拣中心' : store.store_type === 'branch' ? '配送点' : store.store_type === 'pickup_point' ? '自提点' : '中转站'}</span>
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
                   </div>
@@ -967,7 +968,9 @@ const DeliveryStoreManagement: React.FC = () => {
                         loadStoragePackages(store);
                       }}
                       style={{
-                        background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
+                        background: store.store_type === 'transit_station' 
+                          ? 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)'
+                          : 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
                         color: 'white',
                         border: 'none',
                         padding: '6px 12px',
@@ -978,19 +981,25 @@ const DeliveryStoreManagement: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        boxShadow: '0 2px 6px rgba(230, 126, 34, 0.3)',
+                        boxShadow: store.store_type === 'transit_station'
+                          ? '0 2px 6px rgba(155, 89, 182, 0.3)'
+                          : '0 2px 6px rgba(230, 126, 34, 0.3)',
                         transition: 'all 0.3s ease'
                       }}
                       onMouseOver={(e) => {
                         e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(230, 126, 34, 0.4)';
+                        e.currentTarget.style.boxShadow = store.store_type === 'transit_station'
+                          ? '0 4px 8px rgba(155, 89, 182, 0.4)'
+                          : '0 4px 8px rgba(230, 126, 34, 0.4)';
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(230, 126, 34, 0.3)';
+                        e.currentTarget.style.boxShadow = store.store_type === 'transit_station'
+                          ? '0 2px 6px rgba(155, 89, 182, 0.3)'
+                          : '0 2px 6px rgba(230, 126, 34, 0.3)';
                       }}
                     >
-                      📦 入库
+                      {store.store_type === 'transit_station' ? '🏪 中转包裹' : '📦 入库'}
                     </button>
                     <button
                       onClick={(e) => {

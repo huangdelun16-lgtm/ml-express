@@ -122,7 +122,7 @@ export interface DeliveryStore {
   email?: string;
   manager_name: string;
   manager_phone: string;
-  store_type: 'hub' | 'branch' | 'pickup_point';
+  store_type: 'hub' | 'branch' | 'pickup_point' | 'transit_station';
   status: 'active' | 'inactive' | 'maintenance';
   operating_hours: string;
   service_area_radius: number;
