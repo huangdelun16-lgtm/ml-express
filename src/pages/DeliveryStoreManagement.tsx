@@ -1530,15 +1530,29 @@ const DeliveryStoreManagement: React.FC = () => {
                         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#A5C7FF' }}>
                           📦 {pkg.id}
                         </h3>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          background: 'rgba(72, 187, 120, 0.3)',
-                          fontSize: '0.8rem',
-                          color: '#2ecc71'
-                        }}>
-                          ✅ 已送达
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            background: 'rgba(72, 187, 120, 0.3)',
+                            fontSize: '0.8rem',
+                            color: '#2ecc71'
+                          }}>
+                            ✅ 已送达
+                          </span>
+                          {pkg.sender_code && (
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              background: 'rgba(52, 152, 219, 0.3)',
+                              fontSize: '0.8rem',
+                              color: '#3498db',
+                              fontWeight: 'bold'
+                            }}>
+                              📱 寄件码: {pkg.sender_code}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>

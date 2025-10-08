@@ -29,6 +29,7 @@ export interface Package {
   delivery_store_id?: string; // 送达店铺ID
   delivery_store_name?: string; // 送达店铺名称
   store_receive_code?: string; // 店铺收件码
+  sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
 }
 
 export interface FinanceRecord {
