@@ -28,6 +28,12 @@ const CityPackages: React.FC = () => {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [packagePhotos, setPackagePhotos] = useState<any[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
+  
+  // 查询单号功能状态
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState<Package | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -171,6 +177,40 @@ const CityPackages: React.FC = () => {
     }
   };
 
+  // 查询包裹单号
+  const searchPackage = async () => {
+    if (!searchQuery.trim()) {
+      alert('请输入包裹单号');
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      // 在当前包裹列表中搜索
+      const foundPackage = packages.find(pkg => 
+        pkg.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.receiver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pkg.sender_phone.includes(searchQuery) ||
+        pkg.receiver_phone.includes(searchQuery)
+      );
+
+      if (foundPackage) {
+        setSearchResult(foundPackage);
+        setShowSearchModal(false);
+        setShowDetailModal(true);
+        setSelectedPackage(foundPackage);
+      } else {
+        alert('未找到相关包裹，请检查单号是否正确');
+      }
+    } catch (error) {
+      console.error('查询包裹失败:', error);
+      alert('查询失败，请重试');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   const updatePackageStatus = async (id: string, newStatus: string) => {
     const success = await packageService.updatePackageStatus(id, newStatus);
     if (success) {
@@ -303,7 +343,29 @@ const CityPackages: React.FC = () => {
               })()}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowSearchModal(true)}
+              style={{
+                background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)',
+                transition: 'all 0.3s ease',
+                textShadow: 'none'
+              }}
+            >
+              🔍 {language === 'zh' ? '查询单号' : 'Search Package'}
+            </button>
+            
             <button
               onClick={() => setShowDatePicker(true)}
               style={{
@@ -347,6 +409,28 @@ const CityPackages: React.FC = () => {
               }}
             >
               🔄 {language === 'zh' ? '刷新状态' : 'Refresh Status'}
+            </button>
+            
+            <button
+              onClick={() => navigate('/admin')}
+              style={{
+                background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)',
+                transition: 'all 0.3s ease',
+                textShadow: 'none'
+              }}
+            >
+              ← {language === 'zh' ? '返回后台' : 'Back to Admin'}
             </button>
           </div>
         </div>
@@ -585,6 +669,160 @@ const CityPackages: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 查询单号模态框 */}
+      {showSearchModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                🔍 查询包裹单号
+              </h2>
+              <button
+                onClick={() => {
+                  setShowSearchModal(false);
+                  setSearchQuery('');
+                  setSearchResult(null);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ 关闭
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 15px 0', fontSize: '1rem' }}>
+                请输入包裹单号、寄件人姓名、收件人姓名或电话号码
+              </p>
+              
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="例如：MDY20251006172107 或 张三 或 13800138000"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  marginBottom: '15px',
+                  outline: 'none'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    searchPackage();
+                  }
+                }}
+              />
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  onClick={searchPackage}
+                  disabled={searchLoading}
+                  style={{
+                    background: searchLoading ? 'rgba(255, 255, 255, 0.3)' : 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: searchLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)',
+                    transition: 'all 0.3s ease',
+                    opacity: searchLoading ? 0.7 : 1
+                  }}
+                >
+                  {searchLoading ? '🔍 查询中...' : '🔍 查询包裹'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowSearchModal(false);
+                    setSearchQuery('');
+                    setSearchResult(null);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+
+            {/* 搜索提示 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              padding: '15px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h4 style={{ color: '#A5C7FF', margin: '0 0 10px 0', fontSize: '0.9rem' }}>
+                💡 搜索提示
+              </h4>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', textAlign: 'left' }}>
+                <p style={{ margin: '5px 0' }}>• 包裹单号：MDY20251006172107</p>
+                <p style={{ margin: '5px 0' }}>• 寄件人姓名：张三</p>
+                <p style={{ margin: '5px 0' }}>• 收件人姓名：李四</p>
+                <p style={{ margin: '5px 0' }}>• 电话号码：13800138000</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 日期选择器模态框 */}
       {showDatePicker && (
