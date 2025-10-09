@@ -102,7 +102,7 @@ const FinanceManagement: React.FC = () => {
 
   useEffect(() => {
     const calculateSummary = () => {
-      const totalIncome = records.reduce((sum, record) => sum + (record.amount || 0), 0);
+      const totalIncome = records.filter(r => r.record_type === 'income').reduce((sum, record) => sum + (record.amount || 0), 0);
       const totalExpense = records.filter(r => r.record_type === 'expense').reduce((sum, record) => sum + (record.amount || 0), 0);
       const netProfit = totalIncome - totalExpense;
       const pendingPayments = records.filter(r => r.status === 'pending').reduce((sum, record) => sum + (record.amount || 0), 0);
@@ -125,6 +125,8 @@ const FinanceManagement: React.FC = () => {
       setRecords(data);
     } catch (error) {
       console.error('加载财务数据失败:', error);
+      // 添加用户友好的错误提示
+      alert('加载财务数据失败，请刷新页面重试');
     } finally {
       setLoading(false);
     }
@@ -374,30 +376,62 @@ const FinanceManagement: React.FC = () => {
               管理收入、支出、账务流程，以及快递员佣金结算
             </p>
           </div>
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.35)',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              transition: 'all 0.3s ease',
-              backdropFilter: 'blur(10px)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-3px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            ← 返回仪表板
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={loadRecords}
+              disabled={loading}
+              style={{
+                background: loading ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.12)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                transition: 'all 0.3s ease',
+                backdropFilter: 'blur(10px)',
+                opacity: loading ? 0.6 : 1
+              }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
+            >
+              {loading ? '🔄 刷新中...' : '🔄 刷新数据'}
+            </button>
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                transition: 'all 0.3s ease',
+                backdropFilter: 'blur(10px)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.transform = 'translateY(-3px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              ← 返回仪表板
+            </button>
+          </div>
         </div>
 
         <div
