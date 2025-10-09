@@ -420,35 +420,59 @@ const HomePage: React.FC = () => {
       <div 
         style={{ 
           display: 'flex', 
-          flexDirection: 'row', // 恢复为水平排列
-          alignItems: 'center', // 垂直居中对齐
-          gap: '10px', // 恢复间距
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '15px',
           cursor: 'pointer',
           transition: 'opacity 0.3s ease'
-          // 移除 marginRight，让父容器的居中对齐生效
         }}
         onClick={() => window.location.href = '/'}
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
         onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
       >
-        {/* LOGO图片 */}
-        <img 
-          src="/logo.png" 
-          alt="ML Express Logo"
-          style={{
-            width: logoSize,
-            height: logoSize,
-            objectFit: 'contain'
-          }}
-        />
-        
-        {/* 公司名称 - 放大字体2号 */}
+        {/* LOGO药丸标签 */}
         <div style={{
-          color: 'white',
-          fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '2.6rem' : '2.2rem', // 每个尺寸都放大2号
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(255, 255, 255, 0.95)',
+          color: '#2c5282',
+          padding: '8px 16px',
+          borderRadius: '25px',
+          border: '1px solid rgba(44, 82, 130, 0.3)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          fontSize: size === 'small' ? '0.9rem' : size === 'large' ? '1.3rem' : '1.1rem',
           fontWeight: 'bold',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-          whiteSpace: 'nowrap' // 防止文字换行
+          whiteSpace: 'nowrap'
+        }}>
+          <img 
+            src="/logo.png" 
+            alt="ML Express Logo"
+            style={{
+              width: size === 'small' ? '24px' : size === 'large' ? '36px' : '30px',
+              height: size === 'small' ? '24px' : size === 'large' ? '36px' : '30px',
+              objectFit: 'contain',
+              marginRight: '8px'
+            }}
+          />
+          ML
+        </div>
+        
+        {/* 公司名称药丸标签 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+          color: 'white',
+          padding: '8px 20px',
+          borderRadius: '25px',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 2px 8px rgba(44, 82, 130, 0.3)',
+          fontSize: size === 'small' ? '1.0rem' : size === 'large' ? '1.4rem' : '1.2rem',
+          fontWeight: 'bold',
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
         }}>
           MARKET LINK EXPRESS
         </div>
@@ -598,7 +622,7 @@ const HomePage: React.FC = () => {
             fontSize: window.innerWidth < 768 ? '1.1rem' : '1.5rem', 
             marginBottom: '2rem', 
             opacity: 0.9,
-            maxWidth: '600px',
+            maxWidth: '800px',
             lineHeight: '1.4'
           }}>
             {t.hero.subtitle}
