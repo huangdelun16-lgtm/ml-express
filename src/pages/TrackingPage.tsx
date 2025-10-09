@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadScript, GoogleMap, Marker, Polyline } from '@react-google-maps/api';
 import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
+import { supabase, auditLogService } from '../services/supabase';
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -118,6 +119,53 @@ const TrackingPage: React.FC = () => {
       console.error('模拟骑手移动失败:', error);
     }
   }, [courierLocations.length, simulateCourierMovement]);
+
+  // 处理删除骑手
+  const handleDeleteCourier = useCallback(async (courierId: string, courierName: string) => {
+    try {
+      // 删除骑手位置数据
+      const { error: locationError } = await supabase
+        .from('courier_locations')
+        .delete()
+        .eq('courier_id', courierId);
+
+      if (locationError) {
+        console.error('删除骑手位置数据失败:', locationError);
+      }
+
+      // 删除骑手基本信息
+      const { error: courierError } = await supabase
+        .from('couriers')
+        .delete()
+        .eq('id', courierId);
+
+      if (courierError) {
+        console.error('删除骑手信息失败:', courierError);
+      }
+
+      // 记录审计日志
+      const currentUser = localStorage.getItem('currentUser') || 'unknown';
+      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+      
+      await auditLogService.log({
+        user_id: currentUser,
+        user_name: currentUserName,
+        action_type: 'delete',
+        module: 'couriers',
+        target_id: courierId,
+        target_name: `骑手 ${courierName}`,
+        action_description: `删除骑手，姓名：${courierName}，ID：${courierId}`,
+        old_value: JSON.stringify({ courierId, courierName })
+      });
+
+      // 刷新数据
+      await refreshData();
+      alert(`✅ 骑手 ${courierName} 已成功删除`);
+    } catch (error) {
+      console.error('删除骑手失败:', error);
+      alert('删除失败，请稍后重试');
+    }
+  }, [refreshData]);
 
   // 计算当前包裹信息
   const currentPackage = useMemo(() => {
@@ -560,6 +608,29 @@ const TrackingPage: React.FC = () => {
                                 }}
                               >
                                 📊 历史
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const courierName = courierInfo ? courierInfo.name : location.courier_id;
+                                  if (window.confirm(`确定要删除骑手 ${courierName} 吗？\n\n此操作不可撤销！`)) {
+                                    handleDeleteCourier(location.courier_id, courierName);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.8)',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  color: 'white',
+                                  padding: '6px 10px',
+                                  fontSize: '0.7rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                🗑️ 删除
                               </button>
                             </div>
 
