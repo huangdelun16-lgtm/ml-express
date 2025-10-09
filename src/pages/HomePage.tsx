@@ -423,7 +423,8 @@ const HomePage: React.FC = () => {
           alignItems: 'center', 
           gap: '10px',
           cursor: 'pointer',
-          transition: 'opacity 0.3s ease'
+          transition: 'opacity 0.3s ease',
+          marginLeft: logoSize // 向左移动一个LOGO的距离
         }}
         onClick={() => window.location.href = '/'}
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
@@ -440,10 +441,10 @@ const HomePage: React.FC = () => {
           }}
         />
         
-        {/* 公司名称 - 放大字体 */}
+        {/* 公司名称 - 放大字体2号 */}
         <div style={{
           color: 'white',
-          fontSize: size === 'small' ? '1.4rem' : size === 'large' ? '2.4rem' : '2rem',
+          fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '2.6rem' : '2.2rem', // 每个尺寸都放大2号
           fontWeight: 'bold',
           textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
         }}>
