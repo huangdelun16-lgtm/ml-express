@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { adminAccountService, auditLogService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,9 +68,11 @@ export default function LoginScreen({ navigation }: any) {
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>ML</Text>
-          </View>
+          <Image 
+            source={require('../assets/logo.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>MARKET LINK EXPRESS</Text>
           <Text style={styles.subtitle}>快递管理系统</Text>
         </View>
@@ -145,24 +148,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  logo: {
+  logoImage: {
     width: 80,
     height: 80,
-    backgroundColor: '#C0C0C0',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2C3E50',
   },
   title: {
     fontSize: 20,

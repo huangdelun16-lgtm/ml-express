@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -451,9 +452,11 @@ export default function CustomerZoneScreen({ navigation }: any) {
         <View style={styles.headerContent}>
           {/* Logo */}
           <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>ML</Text>
-            </View>
+            <Image 
+              source={require('../assets/logo.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.companyName}>MARKET LINK EXPRESS</Text>
             <Text style={styles.companySlogan}>{t.serviceDescription}</Text>
           </View>
@@ -1192,24 +1195,15 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  logo: {
+  logoImage: {
     width: 60,
     height: 60,
-    backgroundColor: '#C0C0C0',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
   },
   companyName: {
     fontSize: 18,

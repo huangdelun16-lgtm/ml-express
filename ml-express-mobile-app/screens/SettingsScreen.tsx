@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Switch,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, adminAccountService } from '../services/supabase';
@@ -532,9 +533,11 @@ export default function SettingsScreen({ navigation }: any) {
 
             <ScrollView style={styles.aboutContent}>
               <View style={styles.aboutLogoSection}>
-                <View style={styles.aboutLogo}>
-                  <Text style={styles.aboutLogoText}>ML</Text>
-                </View>
+                <Image 
+                  source={require('../assets/logo.png')} 
+                  style={styles.aboutLogoImage}
+                  resizeMode="contain"
+                />
                 <Text style={styles.aboutCompanyName}>Market Link Express</Text>
                 <Text style={styles.aboutSlogan}>缅甸专业快递服务</Text>
               </View>
@@ -1009,24 +1012,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     marginBottom: 20,
   },
-  aboutLogo: {
+  aboutLogoImage: {
     width: 80,
     height: 80,
-    backgroundColor: '#C0C0C0',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
-  },
-  aboutLogoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2C3E50',
   },
   aboutCompanyName: {
     fontSize: 20,
