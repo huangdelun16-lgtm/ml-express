@@ -424,7 +424,7 @@ const HomePage: React.FC = () => {
           gap: '10px',
           cursor: 'pointer',
           transition: 'opacity 0.3s ease',
-          marginLeft: logoSize // 向左移动一个LOGO的距离
+          marginRight: `calc(${logoSize} * 2)` // 向右移动2个LOGO的距离
         }}
         onClick={() => window.location.href = '/'}
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
