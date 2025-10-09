@@ -423,7 +423,8 @@ const HomePage: React.FC = () => {
           alignItems: 'center', 
           gap: '10px',
           cursor: 'pointer',
-          transition: 'opacity 0.3s ease'
+          transition: 'opacity 0.3s ease',
+          paddingRight: '200px'
         }}
         onClick={() => window.location.href = '/'}
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
