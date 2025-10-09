@@ -865,7 +865,7 @@ const HomePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(26, 54, 93, 0.8)',
+          background: 'rgba(0, 0, 0, 0.8)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -873,7 +873,7 @@ const HomePage: React.FC = () => {
           backdropFilter: 'blur(5px)'
         }}>
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
+            background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
             backdropFilter: 'blur(15px)',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '15px',
@@ -881,7 +881,7 @@ const HomePage: React.FC = () => {
             width: '90%',
             maxHeight: '80vh',
             overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
             border: '1px solid rgba(255, 255, 255, 0.3)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
@@ -1631,14 +1631,14 @@ const HomePage: React.FC = () => {
           zIndex: 2000
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '15px',
             width: window.innerWidth < 768 ? '95%' : '80%',
             maxWidth: '800px',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
             border: '1px solid rgba(255, 255, 255, 0.3)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
