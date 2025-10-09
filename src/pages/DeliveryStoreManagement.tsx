@@ -97,6 +97,11 @@ const DeliveryStoreManagement: React.FC = () => {
   
   // 添加重试状态
   const [retryCount, setRetryCount] = useState(0);
+  
+  // 中转码二维码相关状态
+  const [showTransferQRModal, setShowTransferQRModal] = useState(false);
+  const [transferQRCodeDataUrl, setTransferQRCodeDataUrl] = useState('');
+  const [currentTransferPackage, setCurrentTransferPackage] = useState<Package | null>(null);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -237,6 +242,31 @@ const DeliveryStoreManagement: React.FC = () => {
     const packageSuffix = packageId.substring(packageId.length - 4);
     const timeSuffix = Date.now().toString().slice(-3);
     return `TC${storePrefix}${packageSuffix}${timeSuffix}`;
+  };
+
+  // 生成中转码二维码
+  const generateTransferQRCode = async (pkg: Package) => {
+    try {
+      if (!pkg.transfer_code) {
+        setErrorMessage('该包裹没有中转码');
+        return;
+      }
+      
+      const qrCodeUrl = await QRCode.toDataURL(pkg.transfer_code, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#9b59b6',
+          light: '#FFFFFF'
+        }
+      });
+      setTransferQRCodeDataUrl(qrCodeUrl);
+      setCurrentTransferPackage(pkg);
+      setShowTransferQRModal(true);
+    } catch (error) {
+      console.error('生成中转码二维码失败:', error);
+      setErrorMessage('生成中转码二维码失败');
+    }
   };
 
   // 转发包裹功能
@@ -2293,15 +2323,50 @@ const DeliveryStoreManagement: React.FC = () => {
                             {pkg.sender_name} → {pkg.receiver_name}
                           </p>
                         </div>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          background: pkg.status === '已送达' ? 'rgba(72, 187, 120, 0.3)' : 'rgba(160, 174, 192, 0.3)',
-                          fontSize: '0.75rem',
-                          fontWeight: '500'
-                        }}>
-                          {pkg.status}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            background: pkg.status === '已送达' ? 'rgba(72, 187, 120, 0.3)' : 'rgba(160, 174, 192, 0.3)',
+                            fontSize: '0.75rem',
+                            fontWeight: '500'
+                          }}>
+                            {pkg.status}
+                          </span>
+                          {pkg.transfer_code && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                generateTransferQRCode(pkg);
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                boxShadow: '0 2px 4px rgba(155, 89, 182, 0.3)'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(155, 89, 182, 0.4)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(155, 89, 182, 0.3)';
+                              }}
+                            >
+                              🔄 中转码
+                            </button>
+                          )}
+                        </div>
                       </div>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem', opacity: 0.9 }}>
@@ -2341,6 +2406,263 @@ const DeliveryStoreManagement: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 中转码二维码模态框 */}
+      {showTransferQRModal && currentTransferPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h2 style={{
+                margin: 0,
+                color: '#A5C7FF',
+                fontSize: '1.5rem',
+                fontWeight: 'bold'
+              }}>
+                🔄 中转码二维码
+              </h2>
+              <button
+                onClick={() => setShowTransferQRModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 包裹信息 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                包裹信息
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                marginBottom: '1rem'
+              }}>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#2c5282',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}>
+                  包裹ID: {currentTransferPackage.id}
+                </p>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#2c5282',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}>
+                  中转码: {currentTransferPackage.transfer_code}
+                </p>
+                <p style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#666',
+                  fontSize: '0.9rem'
+                }}>
+                  寄件人: {currentTransferPackage.sender_name}
+                </p>
+                <p style={{
+                  margin: 0,
+                  color: '#666',
+                  fontSize: '0.9rem'
+                }}>
+                  收件人: {currentTransferPackage.receiver_name}
+                </p>
+              </div>
+            </div>
+
+            {/* 二维码显示 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '1.5rem',
+              borderRadius: '15px',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <h3 style={{
+                margin: '0 0 1rem 0',
+                color: '#A5C7FF',
+                fontSize: '1.2rem'
+              }}>
+                中转码二维码
+              </h3>
+              <div style={{
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '10px',
+                display: 'inline-block',
+                marginBottom: '1rem'
+              }}>
+                {transferQRCodeDataUrl ? (
+                  <img 
+                    src={transferQRCodeDataUrl} 
+                    alt="中转码二维码" 
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(155, 89, 182, 0.3)'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    background: '#f8f9fa',
+                    border: '2px dashed #9b59b6',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#666',
+                    fontSize: '0.9rem'
+                  }}>
+                    正在生成二维码...
+                  </div>
+                )}
+              </div>
+              <p style={{
+                margin: 0,
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '0.9rem',
+                lineHeight: '1.5'
+              }}>
+                骑手扫描此二维码确认包裹中转<br/>
+                中转码: {currentTransferPackage.transfer_code}<br/>
+                请妥善保管此中转码
+              </p>
+            </div>
+
+            {/* 操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  if (transferQRCodeDataUrl) {
+                    const link = document.createElement('a');
+                    link.href = transferQRCodeDataUrl;
+                    link.download = `中转码_${currentTransferPackage.id}_${currentTransferPackage.transfer_code}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }
+                }}
+                disabled={!transferQRCodeDataUrl}
+                style={{
+                  background: !transferQRCodeDataUrl ? '#94a3b8' : 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: !transferQRCodeDataUrl ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 15px rgba(155, 89, 182, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseOver={(e) => {
+                  if (transferQRCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(155, 89, 182, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (transferQRCodeDataUrl) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(155, 89, 182, 0.3)';
+                  }
+                }}
+              >
+                📥 保存二维码
+              </button>
+              <button
+                onClick={() => setShowTransferQRModal(false)}
+                style={{
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                关闭
+              </button>
+            </div>
           </div>
         </div>
       )}
