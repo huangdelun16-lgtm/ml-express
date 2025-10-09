@@ -420,8 +420,9 @@ const HomePage: React.FC = () => {
       <div 
         style={{ 
           display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px',
+          flexDirection: 'column', // 改为垂直排列
+          alignItems: 'center', // 居中对齐
+          gap: '8px', // 减少间距
           cursor: 'pointer',
           transition: 'opacity 0.3s ease',
           marginRight: `calc(${logoSize} * 2)` // 向右移动2个LOGO的距离
@@ -441,12 +442,14 @@ const HomePage: React.FC = () => {
           }}
         />
         
-        {/* 公司名称 - 放大字体2号 */}
+        {/* 公司名称 - 放大字体2号，居中对齐 */}
         <div style={{
           color: 'white',
           fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '2.6rem' : '2.2rem', // 每个尺寸都放大2号
           fontWeight: 'bold',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+          textAlign: 'center', // 文字居中对齐
+          whiteSpace: 'nowrap' // 防止文字换行
         }}>
           MARKET LINK EXPRESS
         </div>
