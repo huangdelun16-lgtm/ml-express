@@ -455,15 +455,21 @@ const HomePage: React.FC = () => {
           }}
         />
         
-        {/* 公司名称 - 放大字体2号 */}
+        {/* 公司名称 - 与标题相同大小和样式 */}
         <div style={{
           color: 'white',
-          fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '2.6rem' : '2.2rem', // 每个尺寸都放大2号
-          fontWeight: 'bold',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-          whiteSpace: 'nowrap' // 防止文字换行
+          fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '4rem' : '2.2rem',
+          fontWeight: '800',
+          textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
+          background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          letterSpacing: '-1px',
+          lineHeight: '1.1',
+          whiteSpace: 'nowrap'
         }}>
-          MARKET LINK EXPRESS
+          MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
         </div>
       </div>
     );
@@ -676,17 +682,6 @@ const HomePage: React.FC = () => {
             }}>
               {t.hero.title}
             </h1>
-            <p style={{ 
-              fontSize: window.innerWidth < 768 ? '1.1rem' : '1.4rem', 
-              marginBottom: '2rem',
-              opacity: 0.95,
-              maxWidth: '700px',
-              lineHeight: '1.6',
-              fontWeight: '300',
-              textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
-            }}>
-              {t.hero.subtitle}
-            </p>
           </div>
 
           {/* CTA按钮区域 */}
