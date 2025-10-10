@@ -887,7 +887,7 @@ const HomePage: React.FC = () => {
               fontWeight: '700',
               textShadow: '2px 2px 8px rgba(0,0,0,0.3)'
             }}>
-              🚀 立即体验专业快递服务
+              立即体验专业快递服务
             </h3>
             <p style={{
               fontSize: '1.1rem',
@@ -927,7 +927,7 @@ const HomePage: React.FC = () => {
                 document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' });
               }}
               >
-                📝 立即下单
+                立即下单
               </button>
               <button style={{
                 background: 'transparent',
@@ -953,7 +953,7 @@ const HomePage: React.FC = () => {
                 document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
               }}
               >
-                📞 联系我们
+                联系我们
               </button>
             </div>
           </div>
