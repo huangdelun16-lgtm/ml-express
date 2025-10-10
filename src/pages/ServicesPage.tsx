@@ -53,6 +53,32 @@ const ServicesPage: React.FC = () => {
         safe: '安全可靠',
         convenient: '便捷服务',
         affordable: '价格实惠'
+      },
+      services: {
+        lightning: {
+          title: '闪电配送',
+          subtitle: 'LIGHTNING DELIVERY',
+          desc: '30分钟内上门取件，极速送达',
+          features: ['实时定位', '智能路线', '即时通知']
+        },
+        secure: {
+          title: '安全护航',
+          subtitle: 'SECURE ESCORT',
+          desc: '全程保险保障，零风险配送',
+          features: ['全程保险', '实时监控', '安全认证']
+        },
+        smart: {
+          title: '智能服务',
+          subtitle: 'SMART SERVICE',
+          desc: '在线下单，实时跟踪，智能客服',
+          features: ['在线下单', '实时跟踪', 'AI客服']
+        },
+        transparent: {
+          title: '透明定价',
+          subtitle: 'TRANSPARENT PRICING',
+          desc: '价格透明，无隐藏费用，物超所值',
+          features: ['透明定价', '无隐藏费', '优惠活动']
+        }
       }
     },
     en: {
@@ -70,6 +96,32 @@ const ServicesPage: React.FC = () => {
         safe: 'Safe & Reliable',
         convenient: 'Convenient',
         affordable: 'Affordable'
+      },
+      services: {
+        lightning: {
+          title: 'Lightning Delivery',
+          subtitle: 'LIGHTNING DELIVERY',
+          desc: 'Door-to-door pickup within 30 minutes, ultra-fast delivery',
+          features: ['Real-time Location', 'Smart Routing', 'Instant Notifications']
+        },
+        secure: {
+          title: 'Secure Escort',
+          subtitle: 'SECURE ESCORT',
+          desc: 'Full insurance coverage, zero-risk delivery',
+          features: ['Full Insurance', 'Real-time Monitoring', 'Security Certification']
+        },
+        smart: {
+          title: 'Smart Service',
+          subtitle: 'SMART SERVICE',
+          desc: 'Online ordering, real-time tracking, smart customer service',
+          features: ['Online Ordering', 'Real-time Tracking', 'AI Customer Service']
+        },
+        transparent: {
+          title: 'Transparent Pricing',
+          subtitle: 'TRANSPARENT PRICING',
+          desc: 'Transparent pricing, no hidden fees, great value',
+          features: ['Transparent Pricing', 'No Hidden Fees', 'Special Offers']
+        }
       }
     },
     my: {
