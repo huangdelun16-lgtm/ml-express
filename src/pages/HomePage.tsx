@@ -121,7 +121,7 @@ const HomePage: React.FC = () => {
       });
       setQrCodeDataUrl(qrCodeUrl);
     } catch (error) {
-      console.error('生成二维码失败:', error);
+      console.error(t.errors.qrGenerationFailed, error);
     }
   };
 
@@ -133,16 +133,16 @@ const HomePage: React.FC = () => {
     try {
       const link = document.createElement('a');
       link.href = qrCodeDataUrl;
-      link.download = `订单二维码_${generatedOrderId}.png`;
+      link.download = `${t.ui.packageTracking}_${generatedOrderId}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       // 模拟发送给客户
-      alert('二维码已下载到本地，并已发送给客户！');
+      alert(t.errors.qrDownloaded);
     } catch (error) {
-      console.error('下载失败:', error);
-      alert('下载失败，请重试');
+      console.error(t.errors.downloadFailed, error);
+      alert(t.errors.downloadFailed);
     } finally {
       setDownloading(false);
     }
@@ -168,10 +168,10 @@ const HomePage: React.FC = () => {
       try {
         const isConnected = await testConnection();
         if (!isConnected) {
-          console.warn('数据库连接失败，应用将在离线模式下运行');
+          console.warn(t.errors.dbConnectionFailed);
         }
       } catch (error) {
-        console.error('连接测试出错:', error);
+        console.error(t.errors.connectionTestError, error);
       }
     };
     
@@ -205,7 +205,7 @@ const HomePage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('保存客户信息失败:', error);
+      console.error(t.errors.saveCustomerFailed, error);
     }
   };
 
@@ -271,6 +271,38 @@ const HomePage: React.FC = () => {
         address: '缅甸曼德勒',
         phone: '+95 9 123 456 789',
         email: 'info@marketlinkexpress.com'
+      },
+      errors: {
+        mapLoadFailed: '地图加载失败',
+        mapConfigError: 'Google Maps API 配置问题',
+        checkApiKey: '请检查 API Key 设置',
+        qrGenerationFailed: '生成二维码失败',
+        downloadFailed: '下载失败',
+        dbConnectionFailed: '数据库连接失败，应用将在离线模式下运行',
+        connectionTestError: '连接测试出错',
+        saveCustomerFailed: '保存客户信息失败',
+        orderInfoLost: '订单信息丢失，请重新下单',
+        qrDownloaded: '二维码已下载到本地，并已发送给客户'
+      },
+      ui: {
+        packageTracking: '包裹跟踪',
+        lightningDelivery: '极速配送',
+        secureReliable: '安全可靠',
+        smartService: '智能服务',
+        transparentPricing: '透明定价',
+        prepaidPickupFee: '预付取货费',
+        scanQrPay: '请扫描二维码支付',
+        pickupFee: '取货费',
+        paymentQrCode: '支付二维码',
+        confirmPayment: '支付完成',
+        cancelPayment: '取消',
+        packageType: '包裹类型',
+        document: '文件',
+        standardPackage: '标准件（45x60x15cm）以内',
+        overweightPackage: '超重件（10 KG）以上',
+        oversizedPackage: '超规件（45x60x15cm）以上',
+        fragile: '易碎品',
+        packageInfoMismatch: '如实物和包裹信息内容不一致会导致报价失误'
       }
     },
     en: {
@@ -334,6 +366,38 @@ const HomePage: React.FC = () => {
         address: 'Mandalay, Myanmar',
         phone: '+95 9 123 456 789',
         email: 'info@marketlinkexpress.com'
+      },
+      errors: {
+        mapLoadFailed: 'Map Loading Failed',
+        mapConfigError: 'Google Maps API Configuration Issue',
+        checkApiKey: 'Please check API Key settings',
+        qrGenerationFailed: 'QR Code Generation Failed',
+        downloadFailed: 'Download Failed',
+        dbConnectionFailed: 'Database connection failed, app will run in offline mode',
+        connectionTestError: 'Connection test error',
+        saveCustomerFailed: 'Failed to save customer information',
+        orderInfoLost: 'Order information lost, please re-order',
+        qrDownloaded: 'QR Code downloaded locally and sent to customer'
+      },
+      ui: {
+        packageTracking: 'Package Tracking',
+        lightningDelivery: 'Lightning Delivery',
+        secureReliable: 'Secure & Reliable',
+        smartService: 'Smart Service',
+        transparentPricing: 'Transparent Pricing',
+        prepaidPickupFee: 'Prepaid Pickup Fee',
+        scanQrPay: 'Please scan QR code to pay',
+        pickupFee: 'pickup fee',
+        paymentQrCode: 'Payment QR Code',
+        confirmPayment: 'Payment Complete',
+        cancelPayment: 'Cancel',
+        packageType: 'Package Type',
+        document: 'Document',
+        standardPackage: 'Standard Package (45x60x15cm)',
+        overweightPackage: 'Overweight Package (10 KG+)',
+        oversizedPackage: 'Oversized Package (45x60x15cm+)',
+        fragile: 'Fragile',
+        packageInfoMismatch: 'If actual item and package information do not match, it may cause pricing errors'
       }
     },
     my: {
@@ -397,6 +461,38 @@ const HomePage: React.FC = () => {
         address: 'မန္တလေး၊ မြန်မာ',
         phone: '+95 9 123 456 789',
         email: 'info@marketlinkexpress.com'
+      },
+      errors: {
+        mapLoadFailed: 'မြေပုံတင် မအောင်မြင်ပါ',
+        mapConfigError: 'Google Maps API ပြင်ဆင်မှု ပြဿနာ',
+        checkApiKey: 'API Key ပြင်ဆင်မှုကို စစ်ဆေးပါ',
+        qrGenerationFailed: 'QR Code ဖန်တီးခြင်း မအောင်မြင်ပါ',
+        downloadFailed: 'ဒေါင်းလုဒ် မအောင်မြင်ပါ',
+        dbConnectionFailed: 'ဒေတာဘေ့စ် ချိတ်ဆက်မှု မအောင်မြင်ပါ၊ အက်ပ် အော့ဖ်လိုင်း မုဒ်တွင် လည်ပတ်မည်',
+        connectionTestError: 'ချိတ်ဆက်မှု စမ်းသပ်ခြင်း မှားယွင်းပါ',
+        saveCustomerFailed: 'ဖောက်သည်အချက်အလက် သိမ်းဆည်းခြင်း မအောင်မြင်ပါ',
+        orderInfoLost: 'အမှာတင်အချက်အလက် ပျောက်ဆုံးပါ၊ ပြန်လည် အမှာတင်ပါ',
+        qrDownloaded: 'QR Code ကို ဒေါင်းလုဒ်ပြီး ဖောက်သည်ထံ ပို့ပြီးပါပြီ'
+      },
+      ui: {
+        packageTracking: 'ထုပ်ပိုးခြင်း စောင့်ကြည့်ခြင်း',
+        lightningDelivery: 'မြန်ဆန်သော ပို့ဆောင်မှု',
+        secureReliable: 'လုံခြုံ ယုံကြည်စိတ်ချရသော',
+        smartService: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
+        transparentPricing: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
+        prepaidPickupFee: 'ကြိုတင်ပေးချေသော လာယူခြင်း ကုန်ကျစရိတ်',
+        scanQrPay: 'QR Code ကို စကင်န်ဖတ်ပြီး ပေးချေပါ',
+        pickupFee: 'လာယူခြင်း ကုန်ကျစရိတ်',
+        paymentQrCode: 'ပေးချေမှု QR Code',
+        confirmPayment: 'ပေးချေမှုကို အတည်ပြုပါ',
+        cancelPayment: 'ပေးချေမှုကို ပယ်ဖျက်ပါ',
+        packageType: 'ထုပ်ပိုးအမျိုးအစား',
+        document: 'စာရွက်စာတမ်း',
+        standardPackage: 'စံထုပ်ပိုး (45x60x15cm) အတွင်း',
+        overweightPackage: 'အလေးချိန်များသော ထုပ်ပိုး (10 KG) အထက်',
+        oversizedPackage: 'အရွယ်အစားကြီးသော ထုပ်ပိုး (45x60x15cm) အထက်',
+        fragile: 'ပျက်စီးလွယ်သော',
+        packageInfoMismatch: 'အမှန်တကယ်ပစ္စည်းနှင့် ထုပ်ပိုးအချက်အလက် မကိုက်ညီပါက စျေးနှုန်းသတ်မှတ်ခြင်း မှားယွင်းနိုင်ပါသည်'
       }
     }
   };
@@ -848,7 +944,7 @@ const HomePage: React.FC = () => {
                 e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
               }}
             >
-              📦 包裹跟踪
+              📦 {t.ui.packageTracking}
             </button>
           </div>
 
@@ -861,7 +957,7 @@ const HomePage: React.FC = () => {
             justifyContent: 'center',
             animation: 'fadeInUp 1s ease-out 0.6s both'
           }}>
-            {['⚡ 极速配送', '🛡️ 安全可靠', '📱 智能服务', '💎 透明定价'].map((tag, index) => (
+            {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag, index) => (
               <div key={index} style={{
                 background: 'rgba(255,255,255,0.15)',
                 backdropFilter: 'blur(10px)',
@@ -1168,11 +1264,11 @@ const HomePage: React.FC = () => {
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
                   }}
                 >
-                  <option value="文件">文件</option>
-                  <option value="标准件（45x60x15cm）以内">标准件（45x60x15cm）以内</option>
-                  <option value="超重件（10 KG）以上">超重件（10 KG）以上</option>
-                  <option value="超规件（45x60x15cm）以上">超规件（45x60x15cm）以上</option>
-                  <option value="易碎品">易碎品</option>
+                  <option value={t.ui.document}>{t.ui.document}</option>
+                  <option value={t.ui.standardPackage}>{t.ui.standardPackage}</option>
+                  <option value={t.ui.overweightPackage}>{t.ui.overweightPackage}</option>
+                  <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
+                  <option value={t.ui.fragile}>{t.ui.fragile}</option>
                 </select>
                 <input
                   type="text"
@@ -1212,7 +1308,7 @@ const HomePage: React.FC = () => {
                   textAlign: 'center',
                   fontStyle: 'italic'
                 }}>
-                  ***如实物和包裹信息内容不一致会导致报价失误***
+                  ***{t.ui.packageInfoMismatch}***
                 </div>
               </div>
 
@@ -1300,10 +1396,10 @@ const HomePage: React.FC = () => {
               <Logo size="medium" />
             </div>
             <h2 style={{ color: '#2c5282', marginBottom: '1rem' }}>
-              预付取货费
+              {t.ui.prepaidPickupFee}
             </h2>
             <p style={{ color: '#4a5568', marginBottom: '2rem', fontSize: '1.1rem' }}>
-              请扫描二维码支付 <strong>2000 MMK</strong> 取货费
+              {t.ui.scanQrPay} <strong>2000 MMK</strong> {t.ui.pickupFee}
             </p>
             
             {/* 二维码占位符 */}
@@ -1322,7 +1418,7 @@ const HomePage: React.FC = () => {
               fontSize: '0.9rem',
               color: '#666'
             }}>
-              支付二维码
+              {t.ui.paymentQrCode}
             </div>
             
             <div style={{ 
@@ -1338,7 +1434,7 @@ const HomePage: React.FC = () => {
                   // 获取存储的订单信息
                   const pendingOrder = localStorage.getItem('pendingOrder');
                   if (!pendingOrder) {
-                    alert('订单信息丢失，请重新下单');
+                    alert(t.errors.orderInfoLost);
                     return;
                   }
                   
@@ -1410,7 +1506,7 @@ const HomePage: React.FC = () => {
                   e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
                 }}
               >
-                支付完成
+                {t.ui.confirmPayment}
               </button>
               <button
                 onClick={() => setShowPaymentModal(false)}
@@ -1428,7 +1524,7 @@ const HomePage: React.FC = () => {
                 onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
                 onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
-                取消
+                {t.ui.cancelPayment}
               </button>
             </div>
           </div>
@@ -1980,7 +2076,7 @@ const HomePage: React.FC = () => {
                 onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
                 onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
-                取消
+                {t.ui.cancelPayment}
               </button>
             </div>
           </div>
