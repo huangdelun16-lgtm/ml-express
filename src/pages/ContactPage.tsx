@@ -52,6 +52,27 @@ const ContactPage: React.FC = () => {
         addressValue: 'Mandalay, Myanmar',
         businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
       }
+    },
+    my: {
+      nav: {
+        home: 'ပင်မ',
+        services: 'ဝန်ဆောင်မှု',
+        tracking: 'ထုပ်ပိုးခြင်း',
+        contact: 'ဆက်သွယ်ရန်',
+        admin: 'စီမံခန့်ခွဲမှု'
+      },
+      contact: {
+        title: 'ဆက်သွယ်ရန်',
+        subtitle: 'ကျွန်ုပ်တို့သည် ပရော်ဖက်ရှင်နယ် ပို့ဆောင်မှု ဝန်ဆောင်မှုကို ပေးဆောင်ရန် ဤနေရာတွင် ရှိပါသည်',
+        phone: 'ဖုန်းဆက်သွယ်ရန်',
+        email: 'အီးမေးလ်ဆက်သွယ်ရန်',
+        address: 'ကုမ္ပဏီလိပ်စာ',
+        businessHours: 'အလုပ်ချိန်',
+        phoneValue: '+95 9 123 456 789',
+        emailValue: 'info@marketlinkexpress.com',
+        addressValue: 'မန္တလေး၊ မြန်မာ',
+        businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00'
+      }
     }
   };
 
@@ -188,7 +209,7 @@ const ContactPage: React.FC = () => {
           
           {/* 语言切换 */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['zh', 'en'].map((lang) => (
+            {['zh', 'en', 'my'].map((lang) => (
               <button
                 key={lang}
                 onClick={() => handleLanguageChange(lang)}

@@ -52,6 +52,26 @@ const TrackingPage: React.FC = () => {
         location: 'Current Location',
         estimatedDelivery: 'Estimated Delivery'
       }
+    },
+    my: {
+      nav: {
+        home: 'ပင်မ',
+        services: 'ဝန်ဆောင်မှု',
+        tracking: 'ထုပ်ပိုးခြင်း',
+        contact: 'ဆက်သွယ်ရန်',
+        admin: 'စီမံခန့်ခွဲမှု'
+      },
+      tracking: {
+        title: 'ထုပ်ပိုးခြင်း',
+        placeholder: 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ',
+        track: 'ရှာဖွေပါ',
+        notFound: 'ထုပ်ပိုးအချက်အလက် မတွေ့ပါ',
+        packageInfo: 'ထုပ်ပိုးအချက်အလက်',
+        trackingNumber: 'နံပါတ်',
+        status: 'အခြေအနေ',
+        location: 'လက်ရှိတည်နေရာ',
+        estimatedDelivery: 'ပို့ဆောင်မည့်အချိန်'
+      }
     }
   };
 
@@ -203,7 +223,7 @@ const TrackingPage: React.FC = () => {
           
           {/* 语言切换 */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['zh', 'en'].map((lang) => (
+            {['zh', 'en', 'my'].map((lang) => (
               <button
                 key={lang}
                 onClick={() => handleLanguageChange(lang)}

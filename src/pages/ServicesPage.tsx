@@ -42,6 +42,22 @@ const ServicesPage: React.FC = () => {
         convenient: 'Convenient',
         affordable: 'Affordable'
       }
+    },
+    my: {
+      nav: {
+        home: 'ပင်မ',
+        services: 'ဝန်ဆောင်မှု',
+        tracking: 'ထုပ်ပိုးခြင်း',
+        contact: 'ဆက်သွယ်ရန်',
+        admin: 'စီမံခန့်ခွဲမှု'
+      },
+      features: {
+        title: 'ဝန်ဆောင်မှုများ',
+        fast: 'မြန်ဆန်သော ပို့ဆောင်မှု',
+        safe: 'လုံခြုံသော ဝန်ဆောင်မှု',
+        convenient: 'အဆင်ပြေသော ဝန်ဆောင်မှု',
+        affordable: 'စျေးနှုန်းသင့်တင့်သော'
+      }
     }
   };
 
@@ -178,7 +194,7 @@ const ServicesPage: React.FC = () => {
           
           {/* 语言切换 */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['zh', 'en'].map((lang) => (
+            {['zh', 'en', 'my'].map((lang) => (
               <button
                 key={lang}
                 onClick={() => handleLanguageChange(lang)}
