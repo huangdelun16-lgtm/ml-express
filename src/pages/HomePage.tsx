@@ -906,7 +906,6 @@ const HomePage: React.FC = () => {
               <button style={{
                 background: 'linear-gradient(135deg, #667eea, #764ba2)',
                 color: 'white',
-                border: 'none',
                 padding: '16px 32px',
                 borderRadius: '50px',
                 fontSize: '1rem',
