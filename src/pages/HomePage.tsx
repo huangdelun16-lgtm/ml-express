@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import { packageService, testConnection, userService } from '../services/supabase';
 import QRCode from 'qrcode';
@@ -51,7 +52,9 @@ class ErrorBoundary extends React.Component<
 }
 
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
   const [language, setLanguage] = useState('zh');
+  const [isVisible, setIsVisible] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -66,6 +69,17 @@ const HomePage: React.FC = () => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
   // const [orderData, setOrderData] = useState<any>(null);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  const handleNavigation = (path: string) => {
+    setIsVisible(false);
+    setTimeout(() => {
+      navigate(path);
+    }, 300);
+  };
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -456,18 +470,34 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="homepage" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6' }}>
+    <div className="homepage" style={{ 
+      fontFamily: 'Arial, sans-serif', 
+      lineHeight: '1.6',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* 页面切换动画背景 */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        opacity: isVisible ? 0 : 1,
+        transition: 'opacity 0.3s ease-in-out',
+        zIndex: 1
+      }} />
       {/* 顶部导航栏 */}
       <nav style={{
+        position: 'relative',
+        zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         color: 'white',
         padding: '1rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000,
         boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         flexWrap: 'wrap'
       }}>
@@ -488,33 +518,42 @@ const HomePage: React.FC = () => {
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.home}</a>
-          <a href="#services" style={{ 
+          <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white', 
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease'
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
-          >{t.nav.services}</a>
-          <a href="#tracking" style={{ 
+          >{t.nav.services}</button>
+          <button onClick={() => handleNavigation('/tracking')} style={{ 
             color: 'white', 
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease'
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
-          >{t.nav.tracking}</a>
-          <a href="#contact" style={{ 
+          >{t.nav.tracking}</button>
+          <button onClick={() => handleNavigation('/contact')} style={{ 
             color: 'white', 
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease'
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
-          >{t.nav.contact}</a>
+          >{t.nav.contact}</button>
           <a href="/admin/login" style={{ 
           color: 'white',
             textDecoration: 'none',
@@ -548,16 +587,20 @@ const HomePage: React.FC = () => {
 
       {/* 英雄区域 */}
       <section id="home" style={{
+        position: 'relative',
+        zIndex: 5,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-                color: 'white',
+        color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem',
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'all 0.6s ease-in-out',
         textAlign: 'center',
         minHeight: window.innerWidth < 768 ? '60vh' : '70vh',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        position: 'relative',
         overflow: 'hidden'
       }}>
         {/* 背景装饰 */}
@@ -631,405 +674,19 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 高级服务特色模块 */}
-      <section id="services" style={{ 
-        padding: window.innerWidth < 768 ? '3rem 1rem' : '6rem 2rem', 
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* 背景装饰 */}
-        <div style={{
-          position: 'absolute',
-          top: '10%',
-          left: '5%',
-          width: '200px',
-          height: '200px',
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: '50%',
-          filter: 'blur(40px)'
-        }}></div>
-        <div style={{
-          position: 'absolute',
-          bottom: '10%',
-          right: '5%',
-          width: '300px',
-          height: '300px',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '50%',
-          filter: 'blur(60px)'
-        }}></div>
 
-        <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          {/* 主标题区域 */}
-          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
-            <div style={{
-              display: 'inline-block',
-              background: 'rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '50px',
-              padding: '8px 24px',
-              marginBottom: '1.5rem',
-              border: '1px solid rgba(255,255,255,0.3)'
-            }}>
-              <span style={{ 
-                color: 'white', 
-                fontSize: '0.9rem', 
-                fontWeight: '600',
-                letterSpacing: '1px'
-              }}>
-                ✨ PREMIUM SERVICES ✨
-              </span>
-            </div>
-            <h2 style={{ 
-              fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem', 
-              color: 'white',
-              marginBottom: '1rem',
-              fontWeight: '800',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
-              letterSpacing: '-1px'
-            }}>
-              {t.features.title}
-            </h2>
-            <p style={{ 
-              fontSize: '1.2rem', 
-              color: 'rgba(255,255,255,0.9)',
-              maxWidth: '600px',
-              margin: '0 auto',
-              lineHeight: '1.6',
-              fontWeight: '300'
-            }}>
-              专业、高效、值得信赖的快递服务体验
-            </p>
-          </div>
 
-          {/* 高级服务卡片网格 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-            gap: '2rem',
-            marginBottom: '3rem'
-          }}>
-            {[
-              { 
-                icon: '⚡', 
-                title: '闪电配送', 
-                subtitle: 'LIGHTNING DELIVERY',
-                desc: '30分钟内上门取件，极速送达',
-                features: ['实时定位', '智能路线', '即时通知'],
-                color: '#ff6b6b',
-                bgGradient: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)',
-                iconBg: 'rgba(255, 107, 107, 0.2)'
-              },
-              { 
-                icon: '🛡️', 
-                title: '安全护航', 
-                subtitle: 'SECURE ESCORT',
-                desc: '全程保险保障，零风险配送',
-                features: ['全程保险', '实时监控', '安全认证'],
-                color: '#4ecdc4',
-                bgGradient: 'linear-gradient(135deg, #4ecdc4, #44a08d)',
-                iconBg: 'rgba(78, 205, 196, 0.2)'
-              },
-              { 
-                icon: '📱', 
-                title: '智能服务', 
-                subtitle: 'SMART SERVICE',
-                desc: '在线下单，实时跟踪，智能客服',
-                features: ['在线下单', '实时跟踪', 'AI客服'],
-                color: '#45b7d1',
-                bgGradient: 'linear-gradient(135deg, #45b7d1, #96c93d)',
-                iconBg: 'rgba(69, 183, 209, 0.2)'
-              },
-              { 
-                icon: '💎', 
-                title: '透明定价', 
-                subtitle: 'TRANSPARENT PRICING',
-                desc: '价格透明，无隐藏费用，物超所值',
-                features: ['透明定价', '无隐藏费', '优惠活动'],
-                color: '#f093fb',
-                bgGradient: 'linear-gradient(135deg, #f093fb, #f5576c)',
-                iconBg: 'rgba(240, 147, 251, 0.2)'
-              }
-            ].map((service, index) => (
-              <div key={index} style={{
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                padding: '2.5rem',
-                position: 'relative',
-                overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.2)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
-              }}
-              >
-                {/* 装饰性背景 */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-50px',
-                  right: '-50px',
-                  width: '120px',
-                  height: '120px',
-                  background: service.iconBg,
-                  borderRadius: '50%',
-                  opacity: '0.6'
-                }}></div>
-
-                {/* 图标区域 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '1.5rem'
-                }}>
-                  <div style={{
-                    width: '60px',
-                    height: '60px',
-                    background: service.bgGradient,
-                    borderRadius: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: '1rem',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
-                  }}>
-                    <span style={{ fontSize: '28px' }}>{service.icon}</span>
-                  </div>
-                  <div>
-                    <h3 style={{ 
-                      fontSize: '1.5rem', 
-                      fontWeight: '700',
-                      color: '#2d3748',
-                      margin: '0 0 4px 0',
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {service.title}
-                    </h3>
-                    <p style={{ 
-                      fontSize: '0.8rem', 
-                      color: '#718096',
-                      margin: 0,
-                      fontWeight: '500',
-                      letterSpacing: '1px'
-                    }}>
-                      {service.subtitle}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 描述 */}
-                <p style={{ 
-                  fontSize: '1rem', 
-                  color: '#4a5568',
-                  marginBottom: '1.5rem',
-                  lineHeight: '1.6',
-                  fontWeight: '400'
-                }}>
-                  {service.desc}
-                </p>
-
-                {/* 特色功能列表 */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  {service.features.map((feature, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem',
-                      fontSize: '0.9rem',
-                      color: '#4a5568'
-                    }}>
-                      <div style={{
-                        width: '6px',
-                        height: '6px',
-                        background: service.color,
-                        borderRadius: '50%',
-                        marginRight: '0.75rem'
-                      }}></div>
-                      <span style={{ fontWeight: '500' }}>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 底部装饰线 */}
-                <div style={{
-                  height: '3px',
-                  background: service.bgGradient,
-                  borderRadius: '2px',
-                  marginTop: '1rem'
-                }}></div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* 使用流程 */}
-      <section style={{ 
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: 'white' 
-      }}>
-        <h2 style={{ 
-          textAlign: 'center', 
-          fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
-          marginBottom: '3rem', 
-          color: '#000000' 
-        }}>
-          {t.process.title}
-        </h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '2rem',
-          maxWidth: '1000px',
-          margin: '0 auto'
-        }}>
-          {[
-            { step: '1', title: t.process.step1, desc: '填写寄件信息' },
-            { step: '2', title: t.process.step2, desc: '快递员上门取件' },
-            { step: '3', title: t.process.step3, desc: '快速安全配送' },
-            { step: '4', title: t.process.step4, desc: '收件人签收确认' }
-          ].map((process, index) => (
-            <div key={index} style={{
-              textAlign: 'center',
-              position: 'relative'
-            }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-                color: 'white',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                margin: '0 auto 1rem',
-                boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)'
-              }}>
-                {process.step}
-              </div>
-              <h3 style={{ color: '#2c5282', marginBottom: '0.5rem' }}>{process.title}</h3>
-              <p style={{ color: '#666' }}>{process.desc}</p>
-              {index < 3 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '30px',
-                  right: '-50%',
-                  width: '100%',
-                  height: '2px',
-                  background: 'linear-gradient(90deg, #2c5282 0%, #3182ce 100%)',
-                  zIndex: -1
-                }}></div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 包裹跟踪 */}
-      <section id="tracking" style={{ 
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
-      }}>
-        <h2 style={{ 
-          textAlign: 'center', 
-          fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
-          marginBottom: '3rem', 
-          color: '#000000' 
-        }}>
-          {t.tracking.title}
-        </h2>
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          background: 'white',
-          padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
-          borderRadius: '15px',
-          boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
-          border: '1px solid rgba(192, 192, 192, 0.2)'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem', 
-            marginBottom: '2rem',
-            flexDirection: window.innerWidth < 768 ? 'column' : 'row'
-          }}>
-            <input
-              type="text"
-              placeholder={t.tracking.placeholder}
-              value={trackingNumber}
-              onChange={(e) => setTrackingNumber(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '1rem',
-                border: '2px solid #e2e8f0',
-                borderRadius: '10px',
-                fontSize: '1rem',
-                transition: 'border-color 0.3s ease'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-            />
-            <button
-              onClick={handleTracking}
-              style={{
-                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '1rem 2rem',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                minWidth: window.innerWidth < 768 ? '100%' : 'auto',
-                boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 82, 130, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.3)';
-              }}
-            >
-              {t.tracking.track}
-            </button>
-          </div>
-          
-          {trackingResult && (
-            <div style={{
-              background: 'linear-gradient(135deg, #e6f3ff 0%, #f0f8ff 100%)',
-              padding: '1.5rem',
-              borderRadius: '10px',
-              border: '1px solid #2c5282'
-            }}>
-              <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>包裹信息</h3>
-              <p><strong>单号：</strong>{trackingResult.number}</p>
-              <p><strong>状态：</strong>{trackingResult.status}</p>
-              <p><strong>当前位置：</strong>{trackingResult.location}</p>
-              <p><strong>预计送达：</strong>{trackingResult.estimatedDelivery}</p>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* 页脚 */}
       <footer id="contact" style={{
+        position: 'relative',
+        zIndex: 5,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-                    color: 'white',
+        color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '3rem 2rem',
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'all 0.6s ease-in-out',
         textAlign: 'center'
       }}>
         <Logo size="medium" />

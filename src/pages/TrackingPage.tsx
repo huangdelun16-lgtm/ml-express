@@ -1,870 +1,398 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LoadScript, GoogleMap, Marker, Polyline } from '@react-google-maps/api';
-import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
-import { supabase, auditLogService } from '../services/supabase';
-
-// 错误边界组件
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error?: Error }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Google Maps Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{
-          width: '100%',
-          height: '400px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(15,32,60,0.6)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          color: 'white'
-        }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
-          <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
-          <p style={{ margin: '0', opacity: 0.8, textAlign: 'center' }}>
-            Google Maps API 配置问题<br/>
-            请检查 API Key 设置
-          </p>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-const mapContainerStyle: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
-  borderRadius: '20px',
-  overflow: 'hidden'
-};
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
-  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(null);
-  const [initializing, setInitializing] = useState(false);
+  const [language, setLanguage] = useState('zh');
+  const [isVisible, setIsVisible] = useState(false);
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingResult, setTrackingResult] = useState<any>(null);
 
-  const {
-    packages,
-    courierLocations,
-    couriers,
-    trackingEvents,
-    loading,
-    error,
-    lastUpdate,
-    refreshData,
-    initializeCourierData,
-    simulateCourierMovement
-  } = useRealTimeTracking({
-    refreshInterval: 30000,
-    autoRefresh: true,
-    selectedPackageId: selectedPackageId || undefined
-  });
-
-  const googleMapsApiKey = useMemo(() => process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY", []);
-  
   useEffect(() => {
-    document.title = '实时跟踪 | 管理后台';
+    setIsVisible(true);
   }, []);
 
-  // 处理初始化骑手数据
-  const handleInitializeCourierData = useCallback(async () => {
-    if (!window.confirm('确定要初始化骑手位置数据吗？\n\n这将为所有活跃骑手生成模拟位置数据用于演示。')) {
+  const translations = {
+    zh: {
+      nav: {
+        home: '首页',
+        services: '服务',
+        tracking: '包裹跟踪',
+        contact: '联系我们',
+        admin: '管理后台'
+      },
+      tracking: {
+        title: '包裹跟踪',
+        placeholder: '请输入包裹单号',
+        track: '查询',
+        notFound: '未找到包裹信息',
+        packageInfo: '包裹信息',
+        trackingNumber: '单号',
+        status: '状态',
+        location: '当前位置',
+        estimatedDelivery: '预计送达'
+      }
+    },
+    en: {
+      nav: {
+        home: 'Home',
+        services: 'Services',
+        tracking: 'Tracking',
+        contact: 'Contact',
+        admin: 'Admin'
+      },
+      tracking: {
+        title: 'Package Tracking',
+        placeholder: 'Enter tracking number',
+        track: 'Track',
+        notFound: 'Package not found',
+        packageInfo: 'Package Information',
+        trackingNumber: 'Number',
+        status: 'Status',
+        location: 'Current Location',
+        estimatedDelivery: 'Estimated Delivery'
+      }
+    }
+  };
+
+  const t = translations[language as keyof typeof translations] || translations.zh;
+
+  const handleLanguageChange = (lang: string) => {
+    setLanguage(lang);
+  };
+
+  const handleNavigation = (path: string) => {
+    setIsVisible(false);
+    setTimeout(() => {
+      navigate(path);
+    }, 300);
+  };
+
+  const handleTracking = () => {
+    if (!trackingNumber.trim()) {
+      alert('请输入包裹单号');
       return;
     }
 
-    setInitializing(true);
-    try {
-      await initializeCourierData();
-      alert('✅ 骑手位置数据初始化成功！\n\n现在可以在地图上看到骑手位置了。');
-    } catch (error) {
-      console.error('初始化骑手数据失败:', error);
-      alert('初始化失败，请稍后重试');
-    } finally {
-      setInitializing(false);
-    }
-  }, [initializeCourierData]);
-
-  // 处理模拟骑手移动
-  const handleSimulateCourierMovement = useCallback(async () => {
-    if (courierLocations.length === 0) {
-      alert('没有找到骑手位置数据\n\n请先点击"初始化骑手数据"按钮。');
-      return;
-    }
-
-    try {
-      await simulateCourierMovement();
-      console.log('骑手位置已更新');
-    } catch (error) {
-      console.error('模拟骑手移动失败:', error);
-    }
-  }, [courierLocations.length, simulateCourierMovement]);
-
-  // 处理删除骑手
-  const handleDeleteCourier = useCallback(async (courierId: string, courierName: string) => {
-    try {
-      // 删除骑手位置数据
-      const { error: locationError } = await supabase
-        .from('courier_locations')
-        .delete()
-        .eq('courier_id', courierId);
-
-      if (locationError) {
-        console.error('删除骑手位置数据失败:', locationError);
-      }
-
-      // 删除骑手基本信息
-      const { error: courierError } = await supabase
-        .from('couriers')
-        .delete()
-        .eq('id', courierId);
-
-      if (courierError) {
-        console.error('删除骑手信息失败:', courierError);
-      }
-
-      // 记录审计日志
-      const currentUser = localStorage.getItem('currentUser') || 'unknown';
-      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
-      
-      await auditLogService.log({
-        user_id: currentUser,
-        user_name: currentUserName,
-        action_type: 'delete',
-        module: 'couriers',
-        target_id: courierId,
-        target_name: `骑手 ${courierName}`,
-        action_description: `删除骑手，姓名：${courierName}，ID：${courierId}`,
-        old_value: JSON.stringify({ courierId, courierName })
-      });
-
-      // 刷新数据
-      await refreshData();
-      alert(`✅ 骑手 ${courierName} 已成功删除`);
-    } catch (error) {
-      console.error('删除骑手失败:', error);
-      alert('删除失败，请稍后重试');
-    }
-  }, [refreshData]);
-
-  // 计算当前包裹信息
-  const currentPackage = useMemo(() => {
-    return selectedPackageId ? packages.find(pkg => pkg.id === selectedPackageId) : null;
-  }, [selectedPackageId, packages]);
-
-  // 计算当前快递员位置
-  const currentCourierLocation = useMemo(() => {
-    if (!currentPackage?.courier) return null;
-    return courierLocations.find(loc => loc.courier_id === currentPackage.courier) || null;
-  }, [currentPackage, courierLocations]);
-
-  // 计算地图中心点
-  const defaultCenter = useMemo(() => ({ lat: 39.9042, lng: 116.4074 }), []);
-  
-  const mapCenter = useMemo(() => {
-    if (currentCourierLocation) {
-      return {
-        lat: currentCourierLocation.latitude,
-        lng: currentCourierLocation.longitude
-      };
-    }
-    if (courierLocations.length > 0) {
-      const avgLat = courierLocations.reduce((sum, loc) => sum + loc.latitude, 0) / courierLocations.length;
-      const avgLng = courierLocations.reduce((sum, loc) => sum + loc.longitude, 0) / courierLocations.length;
-      return { lat: avgLat, lng: avgLng };
-    }
-    return defaultCenter;
-  }, [currentCourierLocation, courierLocations, defaultCenter]);
-
-  // 计算跟踪路径
-  const trackingPath = useMemo(() => {
-    if (!selectedPackageId || trackingEvents.length === 0) return [];
-    
-    return trackingEvents
-      .sort((a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime())
-      .map(event => ({
-        lat: event.latitude,
-        lng: event.longitude
-      }));
-  }, [selectedPackageId, trackingEvents]);
-
-  // 计算快递员标记
-  const courierMarkers = useMemo(() => {
-    return courierLocations.map(location => ({
-      id: location.id,
-      position: { lat: location.latitude, lng: location.longitude },
-      title: `骑手 ${location.courier_id}`,
-      status: location.status,
-      lastUpdate: location.last_update
-    }));
-  }, [courierLocations]);
-
-  // 处理选择包裹
-  const handleSelectPackage = useCallback((packageId: string) => {
-    setSelectedPackageId(packageId);
-  }, []);
+    // 模拟查询结果
+    setTrackingResult({
+      number: trackingNumber,
+      status: '配送中',
+      location: '曼德勒配送中心',
+      estimatedDelivery: '2024年1月15日 14:00'
+    });
+  };
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)',
-      padding: '20px'
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      position: 'relative',
+      overflow: 'hidden'
     }}>
+      {/* 页面切换动画背景 */}
       <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '20px',
-        padding: '24px',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.2)'
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.3s ease-in-out',
+        zIndex: 1
+      }} />
+
+      {/* 导航栏 */}
+      <nav style={{
+        position: 'relative',
+        zIndex: 10,
+        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
+        padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
       }}>
-        {/* 页面标题和操作按钮 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img 
+            src="/logo.png" 
+            alt="Logo" 
+            style={{ 
+              width: window.innerWidth < 768 ? '40px' : '50px', 
+              height: window.innerWidth < 768 ? '40px' : '50px' 
+            }} 
+          />
+          <span style={{ 
+            color: 'white', 
+            fontSize: window.innerWidth < 768 ? '1.2rem' : '1.5rem', 
+            fontWeight: 'bold' 
+          }}>
+            MARKET LINK EXPRESS
+          </span>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+          <button onClick={() => handleNavigation('/')} style={{ 
+            color: 'white', 
+            textDecoration: 'none',
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          >{t.nav.home}</button>
+          <button onClick={() => handleNavigation('/services')} style={{ 
+            color: 'white', 
+            textDecoration: 'none',
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          >{t.nav.services}</button>
+          <button style={{ 
+            color: '#FFD700', 
+            textDecoration: 'none',
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}>{t.nav.tracking}</button>
+          <button onClick={() => handleNavigation('/contact')} style={{ 
+            color: 'white', 
+            textDecoration: 'none',
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          >{t.nav.contact}</button>
+          <a href="/admin/login" style={{ 
+            color: 'white',
+            textDecoration: 'none',
+            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
+            transition: 'color 0.3s ease',
+            background: 'rgba(255,255,255,0.2)',
+            padding: '0.5rem 1rem',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.3)'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          >{t.nav.admin}</a>
+          
+          {/* 语言切换 */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['zh', 'en'].map((lang) => (
+              <button
+                key={lang}
+                onClick={() => handleLanguageChange(lang)}
+                style={{
+                  background: language === lang ? 'rgba(255,255,255,0.3)' : 'transparent',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  padding: '0.3rem 0.6rem',
+                  borderRadius: '15px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = language === lang ? 'rgba(255,255,255,0.3)' : 'transparent'}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+
+      {/* 主要内容区域 */}
+      <div style={{
+        position: 'relative',
+        zIndex: 5,
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'all 0.6s ease-in-out',
+        padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem'
+      }}>
+        {/* 页面标题 */}
+        <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+          <h1 style={{
+            fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem',
+            color: 'white',
+            marginBottom: '1rem',
+            fontWeight: '800',
+            textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
+            letterSpacing: '-1px'
+          }}>
+            {t.tracking.title}
+          </h1>
+          <p style={{
+            fontSize: '1.2rem',
+            color: 'rgba(255,255,255,0.9)',
+            maxWidth: '600px',
+            margin: '0 auto',
+            lineHeight: '1.6',
+            fontWeight: '300'
+          }}>
+            实时查询您的包裹状态和位置信息
+          </p>
+        </div>
+
+        {/* 跟踪查询区域 */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
-          gap: '16px'
+          maxWidth: '800px',
+          margin: '0 auto',
+          background: 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '20px',
+          padding: '3rem',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+          border: '1px solid rgba(255,255,255,0.3)'
         }}>
-          <div>
-            <h1 style={{ color: 'white', fontSize: '2rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>
-              🗺️ 实时跟踪中心
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '1rem' }}>
-              实时监控快递员位置和包裹配送状态
-            </p>
+          {/* 查询输入区域 */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '1rem', 
+            marginBottom: '2rem',
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row'
+          }}>
+            <input
+              type="text"
+              placeholder={t.tracking.placeholder}
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '1.2rem',
+                border: '2px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                transition: 'border-color 0.3s ease',
+                background: 'white'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+            />
+            <button
+              onClick={handleTracking}
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '1.2rem 2.5rem',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                minWidth: window.innerWidth < 768 ? '100%' : 'auto',
+                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 30px rgba(102, 126, 234, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+              }}
+            >
+              {t.tracking.track}
+            </button>
           </div>
           
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleInitializeCourierData}
-              disabled={initializing}
-              style={{
-                background: initializing ? 'rgba(156, 163, 175, 0.8)' : 'rgba(16, 185, 129, 0.8)',
-                color: 'white',
-                border: 'none',
-                padding: '12px 20px',
-                borderRadius: '8px',
-                cursor: initializing ? 'not-allowed' : 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '500',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-            >
-              {initializing ? '🔄 初始化中...' : '🎯 初始化骑手数据'}
-            </button>
-            
-            <button
-              onClick={handleSimulateCourierMovement}
-              disabled={loading || courierLocations.length === 0}
-              style={{
-                background: loading ? 'rgba(156, 163, 175, 0.8)' : 'rgba(59, 130, 246, 0.8)',
-                color: 'white',
-                border: 'none',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                cursor: loading || courierLocations.length === 0 ? 'not-allowed' : 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '500',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-            >
-              📍 更新骑手位置
-            </button>
-            
-            <button
-              onClick={() => navigate('/')}
-              style={{
-                background: 'rgba(239, 68, 68, 0.8)',
-                color: 'white',
-                border: 'none',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '500',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <span style={{ fontSize: '1.1rem' }}>🏠</span> 返回主页
-            </button>
-          </div>
-        </div>
-
-        {/* 状态栏 */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.08)',
-          borderRadius: '12px',
-          padding: '12px 16px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}>
-          <div style={{ color: 'white', fontSize: '0.9rem' }}>
-            {loading && '🔄 数据加载中...'}
-            {error && `❌ ${error}`}
-            {!loading && !error && lastUpdate && (
-              <>
-                ✅ 数据已更新 | 最后更新: {lastUpdate.toLocaleTimeString()}
-              </>
-            )}
-          </div>
-          <button
-            onClick={refreshData}
-            disabled={loading}
-            style={{
-              background: 'rgba(59, 130, 246, 0.6)',
-              color: 'white',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '0.8rem',
-              transition: 'all 0.2s'
-            }}
-          >
-            🔄 手动刷新
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px', marginTop: '24px' }}>
-          {/* 左侧面板 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* 进行中的包裹 */}
+          {/* 查询结果 */}
+          {trackingResult && (
             <div style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '18px',
-              border: '1px solid rgba(255,255,255,0.1)'
+              background: 'linear-gradient(135deg, #e6f3ff 0%, #f0f8ff 100%)',
+              padding: '2rem',
+              borderRadius: '15px',
+              border: '2px solid #667eea',
+              animation: 'fadeInUp 0.5s ease-out'
             }}>
-              <h2 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '12px' }}>📦 进行中的包裹</h2>
-              {packages.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '20px 0' }}>
-                  暂无进行中的包裹
-                </p>
-              ) : (
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {packages.map(pkg => (
-                    <div
-                      key={pkg.id}
-                      onClick={() => handleSelectPackage(pkg.id)}
-                      style={{
-                        background: selectedPackageId === pkg.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.08)',
-                        border: selectedPackageId === pkg.id ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        padding: '10px',
-                        marginBottom: '6px',
-                        cursor: 'pointer',
-                        color: 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>#{pkg.id.slice(-8)}</div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '4px' }}>
-                        {pkg.sender_name} → {pkg.receiver_name}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '2px' }}>
-                        状态: {pkg.status} | 骑手: {pkg.courier || '待分配'}
-                      </div>
-                    </div>
-                  ))}
+              <h3 style={{ 
+                color: '#667eea', 
+                marginBottom: '1.5rem', 
+                fontSize: '1.3rem',
+                fontWeight: '600'
+              }}>
+                📦 {t.tracking.packageInfo}
+              </h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1rem'
+              }}>
+                <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
+                  <strong style={{ color: '#4a5568' }}>{t.tracking.trackingNumber}：</strong>
+                  <span style={{ color: '#2d3748' }}>{trackingResult.number}</span>
                 </div>
-              )}
-            </div>
-
-            {/* 增强的在线快递员模块 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '18px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h2 style={{ color: 'white', fontSize: '1.2rem', margin: 0 }}>🚴 在线快递员</h2>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
-                    {courierLocations.length} 人在线
-                  </span>
-                  <button
-                    onClick={refreshData}
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.6)',
-                      border: 'none',
-                      borderRadius: '6px',
-                      color: 'white',
-                      padding: '4px 8px',
-                      fontSize: '0.7rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🔄 刷新
-                  </button>
+                <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
+                  <strong style={{ color: '#4a5568' }}>{t.tracking.status}：</strong>
+                  <span style={{ color: '#e53e3e', fontWeight: '600' }}>{trackingResult.status}</span>
+                </div>
+                <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
+                  <strong style={{ color: '#4a5568' }}>{t.tracking.location}：</strong>
+                  <span style={{ color: '#2d3748' }}>{trackingResult.location}</span>
+                </div>
+                <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
+                  <strong style={{ color: '#4a5568' }}>{t.tracking.estimatedDelivery}：</strong>
+                  <span style={{ color: '#38a169', fontWeight: '600' }}>{trackingResult.estimatedDelivery}</span>
                 </div>
               </div>
-
-              {courierLocations.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚴‍♂️</div>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', margin: '0 0 8px 0' }}>
-                    暂无在线骑手
-                  </p>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', margin: 0 }}>
-                    等待骑手上线或点击"初始化骑手数据"
-                  </p>
-                </div>
-              ) : (
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {courierLocations.map(location => {
-                    const courierInfo = couriers.find(c => c.id === location.courier_id);
-                    const taskCount = packages.filter(pkg => 
-                      pkg.courier === location.courier_id && 
-                      ['待取件', '已取件', '配送中'].includes(pkg.status)
-                    ).length;
-                    
-                    const getStatusInfo = (status: string) => {
-                      switch (status) {
-                        case 'online':
-                          return { color: 'rgba(16, 185, 129, 0.8)', text: '在线', icon: '🟢' };
-                        case 'busy':
-                          return { color: 'rgba(245, 158, 11, 0.8)', text: '忙碌', icon: '🟡' };
-                        case 'offline':
-                          return { color: 'rgba(156, 163, 175, 0.8)', text: '离线', icon: '⚫' };
-                        default:
-                          return { color: 'rgba(156, 163, 175, 0.8)', text: '未知', icon: '❓' };
-                      }
-                    };
-                    
-                    const statusInfo = getStatusInfo(location.status);
-                    const isSelected = selectedCourierId === location.courier_id;
-                    
-                    return (
-                      <div
-                        key={location.id}
-                        style={{
-                          background: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.08)',
-                          border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.1)'}`,
-                          borderRadius: '12px',
-                          padding: '14px',
-                          marginBottom: '10px',
-                          color: 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onClick={() => setSelectedCourierId(isSelected ? null : location.courier_id)}
-                      >
-                        {/* 骑手基本信息 */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '1.1rem' }}>{statusInfo.icon}</span>
-                              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                                {courierInfo ? courierInfo.name : `骑手 ${location.courier_id.slice(-6)}`}
-                              </div>
-                              <div style={{
-                                background: statusInfo.color,
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '10px',
-                                fontSize: '0.65rem',
-                                fontWeight: '500'
-                              }}>
-                                {statusInfo.text}
-                              </div>
-                            </div>
-                            {courierInfo && (
-                              <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '4px' }}>
-                                📞 {courierInfo.phone} • 🚲 {courierInfo.vehicle_type}
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{
-                              background: taskCount > 0 ? 'rgba(245, 158, 11, 0.8)' : 'rgba(16, 185, 129, 0.8)',
-                              color: 'white',
-                              padding: '4px 8px',
-                              borderRadius: '8px',
-                              fontSize: '0.7rem',
-                              fontWeight: '600'
-                            }}>
-                              📦 {taskCount} 任务
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 位置和状态信息 */}
-                        <div style={{ fontSize: '0.75rem', opacity: 0.9, marginBottom: '8px' }}>
-                          <div style={{ marginBottom: '2px' }}>
-                            📍 {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
-                          </div>
-                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            <span>🚀 {location.speed || 0} km/h</span>
-                            <span>🔋 {location.battery_level || 100}%</span>
-                            {courierInfo && (
-                              <span>⭐ {courierInfo.rating || 5.0}</span>
-                            )}
-                            <span>🕒 {new Date(location.last_update).toLocaleTimeString()}</span>
-                          </div>
-                        </div>
-
-                        {/* 展开的操作面板 */}
-                        {isSelected && (
-                          <div style={{
-                            borderTop: '1px solid rgba(255,255,255,0.1)',
-                            paddingTop: '12px',
-                            marginTop: '8px'
-                          }}>
-                            {/* 快捷操作按钮 */}
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const courier = couriers.find(c => c.id === location.courier_id);
-                                  if (courier?.phone) {
-                                    window.open(`tel:${courier.phone}`);
-                                  }
-                                }}
-                                style={{
-                                  background: 'rgba(16, 185, 129, 0.8)',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  color: 'white',
-                                  padding: '6px 10px',
-                                  fontSize: '0.7rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                📞 呼叫
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  alert('消息功能开发中...');
-                                }}
-                                style={{
-                                  background: 'rgba(59, 130, 246, 0.8)',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  color: 'white',
-                                  padding: '6px 10px',
-                                  fontSize: '0.7rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                💬 消息
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/courier-history/${location.courier_id}`);
-                                }}
-                                style={{
-                                  background: 'rgba(168, 85, 247, 0.8)',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  color: 'white',
-                                  padding: '6px 10px',
-                                  fontSize: '0.7rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                📊 历史
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const courierName = courierInfo ? courierInfo.name : location.courier_id;
-                                  if (window.confirm(`确定要删除骑手 ${courierName} 吗？\n\n此操作不可撤销！`)) {
-                                    handleDeleteCourier(location.courier_id, courierName);
-                                  }
-                                }}
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.8)',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  color: 'white',
-                                  padding: '6px 10px',
-                                  fontSize: '0.7rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                🗑️ 删除
-                              </button>
-                            </div>
-
-                            {/* 当前任务列表 */}
-                            {taskCount > 0 && (
-                              <div style={{ marginTop: '8px' }}>
-                                <div style={{ fontSize: '0.75rem', marginBottom: '6px', opacity: 0.9 }}>
-                                  🎯 当前任务 ({taskCount}):
-                                </div>
-                                <div style={{ maxHeight: '80px', overflowY: 'auto' }}>
-                                  {packages
-                                    .filter(pkg => pkg.courier === location.courier_id && ['待取件', '已取件', '配送中'].includes(pkg.status))
-                                    .map(pkg => (
-                                      <div
-                                        key={pkg.id}
-                                        style={{
-                                          background: 'rgba(16, 185, 129, 0.1)',
-                                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                                          borderRadius: '6px',
-                                          padding: '4px 6px',
-                                          marginBottom: '3px',
-                                          fontSize: '0.65rem',
-                                          display: 'flex',
-                                          justifyContent: 'space-between',
-                                          alignItems: 'center'
-                                        }}
-                                      >
-                                        <span>#{pkg.id.slice(-6)} - {pkg.status}</span>
-                                        <span style={{ opacity: 0.7 }}>
-                                          {pkg.receiver_name}
-                                        </span>
-                                      </div>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* 备注信息 */}
-                            {courierInfo?.notes && (
-                              <div style={{
-                                fontSize: '0.7rem',
-                                opacity: 0.6,
-                                marginTop: '8px',
-                                fontStyle: 'italic',
-                                borderTop: '1px solid rgba(255,255,255,0.1)',
-                                paddingTop: '6px'
-                              }}>
-                                💡 备注: {courierInfo.notes}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 底部统计信息 */}
-              {courierLocations.length > 0 && (
-                <div style={{
-                  borderTop: '1px solid rgba(255,255,255,0.1)',
-                  paddingTop: '12px',
-                  marginTop: '12px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-                  gap: '8px',
-                  fontSize: '0.7rem'
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'rgba(16, 185, 129, 1)', fontWeight: 'bold' }}>
-                      {courierLocations.filter(c => c.status === 'online').length}
-                    </div>
-                    <div style={{ opacity: 0.7 }}>在线</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'rgba(245, 158, 11, 1)', fontWeight: 'bold' }}>
-                      {courierLocations.filter(c => c.status === 'busy').length}
-                    </div>
-                    <div style={{ opacity: 0.7 }}>忙碌</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'rgba(59, 130, 246, 1)', fontWeight: 'bold' }}>
-                      {packages.filter(p => ['待取件', '已取件', '配送中'].includes(p.status)).length}
-                    </div>
-                    <div style={{ opacity: 0.7 }}>任务</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'rgba(168, 85, 247, 1)', fontWeight: 'bold' }}>
-                      {Math.round(courierLocations.reduce((sum, c) => sum + (c.speed || 0), 0) / courierLocations.length) || 0}
-                    </div>
-                    <div style={{ opacity: 0.7 }}>平均速度</div>
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
+          )}
 
-          {/* 右侧主要内容 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* 地图区域 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '18px',
-              border: '1px solid rgba(255,255,255,0.1)',
-              height: '400px'
-            }}>
-              {googleMapsApiKey ? (
-                <ErrorBoundary>
-                  <LoadScript googleMapsApiKey={googleMapsApiKey}>
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={mapCenter}
-                    zoom={13}
-                    options={{
-                      styles: [
-                        { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-                        { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-                        { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] }
-                      ]
-                    }}
-                  >
-                    {/* 快递员标记 */}
-                    {courierMarkers.map(marker => (
-                      <Marker
-                        key={marker.id}
-                        position={marker.position}
-                        title={marker.title}
-                        icon={{
-                          url: `data:image/svg+xml,${encodeURIComponent(`
-                            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="16" cy="16" r="15" fill="${marker.status === 'online' ? '#10b981' : '#f59e0b'}" stroke="white" stroke-width="2"/>
-                              <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🚴</text>
-                            </svg>
-                          `)}`,
-                          scaledSize: new window.google.maps.Size(32, 32)
-                        }}
-                      />
-                    ))}
-
-                    {/* 跟踪路径 */}
-                    {trackingPath.length > 1 && (
-                      <Polyline
-                        path={trackingPath}
-                        options={{
-                          strokeColor: '#3b82f6',
-                          strokeOpacity: 0.8,
-                          strokeWeight: 3
-                        }}
-                      />
-                    )}
-                  </GoogleMap>
-                </LoadScript>
-                </ErrorBoundary>
-              ) : (
-                <div style={{ ...mapContainerStyle, background: 'rgba(15,32,60,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '0 20px' }}>
-                    未检测到 Google Maps API Key，请先在 `.env.local` 和 Netlify 环境变量中配置 `REACT_APP_GOOGLE_MAPS_API_KEY`。
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 配送详情 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '18px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <h2 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '12px' }}>配送详情</h2>
-              {currentPackage ? (
-                <div style={{ color: 'white', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '18px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '1rem', opacity: 0.9 }}>包裹信息</h3>
-                    <p style={{ margin: '6px 0' }}>包裹编号：{currentPackage.id}</p>
-                    <p style={{ margin: '6px 0' }}>寄件人：{currentPackage.sender_name}</p>
-                    <p style={{ margin: '6px 0' }}>收件人：{currentPackage.receiver_name}</p>
-                    <p style={{ margin: '6px 0' }}>状态：{currentPackage.status}</p>
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '1rem', opacity: 0.9 }}>快递员</h3>
-                    <p style={{ margin: '6px 0' }}>负责快递员：{currentPackage.courier || '待分配'}</p>
-                    {currentCourierLocation ? (
-                      <>
-                        <p style={{ margin: '6px 0' }}>当前位置：{currentCourierLocation.latitude.toFixed(5)}, {currentCourierLocation.longitude.toFixed(5)}</p>
-                        <p style={{ margin: '6px 0' }}>最后上报：{currentCourierLocation.last_update}</p>
-                      </>
-                    ) : (
-                      <p style={{ margin: '6px 0' }}>暂无位置数据</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p style={{ color: 'rgba(255,255,255,0.7)' }}>请选择左侧列表中的包裹查看详情</p>
-              )}
-            </div>
-
-            {/* 实时事件 & 轨迹 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '18px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <h2 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '12px' }}>📍 实时轨迹</h2>
-              {trackingEvents.length > 0 ? (
-                <ul style={{ color: 'white', listStyle: 'none', padding: 0, margin: 0, maxHeight: '200px', overflowY: 'auto' }}>
-                  {trackingEvents
-                    .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime())
-                    .map(event => (
-                      <li key={event.id} style={{ 
-                        padding: '8px 0', 
-                        borderBottom: '1px solid rgba(255,255,255,0.1)',
-                        fontSize: '0.9rem'
-                      }}>
-                        <div style={{ fontWeight: 600 }}>{event.status}</div>
-                        <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '2px' }}>
-                          📍 {event.latitude.toFixed(5)}, {event.longitude.toFixed(5)}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '2px' }}>
-                          🕒 {new Date(event.event_time).toLocaleString()}
-                        </div>
-                      </li>
-                    ))}
-                </ul>
-              ) : (
-                <p style={{ color: 'rgba(255,255,255,0.7)' }}>请选择包裹后显示轨迹记录</p>
-              )}
-            </div>
+          {/* 使用说明 */}
+          <div style={{
+            marginTop: '2rem',
+            padding: '1.5rem',
+            background: 'rgba(102, 126, 234, 0.1)',
+            borderRadius: '12px',
+            border: '1px solid rgba(102, 126, 234, 0.2)'
+          }}>
+            <h4 style={{ color: '#667eea', marginBottom: '1rem', fontSize: '1.1rem' }}>
+              💡 使用说明
+            </h4>
+            <ul style={{ color: '#4a5568', lineHeight: '1.6', margin: 0, paddingLeft: '1.5rem' }}>
+              <li>输入您的包裹单号进行查询</li>
+              <li>系统将显示包裹的实时状态和位置</li>
+              <li>预计送达时间仅供参考，实际时间可能有所变化</li>
+              <li>如有疑问，请联系客服获取更多帮助</li>
+            </ul>
           </div>
         </div>
       </div>
+
+      {/* 添加CSS动画 */}
+      <style>
+        {`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
     </div>
   );
 };
