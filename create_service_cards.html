@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MARKET LINK EXPRESS 服务卡片</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        
+        .service-card {
+            width: 400px;
+            height: 300px;
+            background: linear-gradient(135deg, #b0d3e8 0%, #558cea 100%);
+            border-radius: 15px;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 8px;
+            display: inline-block;
+            margin-right: 15px;
+            vertical-align: top;
+        }
+        
+        .title {
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 0;
+            display: inline-block;
+            vertical-align: top;
+            margin-top: 5px;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+        
+        .features {
+            margin-top: 30px;
+        }
+        
+        .feature {
+            color: white;
+            font-size: 14px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-icon {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        
+        .qr-code {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #333;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
+        .qr-text {
+            position: absolute;
+            bottom: 5px;
+            right: 20px;
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            width: 60px;
+        }
+        
+        .simple-card {
+            width: 300px;
+            height: 200px;
+            background: linear-gradient(135deg, #b0d3e8 0%, #558cea 100%);
+            border-radius: 12px;
+            padding: 15px;
+            box-sizing: border-box;
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+        }
+        
+        .simple-card .logo {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .simple-card .title {
+            font-size: 16px;
+            margin-top: 2px;
+        }
+        
+        .simple-card .subtitle {
+            font-size: 12px;
+        }
+        
+        .simple-card .features {
+            margin-top: 20px;
+        }
+        
+        .simple-card .feature {
+            font-size: 12px;
+            margin: 6px 0;
+        }
+        
+        .simple-card .qr-code {
+            width: 50px;
+            height: 50px;
+            bottom: 15px;
+            right: 15px;
+            font-size: 10px;
+        }
+        
+        .simple-card .qr-text {
+            bottom: 2px;
+            right: 15px;
+            width: 50px;
+            font-size: 10px;
+        }
+        
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .card-title {
+            text-align: center;
+            color: #333;
+            margin: 20px 0 10px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="card-title">MARKET LINK EXPRESS 服务卡片</h2>
+        
+        <div class="service-card">
+            <div class="logo"></div>
+            <div>
+                <h1 class="title">MARKET LINK EXPRESS</h1>
+                <p class="subtitle">曼德勒最萌快递服务</p>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">⚡</span>
+                    <span>实时小猫追踪</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🛡️</span>
+                    <span>快速安全送达</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📱</span>
+                    <span>可爱客服体验</span>
+                </div>
+            </div>
+            
+            <div class="qr-code">QR<br>Code</div>
+            <div class="qr-text">扫码下载</div>
+        </div>
+        
+        <div class="simple-card">
+            <div class="logo"></div>
+            <div>
+                <h1 class="title">MARKET LINK EXPRESS</h1>
+                <p class="subtitle">曼德勒最萌快递服务</p>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">⚡</span>
+                    <span>实时追踪</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🛡️</span>
+                    <span>安全送达</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📱</span>
+                    <span>客服体验</span>
+                </div>
+            </div>
+            
+            <div class="qr-code">QR<br>Code</div>
+            <div class="qr-text">扫码下载</div>
+        </div>
+    </div>
+    
+    <script>
+        // 添加截图功能
+        function captureCard(cardElement, filename) {
+            // 使用 html2canvas 库进行截图
+            if (typeof html2canvas !== 'undefined') {
+                html2canvas(cardElement).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                });
+            } else {
+                console.log('需要引入 html2canvas 库进行截图');
+            }
+        }
+        
+        // 添加点击事件
+        document.querySelectorAll('.service-card, .simple-card').forEach((card, index) => {
+            card.addEventListener('click', () => {
+                const filename = index === 0 ? 'service_cards.png' : 'simple_service_card.png';
+                captureCard(card, filename);
+            });
+        });
+        
+        console.log('📋 使用说明:');
+        console.log('1. 右键点击卡片选择"另存为图片"');
+        console.log('2. 或者使用浏览器截图功能');
+        console.log('3. 将图片保存为 PNG 格式');
+    </script>
+</body>
+</html>

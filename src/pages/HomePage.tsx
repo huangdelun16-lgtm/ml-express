@@ -597,7 +597,7 @@ const HomePage: React.FC = () => {
             fontSize: window.innerWidth < 768 ? '1.1rem' : '1.5rem', 
             marginBottom: '2rem', 
             opacity: 0.9,
-            maxWidth: '800px',
+            maxWidth: '1000px',
             lineHeight: '1.4'
           }}>
             {t.hero.subtitle}
@@ -631,55 +631,224 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 服务特色 */}
+      {/* 可爱动物服务广告 */}
       <section id="services" style={{ 
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
+        background: 'linear-gradient(135deg, #b0d3e8 0%, #558cea 100%)',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <h2 style={{ 
-          textAlign: 'center', 
-          fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
-          marginBottom: '3rem', 
-          color: '#000000' 
-        }}>
-          {t.features.title}
-        </h2>
+        {/* 背景装饰 */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '2rem',
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          {[
-            { icon: '⚡', title: t.features.fast, desc: '30分钟内上门取件' },
-        { icon: '🔒', title: t.features.safe, desc: '全程保险保障' },
-        { icon: '📲', title: t.features.convenient, desc: '在线下单，实时跟踪' },
-        { icon: '💎', title: t.features.affordable, desc: '价格透明，无隐藏费用' }
-          ].map((feature, index) => (
-            <div key={index} style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '15px',
-                  textAlign: 'center',
-              boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
-                  transition: 'all 0.3s ease',
-              border: '1px solid rgba(192, 192, 192, 0.2)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 12px 35px rgba(44, 82, 130, 0.2)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(44, 82, 130, 0.1)';
-            }}
-            >
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{feature.icon}</div>
-              <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{feature.title}</h3>
-              <p style={{ color: '#666' }}>{feature.desc}</p>
+          position: 'absolute',
+          top: '-50px',
+          right: '-50px',
+          fontSize: '200px',
+          opacity: '0.1',
+          color: 'white',
+          transform: 'rotate(15deg)'
+        }}>🐱</div>
+        <div style={{
+          position: 'absolute',
+          bottom: '-30px',
+          left: '-30px',
+          fontSize: '150px',
+          opacity: '0.1',
+          color: 'white',
+          transform: 'rotate(-15deg)'
+        }}>🚚</div>
+
+        <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* 主标题 */}
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <h2 style={{ 
+              fontSize: window.innerWidth < 768 ? '2rem' : '3rem', 
+              color: 'white',
+              marginBottom: '1rem',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+              fontWeight: 'bold'
+            }}>
+              🌟 {t.features.title} 🌟
+            </h2>
+            <p style={{ 
+              fontSize: '1.2rem', 
+              color: 'rgba(255,255,255,0.9)',
+              maxWidth: '600px',
+              margin: '0 auto',
+              lineHeight: '1.6'
+            }}>
+              小橘猫快递员为您介绍我们的超棒服务！
+            </p>
+          </div>
+
+          {/* 主广告卡片 */}
+          <div style={{
+            background: 'rgba(255,255,255,0.95)',
+            borderRadius: '25px',
+            padding: '3rem',
+            marginBottom: '2rem',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(255,255,255,0.3)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem' }}>
+              <div style={{ fontSize: '80px', marginRight: '20px' }}>🐱</div>
+              <div>
+                <h3 style={{ 
+                  fontSize: '2rem', 
+                  color: '#2c5282', 
+                  margin: '0 0 10px 0',
+                  fontWeight: 'bold'
+                }}>
+                  小橘猫快递员
+                </h3>
+                <p style={{ 
+                  fontSize: '1.1rem', 
+                  color: '#666', 
+                  margin: 0,
+                  fontStyle: 'italic'
+                }}>
+                  "喵~ 让我为您介绍我们的服务特色！"
+                </p>
+              </div>
             </div>
-          ))}
+
+            {/* 服务特色网格 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+              gap: '1.5rem',
+              marginTop: '2rem'
+            }}>
+              {[
+                { 
+                  animal: '🐰', 
+                  title: '闪电兔配送', 
+                  desc: '30分钟内上门取件', 
+                  color: '#ff6b6b',
+                  bgColor: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)'
+                },
+                { 
+                  animal: '🦉', 
+                  title: '智慧猫头鹰', 
+                  desc: '全程保险保障', 
+                  color: '#4ecdc4',
+                  bgColor: 'linear-gradient(135deg, #4ecdc4, #44a08d)'
+                },
+                { 
+                  animal: '🦊', 
+                  title: '机智小狐狸', 
+                  desc: '在线下单，实时跟踪', 
+                  color: '#45b7d1',
+                  bgColor: 'linear-gradient(135deg, #45b7d1, #96c93d)'
+                },
+                { 
+                  animal: '🐻', 
+                  title: '贴心小熊', 
+                  desc: '价格透明，无隐藏费用', 
+                  color: '#f093fb',
+                  bgColor: 'linear-gradient(135deg, #f093fb, #f5576c)'
+                }
+              ].map((service, index) => (
+                <div key={index} style={{
+                  background: service.bgColor,
+                  padding: '1.5rem',
+                  borderRadius: '20px',
+                  textAlign: 'center',
+                  color: 'white',
+                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
+                }}
+                >
+                  {/* 装饰圆圈 */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-20px',
+                    right: '-20px',
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.2)',
+                    opacity: '0.5'
+                  }}></div>
+                  
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{service.animal}</div>
+                  <h4 style={{ 
+                    fontSize: '1.3rem', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+                  }}>
+                    {service.title}
+                  </h4>
+                  <p style={{ 
+                    fontSize: '0.95rem', 
+                    opacity: '0.9',
+                    lineHeight: '1.4',
+                    margin: 0
+                  }}>
+                    {service.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* 底部CTA */}
+            <div style={{ 
+              textAlign: 'center', 
+              marginTop: '2rem',
+              padding: '1.5rem',
+              background: 'rgba(85, 140, 234, 0.1)',
+              borderRadius: '15px',
+              border: '2px dashed rgba(85, 140, 234, 0.3)'
+            }}>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#2c5282', 
+                margin: '0 0 1rem 0',
+                fontWeight: '600'
+              }}>
+                🎉 选择 MARKET LINK EXPRESS，让可爱的小动物们为您服务！
+              </p>
+              <button style={{
+                background: 'linear-gradient(135deg, #558cea, #428cc9)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 30px',
+                borderRadius: '25px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(85, 140, 234, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(85, 140, 234, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(85, 140, 234, 0.3)';
+              }}
+              onClick={() => {
+                document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              >
+                🚀 立即下单体验
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
