@@ -631,55 +631,333 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 服务特色 */}
+      {/* 高级服务特色模块 */}
       <section id="services" style={{ 
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem', 
-        background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
+        padding: window.innerWidth < 768 ? '3rem 1rem' : '6rem 2rem', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <h2 style={{ 
-          textAlign: 'center', 
-          fontSize: window.innerWidth < 768 ? '2rem' : '2.5rem', 
-          marginBottom: '3rem', 
-          color: '#000000' 
-        }}>
-          {t.features.title}
-        </h2>
+        {/* 背景装饰 */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '2rem',
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          {[
-            { icon: '⚡', title: t.features.fast, desc: '30分钟内上门取件' },
-        { icon: '🔒', title: t.features.safe, desc: '全程保险保障' },
-        { icon: '📲', title: t.features.convenient, desc: '在线下单，实时跟踪' },
-        { icon: '💎', title: t.features.affordable, desc: '价格透明，无隐藏费用' }
-          ].map((feature, index) => (
-            <div key={index} style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '15px',
-                  textAlign: 'center',
-              boxShadow: '0 8px 25px rgba(44, 82, 130, 0.1)',
-                  transition: 'all 0.3s ease',
-              border: '1px solid rgba(192, 192, 192, 0.2)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.boxShadow = '0 12px 35px rgba(44, 82, 130, 0.2)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(44, 82, 130, 0.1)';
-            }}
-            >
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{feature.icon}</div>
-              <h3 style={{ color: '#2c5282', marginBottom: '1rem' }}>{feature.title}</h3>
-              <p style={{ color: '#666' }}>{feature.desc}</p>
+          position: 'absolute',
+          top: '10%',
+          left: '5%',
+          width: '200px',
+          height: '200px',
+          background: 'rgba(255,255,255,0.1)',
+          borderRadius: '50%',
+          filter: 'blur(40px)'
+        }}></div>
+        <div style={{
+          position: 'absolute',
+          bottom: '10%',
+          right: '5%',
+          width: '300px',
+          height: '300px',
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: '50%',
+          filter: 'blur(60px)'
+        }}></div>
+
+        <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* 主标题区域 */}
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <div style={{
+              display: 'inline-block',
+              background: 'rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '50px',
+              padding: '8px 24px',
+              marginBottom: '1.5rem',
+              border: '1px solid rgba(255,255,255,0.3)'
+            }}>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '0.9rem', 
+                fontWeight: '600',
+                letterSpacing: '1px'
+              }}>
+                ✨ PREMIUM SERVICES ✨
+              </span>
             </div>
-          ))}
+            <h2 style={{ 
+              fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem', 
+              color: 'white',
+              marginBottom: '1rem',
+              fontWeight: '800',
+              textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
+              letterSpacing: '-1px'
+            }}>
+              {t.features.title}
+            </h2>
+            <p style={{ 
+              fontSize: '1.2rem', 
+              color: 'rgba(255,255,255,0.9)',
+              maxWidth: '600px',
+              margin: '0 auto',
+              lineHeight: '1.6',
+              fontWeight: '300'
+            }}>
+              专业、高效、值得信赖的快递服务体验
+            </p>
+          </div>
+
+          {/* 高级服务卡片网格 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+            gap: '2rem',
+            marginBottom: '3rem'
+          }}>
+            {[
+              { 
+                icon: '⚡', 
+                title: '闪电配送', 
+                subtitle: 'LIGHTNING DELIVERY',
+                desc: '30分钟内上门取件，极速送达',
+                features: ['实时定位', '智能路线', '即时通知'],
+                color: '#ff6b6b',
+                bgGradient: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)',
+                iconBg: 'rgba(255, 107, 107, 0.2)'
+              },
+              { 
+                icon: '🛡️', 
+                title: '安全护航', 
+                subtitle: 'SECURE ESCORT',
+                desc: '全程保险保障，零风险配送',
+                features: ['全程保险', '实时监控', '安全认证'],
+                color: '#4ecdc4',
+                bgGradient: 'linear-gradient(135deg, #4ecdc4, #44a08d)',
+                iconBg: 'rgba(78, 205, 196, 0.2)'
+              },
+              { 
+                icon: '📱', 
+                title: '智能服务', 
+                subtitle: 'SMART SERVICE',
+                desc: '在线下单，实时跟踪，智能客服',
+                features: ['在线下单', '实时跟踪', 'AI客服'],
+                color: '#45b7d1',
+                bgGradient: 'linear-gradient(135deg, #45b7d1, #96c93d)',
+                iconBg: 'rgba(69, 183, 209, 0.2)'
+              },
+              { 
+                icon: '💎', 
+                title: '透明定价', 
+                subtitle: 'TRANSPARENT PRICING',
+                desc: '价格透明，无隐藏费用，物超所值',
+                features: ['透明定价', '无隐藏费', '优惠活动'],
+                color: '#f093fb',
+                bgGradient: 'linear-gradient(135deg, #f093fb, #f5576c)',
+                iconBg: 'rgba(240, 147, 251, 0.2)'
+              }
+            ].map((service, index) => (
+              <div key={index} style={{
+                background: 'rgba(255,255,255,0.95)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '24px',
+                padding: '2.5rem',
+                position: 'relative',
+                overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
+              }}
+              >
+                {/* 装饰性背景 */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-50px',
+                  right: '-50px',
+                  width: '120px',
+                  height: '120px',
+                  background: service.iconBg,
+                  borderRadius: '50%',
+                  opacity: '0.6'
+                }}></div>
+
+                {/* 图标区域 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    background: service.bgGradient,
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '1rem',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                  }}>
+                    <span style={{ fontSize: '28px' }}>{service.icon}</span>
+                  </div>
+                  <div>
+                    <h3 style={{ 
+                      fontSize: '1.5rem', 
+                      fontWeight: '700',
+                      color: '#2d3748',
+                      margin: '0 0 4px 0',
+                      letterSpacing: '-0.5px'
+                    }}>
+                      {service.title}
+                    </h3>
+                    <p style={{ 
+                      fontSize: '0.8rem', 
+                      color: '#718096',
+                      margin: 0,
+                      fontWeight: '500',
+                      letterSpacing: '1px'
+                    }}>
+                      {service.subtitle}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 描述 */}
+                <p style={{ 
+                  fontSize: '1rem', 
+                  color: '#4a5568',
+                  marginBottom: '1.5rem',
+                  lineHeight: '1.6',
+                  fontWeight: '400'
+                }}>
+                  {service.desc}
+                </p>
+
+                {/* 特色功能列表 */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  {service.features.map((feature, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginBottom: '0.5rem',
+                      fontSize: '0.9rem',
+                      color: '#4a5568'
+                    }}>
+                      <div style={{
+                        width: '6px',
+                        height: '6px',
+                        background: service.color,
+                        borderRadius: '50%',
+                        marginRight: '0.75rem'
+                      }}></div>
+                      <span style={{ fontWeight: '500' }}>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 底部装饰线 */}
+                <div style={{
+                  height: '3px',
+                  background: service.bgGradient,
+                  borderRadius: '2px',
+                  marginTop: '1rem'
+                }}></div>
+              </div>
+            ))}
+          </div>
+
+          {/* 底部CTA区域 */}
+          <div style={{
+            textAlign: 'center',
+            background: 'rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '3rem 2rem',
+            border: '1px solid rgba(255,255,255,0.2)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+          }}>
+            <h3 style={{
+              fontSize: '2rem',
+              color: 'white',
+              marginBottom: '1rem',
+              fontWeight: '700',
+              textShadow: '2px 2px 8px rgba(0,0,0,0.3)'
+            }}>
+              🚀 立即体验专业快递服务
+            </h3>
+            <p style={{
+              fontSize: '1.1rem',
+              color: 'rgba(255,255,255,0.9)',
+              marginBottom: '2rem',
+              fontWeight: '300'
+            }}>
+              选择 MARKET LINK EXPRESS，享受极致的快递服务体验
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button style={{
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                color: 'white',
+                border: 'none',
+                padding: '16px 32px',
+                borderRadius: '50px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease',
+                border: '2px solid rgba(255,255,255,0.2)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.5)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)';
+              }}
+              onClick={() => {
+                document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              >
+                📝 立即下单
+              </button>
+              <button style={{
+                background: 'transparent',
+                color: 'white',
+                border: '2px solid rgba(255,255,255,0.3)',
+                padding: '16px 32px',
+                borderRadius: '50px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                backdropFilter: 'blur(10px)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.5)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+              }}
+              onClick={() => {
+                document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              >
+                📞 联系我们
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
