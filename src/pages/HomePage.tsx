@@ -634,7 +634,7 @@ const HomePage: React.FC = () => {
       {/* 高级服务特色模块 */}
       <section id="services" style={{ 
         padding: window.innerWidth < 768 ? '3rem 1rem' : '6rem 2rem', 
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -870,93 +870,6 @@ const HomePage: React.FC = () => {
             ))}
           </div>
 
-          {/* 底部CTA区域 */}
-          <div style={{
-            textAlign: 'center',
-            background: 'rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            padding: '3rem 2rem',
-            border: '1px solid rgba(255,255,255,0.2)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-          }}>
-            <h3 style={{
-              fontSize: '2rem',
-              color: 'white',
-              marginBottom: '1rem',
-              fontWeight: '700',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.3)'
-            }}>
-              立即体验专业快递服务
-            </h3>
-            <p style={{
-              fontSize: '1.1rem',
-              color: 'rgba(255,255,255,0.9)',
-              marginBottom: '2rem',
-              fontWeight: '300'
-            }}>
-              选择 MARKET LINK EXPRESS，享受极致的快递服务体验
-            </p>
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
-              <button style={{
-                background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '50px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.4)',
-                transition: 'all 0.3s ease',
-                border: '2px solid rgba(255,255,255,0.2)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.5)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)';
-              }}
-              onClick={() => {
-                document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              >
-                立即下单
-              </button>
-              <button style={{
-                background: 'transparent',
-                color: 'white',
-                border: '2px solid rgba(255,255,255,0.3)',
-                padding: '16px 32px',
-                borderRadius: '50px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                backdropFilter: 'blur(10px)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.5)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-              }}
-              onClick={() => {
-                document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              >
-                联系我们
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
