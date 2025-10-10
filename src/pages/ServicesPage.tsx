@@ -63,9 +63,6 @@ const ServicesPage: React.FC = () => {
 
   const t = translations[language as keyof typeof translations] || translations.zh;
 
-  const handleLanguageChange = (lang: string) => {
-    setLanguage(lang);
-  };
 
   const handleNavigation = (path: string) => {
     setIsVisible(false);
@@ -193,28 +190,24 @@ const ServicesPage: React.FC = () => {
           >{t.nav.admin}</a>
           
           {/* 语言切换 */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['zh', 'en', 'my'].map((lang) => (
-              <button
-                key={lang}
-                onClick={() => handleLanguageChange(lang)}
-                style={{
-                  background: language === lang ? 'rgba(255,255,255,0.3)' : 'transparent',
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  padding: '0.3rem 0.6rem',
-                  borderRadius: '15px',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.background = language === lang ? 'rgba(255,255,255,0.3)' : 'transparent'}
-              >
-                {lang.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          <select 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '0.5rem',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="my">မြန်မာ</option>
+          </select>
         </div>
       </nav>
 
