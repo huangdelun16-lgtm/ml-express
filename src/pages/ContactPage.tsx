@@ -128,7 +128,7 @@ const ContactPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.home}</button>
           <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white', 
@@ -140,7 +140,7 @@ const ContactPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.services}</button>
           <button onClick={() => handleNavigation('/tracking')} style={{ 
             color: 'white', 
@@ -152,7 +152,7 @@ const ContactPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.tracking}</button>
           <button style={{ 
             color: '#FFD700', 

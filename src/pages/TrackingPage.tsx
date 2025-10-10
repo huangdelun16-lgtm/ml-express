@@ -143,7 +143,7 @@ const TrackingPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.home}</button>
           <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white', 
@@ -155,7 +155,7 @@ const TrackingPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.services}</button>
           <button style={{ 
             color: '#FFD700', 
@@ -177,7 +177,7 @@ const TrackingPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.contact}</button>
           <a href="/admin/login" style={{ 
             color: 'white',

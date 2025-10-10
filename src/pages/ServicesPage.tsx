@@ -118,7 +118,7 @@ const ServicesPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.home}</button>
           <button style={{ 
             color: '#FFD700', 
@@ -140,7 +140,7 @@ const ServicesPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.tracking}</button>
           <button onClick={() => handleNavigation('/contact')} style={{ 
             color: 'white', 
@@ -152,7 +152,7 @@ const ServicesPage: React.FC = () => {
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white')}
+          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.contact}</button>
           <a href="/admin/login" style={{ 
             color: 'white',
