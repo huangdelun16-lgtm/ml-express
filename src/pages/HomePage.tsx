@@ -467,9 +467,23 @@ const HomePage: React.FC = () => {
           backgroundClip: 'text',
           letterSpacing: '-1px',
           lineHeight: '1.1',
-          whiteSpace: 'nowrap'
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            MARKET LINK
+          </div>
+          <div style={{ 
+            fontSize: '0.6em', 
+            fontStyle: 'italic', 
+            fontWeight: '400',
+            marginTop: '-0.2em'
+          }}>
+            EXPRESS
+          </div>
         </div>
       </div>
     );
