@@ -10,7 +10,6 @@ import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
 import CourierManagement from './pages/CourierManagement';
 import FinanceManagement from './pages/FinanceManagement';
-import TrackingPage as AdminTrackingPage from './pages/TrackingPage';
 import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
 import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
@@ -34,7 +33,7 @@ function App() {
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/couriers" element={<CourierManagement />} />
             <Route path="/admin/finance" element={<FinanceManagement />} />
-            <Route path="/admin/tracking" element={<AdminTrackingPage />} />
+            <Route path="/admin/tracking" element={<TrackingPage />} />
             <Route path="/admin/settings" element={<SystemSettings />} />
             <Route path="/admin/system-settings" element={<SystemSettings />} />
             <Route path="/admin/accounts" element={<AccountManagement />} />
