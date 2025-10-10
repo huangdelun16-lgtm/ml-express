@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { financeService, FinanceRecord, auditLogService } from '../services/supabase';
 
-type TabKey = 'overview' | 'records' | 'analytics';
+type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
 
@@ -442,7 +442,7 @@ const FinanceManagement: React.FC = () => {
             flexWrap: 'wrap'
           }}
         >
-          {(['overview', 'records', 'analytics'] as TabKey[]).map((key) => (
+          {(['overview', 'records', 'analytics', 'package_records', 'courier_records'] as TabKey[]).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -460,6 +460,8 @@ const FinanceManagement: React.FC = () => {
               {key === 'overview' && '📊 财务总览'}
               {key === 'records' && '📑 收支记录'}
               {key === 'analytics' && '📈 数据分析'}
+              {key === 'package_records' && '📦 包裹收支记录'}
+              {key === 'courier_records' && '🚚 骑手收支记录'}
             </button>
           ))}
           <button
@@ -1026,6 +1028,298 @@ const FinanceManagement: React.FC = () => {
             <p style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
               即将上线：收入/支出趋势图、快递员佣金统计、成本结构分析等高级分析模块。
             </p>
+          </div>
+        )}
+
+        {activeTab === 'package_records' && (
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '20px',
+              padding: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)'
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>📦 包裹收支记录</h3>
+            
+            {/* 包裹收入统计 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>包裹收入统计</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'income' && r.category.includes('包裹')).length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹收入笔数</div>
+                </div>
+                <div style={{
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'income' && r.category.includes('包裹')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹收入总额</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 包裹支出统计 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>包裹支出统计</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'expense' && r.category.includes('包裹')).length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹支出笔数</div>
+                </div>
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'expense' && r.category.includes('包裹')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹支出总额</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 包裹收支记录表格 */}
+            <div style={{ marginTop: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近包裹收支记录</h4>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>订单ID</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>类型</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>金额</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>状态</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>日期</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.filter(r => r.category.includes('包裹')).slice(0, 10).map((record) => (
+                      <tr key={record.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {record.order_id || 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            background: record.record_type === 'income' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: record.record_type === 'income' ? '#22c55e' : '#ef4444'
+                          }}>
+                            {record.record_type === 'income' ? '收入' : '支出'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {record.amount?.toLocaleString()} {record.currency}
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            background: record.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+                            color: record.status === 'completed' ? '#22c55e' : '#fbbf24'
+                          }}>
+                            {record.status === 'completed' ? '已完成' : '待处理'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {new Date(record.record_date).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'courier_records' && (
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '20px',
+              padding: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)'
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>🚚 骑手收支记录</h3>
+            
+            {/* 骑手收入统计 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>骑手收入统计</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'income' && r.category.includes('佣金')).length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手收入笔数</div>
+                </div>
+                <div style={{
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'income' && r.category.includes('佣金')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手收入总额</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 骑手支出统计 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>骑手支出统计</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'expense' && r.category.includes('骑手')).length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手支出笔数</div>
+                </div>
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {records.filter(r => r.record_type === 'expense' && r.category.includes('骑手')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手支出总额</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 骑手收支记录表格 */}
+            <div style={{ marginTop: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近骑手收支记录</h4>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手ID</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>类型</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>金额</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>状态</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>日期</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.filter(r => r.category.includes('佣金') || r.category.includes('骑手')).slice(0, 10).map((record) => (
+                      <tr key={record.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {record.courier_id || 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            background: record.record_type === 'income' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: record.record_type === 'income' ? '#22c55e' : '#ef4444'
+                          }}>
+                            {record.record_type === 'income' ? '收入' : '支出'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {record.amount?.toLocaleString()} {record.currency}
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            background: record.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+                            color: record.status === 'completed' ? '#22c55e' : '#fbbf24'
+                          }}>
+                            {record.status === 'completed' ? '已完成' : '待处理'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                          {new Date(record.record_date).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>
