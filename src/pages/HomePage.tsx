@@ -596,111 +596,245 @@ const HomePage: React.FC = () => {
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
         textAlign: 'center',
-        minHeight: window.innerWidth < 768 ? '60vh' : '70vh',
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden'
       }}>
-        {/* 背景装饰 */}
+        {/* 动态背景装饰 */}
         <div style={{
           position: 'absolute',
-          top: '20%',
-          right: '10%',
-          width: '200px',
-          height: '200px',
-          background: 'rgba(192, 192, 192, 0.1)',
+          top: '10%',
+          right: '5%',
+          width: '300px',
+          height: '300px',
+          background: 'rgba(255,255,255,0.15)',
           borderRadius: '50%',
-          filter: 'blur(40px)'
+          filter: 'blur(50px)',
+          animation: 'float 6s ease-in-out infinite'
         }}></div>
         <div style={{
           position: 'absolute',
-          bottom: '20%',
-          left: '10%',
-          width: '150px',
-          height: '150px',
-          background: 'rgba(192, 192, 192, 0.1)',
+          bottom: '15%',
+          left: '8%',
+          width: '250px',
+          height: '250px',
+          background: 'rgba(255,255,255,0.1)',
           borderRadius: '50%',
-          filter: 'blur(30px)'
+          filter: 'blur(40px)',
+          animation: 'float 8s ease-in-out infinite reverse'
+        }}></div>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '400px',
+          height: '400px',
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: '50%',
+          filter: 'blur(80px)',
+          animation: 'pulse 10s ease-in-out infinite'
         }}></div>
         
+        {/* 粒子效果 */}
+        {[...Array(20)].map((_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width: '4px',
+            height: '4px',
+            background: 'rgba(255,255,255,0.6)',
+            borderRadius: '50%',
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animation: `sparkle ${3 + Math.random() * 4}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 2}s`
+          }}></div>
+        ))}
+        
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <Logo size="large" />
-          <h1 style={{ 
-            fontSize: window.innerWidth < 768 ? '2rem' : '3rem', 
-            marginBottom: '1rem', 
-            fontWeight: 'bold',
-            lineHeight: '1.2',
-            marginTop: '1rem'
+          {/* 主标题区域 */}
+          <div style={{
+            marginBottom: '3rem',
+            animation: 'fadeInUp 1s ease-out'
           }}>
-            {t.hero.title}
-          </h1>
-          <p style={{ 
-            fontSize: window.innerWidth < 768 ? '1.1rem' : '1.5rem', 
-            marginBottom: '2rem', 
-            opacity: 0.9,
-            maxWidth: '1000px',
-            lineHeight: '1.4'
+            <Logo size="large" />
+            <h1 style={{ 
+              fontSize: window.innerWidth < 768 ? '2.5rem' : '4rem', 
+              marginBottom: '1.5rem',
+              fontWeight: '800',
+              textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
+              background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              letterSpacing: '-1px',
+              lineHeight: '1.1',
+              marginTop: '1rem'
+            }}>
+              {t.hero.title}
+            </h1>
+            <p style={{ 
+              fontSize: window.innerWidth < 768 ? '1.1rem' : '1.4rem', 
+              marginBottom: '2rem',
+              opacity: 0.95,
+              maxWidth: '700px',
+              lineHeight: '1.6',
+              fontWeight: '300',
+              textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
+            }}>
+              {t.hero.subtitle}
+            </p>
+          </div>
+
+          {/* CTA按钮区域 */}
+          <div style={{
+            display: 'flex',
+            gap: '1.5rem',
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'fadeInUp 1s ease-out 0.3s both'
           }}>
-            {t.hero.subtitle}
-          </p>
-          <button
-            onClick={() => setShowOrderForm(true)}
-            style={{
-              background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
-              color: '#2C3E50',
-              border: 'none',
-              padding: window.innerWidth < 768 ? '0.8rem 1.5rem' : '1rem 2rem',
-              fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-              fontWeight: 'bold',
-              borderRadius: '50px',
-              cursor: 'pointer',
-              boxShadow: '0 6px 20px rgba(192, 192, 192, 0.4)',
-              transition: 'all 0.3s ease',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(192, 192, 192, 0.6)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
-            }}
-          >
-            {t.hero.cta}
-          </button>
+            <button
+              onClick={() => setShowOrderForm(true)}
+              style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                color: '#1e293b',
+                border: '2px solid rgba(255,255,255,0.3)',
+                padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
+                borderRadius: '60px',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
+                boxShadow: '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                textTransform: 'uppercase',
+                letterSpacing: '1.5px',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
+              }}
+            >
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {t.hero.cta}
+              </span>
+            </button>
+            
+            <button
+              onClick={() => handleNavigation('/tracking')}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                border: '2px solid rgba(255,255,255,0.4)',
+                padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
+                borderRadius: '60px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+              }}
+            >
+              📦 包裹跟踪
+            </button>
+          </div>
+
+          {/* 特色标签 */}
+          <div style={{
+            marginTop: '3rem',
+            display: 'flex',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            animation: 'fadeInUp 1s ease-out 0.6s both'
+          }}>
+            {['⚡ 极速配送', '🛡️ 安全可靠', '📱 智能服务', '💎 透明定价'].map((tag, index) => (
+              <div key={index} style={{
+                background: 'rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                padding: '0.8rem 1.5rem',
+                borderRadius: '25px',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                color: 'white',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+              >
+                {tag}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
 
 
 
-      {/* 页脚 */}
-      <footer id="contact" style={{
-        position: 'relative',
-        zIndex: 5,
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        color: 'white',
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '3rem 2rem',
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-        transition: 'all 0.6s ease-in-out',
-        textAlign: 'center'
-      }}>
-        <Logo size="medium" />
-        <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem', marginTop: '1rem' }}>{t.footer.address}</p>
-        <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem' }}>电话：{t.footer.phone}</p>
-        <p style={{ fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem' }}>邮箱：{t.footer.email}</p>
-        <p style={{ 
-          marginTop: '2rem', 
-          opacity: 0.8,
-          fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem'
-        }}>
-          © 2024 MARKET LINK EXPRESS. All rights reserved.
-        </p>
-      </footer>
+
+      {/* CSS动画样式 */}
+      <style>
+        {`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
+          }
+          
+          @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+          }
+          
+          @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1); }
+          }
+          
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
 
       {/* 订单表单模态窗口 */}
       {showOrderForm && (
