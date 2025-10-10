@@ -48,6 +48,7 @@ const ServicesPage: React.FC = () => {
       },
       features: {
         title: '服务特色',
+        subtitle: '专业、高效、值得信赖的快递服务体验',
         fast: '快速配送',
         safe: '安全可靠',
         convenient: '便捷服务',
@@ -64,6 +65,7 @@ const ServicesPage: React.FC = () => {
       },
       features: {
         title: 'Service Features',
+        subtitle: 'Professional, efficient, and trustworthy express delivery service experience',
         fast: 'Fast Delivery',
         safe: 'Safe & Reliable',
         convenient: 'Convenient',
