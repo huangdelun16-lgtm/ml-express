@@ -5,10 +5,28 @@ const ContactPage: React.FC = () => {
   const navigate = useNavigate();
   const [language, setLanguage] = useState('zh');
   const [isVisible, setIsVisible] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showLanguageDropdown) {
+        setShowLanguageDropdown(false);
+      }
+    };
+
+    if (showLanguageDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLanguageDropdown]);
 
   const translations = {
     zh: {
@@ -204,28 +222,76 @@ const ContactPage: React.FC = () => {
           onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
           >{t.nav.admin}</a>
           
-          {/* 语言切换 */}
-          <select 
-            value={language} 
-            onChange={(e) => setLanguage(e.target.value)}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              padding: '0.5rem',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-              backdropFilter: 'blur(10px)',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none'
-            }}
-          >
-            <option value="zh" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>中文</option>
-            <option value="en" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>English</option>
-            <option value="my" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>မြန်မာ</option>
-          </select>
+          {/* 自定义语言选择器 */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                padding: '0.5rem',
+                borderRadius: '5px',
+                fontWeight: 'bold',
+                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                backdropFilter: 'blur(10px)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                minWidth: '120px',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span>{language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'}</span>
+              <span style={{ fontSize: '0.8rem' }}>▼</span>
+            </button>
+            
+            {showLanguageDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: 'rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '5px',
+                marginTop: '2px',
+                zIndex: 1000,
+                overflow: 'hidden'
+              }}>
+                {[
+                  { value: 'zh', label: '中文' },
+                  { value: 'en', label: 'English' },
+                  { value: 'my', label: 'မြန်မာ' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setLanguage(option.value);
+                      setShowLanguageDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.5rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                      transition: 'background 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
