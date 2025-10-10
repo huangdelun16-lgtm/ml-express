@@ -785,32 +785,6 @@ const HomePage: React.FC = () => {
                   opacity: '0.6'
                 }}></div>
 
-                {/* 猫咪快递员图片 - 仅显示在闪电配送卡片中 */}
-                {service.title === '闪电配送' && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    right: '20px',
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
-                    zIndex: 2
-                  }}>
-                    <img 
-                      src="https://images.unsplash.com/photo-1574158622682-e40e69881006?w=200&h=200&fit=crop&crop=center" 
-                      alt="猫咪快递员"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        borderRadius: '12px'
-                      }}
-                    />
-                  </div>
-                )}
-
                 {/* 图标区域 */}
                 <div style={{
                   display: 'flex',
