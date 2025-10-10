@@ -16,7 +16,8 @@ const TrackingPage: React.FC = () => {
   // 点击外部关闭下拉框
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showLanguageDropdown) {
+      const target = event.target as Element;
+      if (showLanguageDropdown && !target.closest('[data-language-dropdown]')) {
         setShowLanguageDropdown(false);
       }
     };
@@ -237,7 +238,7 @@ const TrackingPage: React.FC = () => {
           >{t.nav.admin}</a>
           
           {/* 自定义语言选择器 */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} data-language-dropdown>
             <button
               onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
               style={{
@@ -283,6 +284,7 @@ const TrackingPage: React.FC = () => {
                   <button
                     key={option.value}
                     onClick={() => {
+                      console.log('Language changed to:', option.value);
                       setLanguage(option.value);
                       setShowLanguageDropdown(false);
                     }}
