@@ -3,13 +3,21 @@ import { useNavigate } from 'react-router-dom';
 
 const ContactPage: React.FC = () => {
   const navigate = useNavigate();
-  const [language, setLanguage] = useState('zh');
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('ml-express-language') || 'zh';
+  });
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  // 语言切换函数
+  const handleLanguageChange = (newLanguage: string) => {
+    setLanguage(newLanguage);
+    localStorage.setItem('ml-express-language', newLanguage);
+  };
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -271,7 +279,7 @@ const ContactPage: React.FC = () => {
                     key={option.value}
                     onClick={() => {
                       console.log('Language changed to:', option.value);
-                      setLanguage(option.value);
+                      handleLanguageChange(option.value);
                       setShowLanguageDropdown(false);
                     }}
                     style={{
