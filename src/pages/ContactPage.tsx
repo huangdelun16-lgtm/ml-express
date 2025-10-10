@@ -219,9 +219,9 @@ const ContactPage: React.FC = () => {
               backdropFilter: 'blur(10px)'
             }}
           >
-            <option value="zh">中文</option>
-            <option value="en">English</option>
-            <option value="my">မြန်မာ</option>
+            <option value="zh" style={{ background: 'transparent', color: 'white' }}>中文</option>
+            <option value="en" style={{ background: 'transparent', color: 'white' }}>English</option>
+            <option value="my" style={{ background: 'transparent', color: 'white' }}>မြန်မာ</option>
           </select>
         </div>
       </nav>
