@@ -595,12 +595,15 @@ const HomePage: React.FC = () => {
               borderRadius: '5px',
               fontWeight: 'bold',
               fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-              backdropFilter: 'blur(10px)'
+              backdropFilter: 'blur(10px)',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none'
             }}
           >
-            <option value="zh" style={{ background: 'transparent', color: 'white' }}>中文</option>
-            <option value="en" style={{ background: 'transparent', color: 'white' }}>English</option>
-            <option value="my" style={{ background: 'transparent', color: 'white' }}>မြန်မာ</option>
+            <option value="zh" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>中文</option>
+            <option value="en" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>English</option>
+            <option value="my" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>မြန်မာ</option>
           </select>
         </div>
       </nav>

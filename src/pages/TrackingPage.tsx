@@ -7,7 +7,7 @@ const TrackingPage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
-
+  
   useEffect(() => {
     setIsVisible(true);
   }, []);
@@ -126,9 +126,9 @@ const TrackingPage: React.FC = () => {
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -171,12 +171,12 @@ const TrackingPage: React.FC = () => {
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.home}</button>
           <button onClick={() => handleNavigation('/services')} style={{ 
-            color: 'white', 
+                color: 'white',
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease',
             background: 'none',
-            border: 'none',
+                border: 'none',
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
@@ -193,12 +193,12 @@ const TrackingPage: React.FC = () => {
             fontWeight: 'bold'
           }}>{t.nav.tracking}</button>
           <button onClick={() => handleNavigation('/contact')} style={{ 
-            color: 'white', 
+                color: 'white',
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease',
             background: 'none',
-            border: 'none',
+                border: 'none',
             cursor: 'pointer'
           }}
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
@@ -222,22 +222,25 @@ const TrackingPage: React.FC = () => {
           <select 
             value={language} 
             onChange={(e) => setLanguage(e.target.value)}
-            style={{
+              style={{
               background: 'rgba(255,255,255,0.1)',
-              color: 'white',
+                color: 'white',
               border: '1px solid rgba(255,255,255,0.3)',
               padding: '0.5rem',
               borderRadius: '5px',
               fontWeight: 'bold',
               fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-              backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none'
             }}
           >
-            <option value="zh" style={{ background: 'transparent', color: 'white' }}>中文</option>
-            <option value="en" style={{ background: 'transparent', color: 'white' }}>English</option>
-            <option value="my" style={{ background: 'transparent', color: 'white' }}>မြန်မာ</option>
+            <option value="zh" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>中文</option>
+            <option value="en" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>English</option>
+            <option value="my" style={{ background: 'rgba(0,0,0,0.8)', color: 'white' }}>မြန်မာ</option>
           </select>
-        </div>
+          </div>
       </nav>
 
       {/* 主要内容区域 */}
@@ -285,8 +288,8 @@ const TrackingPage: React.FC = () => {
           border: '1px solid rgba(255,255,255,0.3)'
         }}>
           {/* 查询输入区域 */}
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
             gap: '1rem', 
             marginBottom: '2rem',
             flexDirection: window.innerWidth < 768 ? 'column' : 'row'
@@ -379,11 +382,11 @@ const TrackingPage: React.FC = () => {
           )}
 
           {/* 使用说明 */}
-          <div style={{
+            <div style={{
             marginTop: '2rem',
             padding: '1.5rem',
             background: 'rgba(102, 126, 234, 0.1)',
-            borderRadius: '12px',
+                        borderRadius: '12px',
             border: '1px solid rgba(102, 126, 234, 0.2)'
           }}>
             <h4 style={{ color: '#667eea', marginBottom: '1rem', fontSize: '1.1rem' }}>
