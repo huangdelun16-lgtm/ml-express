@@ -1,23 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation } from '../services/supabase';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
-// 模拟快递员数据接口
+// 快递员数据接口（扩展数据库接口）
 interface Courier {
   id: string;
   name: string;
   phone: string;
-  status: 'online' | 'offline' | 'busy';
-  latitude: number;
-  longitude: number;
-  currentPackages: number;
-  todayDeliveries: number;
+  email?: string;
+  address?: string;
+  vehicle_type?: string;
+  license_number?: string;
+  status: string;
+  join_date?: string;
+  last_active?: string;
+  total_deliveries?: number;
+  rating?: number;
+  notes?: string;
+  // 位置信息
+  latitude?: number;
+  longitude?: number;
+  // 实时状态
+  currentPackages?: number;
+  todayDeliveries?: number;
   batteryLevel?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CourierWithLocation extends Courier {
+  location?: CourierLocation;
 }
 
 const RealTimeTracking: React.FC = () => {
@@ -73,55 +90,98 @@ const RealTimeTracking: React.FC = () => {
     setPackages(activePackages);
   };
 
-  const loadCouriers = () => {
-    // 模拟快递员数据（实际应该从数据库获取）
-    const mockCouriers: Courier[] = [
-      {
-        id: 'C001',
-        name: '张三',
-        phone: '09-123456789',
-        status: 'online',
-        latitude: 16.8661 + (Math.random() - 0.5) * 0.05,
-        longitude: 96.1951 + (Math.random() - 0.5) * 0.05,
-        currentPackages: 3,
-        todayDeliveries: 12,
-        batteryLevel: 85
-      },
-      {
-        id: 'C002',
-        name: '李四',
-        phone: '09-987654321',
-        status: 'online',
-        latitude: 16.8661 + (Math.random() - 0.5) * 0.05,
-        longitude: 96.1951 + (Math.random() - 0.5) * 0.05,
-        currentPackages: 2,
-        todayDeliveries: 15,
-        batteryLevel: 92
-      },
-      {
-        id: 'C003',
-        name: '王五',
-        phone: '09-555666777',
-        status: 'busy',
-        latitude: 16.8661 + (Math.random() - 0.5) * 0.05,
-        longitude: 96.1951 + (Math.random() - 0.5) * 0.05,
-        currentPackages: 5,
-        todayDeliveries: 8,
-        batteryLevel: 45
-      },
-      {
-        id: 'C004',
-        name: '赵六',
-        phone: '09-888999000',
-        status: 'offline',
-        latitude: 16.8661 + (Math.random() - 0.5) * 0.05,
-        longitude: 96.1951 + (Math.random() - 0.5) * 0.05,
-        currentPackages: 0,
-        todayDeliveries: 20,
-        batteryLevel: 100
+  const loadCouriers = async () => {
+    try {
+      console.log('开始加载快递员数据...');
+      
+      // 1. 从数据库获取快递员列表
+      const { data: couriersData, error: couriersError } = await supabase
+        .from('couriers')
+        .select('*')
+        .order('last_active', { ascending: false });
+
+      if (couriersError) {
+        console.error('获取快递员列表失败:', couriersError);
+        setCouriers([]);
+        return;
       }
-    ];
-    setCouriers(mockCouriers);
+
+      if (!couriersData || couriersData.length === 0) {
+        console.log('数据库中没有快递员数据');
+        setCouriers([]);
+        return;
+      }
+
+      // 2. 获取快递员位置信息
+      const { data: locationsData, error: locationsError } = await supabase
+        .from('courier_locations')
+        .select('*');
+
+      if (locationsError) {
+        console.warn('获取位置信息失败:', locationsError);
+      }
+
+      // 3. 计算每个快递员的当前包裹数
+      const { data: packagesData } = await supabase
+        .from('packages')
+        .select('courier, status')
+        .in('status', ['已取件', '配送中']);
+
+      // 统计每个快递员的包裹数
+      const packageCounts: { [key: string]: number } = {};
+      packagesData?.forEach(pkg => {
+        if (pkg.courier && pkg.courier !== '待分配') {
+          packageCounts[pkg.courier] = (packageCounts[pkg.courier] || 0) + 1;
+        }
+      });
+
+      // 4. 合并数据
+      const enrichedCouriers: Courier[] = couriersData.map(courier => {
+        // 查找对应的位置信息
+        const location = locationsData?.find(loc => loc.courier_id === courier.id);
+        
+        // 计算当前包裹数
+        const currentPackages = packageCounts[courier.name] || 0;
+
+        // 确定显示状态
+        let displayStatus = courier.status;
+        if (courier.status === 'active') {
+          // 根据last_active判断是否在线
+          if (courier.last_active) {
+            const lastActiveTime = new Date(courier.last_active).getTime();
+            const now = Date.now();
+            const diffMinutes = (now - lastActiveTime) / (1000 * 60);
+            
+            if (diffMinutes < 30) {
+              displayStatus = currentPackages >= 5 ? 'busy' : 'online';
+            } else {
+              displayStatus = 'offline';
+            }
+          } else {
+            displayStatus = 'offline';
+          }
+        } else {
+          displayStatus = 'offline';
+        }
+
+        return {
+          ...courier,
+          // 使用位置信息，如果没有则使用默认位置（仰光中心附近随机位置）
+          latitude: location?.latitude || (16.8661 + (Math.random() - 0.5) * 0.05),
+          longitude: location?.longitude || (96.1951 + (Math.random() - 0.5) * 0.05),
+          status: displayStatus,
+          currentPackages: currentPackages,
+          todayDeliveries: courier.total_deliveries || 0,
+          batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
+        };
+      });
+
+      console.log('加载了', enrichedCouriers.length, '个快递员');
+      setCouriers(enrichedCouriers);
+    } catch (error) {
+      console.error('加载快递员数据失败:', error);
+      setCouriers([]);
+    }
   };
 
   // 自动分配包裹
@@ -276,7 +336,38 @@ const RealTimeTracking: React.FC = () => {
           padding: '1.5rem',
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
         }}>
-          <h2 style={{ marginTop: 0, color: '#1f2937' }}>🗺️ 快递员实时位置</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ margin: 0, color: '#1f2937' }}>🗺️ 快递员实时位置</h2>
+            {couriers.length > 0 && (
+              <div style={{ 
+                background: '#ecfdf5', 
+                border: '1px solid #86efac', 
+                borderRadius: '6px', 
+                padding: '0.5rem 1rem', 
+                fontSize: '0.8rem',
+                color: '#065f46',
+                fontWeight: 'bold'
+              }}>
+                ✅ 已加载 {couriers.length} 名快递员
+              </div>
+            )}
+          </div>
+          
+          {couriers.length === 0 && (
+            <div style={{ 
+              background: '#fef3c7', 
+              border: '1px solid #fde68a', 
+              borderRadius: '8px', 
+              padding: '1rem', 
+              marginBottom: '1rem',
+              textAlign: 'center'
+            }}>
+              <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>⚠️ 暂无快递员数据</p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f' }}>
+                请前往 <strong>「快递员管理」</strong> 页面添加快递员，或从账号系统导入骑手账号
+              </p>
+            </div>
+          )}
           
           <div style={{ 
             width: '100%', 
@@ -373,35 +464,60 @@ const RealTimeTracking: React.FC = () => {
                 ))}
 
                 {/* 信息窗口 */}
-                {selectedCourier && (
+                {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
                   <InfoWindow
                     position={{ lat: selectedCourier.latitude, lng: selectedCourier.longitude }}
                     onCloseClick={() => setSelectedCourier(null)}
                   >
-                    <div style={{ padding: '0.5rem' }}>
-                      <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937' }}>
+                    <div style={{ padding: '0.5rem', minWidth: '250px' }}>
+                      <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
                         {selectedCourier.name}
                       </h3>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem' }}>
-                        📱 {selectedCourier.phone}
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem' }}>
-                        📦 当前包裹: {selectedCourier.currentPackages}
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem' }}>
-                        ✅ 今日完成: {selectedCourier.todayDeliveries}
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem' }}>
-                        🔋 电量: {selectedCourier.batteryLevel}%
-                      </p>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                          <strong>📱 电话:</strong> {selectedCourier.phone}
+                        </p>
+                        {selectedCourier.email && (
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>📧 邮箱:</strong> {selectedCourier.email}
+                          </p>
+                        )}
+                        {selectedCourier.vehicle_type && (
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>🏍️ 车辆:</strong> {selectedCourier.vehicle_type}
+                          </p>
+                        )}
+                        {selectedCourier.license_number && (
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>🪪 车牌:</strong> {selectedCourier.license_number}
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                          <strong>📦 当前包裹:</strong> <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{selectedCourier.currentPackages || 0}</span>
+                        </p>
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                          <strong>✅ 总完成:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>{selectedCourier.todayDeliveries || 0}</span>
+                        </p>
+                        {selectedCourier.rating !== undefined && (
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                            <strong>⭐ 评分:</strong> <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{selectedCourier.rating.toFixed(1)}</span>
+                          </p>
+                        )}
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                          <strong>🔋 电量:</strong> <span style={{ color: selectedCourier.batteryLevel && selectedCourier.batteryLevel < 30 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{selectedCourier.batteryLevel || 0}%</span>
+                        </p>
+                      </div>
                       <div style={{ 
                         marginTop: '0.5rem',
-                        padding: '0.3rem 0.6rem',
-                        borderRadius: '5px',
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '6px',
                         background: getCourierStatusColor(selectedCourier.status),
                         color: 'white',
                         fontWeight: 'bold',
-                        textAlign: 'center'
+                        textAlign: 'center',
+                        fontSize: '0.9rem'
                       }}>
                         {getCourierStatusText(selectedCourier.status)}
                       </div>
@@ -575,26 +691,66 @@ const RealTimeTracking: React.FC = () => {
                     padding: '1rem',
                     borderRadius: '10px',
                     marginBottom: '1rem',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
                   }}
                   onClick={() => assignPackageToCourier(selectedPackage, courier)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 0.5rem 0' }}>{courier.name}</h3>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', color: '#6b7280' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <h3 style={{ margin: 0 }}>{courier.name}</h3>
+                        {courier.rating !== undefined && (
+                          <span style={{ 
+                            background: '#f59e0b', 
+                            color: 'white', 
+                            padding: '0.2rem 0.5rem', 
+                            borderRadius: '12px', 
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            ⭐ {courier.rating.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                         📱 {courier.phone}
                       </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', color: '#6b7280' }}>
-                        📦 当前包裹: {courier.currentPackages} | ✅ 今日完成: {courier.todayDeliveries}
-                      </p>
+                      {courier.vehicle_type && (
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                          🏍️ {courier.vehicle_type} {courier.license_number && `- ${courier.license_number}`}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#3b82f6', fontWeight: 'bold' }}>
+                          📦 当前: {courier.currentPackages || 0}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>
+                          ✅ 总计: {courier.todayDeliveries || 0}
+                        </p>
+                        {courier.batteryLevel !== undefined && (
+                          <p style={{ margin: 0, fontSize: '0.85rem', color: courier.batteryLevel < 30 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
+                            🔋 {courier.batteryLevel}%
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div style={{
                       padding: '0.5rem 1rem',
                       borderRadius: '8px',
                       background: getCourierStatusColor(courier.status),
                       color: 'white',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      marginLeft: '1rem',
+                      whiteSpace: 'nowrap'
                     }}>
                       {getCourierStatusText(courier.status)}
                     </div>
