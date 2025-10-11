@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
@@ -33,6 +33,30 @@ export default function DashboardScreen({ navigation }: any) {
   useEffect(() => {
     loadUserInfo();
     loadStats();
+    
+    // 骑手心跳：每5分钟更新一次在线状态
+    const heartbeatInterval = setInterval(async () => {
+      const userPosition = await AsyncStorage.getItem('currentUserPosition');
+      if (userPosition === '骑手' || userPosition === '骑手队长') {
+        try {
+          const courierId = await AsyncStorage.getItem('currentCourierId');
+          if (courierId) {
+            await supabase
+              .from('couriers')
+              .update({ 
+                last_active: new Date().toISOString(),
+                status: 'active'
+              })
+              .eq('id', courierId);
+            console.log('✅ 心跳更新：快递员在线状态已刷新');
+          }
+        } catch (error) {
+          console.error('心跳更新失败:', error);
+        }
+      }
+    }, 5 * 60 * 1000); // 5分钟
+
+    return () => clearInterval(heartbeatInterval);
   }, []);
 
   const loadUserInfo = async () => {

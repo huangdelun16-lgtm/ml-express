@@ -9,7 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
 export default function ProfileScreen({ navigation }: any) {
@@ -71,6 +71,26 @@ export default function ProfileScreen({ navigation }: any) {
           text: language === 'zh' ? '退出' : 'Logout',
           style: 'destructive',
           onPress: async () => {
+            // 如果是骑手，更新快递员状态为离线
+            const userPosition = await AsyncStorage.getItem('currentUserPosition');
+            if (userPosition === '骑手' || userPosition === '骑手队长') {
+              try {
+                const courierId = await AsyncStorage.getItem('currentCourierId');
+                if (courierId) {
+                  await supabase
+                    .from('couriers')
+                    .update({ 
+                      last_active: new Date().toISOString(),
+                      status: 'inactive'
+                    })
+                    .eq('id', courierId);
+                  console.log('✅ 快递员状态已更新为离线');
+                }
+              } catch (error) {
+                console.error('更新快递员离线状态失败:', error);
+              }
+            }
+            
             await AsyncStorage.clear();
             // 重置导航栈到客户专区
             navigation.getParent()?.getParent()?.reset({

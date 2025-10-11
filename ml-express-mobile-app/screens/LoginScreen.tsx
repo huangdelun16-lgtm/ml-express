@@ -11,7 +11,7 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { adminAccountService, auditLogService } from '../services/supabase';
+import { adminAccountService, auditLogService, courierService, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 
@@ -37,6 +37,39 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('currentUser', account.username);
         await AsyncStorage.setItem('currentUserName', account.employee_name);
         await AsyncStorage.setItem('currentUserRole', account.role);
+        await AsyncStorage.setItem('currentUserPosition', account.position || '');
+        
+        // 如果是骑手或骑手队长，更新快递员表的last_active状态
+        if (account.position === '骑手' || account.position === '骑手队长') {
+          try {
+            // 通过员工姓名查找对应的快递员记录
+            const { data: courierData } = await supabase
+              .from('couriers')
+              .select('id')
+              .eq('name', account.employee_name)
+              .single();
+            
+            if (courierData) {
+              // 更新快递员的last_active时间和状态
+              await supabase
+                .from('couriers')
+                .update({ 
+                  last_active: new Date().toISOString(),
+                  status: 'active'
+                })
+                .eq('id', courierData.id);
+              
+              // 保存快递员ID，方便后续使用
+              await AsyncStorage.setItem('currentCourierId', courierData.id);
+              
+              console.log('✅ 快递员状态已更新为在线');
+            } else {
+              console.log('⚠️ 未找到对应的快递员记录');
+            }
+          } catch (error) {
+            console.error('更新快递员状态失败:', error);
+          }
+        }
         
         // 记录登录日志
         await auditLogService.log({
@@ -44,7 +77,7 @@ export default function LoginScreen({ navigation }: any) {
           user_name: account.employee_name,
           action_type: 'login',
           module: 'system',
-          action_description: `移动端登录，角色：${account.role}`
+          action_description: `移动端登录，角色：${account.role}，职位：${account.position || '未知'}`
         });
         
         // 跳转到管理系统
