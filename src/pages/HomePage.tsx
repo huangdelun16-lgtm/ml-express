@@ -72,7 +72,22 @@ const HomePage: React.FC = () => {
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [selectedCity, setSelectedCity] = useState('yangon');
   // const [orderData, setOrderData] = useState<any>(null);
+
+  // 缅甸主要城市数据
+  const myanmarCities = {
+    yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 },
+    mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 },
+    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 },
+    mawlamyine: { name: '毛淡棉', nameEn: 'Mawlamyine', nameMm: 'မော်လမြိုင်', lat: 16.4909, lng: 97.6282 },
+    taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 },
+    myitkyina: { name: '密支那', nameEn: 'Myitkyina', nameMm: 'မြစ်ကြီးနား', lat: 25.3833, lng: 97.4000 },
+    pathein: { name: '勃生', nameEn: 'Pathein', nameMm: 'ပုသိမ်', lat: 16.7833, lng: 94.7333 },
+    sittwe: { name: '实兑', nameEn: 'Sittwe', nameMm: 'စစ်တွေ', lat: 20.1500, lng: 92.9000 },
+    kalay: { name: '葛礼', nameEn: 'Kalay', nameMm: 'ကလေး', lat: 23.1833, lng: 94.0500 },
+    monywa: { name: '蒙育瓦', nameEn: 'Monywa', nameMm: 'မုံရွာ', lat: 22.1167, lng: 95.1333 }
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -82,6 +97,15 @@ const HomePage: React.FC = () => {
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage);
     localStorage.setItem('ml-express-language', newLanguage);
+  };
+
+  // 城市切换函数
+  const handleCityChange = (cityKey: string) => {
+    setSelectedCity(cityKey);
+    const city = myanmarCities[cityKey as keyof typeof myanmarCities];
+    if (city) {
+      setMapCenter({ lat: city.lat, lng: city.lng });
+    }
   };
 
   // 点击外部关闭下拉框
@@ -1859,6 +1883,40 @@ const HomePage: React.FC = () => {
               border: '2px solid rgba(255, 255, 255, 0.3)',
               position: 'relative'
             }}>
+              {/* 城市选择器 */}
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '8px',
+                padding: '8px',
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#2d3748',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    minWidth: '120px'
+                  }}
+                >
+                  {Object.entries(myanmarCities).map(([key, city]) => (
+                    <option key={key} value={key}>
+                      {language === 'zh' ? city.name : language === 'en' ? city.nameEn : city.nameMm}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* 交互式地图容器 */}
               <div 
                 style={{
@@ -1872,10 +1930,10 @@ const HomePage: React.FC = () => {
                   const x = e.clientX - rect.left;
                   const y = e.clientY - rect.top;
                   
-                  // 将点击位置转换为大致的经纬度坐标（仰光地区）
-                  // 这是一个简化的转换，实际应用中需要更精确的地图API
-                  const lat = 16.7758 + (0.5 - y / rect.height) * 0.1; // 仰光纬度范围
-                  const lng = 96.1561 + (x / rect.width - 0.5) * 0.1; // 仰光经度范围
+                  // 根据选择的城市动态调整坐标转换
+                  const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                  const lat = currentCity.lat + (0.5 - y / rect.height) * 0.1; // 城市纬度范围
+                  const lng = currentCity.lng + (x / rect.width - 0.5) * 0.1; // 城市经度范围
                   
                   setMapClickPosition({ lat, lng });
                   
@@ -1919,6 +1977,7 @@ const HomePage: React.FC = () => {
                 <ErrorBoundary>
                   <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
                     <GoogleMap
+                      key={selectedCity} // 强制重新渲染当城市改变时
                       mapContainerStyle={{ width: '100%', height: '100%' }}
                       center={mapCenter}
                       zoom={15}
