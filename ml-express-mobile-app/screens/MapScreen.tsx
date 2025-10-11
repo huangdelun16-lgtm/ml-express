@@ -60,16 +60,55 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
+  // 导航到单个地址
   const handleNavigate = (address: string) => {
-    const encoded = encodeURIComponent(address);
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encoded}`);
+    if (!location) {
+      Alert.alert('提示', '正在获取您的位置，请稍后再试');
+      return;
+    }
+
+    // 使用 Google Maps Directions 从当前位置导航到目标地址
+    const origin = `${location.latitude},${location.longitude}`;
+    const destination = encodeURIComponent(address);
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    
+    Linking.openURL(url);
   };
 
+  // 导航到所有包裹地址（优化路线）
   const handleNavigateAll = () => {
-    if (packages.length === 0) return;
-    const firstAddress = packages[0].receiver_address;
-    const encoded = encodeURIComponent(firstAddress);
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`);
+    if (packages.length === 0) {
+      Alert.alert('提示', '暂无待配送包裹');
+      return;
+    }
+
+    if (!location) {
+      Alert.alert('提示', '正在获取您的位置，请稍后再试');
+      return;
+    }
+
+    // 构建多点路线规划
+    const origin = `${location.latitude},${location.longitude}`;
+    
+    if (packages.length === 1) {
+      // 只有一个包裹，直接导航
+      const destination = encodeURIComponent(packages[0].receiver_address);
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+      Linking.openURL(url);
+    } else {
+      // 多个包裹，添加途经点
+      const destination = encodeURIComponent(packages[packages.length - 1].receiver_address);
+      
+      // Google Maps 最多支持9个途经点
+      const waypointsLimit = Math.min(packages.length - 1, 9);
+      const waypoints = packages.slice(0, waypointsLimit).map(pkg => 
+        encodeURIComponent(pkg.receiver_address)
+      ).join('|');
+      
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+      
+      Linking.openURL(url);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -135,10 +174,14 @@ export default function MapScreen({ navigation }: any) {
             </Text>
           </View>
           <TouchableOpacity 
-            style={styles.navigateAllButton}
+            style={[styles.navigateAllButton, packages.length === 0 && styles.navigateAllButtonDisabled]}
             onPress={handleNavigateAll}
+            disabled={packages.length === 0}
           >
-            <Text style={styles.navigateAllText}>开始导航</Text>
+            <Text style={styles.navigateAllIcon}>🧭</Text>
+            <Text style={styles.navigateAllText}>
+              {packages.length > 0 ? `规划路线 (${packages.length}站)` : '暂无任务'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -236,6 +279,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  navigateAllButtonDisabled: {
+    backgroundColor: '#cbd5e0',
+  },
+  navigateAllIcon: {
+    fontSize: 16,
   },
   navigateAllText: {
     color: '#fff',
