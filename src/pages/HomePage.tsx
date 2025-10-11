@@ -1962,14 +1962,14 @@ const HomePage: React.FC = () => {
               
               {/* 自动定位按钮 */}
               <button
-                onClick={async () => {
+                onClick={async (e) => {
                   if (!navigator.geolocation) {
                     alert('您的浏览器不支持地理定位功能');
                     return;
                   }
 
                   // 显示加载状态
-                  const button = event?.currentTarget as HTMLButtonElement;
+                  const button = e.currentTarget as HTMLButtonElement;
                   const originalContent = button.innerHTML;
                   button.innerHTML = '🔄';
                   button.style.opacity = '0.7';
