@@ -189,7 +189,7 @@ const RealTimeTracking: React.FC = () => {
     // 找到在线且当前包裹最少的快递员
     const availableCouriers = couriers
       .filter(c => c.status === 'online')
-      .sort((a, b) => a.currentPackages - b.currentPackages);
+      .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
     if (availableCouriers.length === 0) {
       alert('当前没有在线的快递员，请稍后再试');
@@ -221,7 +221,7 @@ const RealTimeTracking: React.FC = () => {
         // 更新快递员的包裹数（实际应该从后端更新）
         setCouriers(prev => prev.map(c => 
           c.id === courier.id 
-            ? { ...c, currentPackages: c.currentPackages + 1 }
+            ? { ...c, currentPackages: (c.currentPackages || 0) + 1 }
             : c
         ));
       } else {
