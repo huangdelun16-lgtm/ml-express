@@ -89,6 +89,9 @@ const HomePage: React.FC = () => {
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
+  const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
+  const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
+  const [paymentQRCode, setPaymentQRCode] = useState<string>('');
   // const [orderData, setOrderData] = useState<any>(null);
 
   // 缅甸主要城市数据
@@ -412,7 +415,18 @@ const HomePage: React.FC = () => {
         selectTime: '选择时间',
         confirmTime: '确认时间',
         cancel: '取消',
-        selectedTime: '已选时间'
+        selectedTime: '已选时间',
+        calculating: '正在计算价格...',
+        deliveryDistance: '配送距离',
+        totalAmount: '应付金额',
+        paymentQRCode: '收款二维码',
+        scanToPay: '扫码支付',
+        priceBreakdown: '价格明细',
+        basePrice: '基础费用',
+        distanceFee: '距离费用',
+        packageTypeFee: '包裹类型',
+        weightFee: '重量费用',
+        speedFee: '速度费用'
       }
     },
     en: {
@@ -518,7 +532,18 @@ const HomePage: React.FC = () => {
         selectTime: 'Select Time',
         confirmTime: 'Confirm Time',
         cancel: 'Cancel',
-        selectedTime: 'Selected Time'
+        selectedTime: 'Selected Time',
+        calculating: 'Calculating price...',
+        deliveryDistance: 'Delivery Distance',
+        totalAmount: 'Total Amount',
+        paymentQRCode: 'Payment QR Code',
+        scanToPay: 'Scan to Pay',
+        priceBreakdown: 'Price Breakdown',
+        basePrice: 'Base Fee',
+        distanceFee: 'Distance Fee',
+        packageTypeFee: 'Package Type',
+        weightFee: 'Weight Fee',
+        speedFee: 'Speed Fee'
       }
     },
     my: {
@@ -624,7 +649,18 @@ const HomePage: React.FC = () => {
         selectTime: 'အချိန်ရွေးပါ',
         confirmTime: 'အချိန်အတည်ပြုပါ',
         cancel: 'ပယ်ဖျက်',
-        selectedTime: 'ရွေးချယ်ထားသောအချိန်'
+        selectedTime: 'ရွေးချယ်ထားသောအချိန်',
+        calculating: 'စျေးနှုန်းတွက်ချက်နေသည်...',
+        deliveryDistance: 'ပို့ဆောင်အကွာအဝေး',
+        totalAmount: 'စုစုပေါင်းပမာဏ',
+        paymentQRCode: 'ငွေပေးချေမှု QR ကုဒ်',
+        scanToPay: 'စကင်န်ဖတ်၍ ငွေပေးပါ',
+        priceBreakdown: 'စျေးနှုန်းအသေးစိတ်',
+        basePrice: 'အခြေခံအခကြေး',
+        distanceFee: 'အကွာအဝေးအခ',
+        packageTypeFee: 'ပစ္စည်းအမျိုးအစား',
+        weightFee: 'အလေးချိန်အခ',
+        speedFee: 'မြန်နှုန်းအခ'
       }
     }
   };
@@ -660,7 +696,125 @@ const HomePage: React.FC = () => {
     return `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
   };
 
-  const handleOrderSubmit = (e: React.FormEvent) => {
+  // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
+  const calculateDistance = async (origin: string, destination: string): Promise<number> => {
+    try {
+      if (!window.google || !window.google.maps) {
+        console.warn('Google Maps API未加载，使用估算距离');
+        return 5; // 默认5km
+      }
+
+      const service = new window.google.maps.DistanceMatrixService();
+      
+      return new Promise((resolve, reject) => {
+        service.getDistanceMatrix(
+          {
+            origins: [origin],
+            destinations: [destination],
+            travelMode: window.google.maps.TravelMode.DRIVING,
+            unitSystem: window.google.maps.UnitSystem.METRIC,
+          },
+          (response: any, status: any) => {
+            if (status === 'OK' && response.rows[0]?.elements[0]?.status === 'OK') {
+              const distanceInMeters = response.rows[0].elements[0].distance.value;
+              const distanceInKm = distanceInMeters / 1000;
+              resolve(Math.round(distanceInKm * 10) / 10); // 保留一位小数
+            } else {
+              console.warn('距离计算失败，使用估算值');
+              resolve(5); // 默认5km
+            }
+          }
+        );
+      });
+    } catch (error) {
+      console.error('距离计算出错:', error);
+      return 5; // 默认5km
+    }
+  };
+
+  // 计算配送价格
+  const calculatePrice = (packageType: string, weight: string, deliverySpeed: string, distance: number): number => {
+    let basePrice = 3000; // 基础价格 3000 MMK
+    
+    // 1. 根据包裹类型调整价格
+    const packagePriceMultiplier: { [key: string]: number } = {
+      [t.ui.document]: 1.0,           // 文件: 1倍
+      [t.ui.standardPackage]: 1.2,    // 标准件: 1.2倍
+      [t.ui.overweightPackage]: 1.8,  // 超重件: 1.8倍
+      [t.ui.oversizedPackage]: 2.0,   // 超规件: 2倍
+      [t.ui.fragile]: 1.5,            // 易碎品: 1.5倍
+      [t.ui.foodDrinks]: 1.3          // 食品饮料: 1.3倍
+    };
+    
+    const typeMultiplier = packagePriceMultiplier[packageType] || 1.0;
+    basePrice *= typeMultiplier;
+    
+    // 2. 根据重量调整价格
+    const weightNum = parseFloat(weight) || 1;
+    if (weightNum > 10) {
+      basePrice += (weightNum - 10) * 200; // 超过10kg，每kg加200 MMK
+    } else if (weightNum > 5) {
+      basePrice += (weightNum - 5) * 150; // 5-10kg，每kg加150 MMK
+    }
+    
+    // 3. 根据配送速度调整价格
+    const speedPriceMultiplier: { [key: string]: number } = {
+      [t.ui.onTimeDelivery]: 1.0,      // 准时达: 1倍
+      [t.ui.urgentDelivery]: 1.5,      // 急送达: 1.5倍
+      [t.ui.scheduledDelivery]: 1.2    // 定时达: 1.2倍
+    };
+    
+    const speedMultiplier = speedPriceMultiplier[deliverySpeed] || 1.0;
+    basePrice *= speedMultiplier;
+    
+    // 4. 根据距离调整价格
+    if (distance <= 3) {
+      // 3km以内，不加价
+      basePrice += 0;
+    } else if (distance <= 10) {
+      // 3-10km，每km加300 MMK
+      basePrice += (distance - 3) * 300;
+    } else if (distance <= 20) {
+      // 10-20km，每km加500 MMK
+      basePrice += 7 * 300 + (distance - 10) * 500;
+    } else {
+      // 20km以上，每km加700 MMK
+      basePrice += 7 * 300 + 10 * 500 + (distance - 20) * 700;
+    }
+    
+    // 返回向上取整到百位的价格
+    return Math.ceil(basePrice / 100) * 100;
+  };
+
+  // 生成收款二维码
+  const generatePaymentQRCode = async (amount: number, orderId: string) => {
+    try {
+      // 生成支付信息（可以根据实际支付方式调整）
+      const paymentInfo = {
+        amount: amount,
+        currency: 'MMK',
+        orderId: orderId,
+        merchant: 'ML Express',
+        description: '快递费用'
+      };
+      
+      const paymentString = JSON.stringify(paymentInfo);
+      const qrDataUrl = await QRCode.toDataURL(paymentString, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#2c5282',
+          light: '#ffffff'
+        }
+      });
+      
+      setPaymentQRCode(qrDataUrl);
+    } catch (error) {
+      console.error('生成收款二维码失败:', error);
+    }
+  };
+
+  const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     const orderInfo = {
@@ -676,10 +830,48 @@ const HomePage: React.FC = () => {
       scheduledTime: scheduledDeliveryTime || null
     };
     
-    // 存储订单信息到localStorage，支付完成后使用
-    localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
+    // 关闭订单表单，显示加载状态
     setShowOrderForm(false);
-    setShowPaymentModal(true);
+    
+    try {
+      // 1. 计算距离
+      const distance = await calculateDistance(
+        orderInfo.senderAddress,
+        orderInfo.receiverAddress
+      );
+      setDeliveryDistance(distance);
+      
+      // 2. 计算价格
+      const price = calculatePrice(
+        orderInfo.packageType,
+        orderInfo.weight,
+        orderInfo.deliverySpeed,
+        distance
+      );
+      setCalculatedPrice(price);
+      
+      // 3. 生成临时订单ID
+      const tempOrderId = generateMyanmarPackageId();
+      
+      // 4. 生成收款二维码
+      await generatePaymentQRCode(price, tempOrderId);
+      
+      // 5. 存储订单信息（包含价格和距离）
+      const orderWithPrice = {
+        ...orderInfo,
+        price: price,
+        distance: distance,
+        tempOrderId: tempOrderId
+      };
+      localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
+      
+      // 6. 显示支付模态框
+      setShowPaymentModal(true);
+    } catch (error) {
+      console.error('订单处理失败:', error);
+      alert('订单处理失败，请重试');
+      setShowOrderForm(true);
+    }
   };
 
   // LOGO组件
@@ -1569,38 +1761,86 @@ const HomePage: React.FC = () => {
             background: 'white',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '15px',
-            maxWidth: '400px',
+            maxWidth: '500px',
             width: '90%',
             textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+            maxHeight: '90vh',
+            overflow: 'auto'
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <Logo size="medium" />
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💳</div>
+              <h2 style={{ color: '#2c5282', margin: 0 }}>
+                {t.ui.paymentQRCode}
+              </h2>
             </div>
-            <h2 style={{ color: '#2c5282', marginBottom: '1rem' }}>
-              {t.ui.prepaidPickupFee}
-            </h2>
-            <p style={{ color: '#4a5568', marginBottom: '2rem', fontSize: '1.1rem' }}>
-              {t.ui.scanQrPay} <strong>2000 MMK</strong> {t.ui.pickupFee}
-            </p>
-            
-            {/* 二维码占位符 */}
+
+            {/* 配送距离 */}
             <div style={{
-              width: '200px',
-              height: '200px',
-              background: 'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)',
-              backgroundSize: '20px 20px',
-              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-              margin: '0 auto 2rem',
-              border: '2px solid #e2e8f0',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '1rem',
               borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.9rem',
-              color: '#666'
+              marginBottom: '1rem',
+              color: 'white'
             }}>
-              {t.ui.paymentQrCode}
+              <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>📍 {t.ui.deliveryDistance}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginTop: '0.3rem' }}>
+                {deliveryDistance} km
+              </div>
+            </div>
+
+            {/* 应付金额 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              padding: '1.5rem',
+              borderRadius: '10px',
+              marginBottom: '1.5rem',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '1rem', opacity: 0.9 }}>💰 {t.ui.totalAmount}</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
+                {calculatedPrice.toLocaleString()} MMK
+              </div>
+            </div>
+
+            {/* 收款二维码 */}
+            <div style={{
+              background: '#f8f9fa',
+              padding: '1.5rem',
+              borderRadius: '10px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ fontSize: '1rem', color: '#2c5282', marginBottom: '1rem', fontWeight: 'bold' }}>
+                📱 {t.ui.scanToPay}
+              </div>
+              {paymentQRCode ? (
+                <img 
+                  src={paymentQRCode} 
+                  alt="Payment QR Code"
+                  style={{
+                    width: '250px',
+                    height: '250px',
+                    margin: '0 auto',
+                    display: 'block',
+                    borderRadius: '10px',
+                    border: '3px solid #2c5282'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '250px',
+                  height: '250px',
+                  background: '#e9ecef',
+                  margin: '0 auto',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#666'
+                }}>
+                  {t.ui.calculating}
+                </div>
+              )}
             </div>
             
             <div style={{ 
@@ -1636,12 +1876,13 @@ const HomePage: React.FC = () => {
                     weight: orderInfo.weight,
                     delivery_speed: orderInfo.deliverySpeed,
                     scheduled_delivery_time: orderInfo.scheduledTime || null,
+                    delivery_distance: orderInfo.distance || deliveryDistance,
                     status: '待取件',
                     create_time: new Date().toLocaleString('zh-CN'),
                     pickup_time: '',
                     delivery_time: '',
                     courier: '待分配',
-                    price: '5000 MMK'
+                    price: `${orderInfo.price || calculatedPrice} MMK`
                   };
                   
                   // 保存到数据库
