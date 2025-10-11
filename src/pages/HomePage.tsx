@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, testConnection, userService } from '../services/supabase';
+import { packageService, testConnection, userService, systemSettingsService } from '../services/supabase';
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
@@ -93,6 +93,19 @@ const HomePage: React.FC = () => {
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   const [paymentQRCode, setPaymentQRCode] = useState<string>('');
   // const [orderData, setOrderData] = useState<any>(null);
+  
+  // 系统价格设置
+  const [pricingSettings, setPricingSettings] = useState({
+    baseFee: 1500,
+    perKmFee: 500,
+    weightSurcharge: 150,
+    urgentSurcharge: 500,
+    oversizeSurcharge: 300,
+    scheduledSurcharge: 200,
+    fragileSurcharge: 400,
+    foodBeverageSurcharge: 300,
+    freeKmThreshold: 3
+  });
 
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -110,7 +123,34 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     setIsVisible(true);
+    loadPricingSettings();
   }, []);
+
+  // 从系统设置加载价格配置
+  const loadPricingSettings = async () => {
+    try {
+      const settings = await systemSettingsService.getAllSettings();
+      const settingsMap: { [key: string]: any } = {};
+      settings.forEach(setting => {
+        settingsMap[setting.setting_key] = setting.setting_value;
+      });
+      
+      setPricingSettings({
+        baseFee: parseFloat(settingsMap['pricing.base_fee']) || 1500,
+        perKmFee: parseFloat(settingsMap['pricing.per_km_fee']) || 500,
+        weightSurcharge: parseFloat(settingsMap['pricing.weight_surcharge']) || 150,
+        urgentSurcharge: parseFloat(settingsMap['pricing.urgent_surcharge']) || 500,
+        oversizeSurcharge: parseFloat(settingsMap['pricing.oversize_surcharge']) || 300,
+        scheduledSurcharge: parseFloat(settingsMap['pricing.scheduled_surcharge']) || 200,
+        fragileSurcharge: parseFloat(settingsMap['pricing.fragile_surcharge']) || 400,
+        foodBeverageSurcharge: parseFloat(settingsMap['pricing.food_beverage_surcharge']) || 300,
+        freeKmThreshold: parseFloat(settingsMap['pricing.free_km_threshold']) || 3
+      });
+    } catch (error) {
+      console.error('加载价格设置失败:', error);
+      // 使用默认值
+    }
+  };
 
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
@@ -784,58 +824,47 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 计算配送价格
+  // 计算配送价格（使用系统设置中的价格）
   const calculatePrice = (packageType: string, weight: string, deliverySpeed: string, distance: number): number => {
-    let basePrice = 3000; // 基础价格 3000 MMK
+    // 1. 基础起步价
+    let totalPrice = pricingSettings.baseFee;
     
-    // 1. 根据包裹类型调整价格
-    const packagePriceMultiplier: { [key: string]: number } = {
-      [t.ui.document]: 1.0,           // 文件: 1倍
-      [t.ui.standardPackage]: 1.2,    // 标准件: 1.2倍
-      [t.ui.overweightPackage]: 1.8,  // 超重件: 1.8倍
-      [t.ui.oversizedPackage]: 2.0,   // 超规件: 2倍
-      [t.ui.fragile]: 1.5,            // 易碎品: 1.5倍
-      [t.ui.foodDrinks]: 1.3          // 食品饮料: 1.3倍
-    };
-    
-    const typeMultiplier = packagePriceMultiplier[packageType] || 1.0;
-    basePrice *= typeMultiplier;
-    
-    // 2. 根据重量调整价格
-    const weightNum = parseFloat(weight) || 1;
-    if (weightNum > 10) {
-      basePrice += (weightNum - 10) * 200; // 超过10kg，每kg加200 MMK
-    } else if (weightNum > 5) {
-      basePrice += (weightNum - 5) * 150; // 5-10kg，每kg加150 MMK
+    // 2. 距离费用（超过免费公里数后按每公里费用计算）
+    if (distance > pricingSettings.freeKmThreshold) {
+      const chargeableDistance = distance - pricingSettings.freeKmThreshold;
+      totalPrice += chargeableDistance * pricingSettings.perKmFee;
     }
     
-    // 3. 根据配送速度调整价格
-    const speedPriceMultiplier: { [key: string]: number } = {
-      [t.ui.onTimeDelivery]: 1.0,      // 准时达: 1倍
-      [t.ui.urgentDelivery]: 1.5,      // 急送达: 1.5倍
-      [t.ui.scheduledDelivery]: 1.2    // 定时达: 1.2倍
-    };
+    // 3. 重量附加费（假设阈值为5kg）
+    const weightNum = parseFloat(weight) || 1;
+    const weightThreshold = 5;
+    if (weightNum > weightThreshold) {
+      totalPrice += (weightNum - weightThreshold) * pricingSettings.weightSurcharge;
+    }
     
-    const speedMultiplier = speedPriceMultiplier[deliverySpeed] || 1.0;
-    basePrice *= speedMultiplier;
+    // 4. 包裹类型附加费
+    if (packageType === t.ui.oversizedPackage || packageType === '超规件') {
+      // 超规件：按距离计算附加费
+      totalPrice += distance * pricingSettings.oversizeSurcharge;
+    } else if (packageType === t.ui.fragile || packageType === '易碎品') {
+      // 易碎品：固定附加费
+      totalPrice += pricingSettings.fragileSurcharge;
+    } else if (packageType === t.ui.foodDrinks || packageType === '食品和饮料') {
+      // 食品和饮料：按距离计算附加费
+      totalPrice += distance * pricingSettings.foodBeverageSurcharge;
+    }
     
-    // 4. 根据距离调整价格
-    if (distance <= 3) {
-      // 3km以内，不加价
-      basePrice += 0;
-    } else if (distance <= 10) {
-      // 3-10km，每km加300 MMK
-      basePrice += (distance - 3) * 300;
-    } else if (distance <= 20) {
-      // 10-20km，每km加500 MMK
-      basePrice += 7 * 300 + (distance - 10) * 500;
-    } else {
-      // 20km以上，每km加700 MMK
-      basePrice += 7 * 300 + 10 * 500 + (distance - 20) * 700;
+    // 5. 配送速度附加费
+    if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '急送达') {
+      // 急送达：固定附加费
+      totalPrice += pricingSettings.urgentSurcharge;
+    } else if (deliverySpeed === t.ui.scheduledDelivery || deliverySpeed === '定时达') {
+      // 定时达：固定附加费
+      totalPrice += pricingSettings.scheduledSurcharge;
     }
     
     // 返回向上取整到百位的价格
-    return Math.ceil(basePrice / 100) * 100;
+    return Math.ceil(totalPrice / 100) * 100;
   };
 
   // 生成收款二维码

@@ -106,11 +106,11 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'pricing.oversize_surcharge',
     label: '超规附加费',
-    description: '当包裹尺寸超过标准规格时收取的额外费用。',
+    description: '当包裹尺寸超过标准规格时，每公里额外增加的费用。',
     category: 'pricing',
     type: 'number',
     defaultValue: 300,
-    suffix: 'MMK'
+    suffix: 'MMK/公里'
   },
   {
     key: 'pricing.scheduled_surcharge',
@@ -129,6 +129,15 @@ const settingDefinitions: SettingDefinition[] = [
     type: 'number',
     defaultValue: 400,
     suffix: 'MMK'
+  },
+  {
+    key: 'pricing.food_beverage_surcharge',
+    label: '食品和饮料附加费',
+    description: '配送食品和饮料类包裹时，每公里额外增加的费用。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 300,
+    suffix: 'MMK/公里'
   },
   {
     key: 'pricing.free_km_threshold',
