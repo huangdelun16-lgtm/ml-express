@@ -87,7 +87,7 @@ const settingDefinitions: SettingDefinition[] = [
   },
   {
     key: 'pricing.weight_surcharge',
-    label: '重量附加费 (每公斤)',
+    label: '超重附加费',
     description: '当包裹超过默认重量阈值时，每公斤额外增加的费用。',
     category: 'pricing',
     type: 'number',
@@ -95,13 +95,40 @@ const settingDefinitions: SettingDefinition[] = [
     suffix: 'MMK/公斤'
   },
   {
-    key: 'pricing.urgent_multiplier',
-    label: '加急倍率',
-    description: '针对加急配送的价格倍率，例如 1.5 表示价格乘以 1.5。',
+    key: 'pricing.urgent_surcharge',
+    label: '急送达附加费',
+    description: '选择急送达配送方式时额外收取的固定费用。',
     category: 'pricing',
     type: 'number',
-    defaultValue: 1.5,
-    suffix: 'x'
+    defaultValue: 500,
+    suffix: 'MMK'
+  },
+  {
+    key: 'pricing.oversize_surcharge',
+    label: '超规附加费',
+    description: '当包裹尺寸超过标准规格时收取的额外费用。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 300,
+    suffix: 'MMK'
+  },
+  {
+    key: 'pricing.scheduled_surcharge',
+    label: '定时达附加费',
+    description: '选择定时达配送方式时额外收取的预约服务费。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 200,
+    suffix: 'MMK'
+  },
+  {
+    key: 'pricing.fragile_surcharge',
+    label: '易碎品附加费',
+    description: '运输易碎物品时收取的额外保护和小心处理费用。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 400,
+    suffix: 'MMK'
   },
   {
     key: 'pricing.free_km_threshold',
@@ -787,7 +814,11 @@ const SystemSettings: React.FC = () => {
           {loading ? (
             <div style={{ color: 'rgba(255,255,255,0.7)' }}>正在加载配置，请稍候...</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: activeTab === 'pricing' ? 'repeat(2, 1fr)' : '1fr',
+              gap: '16px' 
+            }}>
               {currentDefinitions.map(def => {
                 const metadata = settingsMetadata[def.key];
                 return (
