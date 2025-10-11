@@ -86,6 +86,9 @@ const HomePage: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState('yangon');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
+  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+  const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
+  const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
   // const [orderData, setOrderData] = useState<any>(null);
 
   // 缅甸主要城市数据
@@ -403,7 +406,13 @@ const HomePage: React.FC = () => {
         urgentDelivery: '急送达（订单后30分钟送达）',
         scheduledDelivery: '定时达（客户要求的时间送达）',
         selectDeliverySpeed: '请选择配送速度',
-        packageInfoMismatch: '如实物和包裹信息内容不一致会导致报价失误'
+        packageInfoMismatch: '如实物和包裹信息内容不一致会导致报价失误',
+        selectDeliveryTime: '选择送达时间',
+        selectDate: '选择日期',
+        selectTime: '选择时间',
+        confirmTime: '确认时间',
+        cancel: '取消',
+        selectedTime: '已选时间'
       }
     },
     en: {
@@ -503,7 +512,13 @@ const HomePage: React.FC = () => {
         urgentDelivery: 'Urgent Delivery (30 minutes after order)',
         scheduledDelivery: 'Scheduled Delivery (Customer requested time)',
         selectDeliverySpeed: 'Please select delivery speed',
-        packageInfoMismatch: 'If actual item and package information do not match, it may cause pricing errors'
+        packageInfoMismatch: 'If actual item and package information do not match, it may cause pricing errors',
+        selectDeliveryTime: 'Select Delivery Time',
+        selectDate: 'Select Date',
+        selectTime: 'Select Time',
+        confirmTime: 'Confirm Time',
+        cancel: 'Cancel',
+        selectedTime: 'Selected Time'
       }
     },
     my: {
@@ -603,7 +618,13 @@ const HomePage: React.FC = () => {
         urgentDelivery: 'အလျင်အမြန်ပို့ဆောင်မှု（အမှာတင်ပြီး ၃၀ မိနစ်အတွင်း）',
         scheduledDelivery: 'အချိန်သတ်မှတ်ပို့ဆောင်မှု（ဖောက်သည်တောင်းဆိုသောအချိန်）',
         selectDeliverySpeed: 'ပို့ဆောင်မှုမြန်နှုန်းကို ရွေးချယ်ပါ',
-        packageInfoMismatch: 'အမှန်တကယ်ပစ္စည်းနှင့် ထုပ်ပိုးအချက်အလက် မကိုက်ညီပါက စျေးနှုန်းသတ်မှတ်ခြင်း မှားယွင်းနိုင်ပါသည်'
+        packageInfoMismatch: 'အမှန်တကယ်ပစ္စည်းနှင့် ထုပ်ပိုးအချက်အလက် မကိုက်ညီပါက စျေးနှုန်းသတ်မှတ်ခြင်း မှားယွင်းနိုင်ပါသည်',
+        selectDeliveryTime: 'ပို့ဆောင်ချိန်ကို ရွေးချယ်ပါ',
+        selectDate: 'ရက်စွဲရွေးပါ',
+        selectTime: 'အချိန်ရွေးပါ',
+        confirmTime: 'အချိန်အတည်ပြုပါ',
+        cancel: 'ပယ်ဖျက်',
+        selectedTime: 'ရွေးချယ်ထားသောအချိန်'
       }
     }
   };
@@ -651,7 +672,8 @@ const HomePage: React.FC = () => {
       receiverAddress: formData.get('receiverAddress') as string,
       packageType: formData.get('packageType') as string,
       weight: formData.get('weight') as string,
-      deliverySpeed: formData.get('deliverySpeed') as string
+      deliverySpeed: formData.get('deliverySpeed') as string,
+      scheduledTime: scheduledDeliveryTime || null
     };
     
     // 存储订单信息到localStorage，支付完成后使用
@@ -1385,6 +1407,15 @@ const HomePage: React.FC = () => {
                 <select
                   name="deliverySpeed"
                   required
+                  value={selectedDeliverySpeed}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedDeliverySpeed(value);
+                    // 如果选择了"定时达"，打开时间选择器
+                    if (value === t.ui.scheduledDelivery) {
+                      setShowTimePickerModal(true);
+                    }
+                  }}
                   style={{
                     width: '100%',
                     padding: '0.8rem',
@@ -1419,6 +1450,24 @@ const HomePage: React.FC = () => {
                   <option value={t.ui.urgentDelivery}>{t.ui.urgentDelivery}</option>
                   <option value={t.ui.scheduledDelivery}>{t.ui.scheduledDelivery}</option>
                 </select>
+                
+                {/* 显示选择的时间 */}
+                {selectedDeliverySpeed === t.ui.scheduledDelivery && scheduledDeliveryTime && (
+                  <div style={{
+                    padding: '0.8rem',
+                    background: 'rgba(72, 187, 120, 0.1)',
+                    border: '2px solid rgba(72, 187, 120, 0.3)',
+                    borderRadius: '8px',
+                    marginBottom: '0.5rem',
+                    color: '#2c5282',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <span style={{ fontSize: '1.2rem' }}>🕐</span>
+                    <span style={{ fontWeight: '500' }}>{t.ui.selectedTime}: {scheduledDeliveryTime}</span>
+                  </div>
+                )}
                 <input
                   type="text"
                   name="weight"
@@ -1586,6 +1635,7 @@ const HomePage: React.FC = () => {
                     package_type: orderInfo.packageType,
                     weight: orderInfo.weight,
                     delivery_speed: orderInfo.deliverySpeed,
+                    scheduled_delivery_time: orderInfo.scheduledTime || null,
                     status: '待取件',
                     create_time: new Date().toLocaleString('zh-CN'),
                     pickup_time: '',
@@ -2442,6 +2492,156 @@ const HomePage: React.FC = () => {
                 onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 {t.ui.cancelPayment}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 时间选择器模态窗口 */}
+      {showTimePickerModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
+            borderRadius: '20px',
+            width: window.innerWidth < 768 ? '90%' : '400px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🕐</div>
+              <h2 style={{ color: 'white', margin: 0 }}>
+                {t.ui.selectDeliveryTime}
+              </h2>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                color: 'white', 
+                display: 'block', 
+                marginBottom: '0.5rem',
+                fontWeight: 'bold'
+              }}>
+                {t.ui.selectDate}
+              </label>
+              <input
+                type="date"
+                id="delivery-date"
+                min={new Date().toISOString().split('T')[0]}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '10px',
+                  fontSize: '1rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#2c5282',
+                  fontWeight: '500'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                color: 'white', 
+                display: 'block', 
+                marginBottom: '0.5rem',
+                fontWeight: 'bold'
+              }}>
+                {t.ui.selectTime}
+              </label>
+              <input
+                type="time"
+                id="delivery-time"
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '10px',
+                  fontSize: '1rem',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#2c5282',
+                  fontWeight: '500'
+                }}
+              />
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  const dateInput = document.getElementById('delivery-date') as HTMLInputElement;
+                  const timeInput = document.getElementById('delivery-time') as HTMLInputElement;
+                  
+                  if (dateInput.value && timeInput.value) {
+                    const formattedDateTime = `${dateInput.value} ${timeInput.value}`;
+                    setScheduledDeliveryTime(formattedDateTime);
+                    setShowTimePickerModal(false);
+                  } else {
+                    alert('请选择日期和时间');
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease',
+                  flex: 1
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                {t.ui.confirmTime}
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowTimePickerModal(false);
+                  setSelectedDeliverySpeed('');
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '2px solid white',
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease',
+                  flex: 1
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+              >
+                {t.ui.cancel}
               </button>
             </div>
           </div>
