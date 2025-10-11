@@ -73,6 +73,8 @@ const HomePage: React.FC = () => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState('yangon');
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
   // const [orderData, setOrderData] = useState<any>(null);
 
   // 缅甸主要城市数据
@@ -105,6 +107,53 @@ const HomePage: React.FC = () => {
     const city = myanmarCities[cityKey as keyof typeof myanmarCities];
     if (city) {
       setMapCenter({ lat: city.lat, lng: city.lng });
+    }
+  };
+
+  // 长按处理函数
+  const handleLongPress = async (e: any) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 根据选择的城市动态调整坐标转换
+    const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+    const lat = currentCity.lat + (0.5 - y / rect.height) * 0.1;
+    const lng = currentCity.lng + (x / rect.width - 0.5) * 0.1;
+    
+    // 设置地图点击位置
+    setMapClickPosition({ lat, lng });
+    
+    // 模拟反向地理编码获取地址
+    try {
+      const addresses = [
+        '仰光市中心商业区',
+        '仰光大学附近',
+        '茵雅湖畔',
+        '昂山市场周边',
+        '仰光国际机场附近',
+        '皇家湖公园旁',
+        '仰光火车站区域'
+      ];
+      
+      const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
+      const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      
+      // 自动填充到地址输入框
+      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+      if (addressInput) {
+        addressInput.value = fullAddress;
+        addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+        addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+      }
+      
+      // 更新选中位置
+      setSelectedLocation({ lat, lng, address: fullAddress });
+      
+      // 显示提示
+      console.log(`✅ 长按选中位置：${fullAddress}`);
+    } catch (error) {
+      console.error('地址获取失败:', error);
     }
   };
 
@@ -1925,53 +1974,52 @@ const HomePage: React.FC = () => {
                   position: 'relative',
                   cursor: 'crosshair'
                 }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const y = e.clientY - rect.top;
-                  
-                  // 根据选择的城市动态调整坐标转换
-                  const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
-                  const lat = currentCity.lat + (0.5 - y / rect.height) * 0.1; // 城市纬度范围
-                  const lng = currentCity.lng + (x / rect.width - 0.5) * 0.1; // 城市经度范围
-                  
-                  setMapClickPosition({ lat, lng });
-                  
-                  // 模拟反向地理编码获取地址
-                  const simulateReverseGeocode = async () => {
-                    try {
-                      // 模拟地址数据
-                      const addresses = [
-                        '仰光市中心商业区',
-                        '仰光大学附近',
-                        '茵雅湖畔',
-                        '昂山市场周边',
-                        '仰光国际机场附近',
-                        '皇家湖公园旁',
-                        '仰光火车站区域'
-                      ];
-                      
-                      const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
-                      const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                      
-                      // 自动填充到地址输入框
-                      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
-                      if (addressInput) {
-                        addressInput.value = fullAddress;
-                        addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
-                        addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
-                      }
-                      
-                      // 更新选中位置
-                      setSelectedLocation({ lat, lng, address: fullAddress });
-                      
-                    } catch (error) {
-                      console.error('地址获取失败:', error);
-                    }
-                  };
-                  
-                  simulateReverseGeocode();
+                onMouseDown={(e) => {
+                  // 开始长按计时
+                  const timer = setTimeout(() => {
+                    setIsLongPressing(true);
+                    handleLongPress(e);
+                  }, 500); // 500ms后触发长按
+                  setLongPressTimer(timer);
                 }}
+                onMouseUp={() => {
+                  // 取消长按
+                  if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    setLongPressTimer(null);
+                  }
+                  setIsLongPressing(false);
+                }}
+                onMouseLeave={() => {
+                  // 鼠标离开时取消长按
+                  if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    setLongPressTimer(null);
+                  }
+                  setIsLongPressing(false);
+                }}
+                onTouchStart={(e) => {
+                  // 移动端长按支持
+                  const timer = setTimeout(() => {
+                    setIsLongPressing(true);
+                    const touch = e.touches[0];
+                    const mouseEvent = {
+                      currentTarget: e.currentTarget,
+                      clientX: touch.clientX,
+                      clientY: touch.clientY
+                    } as any;
+                    handleLongPress(mouseEvent);
+                  }, 500);
+                  setLongPressTimer(timer);
+                }}
+                onTouchEnd={() => {
+                  if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    setLongPressTimer(null);
+                  }
+                  setIsLongPressing(false);
+                }}
+              
               >
                 {/* 真正的Google Maps */}
                 <ErrorBoundary>
@@ -1985,16 +2033,41 @@ const HomePage: React.FC = () => {
                         // 地图加载完成后的提示
                         console.log('地图加载完成，可以开始定位');
                       }}
-                      onClick={(e) => {
+                      onRightClick={async (e) => {
                         if (e.latLng) {
                           const lat = e.latLng.lat();
                           const lng = e.latLng.lng();
+                          
+                          // 设置地图点击位置
                           setMapClickPosition({ lat, lng });
                           
-                          // 显示坐标信息
-                          const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
-                          if (addressInput) {
-                            addressInput.value = `纬度: ${lat.toFixed(6)}, 经度: ${lng.toFixed(6)}`;
+                          // 获取地址
+                          try {
+                            const addresses = [
+                              '仰光市中心商业区',
+                              '仰光大学附近',
+                              '茵雅湖畔',
+                              '昂山市场周边',
+                              '仰光国际机场附近',
+                              '皇家湖公园旁',
+                              '仰光火车站区域'
+                            ];
+                            
+                            const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
+                            const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            
+                            // 自动填充到地址输入框
+                            const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                            if (addressInput) {
+                              addressInput.value = fullAddress;
+                              addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                              addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                            }
+                            
+                            // 更新选中位置
+                            setSelectedLocation({ lat, lng, address: fullAddress });
+                          } catch (error) {
+                            console.error('地址获取失败:', error);
                           }
                         }
                       }}
