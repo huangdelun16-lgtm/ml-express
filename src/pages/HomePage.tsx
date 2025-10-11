@@ -132,7 +132,7 @@ const HomePage: React.FC = () => {
       const settings = await systemSettingsService.getAllSettings();
       const settingsMap: { [key: string]: any } = {};
       settings.forEach(setting => {
-        settingsMap[setting.setting_key] = setting.setting_value;
+        settingsMap[setting.settings_key] = setting.settings_value;
       });
       
       setPricingSettings({
