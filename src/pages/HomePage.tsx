@@ -384,7 +384,11 @@ const HomePage: React.FC = () => {
         connectionTestError: '连接测试出错',
         saveCustomerFailed: '保存客户信息失败',
         orderInfoLost: '订单信息丢失，请重新下单',
-        qrDownloaded: '二维码已下载到本地，并已发送给客户'
+        qrDownloaded: '二维码已下载到本地，并已发送给客户',
+        addressRequired: '请填写完整的寄件和收件地址',
+        packageInfoRequired: '请填写完整的包裹信息',
+        orderProcessFailed: '订单处理失败',
+        distanceCalculationFailed: '距离计算失败，使用默认值'
       },
       ui: {
         packageTracking: '包裹跟踪',
@@ -501,7 +505,11 @@ const HomePage: React.FC = () => {
         connectionTestError: 'Connection test error',
         saveCustomerFailed: 'Failed to save customer information',
         orderInfoLost: 'Order information lost, please re-order',
-        qrDownloaded: 'QR Code downloaded locally and sent to customer'
+        qrDownloaded: 'QR Code downloaded locally and sent to customer',
+        addressRequired: 'Please fill in complete sender and receiver addresses',
+        packageInfoRequired: 'Please fill in complete package information',
+        orderProcessFailed: 'Order processing failed',
+        distanceCalculationFailed: 'Distance calculation failed, using default value'
       },
       ui: {
         packageTracking: 'Package Tracking',
@@ -618,7 +626,11 @@ const HomePage: React.FC = () => {
         connectionTestError: 'ချိတ်ဆက်မှု စမ်းသပ်ခြင်း မှားယွင်းပါ',
         saveCustomerFailed: 'ဖောက်သည်အချက်အလက် သိမ်းဆည်းခြင်း မအောင်မြင်ပါ',
         orderInfoLost: 'အမှာတင်အချက်အလက် ပျောက်ဆုံးပါ၊ ပြန်လည် အမှာတင်ပါ',
-        qrDownloaded: 'QR Code ကို ဒေါင်းလုဒ်ပြီး ဖောက်သည်ထံ ပို့ပြီးပါပြီ'
+        qrDownloaded: 'QR Code ကို ဒေါင်းလုဒ်ပြီး ဖောက်သည်ထံ ပို့ပြီးပါပြီ',
+        addressRequired: 'ပေးပို့သူနှင့် လက်ခံသူ လိပ်စာ အပြည့်အစုံ ဖြည့်ပါ',
+        packageInfoRequired: 'ပစ္စည်းအချက်အလက် အပြည့်အစုံ ဖြည့်ပါ',
+        orderProcessFailed: 'အမှာတင်ခြင်း မအောင်မြင်ပါ',
+        distanceCalculationFailed: 'အကွာအဝေး တွက်ချက်ခြင်း မအောင်မြင်ပါ၊ ပုံသေတန်ဖိုး သုံးပါမည်'
       },
       ui: {
         packageTracking: 'ထုပ်ပိုးခြင်း စောင့်ကြည့်ခြင်း',
@@ -698,15 +710,28 @@ const HomePage: React.FC = () => {
 
   // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
   const calculateDistance = async (origin: string, destination: string): Promise<number> => {
+    console.log('开始计算距离:', { origin, destination });
+    
     try {
       if (!window.google || !window.google.maps) {
-        console.warn('Google Maps API未加载，使用估算距离');
-        return 5; // 默认5km
+        console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
+        alert(t.errors.distanceCalculationFailed + '\n' + '使用默认距离: 5 km');
+        return 5;
+      }
+
+      if (!origin || !destination) {
+        console.error('❌ 地址信息不完整');
+        throw new Error('地址信息不完整');
       }
 
       const service = new window.google.maps.DistanceMatrixService();
       
       return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          console.warn('⏱️ 距离计算超时，使用默认值');
+          resolve(5);
+        }, 10000); // 10秒超时
+
         service.getDistanceMatrix(
           {
             origins: [origin],
@@ -715,20 +740,47 @@ const HomePage: React.FC = () => {
             unitSystem: window.google.maps.UnitSystem.METRIC,
           },
           (response: any, status: any) => {
-            if (status === 'OK' && response.rows[0]?.elements[0]?.status === 'OK') {
-              const distanceInMeters = response.rows[0].elements[0].distance.value;
-              const distanceInKm = distanceInMeters / 1000;
-              resolve(Math.round(distanceInKm * 10) / 10); // 保留一位小数
+            clearTimeout(timeoutId);
+            
+            console.log('距离计算响应:', { status, response });
+            
+            if (status === 'OK') {
+              const element = response.rows[0]?.elements[0];
+              
+              if (element?.status === 'OK') {
+                const distanceInMeters = element.distance.value;
+                const distanceInKm = distanceInMeters / 1000;
+                const roundedDistance = Math.round(distanceInKm * 10) / 10;
+                console.log('✅ 距离计算成功:', roundedDistance, 'km');
+                resolve(roundedDistance);
+              } else if (element?.status === 'ZERO_RESULTS') {
+                console.warn('⚠️ 无法找到路线，使用默认距离');
+                alert('无法计算两地之间的距离，可能地址不够详细\n使用默认距离: 5 km');
+                resolve(5);
+              } else {
+                console.warn('⚠️ 距离计算状态异常:', element?.status);
+                resolve(5);
+              }
+            } else if (status === 'OVER_QUERY_LIMIT') {
+              console.error('❌ Google Maps API 查询限额已达上限');
+              alert('系统繁忙，使用默认距离: 5 km');
+              resolve(5);
+            } else if (status === 'REQUEST_DENIED') {
+              console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
+              alert('地图服务配置错误，使用默认距离: 5 km');
+              resolve(5);
             } else {
-              console.warn('距离计算失败，使用估算值');
-              resolve(5); // 默认5km
+              console.warn('⚠️ 距离计算失败，状态:', status);
+              resolve(5);
             }
           }
         );
       });
     } catch (error) {
-      console.error('距离计算出错:', error);
-      return 5; // 默认5km
+      console.error('❌ 距离计算异常:', error);
+      const errorMsg = error instanceof Error ? error.message : '未知错误';
+      alert(t.errors.distanceCalculationFailed + '\n' + errorMsg + '\n使用默认距离: 5 km');
+      return 5;
     }
   };
 
@@ -830,33 +882,59 @@ const HomePage: React.FC = () => {
       scheduledTime: scheduledDeliveryTime || null
     };
     
-    // 关闭订单表单，显示加载状态
+    // 验证必填字段
+    if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
+      alert(t.errors.addressRequired || '请填写完整的寄件和收件地址');
+      return;
+    }
+    
+    if (!orderInfo.packageType || !orderInfo.weight || !orderInfo.deliverySpeed) {
+      alert('请填写完整的包裹信息');
+      return;
+    }
+    
+    // 关闭订单表单
     setShowOrderForm(false);
     
     try {
-      // 1. 计算距离
+      console.log('开始处理订单...');
+      
+      // 1. 等待Google Maps API加载
+      let retryCount = 0;
+      while (!isMapLoaded && retryCount < 10) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        retryCount++;
+      }
+      
+      // 2. 计算距离
+      console.log('计算配送距离...');
       const distance = await calculateDistance(
         orderInfo.senderAddress,
         orderInfo.receiverAddress
       );
+      console.log('距离:', distance, 'km');
       setDeliveryDistance(distance);
       
-      // 2. 计算价格
+      // 3. 计算价格
+      console.log('计算配送价格...');
       const price = calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
         distance
       );
+      console.log('价格:', price, 'MMK');
       setCalculatedPrice(price);
       
-      // 3. 生成临时订单ID
+      // 4. 生成临时订单ID
       const tempOrderId = generateMyanmarPackageId();
+      console.log('订单ID:', tempOrderId);
       
-      // 4. 生成收款二维码
+      // 5. 生成收款二维码
+      console.log('生成收款二维码...');
       await generatePaymentQRCode(price, tempOrderId);
       
-      // 5. 存储订单信息（包含价格和距离）
+      // 6. 存储订单信息（包含价格和距离）
       const orderWithPrice = {
         ...orderInfo,
         price: price,
@@ -865,11 +943,13 @@ const HomePage: React.FC = () => {
       };
       localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
       
-      // 6. 显示支付模态框
-      setShowPaymentModal(true);
+      // 7. 显示支付模态框
+      console.log('显示支付页面');
+    setShowPaymentModal(true);
     } catch (error) {
       console.error('订单处理失败:', error);
-      alert('订单处理失败，请重试');
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      alert(`订单处理失败: ${errorMessage}\n\n请检查：\n1. 地址是否填写完整\n2. 网络连接是否正常\n3. 稍后重试`);
       setShowOrderForm(true);
     }
   };
@@ -1772,9 +1852,9 @@ const HomePage: React.FC = () => {
               <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💳</div>
               <h2 style={{ color: '#2c5282', margin: 0 }}>
                 {t.ui.paymentQRCode}
-              </h2>
+            </h2>
             </div>
-
+            
             {/* 配送距离 */}
             <div style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1832,12 +1912,12 @@ const HomePage: React.FC = () => {
                   height: '250px',
                   background: '#e9ecef',
                   margin: '0 auto',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#666'
-                }}>
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#666'
+            }}>
                   {t.ui.calculating}
                 </div>
               )}
