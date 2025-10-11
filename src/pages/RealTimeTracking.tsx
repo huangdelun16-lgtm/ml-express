@@ -27,7 +27,22 @@ const RealTimeTracking: React.FC = () => {
   const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedCity, setSelectedCity] = useState('yangon');
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+
+  // 缅甸主要城市数据
+  const myanmarCities = {
+    yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 },
+    mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 },
+    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 },
+    bago: { name: '勃固', nameEn: 'Bago', nameMm: 'ပဲခူး', lat: 17.3350, lng: 96.4809 },
+    mawlamyine: { name: '毛淡棉', nameEn: 'Mawlamyine', nameMm: 'မော်လမြိုင်', lat: 16.4919, lng: 97.6278 },
+    pathein: { name: '勃生', nameEn: 'Pathein', nameMm: 'ပုသိမ်', lat: 16.7791, lng: 94.7325 },
+    monywa: { name: '蒙育瓦', nameEn: 'Monywa', nameMm: 'မုံရွာ', lat: 22.1086, lng: 95.1358 },
+    myitkyina: { name: '密支那', nameEn: 'Myitkyina', nameMm: 'မြစ်ကြီးနား', lat: 25.3833, lng: 97.3964 },
+    taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7833, lng: 97.0333 },
+    sittwe: { name: '实兑', nameEn: 'Sittwe', nameMm: 'စစ်တွေ', lat: 20.1500, lng: 92.9000 }
+  };
 
   // 加载 Google Maps
   const { isLoaded: isMapLoaded } = useJsApiLoader({
@@ -176,6 +191,15 @@ const RealTimeTracking: React.FC = () => {
     }
   };
 
+  // 切换城市
+  const handleCityChange = (cityKey: string) => {
+    setSelectedCity(cityKey);
+    const city = myanmarCities[cityKey as keyof typeof myanmarCities];
+    if (city) {
+      setMapCenter({ lat: city.lat, lng: city.lng });
+    }
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh',
@@ -259,8 +283,45 @@ const RealTimeTracking: React.FC = () => {
             height: '600px', 
             borderRadius: '10px', 
             overflow: 'hidden',
-            border: '2px solid #e5e7eb'
+            border: '2px solid #e5e7eb',
+            position: 'relative'
           }}>
+            {/* 城市选择器 */}
+            <div style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 1000,
+              background: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '8px',
+              padding: '8px',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <select
+                value={selectedCity}
+                onChange={(e) => handleCityChange(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '2px solid #e5e7eb',
+                  background: 'white',
+                  color: '#1f2937',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  minWidth: '150px',
+                  outline: 'none'
+                }}
+              >
+                {Object.entries(myanmarCities).map(([key, city]) => (
+                  <option key={key} value={key}>
+                    📍 {city.name} ({city.nameEn})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {!isMapLoaded ? (
               <div style={{
                 width: '100%',
@@ -275,10 +336,15 @@ const RealTimeTracking: React.FC = () => {
               </div>
             ) : (
               <GoogleMap
+                key={selectedCity}
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={mapCenter}
                 zoom={13}
                 options={{
+                  fullscreenControl: true,
+                  fullscreenControlOptions: {
+                    position: window.google.maps.ControlPosition.TOP_RIGHT
+                  },
                   styles: [
                     {
                       featureType: 'poi',
@@ -561,6 +627,25 @@ const RealTimeTracking: React.FC = () => {
     </div>
   );
 };
+
+// 添加全局样式来调整Google Maps全屏按钮位置
+const style = document.createElement('style');
+style.innerHTML = `
+  /* 调整Google Maps全屏控制按钮位置 */
+  .gm-fullscreen-control {
+    top: 50px !important;
+    right: 10px !important;
+  }
+  
+  /* 确保其他控制按钮也有适当的间距 */
+  .gm-svpc {
+    top: 100px !important;
+  }
+`;
+if (!document.head.querySelector('style[data-realtime-tracking-styles]')) {
+  style.setAttribute('data-realtime-tracking-styles', 'true');
+  document.head.appendChild(style);
+}
 
 export default RealTimeTracking;
 
