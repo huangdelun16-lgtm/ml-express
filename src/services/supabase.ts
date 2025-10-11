@@ -17,6 +17,9 @@ export interface Package {
   package_type: string;
   weight: string;
   description?: string;
+  delivery_speed?: string; // 配送速度（准时达/急送达/定时达）
+  scheduled_delivery_time?: string; // 定时达的指定时间
+  delivery_distance?: number; // 配送距离（km）
   status: string;
   create_time: string;
   pickup_time: string;
