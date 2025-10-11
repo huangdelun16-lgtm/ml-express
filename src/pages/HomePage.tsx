@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, testConnection, userService } from '../services/supabase';
 import QRCode from 'qrcode';
+
+// Google Maps API 配置
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
+const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -53,6 +57,13 @@ class ErrorBoundary extends React.Component<
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  
+  // Google Maps API 加载
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES
+  });
+  
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
@@ -672,8 +683,8 @@ const HomePage: React.FC = () => {
           src="/logo.png" 
           alt="ML Express Logo"
           style={{
-            width: logoSize,
-            height: logoSize,
+          width: logoSize,
+          height: logoSize,
             objectFit: 'contain'
           }}
         />
@@ -699,7 +710,7 @@ const HomePage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             MARKET LINK
           </div>
-          <div style={{ 
+          <div style={{
             fontSize: '0.6em', 
             fontStyle: 'italic', 
             fontWeight: '400',
@@ -811,14 +822,14 @@ const HomePage: React.FC = () => {
           <div style={{ position: 'relative' }} data-language-dropdown>
             <button
               onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '0.5rem',
-                borderRadius: '5px',
-                fontWeight: 'bold',
-                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '0.5rem',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
                 backdropFilter: 'blur(10px)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -886,7 +897,7 @@ const HomePage: React.FC = () => {
         position: 'relative',
         zIndex: 5,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        color: 'white',
+                color: 'white',
         padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
@@ -956,8 +967,8 @@ const HomePage: React.FC = () => {
             marginBottom: '3rem',
             animation: 'fadeInUp 1s ease-out'
           }}>
-            <Logo size="large" />
-            <h1 style={{ 
+          <Logo size="large" />
+          <h1 style={{ 
               fontSize: window.innerWidth < 768 ? '2.5rem' : '4rem', 
               marginBottom: '1.5rem',
               fontWeight: '800',
@@ -968,10 +979,10 @@ const HomePage: React.FC = () => {
               backgroundClip: 'text',
               letterSpacing: '-1px',
               lineHeight: '1.1',
-              marginTop: '1rem'
-            }}>
-              {t.hero.title}
-            </h1>
+            marginTop: '1rem'
+          }}>
+            {t.hero.title}
+          </h1>
           </div>
 
           {/* CTA按钮区域 */}
@@ -983,15 +994,15 @@ const HomePage: React.FC = () => {
             justifyContent: 'center',
             animation: 'fadeInUp 1s ease-out 0.3s both'
           }}>
-            <button
-              onClick={() => setShowOrderForm(true)}
-              style={{
+          <button
+            onClick={() => setShowOrderForm(true)}
+            style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 color: '#1e293b',
                 border: '2px solid rgba(255,255,255,0.3)',
                 padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
                 borderRadius: '60px',
-                cursor: 'pointer',
+              cursor: 'pointer',
                 fontWeight: '700',
                 fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
                 boxShadow: '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
@@ -1000,22 +1011,22 @@ const HomePage: React.FC = () => {
                 letterSpacing: '1.5px',
                 position: 'relative',
                 overflow: 'hidden'
-              }}
-              onMouseOver={(e) => {
+            }}
+            onMouseOver={(e) => {
                 e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
                 e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4)';
                 e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)';
-              }}
-              onMouseOut={(e) => {
+            }}
+            onMouseOut={(e) => {
                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
                 e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)';
                 e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
-              }}
-            >
+            }}
+          >
               <span style={{ position: 'relative', zIndex: 1 }}>
-                {t.hero.cta}
+            {t.hero.cta}
               </span>
-            </button>
+          </button>
             
             <button
               onClick={() => handleNavigation('/tracking')}
@@ -1032,29 +1043,29 @@ const HomePage: React.FC = () => {
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 textTransform: 'uppercase',
                 letterSpacing: '1px'
-              }}
-              onMouseOver={(e) => {
+            }}
+            onMouseOver={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
                 e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
                 e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-              }}
-              onMouseOut={(e) => {
+            }}
+            onMouseOut={(e) => {
                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
                 e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
                 e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
-              }}
+            }}
             >
               📦 {t.ui.packageTracking}
             </button>
-          </div>
+            </div>
 
           {/* 特色标签 */}
-          <div style={{
+        <div style={{
             marginTop: '3rem',
-            display: 'flex',
+                    display: 'flex',
             gap: '1rem',
             flexWrap: 'wrap',
-            justifyContent: 'center',
+                    justifyContent: 'center',
             animation: 'fadeInUp 1s ease-out 0.6s both'
           }}>
             {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag, index) => (
@@ -1078,11 +1089,11 @@ const HomePage: React.FC = () => {
                 e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
-              >
+            >
                 {tag}
-              </div>
-            ))}
           </div>
+            ))}
+            </div>
         </div>
       </section>
 
@@ -2033,11 +2044,41 @@ const HomePage: React.FC = () => {
               
               >
                 {/* 真正的Google Maps */}
-                <ErrorBoundary>
-                  <LoadScript 
-                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}
-                    libraries={['places' as any]}
-                  >
+                {mapLoadError ? (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
+                    color: '#4a5568'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+                    <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
+                    <p style={{ margin: '0', opacity: 0.8 }}>请检查网络连接</p>
+                  </div>
+                ) : !isMapLoaded ? (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
+                    color: '#4a5568'
+                  }}>
+                    <div style={{ 
+                      fontSize: '2rem', 
+                      marginBottom: '1rem',
+                      animation: 'spin 1s linear infinite'
+                    }}>🌍</div>
+                    <h3 style={{ margin: '0' }}>地图加载中...</h3>
+                  </div>
+                ) : (
+                  <ErrorBoundary>
                     <GoogleMap
                       key={selectedCity} // 强制重新渲染当城市改变时
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -2064,7 +2105,7 @@ const HomePage: React.FC = () => {
                                   const address = place.formatted_address || place.name;
                                   
                                   // 设置地图点击位置
-                                  setMapClickPosition({ lat, lng });
+                  setMapClickPosition({ lat, lng });
                                   setMapCenter({ lat, lng });
                                   
                                   // 自动填充到地址输入框
@@ -2103,19 +2144,19 @@ const HomePage: React.FC = () => {
                               const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
                               fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             }
-                            
-                            // 自动填充到地址输入框
+                      
+                      // 自动填充到地址输入框
                             const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
-                            if (addressInput) {
-                              addressInput.value = fullAddress;
-                              addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
-                              addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
-                            }
-                            
-                            // 更新选中位置
-                            setSelectedLocation({ lat, lng, address: fullAddress });
-                          } catch (error) {
-                            console.error('地址获取失败:', error);
+                      if (addressInput) {
+                        addressInput.value = fullAddress;
+                        addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                        addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                      }
+                      
+                      // 更新选中位置
+                      setSelectedLocation({ lat, lng, address: fullAddress });
+                    } catch (error) {
+                      console.error('地址获取失败:', error);
                             const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
                             const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             
@@ -2131,7 +2172,7 @@ const HomePage: React.FC = () => {
                         }
                       }}
                     >
-                      {mapClickPosition && (
+                {mapClickPosition && (
                         <Marker
                           position={{ lat: mapClickPosition.lat, lng: mapClickPosition.lng }}
                           title="选择的位置"
@@ -2148,8 +2189,8 @@ const HomePage: React.FC = () => {
                         />
                       )}
                     </GoogleMap>
-                  </LoadScript>
-                </ErrorBoundary>
+                  </ErrorBoundary>
+                )}
               
               {/* 自动定位按钮 */}
               <button
@@ -2166,8 +2207,8 @@ const HomePage: React.FC = () => {
                   button.style.opacity = '0.7';
                   button.disabled = true;
 
-                  try {
-                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    try {
+                      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
                       navigator.geolocation.getCurrentPosition(
                         resolve, 
                         reject, 
@@ -2177,10 +2218,10 @@ const HomePage: React.FC = () => {
                           maximumAge: 300000 // 5分钟缓存
                         }
                       );
-                    });
-                    
-                    const { latitude, longitude } = position.coords;
-                    
+                      });
+                      
+                      const { latitude, longitude } = position.coords;
+                      
                     // 使用Google Geocoding API进行逆地理编码
                     try {
                       const geocoder = new window.google.maps.Geocoder();
@@ -2409,5 +2450,22 @@ const HomePage: React.FC = () => {
     </div>
   );
 };
+
+// 添加旋转动画的CSS样式
+const style = document.createElement('style');
+style.innerHTML = `
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+if (!document.head.querySelector('style[data-spin-animation]')) {
+  style.setAttribute('data-spin-animation', 'true');
+  document.head.appendChild(style);
+}
 
 export default HomePage;
