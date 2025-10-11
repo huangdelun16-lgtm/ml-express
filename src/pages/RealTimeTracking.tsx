@@ -446,22 +446,25 @@ const RealTimeTracking: React.FC = () => {
                 }}
               >
                 {/* 显示快递员位置 */}
-                {couriers.map(courier => (
-                  <Marker
-                    key={courier.id}
-                    position={{ lat: courier.latitude, lng: courier.longitude }}
-                    icon={{
-                      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="20" cy="20" r="18" fill="${getCourierStatusColor(courier.status)}" stroke="white" stroke-width="3"/>
-                          <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏍️</text>
-                        </svg>
-                      `)}`,
-                      scaledSize: new window.google.maps.Size(40, 40)
-                    }}
-                    onClick={() => setSelectedCourier(courier)}
-                  />
-                ))}
+                {couriers
+                  .filter(courier => courier.latitude != null && courier.longitude != null)
+                  .map(courier => (
+                    <Marker
+                      key={courier.id}
+                      position={{ lat: courier.latitude!, lng: courier.longitude! }}
+                      icon={{
+                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="20" cy="20" r="18" fill="${getCourierStatusColor(courier.status)}" stroke="white" stroke-width="3"/>
+                            <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏍️</text>
+                          </svg>
+                        `)}`,
+                        scaledSize: new window.google.maps.Size(40, 40),
+                        anchor: new window.google.maps.Point(20, 20)
+                      }}
+                      onClick={() => setSelectedCourier(courier)}
+                    />
+                  ))}
 
                 {/* 信息窗口 */}
                 {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
