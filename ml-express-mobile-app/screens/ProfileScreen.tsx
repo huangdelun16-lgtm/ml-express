@@ -75,7 +75,7 @@ export default function ProfileScreen({ navigation }: any) {
             // 重置导航栈到客户专区
             navigation.getParent()?.getParent()?.reset({
               index: 0,
-              routes: [{ name: 'CustomerZone' }],
+              routes: [{ name: 'Login' }],
             });
           }
         }

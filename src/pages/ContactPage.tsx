@@ -55,7 +55,7 @@ const ContactPage: React.FC = () => {
         businessHours: '营业时间',
         phoneValue: '+95 9 123 456 789',
         emailValue: 'info@marketlinkexpress.com',
-        addressValue: '曼德勒市，缅甸',
+        addressValue: '缅甸',
         businessHoursValue: '周一至周日 8:00 - 20:00'
       }
     },
@@ -76,7 +76,7 @@ const ContactPage: React.FC = () => {
         businessHours: 'Business Hours',
         phoneValue: '+95 9 123 456 789',
         emailValue: 'info@marketlinkexpress.com',
-        addressValue: 'Mandalay, Myanmar',
+        addressValue: 'Myanmar',
         businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
       }
     },

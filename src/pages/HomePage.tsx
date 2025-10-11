@@ -67,6 +67,7 @@ const HomePage: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
@@ -219,7 +220,7 @@ const HomePage: React.FC = () => {
         admin: '管理后台'
       },
       hero: {
-        title: '曼德勒同城快递',
+        title: '缅甸同城快递',
         subtitle: '快速、安全、可靠的同城快递服务',
         cta: '立即下单'
       },
@@ -247,7 +248,7 @@ const HomePage: React.FC = () => {
         title: '创建订单',
         sender: '寄件人信息',
         receiver: '收件人信息',
-        package: '包裹信息',
+        package: '速度',
         submit: '提交订单',
         cancel: '取消',
         selectOnMap: '在地图中选择',
@@ -268,7 +269,7 @@ const HomePage: React.FC = () => {
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
-        address: '缅甸曼德勒',
+        address: '缅甸',
         phone: '+95 9 123 456 789',
         email: 'info@marketlinkexpress.com'
       },
@@ -302,6 +303,11 @@ const HomePage: React.FC = () => {
         overweightPackage: '超重件（10 KG）以上',
         oversizedPackage: '超规件（45x60x15cm）以上',
         fragile: '易碎品',
+        foodDrinks: '食品和饮料',
+        onTimeDelivery: '准时达（订单后1小时送达）',
+        urgentDelivery: '急送达（订单后30分钟送达）',
+        scheduledDelivery: '定时达（客户要求的时间送达）',
+        selectDeliverySpeed: '请选择配送速度',
         packageInfoMismatch: '如实物和包裹信息内容不一致会导致报价失误'
       }
     },
@@ -314,7 +320,7 @@ const HomePage: React.FC = () => {
         admin: 'Admin'
       },
       hero: {
-        title: 'Mandalay Same-Day Delivery',
+        title: 'Myanmar Same-Day Delivery',
         subtitle: 'Fast, Safe, and Reliable Same-Day Delivery Service',
         cta: 'Order Now'
       },
@@ -342,7 +348,7 @@ const HomePage: React.FC = () => {
         title: 'Create Order',
         sender: 'Sender Information',
         receiver: 'Receiver Information',
-        package: 'Package Information',
+        package: 'Speed',
         submit: 'Submit Order',
         cancel: 'Cancel',
         selectOnMap: 'Select on Map',
@@ -363,7 +369,7 @@ const HomePage: React.FC = () => {
       },
       footer: {
         company: 'MARKET LINK EXPRESS',
-        address: 'Mandalay, Myanmar',
+        address: 'Myanmar',
         phone: '+95 9 123 456 789',
         email: 'info@marketlinkexpress.com'
       },
@@ -397,6 +403,11 @@ const HomePage: React.FC = () => {
         overweightPackage: 'Overweight Package (10 KG+)',
         oversizedPackage: 'Oversized Package (45x60x15cm+)',
         fragile: 'Fragile',
+        foodDrinks: 'Foods & Drinks',
+        onTimeDelivery: 'On-Time Delivery (1 hour after order)',
+        urgentDelivery: 'Urgent Delivery (30 minutes after order)',
+        scheduledDelivery: 'Scheduled Delivery (Customer requested time)',
+        selectDeliverySpeed: 'Please select delivery speed',
         packageInfoMismatch: 'If actual item and package information do not match, it may cause pricing errors'
       }
     },
@@ -409,7 +420,7 @@ const HomePage: React.FC = () => {
         admin: 'စီမံခန့်ခွဲမှု'
       },
       hero: {
-        title: 'မန္တလေးမြို့တွင်းပို့ဆောင်ရေး',
+        title: 'မြန်မာမြို့တွင်းပို့ဆောင်ရေး',
         subtitle: 'မြန်ဆန်၊ လုံခြုံ၊ ယုံကြည်စိတ်ချရသော မြို့တွင်းပို့ဆောင်ရေး',
         cta: 'အခုပဲအမှာတင်ပါ'
       },
@@ -437,7 +448,7 @@ const HomePage: React.FC = () => {
         title: 'အမှာတင်ခြင်း',
         sender: 'ပို့သူအချက်အလက်',
         receiver: 'လက်ခံသူအချက်အလက်',
-        package: 'ထုပ်ပိုးအချက်အလက်',
+        package: 'မြန်နှုန်း',
         submit: 'အမှာတင်ပါ',
         cancel: 'ပယ်ဖျက်ပါ',
         selectOnMap: 'မြေပုံတွင်ရွေးချယ်ပါ',
@@ -492,6 +503,11 @@ const HomePage: React.FC = () => {
         overweightPackage: 'အလေးချိန်များသော ထုပ်ပိုး (10 KG) အထက်',
         oversizedPackage: 'အရွယ်အစားကြီးသော ထုပ်ပိုး (45x60x15cm) အထက်',
         fragile: 'ပျက်စီးလွယ်သော',
+        foodDrinks: 'အစားအသောက်များ',
+        onTimeDelivery: 'အချိန်မှန်ပို့ဆောင်မှု（အမှာတင်ပြီး ၁ နာရီအတွင်း）',
+        urgentDelivery: 'အလျင်အမြန်ပို့ဆောင်မှု（အမှာတင်ပြီး ၃၀ မိနစ်အတွင်း）',
+        scheduledDelivery: 'အချိန်သတ်မှတ်ပို့ဆောင်မှု（ဖောက်သည်တောင်းဆိုသောအချိန်）',
+        selectDeliverySpeed: 'ပို့ဆောင်မှုမြန်နှုန်းကို ရွေးချယ်ပါ',
         packageInfoMismatch: 'အမှန်တကယ်ပစ္စည်းနှင့် ထုပ်ပိုးအချက်အလက် မကိုက်ညီပါက စျေးနှုန်းသတ်မှတ်ခြင်း မှားယွင်းနိုင်ပါသည်'
       }
     }
@@ -505,7 +521,7 @@ const HomePage: React.FC = () => {
       setTrackingResult({
         number: trackingNumber,
         status: 'In Transit',
-        location: 'Mandalay Distribution Center',
+        location: 'Myanmar Distribution Center',
         estimatedDelivery: 'Today 3:00 PM'
       });
     }
@@ -540,7 +556,7 @@ const HomePage: React.FC = () => {
       receiverAddress: formData.get('receiverAddress') as string,
       packageType: formData.get('packageType') as string,
       weight: formData.get('weight') as string,
-      description: formData.get('description') as string
+      deliverySpeed: formData.get('deliverySpeed') as string
     };
     
     // 存储订单信息到localStorage，支付完成后使用
@@ -1269,23 +1285,45 @@ const HomePage: React.FC = () => {
                   <option value={t.ui.overweightPackage}>{t.ui.overweightPackage}</option>
                   <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
                   <option value={t.ui.fragile}>{t.ui.fragile}</option>
+                  <option value={t.ui.foodDrinks}>{t.ui.foodDrinks}</option>
                 </select>
-                <input
-                  type="text"
-                  name="description"
-                  placeholder={t.order.packageDescription}
+                <select
+                  name="deliverySpeed"
                   required
                   style={{
                     width: '100%',
                     padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '8px',
                     marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease'
+                    transition: 'all 0.3s ease',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c5282' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.7rem center',
+                    backgroundSize: '1em',
+                    paddingRight: '2.5rem',
+                    boxShadow: '0 4px 15px rgba(44, 82, 130, 0.1)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-                />
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(44, 82, 130, 0.6)';
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(44, 82, 130, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
+                  }}
+                >
+                  <option value="">{t.ui.selectDeliverySpeed}</option>
+                  <option value={t.ui.onTimeDelivery}>{t.ui.onTimeDelivery}</option>
+                  <option value={t.ui.urgentDelivery}>{t.ui.urgentDelivery}</option>
+                  <option value={t.ui.scheduledDelivery}>{t.ui.scheduledDelivery}</option>
+                </select>
                 <input
                   type="text"
                   name="weight"
@@ -1452,7 +1490,7 @@ const HomePage: React.FC = () => {
                     receiver_address: orderInfo.receiverAddress,
                     package_type: orderInfo.packageType,
                     weight: orderInfo.weight,
-                    description: orderInfo.description,
+                    delivery_speed: orderInfo.deliverySpeed,
                     status: '待取件',
                     create_time: new Date().toLocaleString('zh-CN'),
                     pickup_time: '',
@@ -1882,8 +1920,12 @@ const HomePage: React.FC = () => {
                   <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={{ lat: 16.8661, lng: 96.1951 }} // 仰光中心
-                      zoom={12}
+                      center={mapCenter}
+                      zoom={15}
+                      onLoad={(map) => {
+                        // 地图加载完成后的提示
+                        console.log('地图加载完成，可以开始定位');
+                      }}
                       onClick={(e) => {
                         if (e.latLng) {
                           const lat = e.latLng.lat();
@@ -1902,6 +1944,16 @@ const HomePage: React.FC = () => {
                         <Marker
                           position={{ lat: mapClickPosition.lat, lng: mapClickPosition.lng }}
                           title="选择的位置"
+                          icon={{
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="8" fill="#38a169" stroke="white" stroke-width="2"/>
+                                <circle cx="12" cy="12" r="3" fill="white"/>
+                              </svg>
+                            `),
+                            scaledSize: new window.google.maps.Size(32, 32),
+                            anchor: new window.google.maps.Point(16, 16)
+                          }}
                         />
                       )}
                     </GoogleMap>
@@ -1911,30 +1963,110 @@ const HomePage: React.FC = () => {
               {/* 自动定位按钮 */}
               <button
                 onClick={async () => {
-                  if (navigator.geolocation) {
-                    try {
-                      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  if (!navigator.geolocation) {
+                    alert('您的浏览器不支持地理定位功能');
+                    return;
+                  }
+
+                  // 显示加载状态
+                  const button = event?.currentTarget as HTMLButtonElement;
+                  const originalContent = button.innerHTML;
+                  button.innerHTML = '🔄';
+                  button.style.opacity = '0.7';
+                  button.disabled = true;
+
+                  try {
+                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                      navigator.geolocation.getCurrentPosition(
+                        resolve, 
+                        reject, 
+                        {
                           enableHighAccuracy: true,
-                          timeout: 10000,
-                          maximumAge: 60000
-                        });
+                          timeout: 15000,
+                          maximumAge: 300000 // 5分钟缓存
+                        }
+                      );
+                    });
+                    
+                    const { latitude, longitude } = position.coords;
+                    
+                    // 使用Google Geocoding API进行逆地理编码
+                    try {
+                      const geocoder = new window.google.maps.Geocoder();
+                      const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+                        geocoder.geocode(
+                          { location: { lat: latitude, lng: longitude } },
+                          (results, status) => {
+                            if (status === 'OK' && results) {
+                              resolve(results);
+                            } else {
+                              reject(new Error(`Geocoding failed: ${status}`));
+                            }
+                          }
+                        );
                       });
-                      
-                      const { latitude, longitude } = position.coords;
-                      
-                      // 简单显示坐标，用户可以手动输入地址
+
+                      if (result && result.length > 0) {
+                        const address = result[0].formatted_address;
+                        
+                        // 更新地图中心到当前位置
+                        setMapCenter({ lat: latitude, lng: longitude });
+                        setMapClickPosition({ lat: latitude, lng: longitude });
+                        
+                        // 填充地址到输入框
+                        const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                        if (addressInput) {
+                          addressInput.value = address;
+                          addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                          addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                        }
+                        
+                        // 更新选中位置
+                        setSelectedLocation({ lat: latitude, lng: longitude, address });
+                        
+                        alert(`✅ 定位成功！\n\n地址：${address}\n\n坐标：${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                      } else {
+                        throw new Error('无法获取地址信息');
+                      }
+                    } catch (geocodeError) {
+                      console.error('逆地理编码失败:', geocodeError);
+                      // 如果逆地理编码失败，至少显示坐标
                       const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
                       if (addressInput) {
                         addressInput.value = `纬度: ${latitude.toFixed(6)}, 经度: ${longitude.toFixed(6)}`;
                       }
-                      alert(`已获取您的位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请在地址框中输入详细地址`);
-                      
-                    } catch (error) {
-                      alert('无法获取您的位置，请检查浏览器权限设置');
+                      setMapCenter({ lat: latitude, lng: longitude });
+                      setMapClickPosition({ lat: latitude, lng: longitude });
+                      alert(`📍 已获取位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`);
                     }
-                  } else {
-                    alert('您的浏览器不支持地理定位功能');
+                    
+                  } catch (error: any) {
+                    console.error('定位失败:', error);
+                    
+                    let errorMessage = '无法获取您的位置';
+                    
+                    if (error.code) {
+                      switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                          errorMessage = '❌ 位置权限被拒绝\n\n请在浏览器设置中允许位置访问，然后刷新页面重试';
+                          break;
+                        case error.POSITION_UNAVAILABLE:
+                          errorMessage = '❌ 位置信息不可用\n\n请检查设备的GPS设置';
+                          break;
+                        case error.TIMEOUT:
+                          errorMessage = '❌ 定位超时\n\n请确保设备已开启位置服务';
+                          break;
+                        default:
+                          errorMessage = `❌ 定位失败: ${error.message}`;
+                      }
+                    }
+                    
+                    alert(errorMessage);
+                  } finally {
+                    // 恢复按钮状态
+                    button.innerHTML = originalContent;
+                    button.style.opacity = '1';
+                    button.disabled = false;
                   }
                 }}
                 style={{

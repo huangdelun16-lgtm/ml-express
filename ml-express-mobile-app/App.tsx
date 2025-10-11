@@ -7,7 +7,6 @@ import { ActivityIndicator, View, Text } from 'react-native';
 import { AppProvider } from './contexts/AppContext';
 
 // 引入所有页面
-import CustomerZoneScreen from './screens/CustomerZoneScreen';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import CourierHomeScreen from './screens/CourierHomeScreen';
@@ -183,15 +182,12 @@ export default function App() {
     <AppProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="CustomerZone"
+          initialRouteName="Login"
           screenOptions={{
             headerShown: false,
           }}
         >
-          {/* 客户专区 - 首页（无需登录） */}
-          <Stack.Screen name="CustomerZone" component={CustomerZoneScreen} />
-          
-          {/* 管理员登录页面 */}
+          {/* 员工登录页面 */}
           <Stack.Screen name="Login" component={LoginScreen} />
           
           {/* 管理系统（需要登录验证） */}

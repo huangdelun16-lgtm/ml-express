@@ -119,8 +119,9 @@ MLExpressApp/
 ├── services/
 │   └── supabase.ts           # Supabase 服务（与网站共用）
 ├── screens/
-│   ├── LoginScreen.tsx       # 登录页面
-│   ├── HomeScreen.tsx        # 主页（包裹列表）
+│   ├── LoginScreen.tsx       # 员工登录页面
+│   ├── DashboardScreen.tsx   # 管理员仪表板
+│   ├── CourierHomeScreen.tsx # 快递员首页
 │   └── PackageDetailScreen.tsx  # 包裹详情
 └── assets/                   # 图片资源
 ```

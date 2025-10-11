@@ -113,20 +113,6 @@ export default function LoginScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          {/* 提示 */}
-          <Text style={styles.hint}>
-            {language === 'zh' ? '默认账号: admin / admin' : 'Default: admin / admin'}
-          </Text>
-
-          {/* 返回客户专区按钮 */}
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backButtonText}>
-              {language === 'zh' ? '← 返回客户专区' : '← Back to Customer Zone'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -149,8 +135,8 @@ const styles = StyleSheet.create({
     marginBottom: 50,
   },
   logoImage: {
-    width: 80,
-    height: 80,
+    width: 120,
+    height: 120,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -200,26 +186,5 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  hint: {
-    textAlign: 'center',
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    marginTop: 20,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 16,
-    alignSelf: 'center',
-  },
-  backButtonText: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

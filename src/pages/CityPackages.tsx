@@ -340,7 +340,7 @@ const CityPackages: React.FC = () => {
               {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
             </h1>
             <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-              {language === 'zh' ? '管理曼德勒同城快递包裹' : 'Manage local express packages in Mandalay'}
+              {language === 'zh' ? '管理缅甸同城快递包裹' : 'Manage local express packages in Myanmar'}
             </p>
             
             {/* 包裹统计信息 - 可点击过滤器 */}

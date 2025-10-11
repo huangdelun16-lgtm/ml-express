@@ -7,6 +7,8 @@ import {
   ScrollView,
   RefreshControl,
   Dimensions,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService } from '../services/supabase';
@@ -15,10 +17,12 @@ import { useApp } from '../contexts/AppContext';
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, setLanguage } = useApp();
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalPackages: 0,
     pendingPackages: 0,
@@ -32,10 +36,14 @@ export default function DashboardScreen({ navigation }: any) {
   }, []);
 
   const loadUserInfo = async () => {
-    const userName = await AsyncStorage.getItem('currentUserName') || '管理员';
-    const userRole = await AsyncStorage.getItem('currentUserRole') || 'admin';
-    setCurrentUserName(userName);
-    setCurrentUserRole(userRole);
+    try {
+      const userName = await AsyncStorage.getItem('currentUserName') || '管理员';
+      const userRole = await AsyncStorage.getItem('currentUserRole') || 'admin';
+      setCurrentUserName(userName);
+      setCurrentUserRole(userRole);
+    } catch (error) {
+      console.error('加载用户信息失败:', error);
+    }
   };
 
   const loadStats = async () => {
@@ -49,6 +57,8 @@ export default function DashboardScreen({ navigation }: any) {
       });
     } catch (error) {
       console.error('加载统计失败:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,21 +68,123 @@ export default function DashboardScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
+  // 如果正在加载，显示加载状态
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2c5282" />
+        <Text style={styles.loadingText}>
+          {language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'တင်၍နေသည်...'}
+        </Text>
+      </View>
+    );
+  }
+
   const handleLogout = async () => {
     await AsyncStorage.clear();
     // 重置导航栈到客户专区
     navigation.getParent()?.getParent()?.reset({
       index: 0,
-      routes: [{ name: 'CustomerZone' }],
+      routes: [{ name: 'Login' }],
     });
   };
+
+  // 语言切换处理
+  const handleLanguageChange = async (newLanguage: string) => {
+    await setLanguage(newLanguage);
+    setShowLanguageModal(false);
+  };
+
+  // 多语言翻译对象
+  const t = {
+    zh: {
+      welcome: '欢迎回来',
+      todayOverview: '今日概览',
+      managementCenter: '管理中心',
+      quickActions: '快捷操作',
+      total: '总包裹',
+      pending: '待取件',
+      inTransit: '配送中',
+      completed: '已完成',
+      packageManagement: '包裹管理',
+      packageManagementDesc: '查看和管理所有包裹',
+      courierManagement: '骑手管理',
+      courierManagementDesc: '快递员信息和业绩',
+      financeManagement: '财务管理',
+      financeManagementDesc: '收入统计和账务',
+      systemSettings: '系统设置',
+      systemSettingsDesc: '配置和偏好设置',
+      systemAdmin: '系统管理员',
+      manager: '经理',
+      finance: '财务',
+      operator: '操作员',
+      language: '语言',
+      chinese: '中文',
+      english: 'English',
+      burmese: 'မြန်မာ',
+    },
+    en: {
+      welcome: 'Welcome Back',
+      todayOverview: "Today's Overview",
+      managementCenter: 'Management Center',
+      quickActions: 'Quick Actions',
+      total: 'Total',
+      pending: 'Pending',
+      inTransit: 'In Transit',
+      completed: 'Completed',
+      packageManagement: 'Package Management',
+      packageManagementDesc: 'View and manage all packages',
+      courierManagement: 'Courier Management',
+      courierManagementDesc: 'Courier info and performance',
+      financeManagement: 'Finance Management',
+      financeManagementDesc: 'Income stats and accounting',
+      systemSettings: 'System Settings',
+      systemSettingsDesc: 'Configuration and preferences',
+      systemAdmin: 'System Admin',
+      manager: 'Manager',
+      finance: 'Finance',
+      operator: 'Operator',
+      language: 'Language',
+      chinese: '中文',
+      english: 'English',
+      burmese: 'မြန်မာ',
+    },
+    my: {
+      welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
+      todayOverview: 'ယနေ့ အခြေအနေ',
+      managementCenter: 'စီမံခန့်ခွဲမှု စင်တာ',
+      quickActions: 'လျင်မြန်သော လုပ်ဆောင်ချက်များ',
+      total: 'စုစုပေါင်း',
+      pending: 'စောင့်ဆိုင်းနေသော',
+      inTransit: 'ပို့ဆောင်နေသော',
+      completed: 'ပြီးမြောက်ပြီး',
+      packageManagement: 'ထုပ်ပိုးစီမံခန့်ခွဲမှု',
+      packageManagementDesc: 'ထုပ်ပိုးများအားလုံးကို ကြည့်ရှုနှင့် စီမံခန့်ခွဲခြင်း',
+      courierManagement: 'ပို့ဆောင်သူ စီမံခန့်ခွဲမှု',
+      courierManagementDesc: 'ပို့ဆောင်သူ အချက်အလက်နှင့် စွမ်းဆောင်ရည်',
+      financeManagement: 'ဘဏ္ဍာရေး စီမံခန့်ခွဲမှု',
+      financeManagementDesc: 'ဝင်ငွေ စာရင်းနှင့် စာရင်းကိုင်',
+      systemSettings: 'စနစ် ဆက်တင်များ',
+      systemSettingsDesc: 'ဖွဲ့စည်းမှုနှင့် ဦးစားပေးချက်များ',
+      systemAdmin: 'စနစ် အက်မင်',
+      manager: 'မန်နေဂျာ',
+      finance: 'ဘဏ္ဍာရေး',
+      operator: 'လုပ်ဆောင်သူ',
+      language: 'ဘာသာစကား',
+      chinese: '中文',
+      english: 'English',
+      burmese: 'မြန်မာ',
+    },
+  };
+
+  const currentT = t[language as keyof typeof t] || t.zh;
 
   // 管理模块卡片数据
   const moduleCards = [
     {
       id: 'packages',
-      title: language === 'zh' ? '包裹管理' : 'Package Management',
-      subtitle: language === 'zh' ? '查看和管理所有包裹' : 'View and manage all packages',
+      title: currentT.packageManagement,
+      subtitle: currentT.packageManagementDesc,
       icon: '📦',
       color: '#3182ce',
       gradient: ['#3182ce', '#2c5282'],
@@ -81,8 +193,8 @@ export default function DashboardScreen({ navigation }: any) {
     },
     {
       id: 'couriers',
-      title: language === 'zh' ? '骑手管理' : 'Courier Management',
-      subtitle: language === 'zh' ? '快递员信息和业绩' : 'Courier info and performance',
+      title: currentT.courierManagement,
+      subtitle: currentT.courierManagementDesc,
       icon: '🚚',
       color: '#9b59b6',
       gradient: ['#9b59b6', '#8e44ad'],
@@ -91,8 +203,8 @@ export default function DashboardScreen({ navigation }: any) {
     },
     {
       id: 'finance',
-      title: language === 'zh' ? '财务管理' : 'Finance Management',
-      subtitle: language === 'zh' ? '收入统计和账务' : 'Income stats and accounting',
+      title: currentT.financeManagement,
+      subtitle: currentT.financeManagementDesc,
       icon: '💰',
       color: '#27ae60',
       gradient: ['#27ae60', '#229954'],
@@ -101,8 +213,8 @@ export default function DashboardScreen({ navigation }: any) {
     },
     {
       id: 'settings',
-      title: language === 'zh' ? '系统设置' : 'System Settings',
-      subtitle: language === 'zh' ? '配置和偏好设置' : 'Configuration and preferences',
+      title: currentT.systemSettings,
+      subtitle: currentT.systemSettingsDesc,
       icon: '⚙️',
       color: '#e67e22',
       gradient: ['#e67e22', '#d35400'],
@@ -112,29 +224,38 @@ export default function DashboardScreen({ navigation }: any) {
   ];
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
       {/* 顶部横幅 */}
       <View style={styles.headerBanner}>
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.greeting}>
-              👋 {language === 'zh' ? '欢迎回来' : 'Welcome Back'}
+              👋 {currentT.welcome}
             </Text>
             <Text style={styles.userName}>{currentUserName}</Text>
             <Text style={styles.userRole}>
-              {currentUserRole === 'admin' ? (language === 'zh' ? '系统管理员' : 'System Admin') : 
-               currentUserRole === 'manager' ? (language === 'zh' ? '经理' : 'Manager') : 
-               currentUserRole === 'finance' ? (language === 'zh' ? '财务' : 'Finance') : (language === 'zh' ? '操作员' : 'Operator')}
+              {currentUserRole === 'admin' ? currentT.systemAdmin : 
+               currentUserRole === 'manager' ? currentT.manager : 
+               currentUserRole === 'finance' ? currentT.finance : currentT.operator}
             </Text>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutIcon}>🚪</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              onPress={() => setShowLanguageModal(true)} 
+              style={styles.languageButton}
+            >
+              <Text style={styles.languageIcon}>🌐</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Text style={styles.logoutIcon}>🚪</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 装饰圆圈 */}
@@ -145,12 +266,12 @@ export default function DashboardScreen({ navigation }: any) {
       {/* 统计卡片区域 */}
       <View style={styles.statsSection}>
         <Text style={styles.sectionTitle}>
-          📊 {language === 'zh' ? '今日概览' : "Today's Overview"}
+          📊 {currentT.todayOverview}
         </Text>
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: '#3182ce' }]}>
             <Text style={styles.statNumber}>{stats.totalPackages}</Text>
-            <Text style={styles.statLabel}>{language === 'zh' ? '总包裹' : 'Total'}</Text>
+            <Text style={styles.statLabel}>{currentT.total}</Text>
             <View style={styles.statIconBg}>
               <Text style={styles.statIcon}>📦</Text>
             </View>
@@ -158,7 +279,7 @@ export default function DashboardScreen({ navigation }: any) {
 
           <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
             <Text style={styles.statNumber}>{stats.pendingPackages}</Text>
-            <Text style={styles.statLabel}>{language === 'zh' ? '待取件' : 'Pending'}</Text>
+            <Text style={styles.statLabel}>{currentT.pending}</Text>
             <View style={styles.statIconBg}>
               <Text style={styles.statIcon}>⏰</Text>
             </View>
@@ -166,7 +287,7 @@ export default function DashboardScreen({ navigation }: any) {
 
           <View style={[styles.statCard, { backgroundColor: '#9b59b6' }]}>
             <Text style={styles.statNumber}>{stats.inProgressPackages}</Text>
-            <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'In Transit'}</Text>
+            <Text style={styles.statLabel}>{currentT.inTransit}</Text>
             <View style={styles.statIconBg}>
               <Text style={styles.statIcon}>🚚</Text>
             </View>
@@ -174,7 +295,7 @@ export default function DashboardScreen({ navigation }: any) {
 
           <View style={[styles.statCard, { backgroundColor: '#27ae60' }]}>
             <Text style={styles.statNumber}>{stats.completedPackages}</Text>
-            <Text style={styles.statLabel}>{language === 'zh' ? '已完成' : 'Completed'}</Text>
+            <Text style={styles.statLabel}>{currentT.completed}</Text>
             <View style={styles.statIconBg}>
               <Text style={styles.statIcon}>✅</Text>
             </View>
@@ -185,7 +306,7 @@ export default function DashboardScreen({ navigation }: any) {
       {/* 管理模块 */}
       <View style={styles.modulesSection}>
         <Text style={styles.sectionTitle}>
-          🎯 {language === 'zh' ? '管理中心' : 'Management Center'}
+          🎯 {currentT.managementCenter}
         </Text>
         <View style={styles.modulesGrid}>
           {moduleCards.map((module) => (
@@ -230,7 +351,7 @@ export default function DashboardScreen({ navigation }: any) {
       {/* 快捷操作 */}
       <View style={styles.quickActionsSection}>
         <Text style={styles.sectionTitle}>
-          ⚡ {language === 'zh' ? '快捷操作' : 'Quick Actions'}
+          ⚡ {currentT.quickActions}
         </Text>
         <View style={styles.quickActions}>
           <TouchableOpacity 
@@ -238,7 +359,9 @@ export default function DashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('PackageManagement')}
           >
             <Text style={styles.quickActionIcon}>➕</Text>
-            <Text style={styles.quickActionText}>新建包裹</Text>
+            <Text style={styles.quickActionText}>
+              {language === 'zh' ? '新建包裹' : language === 'en' ? 'New Package' : 'ထုပ်ပိုးအသစ်'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -246,7 +369,9 @@ export default function DashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Scan')}
           >
             <Text style={styles.quickActionIcon}>📷</Text>
-            <Text style={styles.quickActionText}>扫码查询</Text>
+            <Text style={styles.quickActionText}>
+              {language === 'zh' ? '扫码查询' : language === 'en' ? 'Scan Query' : 'စကင်န်ဖတ်ခြင်း'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -254,13 +379,88 @@ export default function DashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Map')}
           >
             <Text style={styles.quickActionIcon}>🗺️</Text>
-            <Text style={styles.quickActionText}>配送路线</Text>
+            <Text style={styles.quickActionText}>
+              {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်လမ်းကြောင်း'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+        <View style={{ height: 30 }} />
+      </ScrollView>
+
+      {/* 语言切换模态框 */}
+    <Modal
+      visible={showLanguageModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowLanguageModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>🌐 {currentT.language}</Text>
+            <TouchableOpacity 
+              onPress={() => setShowLanguageModal(false)}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.languageOptions}>
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                language === 'zh' && styles.languageOptionActive
+              ]}
+              onPress={() => handleLanguageChange('zh')}
+            >
+              <Text style={[
+                styles.languageOptionText,
+                language === 'zh' && styles.languageOptionTextActive
+              ]}>
+                🇨🇳 {currentT.chinese}
+              </Text>
+              {language === 'zh' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                language === 'en' && styles.languageOptionActive
+              ]}
+              onPress={() => handleLanguageChange('en')}
+            >
+              <Text style={[
+                styles.languageOptionText,
+                language === 'en' && styles.languageOptionTextActive
+              ]}>
+                🇺🇸 {currentT.english}
+              </Text>
+              {language === 'en' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                language === 'my' && styles.languageOptionActive
+              ]}
+              onPress={() => handleLanguageChange('my')}
+            >
+              <Text style={[
+                styles.languageOptionText,
+                language === 'my' && styles.languageOptionTextActive
+              ]}>
+                🇲🇲 {currentT.burmese}
+              </Text>
+              {language === 'my' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </View>
   );
 }
 
@@ -268,6 +468,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0f4f8',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f4f8',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#2c5282',
+    fontWeight: '500',
   },
   headerBanner: {
     backgroundColor: '#1a365d',
@@ -484,5 +699,99 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#2c3e50',
+  },
+  // 头部按钮样式
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  languageButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  languageIcon: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  // 模态框样式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: width * 0.8,
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#6c757d',
+    fontWeight: 'bold',
+  },
+  languageOptions: {
+    gap: 12,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  languageOptionActive: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#2196f3',
+  },
+  languageOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#495057',
+  },
+  languageOptionTextActive: {
+    color: '#1976d2',
+    fontWeight: 'bold',
+  },
+  checkmark: {
+    fontSize: 18,
+    color: '#1976d2',
+    fontWeight: 'bold',
   },
 });

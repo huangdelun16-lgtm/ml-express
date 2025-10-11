@@ -32,6 +32,7 @@ interface AppProviderProps {
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState('zh');
   const [themeMode, setThemeModeState] = useState('light');
+  const [isInitialized, setIsInitialized] = useState(false);
   const [settings, setSettingsState] = useState({
     notifications: true,
     language: 'zh',
@@ -55,8 +56,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setLanguageState(parsed.language || 'zh');
         setThemeModeState(parsed.theme || 'light');
       }
+      setIsInitialized(true);
     } catch (error) {
       console.error('加载设置失败:', error);
+      setIsInitialized(true);
     }
   };
 
@@ -109,6 +112,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     settings,
     updateSettings,
   };
+
+  // 如果还未初始化完成，显示加载状态
+  if (!isInitialized) {
+    return null; // 或者返回一个加载组件
+  }
 
   return (
     <AppContext.Provider value={value}>

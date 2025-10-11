@@ -78,7 +78,7 @@ export default function ScanScreen({ navigation }: any) {
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>📷</Text>
           <Text style={styles.permissionTitle}>需要相机权限</Text>
-          <Text style={styles.permissionDesc}>扫描包裹二维码需要使用相机</Text>
+          <Text style={styles.permissionDesc}>扫描包裹二维码、中转码需要使用相机</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
             <Text style={styles.permissionButtonText}>授予权限</Text>
           </TouchableOpacity>
@@ -133,6 +133,12 @@ export default function ScanScreen({ navigation }: any) {
         return;
       }
 
+      // 检查是否是中转码
+      if (packageId.startsWith('TC')) {
+        await handleTransferCode(packageId);
+        return;
+      }
+
       const packages = await packageService.getAllPackages();
       const foundPackage = packages.find(p => p.id === packageId);
 
@@ -176,6 +182,93 @@ export default function ScanScreen({ navigation }: any) {
       }
     } catch (error) {
       Alert.alert('错误', '查询包裹失败', [
+        { text: '确定', onPress: resetScanState }
+      ]);
+    }
+  };
+
+  const handleTransferCode = async (transferCode: string) => {
+    try {
+      console.log('处理中转码:', transferCode);
+      
+      // 查找具有此中转码的包裹
+      const packages = await packageService.getAllPackages();
+      const foundPackage = packages.find(p => p.transfer_code === transferCode);
+      
+      if (!foundPackage) {
+        Alert.alert('中转码无效', '未找到与此中转码对应的包裹', [
+          { text: '确定', onPress: resetScanState }
+        ]);
+        return;
+      }
+      
+      // 检查包裹状态 - 允许"已送达"（中转站）和"待派送"状态的包裹
+      if (foundPackage.status !== '待派送' && foundPackage.status !== '已送达') {
+        Alert.alert(
+          '包裹状态错误',
+          `包裹编号：${foundPackage.id}\n当前状态：${foundPackage.status}\n\n只有"待派送"或"已送达"（中转站）状态的包裹才能被分配`,
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+        return;
+      }
+      
+      // 确认分配包裹给当前骑手
+      const statusText = foundPackage.status === '已送达' ? '已到达中转站' : foundPackage.status;
+      Alert.alert(
+        '确认分配包裹',
+        `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n寄件人：${foundPackage.sender_name}\n当前状态：${statusText}\n中转码：${transferCode}\n\n是否将此包裹分配给骑手：${currentCourierName}？`,
+        [
+          { text: '取消', onPress: resetScanState },
+          {
+            text: '确认分配',
+            onPress: async () => {
+              await assignPackageToCourier(foundPackage);
+            }
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('处理中转码失败:', error);
+      Alert.alert('错误', '处理中转码失败，请重试', [
+        { text: '确定', onPress: resetScanState }
+      ]);
+    }
+  };
+
+  const assignPackageToCourier = async (pkg: any) => {
+    try {
+      console.log('开始分配包裹给骑手:', pkg.id, currentCourierId);
+      
+      // 更新包裹状态为"派送中"，并分配骑手
+      const success = await packageService.updatePackageStatus(
+        pkg.id,
+        '派送中',
+        pkg.pickup_time,
+        undefined, // 保持delivery_time为空，因为还在派送中
+        currentCourierId, // 分配当前骑手
+        pkg.transfer_code // 保持中转码
+      );
+      
+      if (success) {
+        Alert.alert(
+          '分配成功',
+          `包裹 ${pkg.id} 已成功分配给骑手：${currentCourierName}\n\n包裹状态已更新为"派送中"`,
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+      } else {
+        Alert.alert('分配失败', '更新包裹状态失败，请重试', [
+          { text: '确定', onPress: resetScanState }
+        ]);
+      }
+      
+    } catch (error) {
+      console.error('分配包裹失败:', error);
+      Alert.alert('错误', '分配包裹失败，请重试', [
         { text: '确定', onPress: resetScanState }
       ]);
     }
@@ -258,7 +351,7 @@ export default function ScanScreen({ navigation }: any) {
     <View style={styles.container}>
       {/* 头部 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📦 扫描包裹</Text>
+        <Text style={styles.headerTitle}>📦 扫描包裹/中转码</Text>
         <TouchableOpacity 
           onPress={() => setShowManualInput(!showManualInput)}
           style={styles.manualButton}
@@ -316,7 +409,7 @@ export default function ScanScreen({ navigation }: any) {
 
           <View style={styles.instructions}>
             <Text style={styles.instructionText}>
-              将包裹二维码对准扫描框
+              将包裹二维码或中转码对准扫描框
             </Text>
             {scanned && (
               <TouchableOpacity 
@@ -332,10 +425,10 @@ export default function ScanScreen({ navigation }: any) {
         /* 手动输入界面 */
         <View style={styles.manualContainer}>
           <View style={styles.manualContent}>
-            <Text style={styles.manualTitle}>手动输入包裹编号</Text>
+            <Text style={styles.manualTitle}>手动输入包裹编号或中转码</Text>
             <TextInput
               style={styles.input}
-              placeholder="例如：PKG001"
+              placeholder="例如：PKG001 或 TCABC1234"
               value={manualInput}
               onChangeText={setManualInput}
               autoCapitalize="characters"

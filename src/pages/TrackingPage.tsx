@@ -122,7 +122,7 @@ const TrackingPage: React.FC = () => {
     setTrackingResult({
       number: trackingNumber,
       status: '配送中',
-      location: '曼德勒配送中心',
+      location: '缅甸配送中心',
       estimatedDelivery: '2024年1月15日 14:00'
     });
   };

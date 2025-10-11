@@ -74,7 +74,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<DeliveryStore | null>(null);
-  const [mapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 曼德勒中心
+  const [mapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 缅甸中心
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -667,7 +667,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   name="store_name"
                   value={formData.store_name}
                   onChange={handleInputChange}
-                  placeholder="例: 曼德勒中心店"
+                  placeholder="例: 缅甸中心店"
                   style={inputStyle}
                   required
                 />
@@ -1971,12 +1971,12 @@ const DeliveryStoreManagement: React.FC = () => {
                       onClick={() => {
                         // 使用预设的常用位置
                         const locations = [
-                          { name: '曼德勒市中心', lat: '21.9588', lng: '96.0891' },
+                          { name: '缅甸市中心', lat: '21.9588', lng: '96.0891' },
                           { name: '仰光市中心', lat: '16.8661', lng: '96.1951' },
                           { name: '内比都', lat: '19.7633', lng: '96.0785' }
                         ];
                         
-                        const choice = prompt(`请选择预设位置:\n1. 曼德勒市中心\n2. 仰光市中心\n3. 内比都\n\n请输入数字 (1-3):`);
+                        const choice = prompt(`请选择预设位置:\n1. 缅甸市中心\n2. 仰光市中心\n3. 内比都\n\n请输入数字 (1-3):`);
                         const index = parseInt(choice || '0') - 1;
                         
                         if (index >= 0 && index < locations.length) {
@@ -2258,12 +2258,12 @@ const DeliveryStoreManagement: React.FC = () => {
                 textAlign: 'center',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
-                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✅</div>
+                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🏪</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white' }}>
                   {storagePackages.filter(pkg => pkg.status === '已送达').length}
                 </div>
                 <div style={{ fontSize: '0.8rem', opacity: 0.8, color: 'white' }}>
-                  已送达
+                  已到达中转站
                 </div>
               </div>
             </div>
@@ -2327,11 +2327,14 @@ const DeliveryStoreManagement: React.FC = () => {
                           <span style={{
                             padding: '4px 8px',
                             borderRadius: '6px',
-                            background: pkg.status === '已送达' ? 'rgba(72, 187, 120, 0.3)' : 'rgba(160, 174, 192, 0.3)',
+                            background: pkg.status === '已送达' ? 'rgba(72, 187, 120, 0.3)' : 
+                                       pkg.status === '待派送' ? 'rgba(255, 193, 7, 0.3)' : 'rgba(160, 174, 192, 0.3)',
                             fontSize: '0.75rem',
-                            fontWeight: '500'
+                            fontWeight: '500',
+                            color: pkg.status === '已送达' ? '#48bb78' : 
+                                   pkg.status === '待派送' ? '#ffc107' : '#a0aec0'
                           }}>
-                            {pkg.status}
+                            {pkg.status === '已送达' ? '🏪 已到达中转站' : pkg.status}
                           </span>
                           {pkg.transfer_code && (
                             <button

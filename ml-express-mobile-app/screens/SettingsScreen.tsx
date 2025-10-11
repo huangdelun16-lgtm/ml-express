@@ -1013,8 +1013,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   aboutLogoImage: {
-    width: 80,
-    height: 80,
+    width: 120,
+    height: 120,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

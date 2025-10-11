@@ -29,6 +29,8 @@ export interface Package {
   delivery_store_id?: string;
   delivery_store_name?: string;
   store_receive_code?: string;
+  sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
+  transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
 }
 
 export interface AdminAccount {
@@ -185,6 +187,7 @@ export const packageService = {
     pickupTime?: string, 
     deliveryTime?: string,
     courierName?: string,
+    transferCode?: string,
     storeInfo?: { storeId: string, storeName: string, receiveCode: string }
   ): Promise<boolean> {
     const updateData: any = { status };
@@ -192,6 +195,7 @@ export const packageService = {
     if (pickupTime) updateData.pickup_time = pickupTime;
     if (deliveryTime) updateData.delivery_time = deliveryTime;
     if (courierName) updateData.courier = courierName;
+    if (transferCode) updateData.transfer_code = transferCode;
     
     // 如果是送达状态且有店铺信息，记录店铺信息
     if (status === '已送达' && storeInfo) {
