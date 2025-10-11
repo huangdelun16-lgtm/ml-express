@@ -124,20 +124,20 @@ const HomePage: React.FC = () => {
     // 设置地图点击位置
     setMapClickPosition({ lat, lng });
     
-    // 模拟反向地理编码获取地址
+    // 使用Google Maps Geocoding API获取真实地址
     try {
-      const addresses = [
-        '仰光市中心商业区',
-        '仰光大学附近',
-        '茵雅湖畔',
-        '昂山市场周边',
-        '仰光国际机场附近',
-        '皇家湖公园旁',
-        '仰光火车站区域'
-      ];
+      // 使用Google Maps API获取地址
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await geocoder.geocode({ location: { lat, lng } });
       
-      const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
-      const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      let fullAddress = '';
+      if (response.results && response.results[0]) {
+        fullAddress = response.results[0].formatted_address;
+      } else {
+        // 如果无法获取地址，使用城市名称和坐标
+        const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+        fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      }
       
       // 自动填充到地址输入框
       const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
@@ -150,10 +150,21 @@ const HomePage: React.FC = () => {
       // 更新选中位置
       setSelectedLocation({ lat, lng, address: fullAddress });
       
-      // 显示提示
       console.log(`✅ 长按选中位置：${fullAddress}`);
     } catch (error) {
       console.error('地址获取失败:', error);
+      // 出错时使用城市名称和坐标
+      const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+      const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      
+      const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+      if (addressInput) {
+        addressInput.value = fallbackAddress;
+        addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+        addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+      }
+      
+      setSelectedLocation({ lat, lng, address: fallbackAddress });
     }
   };
 
@@ -2023,7 +2034,10 @@ const HomePage: React.FC = () => {
               >
                 {/* 真正的Google Maps */}
                 <ErrorBoundary>
-                  <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}>
+                  <LoadScript 
+                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"}
+                    libraries={['places' as any]}
+                  >
                     <GoogleMap
                       key={selectedCity} // 强制重新渲染当城市改变时
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -2032,6 +2046,42 @@ const HomePage: React.FC = () => {
                       onLoad={(map) => {
                         // 地图加载完成后的提示
                         console.log('地图加载完成，可以开始定位');
+                        
+                        // 添加地图POI点击事件监听
+                        map.addListener('click', async (e: any) => {
+                          if (e.placeId) {
+                            // 阻止默认行为（打开信息窗口）
+                            e.stop();
+                            
+                            // 获取POI的详细信息
+                            const service = new window.google.maps.places.PlacesService(map);
+                            service.getDetails(
+                              { placeId: e.placeId, fields: ['name', 'formatted_address', 'geometry'] },
+                              (place: any, status: any) => {
+                                if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+                                  const lat = place.geometry.location.lat();
+                                  const lng = place.geometry.location.lng();
+                                  const address = place.formatted_address || place.name;
+                                  
+                                  // 设置地图点击位置
+                                  setMapClickPosition({ lat, lng });
+                                  setMapCenter({ lat, lng });
+                                  
+                                  // 自动填充到地址输入框
+                                  const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+                                  if (addressInput) {
+                                    addressInput.value = address;
+                                    addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                                    addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                                  }
+                                  
+                                  // 更新选中位置
+                                  setSelectedLocation({ lat, lng, address });
+                                }
+                              }
+                            );
+                          }
+                        });
                       }}
                       onRightClick={async (e) => {
                         if (e.latLng) {
@@ -2041,20 +2091,18 @@ const HomePage: React.FC = () => {
                           // 设置地图点击位置
                           setMapClickPosition({ lat, lng });
                           
-                          // 获取地址
+                          // 使用Google Maps Geocoding API获取真实地址
                           try {
-                            const addresses = [
-                              '仰光市中心商业区',
-                              '仰光大学附近',
-                              '茵雅湖畔',
-                              '昂山市场周边',
-                              '仰光国际机场附近',
-                              '皇家湖公园旁',
-                              '仰光火车站区域'
-                            ];
+                            const geocoder = new window.google.maps.Geocoder();
+                            const response = await geocoder.geocode({ location: { lat, lng } });
                             
-                            const randomAddress = addresses[Math.floor(Math.random() * addresses.length)];
-                            const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            let fullAddress = '';
+                            if (response.results && response.results[0]) {
+                              fullAddress = response.results[0].formatted_address;
+                            } else {
+                              const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                              fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            }
                             
                             // 自动填充到地址输入框
                             const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
@@ -2068,6 +2116,17 @@ const HomePage: React.FC = () => {
                             setSelectedLocation({ lat, lng, address: fullAddress });
                           } catch (error) {
                             console.error('地址获取失败:', error);
+                            const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                            const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                            
+                            const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+                            if (addressInput) {
+                              addressInput.value = fallbackAddress;
+                              addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                              addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                            }
+                            
+                            setSelectedLocation({ lat, lng, address: fallbackAddress });
                           }
                         }
                       }}
