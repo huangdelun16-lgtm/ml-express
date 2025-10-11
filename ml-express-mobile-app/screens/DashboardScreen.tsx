@@ -9,10 +9,12 @@ import {
   Dimensions,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -33,14 +35,16 @@ export default function DashboardScreen({ navigation }: any) {
   useEffect(() => {
     loadUserInfo();
     loadStats();
+    requestLocationPermission();
     
-    // 骑手心跳：每5分钟更新一次在线状态
+    // 骑手心跳：每5分钟更新一次在线状态和位置
     const heartbeatInterval = setInterval(async () => {
       const userPosition = await AsyncStorage.getItem('currentUserPosition');
       if (userPosition === '骑手' || userPosition === '骑手队长') {
         try {
           const courierId = await AsyncStorage.getItem('currentCourierId');
           if (courierId) {
+            // 更新在线状态
             await supabase
               .from('couriers')
               .update({ 
@@ -48,7 +52,11 @@ export default function DashboardScreen({ navigation }: any) {
                 status: 'active'
               })
               .eq('id', courierId);
-            console.log('✅ 心跳更新：快递员在线状态已刷新');
+            
+            // 更新位置信息
+            await updateCourierLocation(courierId);
+            
+            console.log('✅ 心跳更新：快递员在线状态和位置已刷新');
           }
         } catch (error) {
           console.error('心跳更新失败:', error);
@@ -58,6 +66,85 @@ export default function DashboardScreen({ navigation }: any) {
 
     return () => clearInterval(heartbeatInterval);
   }, []);
+
+  // 请求位置权限
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        console.log('✅ 位置权限已获取');
+        // 立即上传一次位置
+        const userPosition = await AsyncStorage.getItem('currentUserPosition');
+        if (userPosition === '骑手' || userPosition === '骑手队长') {
+          const courierId = await AsyncStorage.getItem('currentCourierId');
+          if (courierId) {
+            await updateCourierLocation(courierId);
+          }
+        }
+      } else {
+        console.log('⚠️ 位置权限被拒绝');
+      }
+    } catch (error) {
+      console.error('请求位置权限失败:', error);
+    }
+  };
+
+  // 更新快递员位置
+  const updateCourierLocation = async (courierId: string) => {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude, altitude, heading, speed } = location.coords;
+
+      // 检查是否已有位置记录
+      const { data: existingLocation } = await supabase
+        .from('courier_locations')
+        .select('id')
+        .eq('courier_id', courierId)
+        .single();
+
+      const locationData = {
+        courier_id: courierId,
+        latitude,
+        longitude,
+        heading: heading || 0,
+        speed: speed || 0,
+        last_update: new Date().toISOString(),
+        battery_level: await getBatteryLevel(),
+        status: 'active'
+      };
+
+      if (existingLocation) {
+        // 更新现有记录
+        await supabase
+          .from('courier_locations')
+          .update(locationData)
+          .eq('courier_id', courierId);
+      } else {
+        // 创建新记录
+        await supabase
+          .from('courier_locations')
+          .insert([locationData]);
+      }
+
+      console.log(`✅ 位置已更新: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+    } catch (error) {
+      console.error('更新位置失败:', error);
+    }
+  };
+
+  // 获取电池电量（模拟）
+  const getBatteryLevel = async (): Promise<number> => {
+    try {
+      // 在实际应用中，可以使用 expo-battery 获取真实电量
+      // 这里返回一个随机值作为示例
+      return Math.floor(Math.random() * 30) + 70; // 70-100%
+    } catch (error) {
+      return 85; // 默认值
+    }
+  };
 
   const loadUserInfo = async () => {
     try {

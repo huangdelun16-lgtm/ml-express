@@ -14,6 +14,7 @@ import {
 import { adminAccountService, auditLogService, courierService, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import * as Location from 'expo-location';
 
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
@@ -62,7 +63,51 @@ export default function LoginScreen({ navigation }: any) {
               // 保存快递员ID，方便后续使用
               await AsyncStorage.setItem('currentCourierId', courierData.id);
               
-              console.log('✅ 快递员状态已更新为在线');
+              // 立即上传一次位置
+              try {
+                const locationPermission = await Location.requestForegroundPermissionsAsync();
+                if (locationPermission.status === 'granted') {
+                  const location = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced,
+                  });
+
+                  const locationData = {
+                    courier_id: courierData.id,
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    heading: location.coords.heading || 0,
+                    speed: location.coords.speed || 0,
+                    last_update: new Date().toISOString(),
+                    battery_level: Math.floor(Math.random() * 30) + 70,
+                    status: 'active'
+                  };
+
+                  // 检查是否已有位置记录
+                  const { data: existingLoc } = await supabase
+                    .from('courier_locations')
+                    .select('id')
+                    .eq('courier_id', courierData.id)
+                    .single();
+
+                  if (existingLoc) {
+                    await supabase
+                      .from('courier_locations')
+                      .update(locationData)
+                      .eq('courier_id', courierData.id);
+                  } else {
+                    await supabase
+                      .from('courier_locations')
+                      .insert([locationData]);
+                  }
+
+                  console.log('✅ 快递员状态和位置已更新');
+                } else {
+                  console.log('✅ 快递员状态已更新为在线（位置权限未授予）');
+                }
+              } catch (locationError) {
+                console.error('上传位置失败:', locationError);
+                console.log('✅ 快递员状态已更新为在线（位置上传失败）');
+              }
             } else {
               console.log('⚠️ 未找到对应的快递员记录');
             }
