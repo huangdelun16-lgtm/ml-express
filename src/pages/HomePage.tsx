@@ -2130,7 +2130,7 @@ const HomePage: React.FC = () => {
                 }}
                 style={{
                   position: 'absolute',
-                  top: '10px',
+                  top: '70px',
                   right: '10px',
                   background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                   color: 'white',
