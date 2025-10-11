@@ -444,7 +444,7 @@ const HomePage: React.FC = () => {
         cancelPayment: '取消',
         packageType: '包裹类型',
         document: '文件',
-        standardPackage: '标准件（45x60x15cm）以内',
+        standardPackage: '标准件（45x60x15cm）和（5KG）以内',
         overweightPackage: '超重件（10 KG）以上',
         oversizedPackage: '超规件（45x60x15cm）以上',
         fragile: '易碎品',
@@ -565,7 +565,7 @@ const HomePage: React.FC = () => {
         cancelPayment: 'Cancel',
         packageType: 'Package Type',
         document: 'Document',
-        standardPackage: 'Standard Package (45x60x15cm)',
+        standardPackage: 'Standard Package (45x60x15cm) & (5KG)',
         overweightPackage: 'Overweight Package (10 KG+)',
         oversizedPackage: 'Oversized Package (45x60x15cm+)',
         fragile: 'Fragile',
@@ -686,7 +686,7 @@ const HomePage: React.FC = () => {
         cancelPayment: 'ပေးချေမှုကို ပယ်ဖျက်ပါ',
         packageType: 'ထုပ်ပိုးအမျိုးအစား',
         document: 'စာရွက်စာတမ်း',
-        standardPackage: 'စံထုပ်ပိုး (45x60x15cm) အတွင်း',
+        standardPackage: 'စံထုပ်ပိုး (45x60x15cm) နှင့် (5KG) အတွင်း',
         overweightPackage: 'အလေးချိန်များသော ထုပ်ပိုး (10 KG) အထက်',
         oversizedPackage: 'အရွယ်အစားကြီးသော ထုပ်ပိုး (45x60x15cm) အထက်',
         fragile: 'ပျက်စီးလွယ်သော',
@@ -1698,10 +1698,10 @@ const HomePage: React.FC = () => {
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
                   }}
                 >
-                  <option value={t.ui.document}>{t.ui.document}</option>
                   <option value={t.ui.standardPackage}>{t.ui.standardPackage}</option>
                   <option value={t.ui.overweightPackage}>{t.ui.overweightPackage}</option>
                   <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
+                  <option value={t.ui.document}>{t.ui.document}</option>
                   <option value={t.ui.fragile}>{t.ui.fragile}</option>
                   <option value={t.ui.foodDrinks}>{t.ui.foodDrinks}</option>
                 </select>
