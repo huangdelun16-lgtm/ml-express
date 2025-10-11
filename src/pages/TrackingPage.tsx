@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, courierService } from '../services/supabase';
+import { packageService, trackingService } from '../services/supabase';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
@@ -56,17 +56,27 @@ const TrackingPage: React.FC = () => {
   // 加载快递员位置
   const loadCourierLocation = async (courierName: string) => {
     try {
-      const couriers = await courierService.getAllCouriers();
-      const courier = couriers.find(c => c.name === courierName);
+      // 从 trackingService 获取活跃的快递员
+      const couriers = await trackingService.getActiveCouriers();
+      const courier = couriers.find((c: any) => c.name === courierName);
       
-      if (courier && courier.latitude && courier.longitude) {
+      if (!courier) {
+        console.log('未找到快递员:', courierName);
+        return;
+      }
+      
+      // 获取快递员的位置信息
+      const locations = await trackingService.getCourierLocations();
+      const courierLocation = locations.find((loc: any) => loc.courier_id === courier.id);
+      
+      if (courierLocation) {
         setCourierLocation({
-          lat: courier.latitude,
-          lng: courier.longitude,
+          lat: courierLocation.latitude,
+          lng: courierLocation.longitude,
           name: courier.name,
           phone: courier.phone,
-          vehicle: courier.vehicle_type,
-          last_active: courier.last_active
+          vehicle: courier.vehicle_type || '摩托车',
+          last_active: courierLocation.last_update
         });
       }
     } catch (error) {
