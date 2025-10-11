@@ -140,7 +140,7 @@ const HomePage: React.FC = () => {
       const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       
       // 自动填充到地址输入框
-      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+      const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
       if (addressInput) {
         addressInput.value = fullAddress;
         addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
@@ -2057,7 +2057,7 @@ const HomePage: React.FC = () => {
                             const fullAddress = `${randomAddress}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             
                             // 自动填充到地址输入框
-                            const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                            const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
                             if (addressInput) {
                               addressInput.value = fullAddress;
                               addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
@@ -2146,7 +2146,7 @@ const HomePage: React.FC = () => {
                         setMapClickPosition({ lat: latitude, lng: longitude });
                         
                         // 填充地址到输入框
-                        const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                        const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
                         if (addressInput) {
                           addressInput.value = address;
                           addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
@@ -2163,7 +2163,7 @@ const HomePage: React.FC = () => {
                     } catch (geocodeError) {
                       console.error('逆地理编码失败:', geocodeError);
                       // 如果逆地理编码失败，至少显示坐标
-                      const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                      const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
                       if (addressInput) {
                         addressInput.value = `纬度: ${latitude.toFixed(6)}, 经度: ${longitude.toFixed(6)}`;
                       }
@@ -2242,6 +2242,7 @@ const HomePage: React.FC = () => {
               </div>
               <input
                 type="text"
+                id="map-address-input"
                 placeholder={t.order.mapPlaceholder}
                 style={{
                   width: '100%',
@@ -2269,7 +2270,7 @@ const HomePage: React.FC = () => {
               <button
                 onClick={() => {
                   // 确认选择地址的逻辑
-                  const addressInput = document.querySelector('input[placeholder*="输入详细地址"]') as HTMLInputElement;
+                  const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
                   if (addressInput && addressInput.value.trim()) {
                     // 获取完整地址（包含用户补充的详细信息）
                     const completeAddress = addressInput.value.trim();
