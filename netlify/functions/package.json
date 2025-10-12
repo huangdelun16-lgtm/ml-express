@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Netlify Functions for ML Express",
   "dependencies": {
-    "twilio": "^5.3.5"
+    "twilio": "^5.3.5",
+    "nodemailer": "^6.9.7"
   }
 }

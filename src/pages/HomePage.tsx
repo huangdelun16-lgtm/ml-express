@@ -112,6 +112,7 @@ const HomePage: React.FC = () => {
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sentCode, setSentCode] = useState('');
+  const [verificationType, setVerificationType] = useState<'email' | 'sms'>('email'); // 默认使用邮箱验证
   
   // 系统价格设置
   const [pricingSettings, setPricingSettings] = useState({
@@ -298,9 +299,15 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        // 验证验证码是否正确
-        const { verifyVerificationCode } = await import('../services/smsService');
-        const verifyResult = await verifyVerificationCode(registerForm.phone, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+        // 验证验证码是否正确（根据验证方式选择不同的服务）
+        let verifyResult;
+        if (verificationType === 'email') {
+          const { verifyEmailCode } = await import('../services/emailService');
+          verifyResult = await verifyEmailCode(registerForm.email, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+        } else {
+          const { verifyVerificationCode } = await import('../services/smsService');
+          verifyResult = await verifyVerificationCode(normalizedPhone, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+        }
         
         if (!verifyResult.success) {
           alert(verifyResult.message);
@@ -350,7 +357,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 发送验证码
+  // 发送验证码（支持邮箱和短信）
   const handleSendVerificationCode = async () => {
     // 检查倒计时
     if (countdown > 0) {
@@ -360,42 +367,81 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    // 验证手机号
-    if (!registerForm.phone) {
-      alert(language === 'zh' ? '请先输入手机号' : 
-            language === 'en' ? 'Please enter phone number first' : 
-            'ဖုန်းနံပါတ်ထည့်ပါ');
-      return;
-    }
-
-    // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
-    const phoneRegex = /^0?9\d{7,9}$/;
-    if (!phoneRegex.test(registerForm.phone)) {
-      alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
-            language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
-            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
-      return;
-    }
-
     try {
-      // 确保手机号以0开头（统一格式）
-      const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
-      console.log('📱 发送验证码到:', normalizedPhone);
-      
-      // 调用SMS服务
-      const { sendVerificationCode } = await import('../services/smsService');
-      const result = await sendVerificationCode(normalizedPhone, language as 'zh' | 'en' | 'my');
-      
-      if (result.success) {
-        setCodeSent(true);
-        setCountdown(60); // 60秒倒计时
-        if (result.code) {
-          setSentCode(result.code); // 开发模式可能会返回验证码
-          console.log('🔑 验证码:', result.code);
+      if (verificationType === 'email') {
+        // ========== 邮箱验证 ==========
+        // 验证邮箱
+        if (!registerForm.email) {
+          alert(language === 'zh' ? '请先输入邮箱' : 
+                language === 'en' ? 'Please enter email first' : 
+                'အီးမေးလ်ထည့်ပါ');
+          return;
         }
-        alert(result.message);
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(registerForm.email)) {
+          alert(language === 'zh' ? '请输入有效的邮箱地址' : 
+                language === 'en' ? 'Please enter a valid email address' : 
+                'မှန်ကန်သော အီးမေးလ်လိပ်စာထည့်ပါ');
+          return;
+        }
+
+        console.log('📧 发送验证码到邮箱:', registerForm.email);
+        
+        // 调用邮箱服务
+        const { sendEmailVerificationCode } = await import('../services/emailService');
+        const result = await sendEmailVerificationCode(registerForm.email, language as 'zh' | 'en' | 'my');
+        
+        if (result.success) {
+          setCodeSent(true);
+          setCountdown(60); // 60秒倒计时
+          if (result.code) {
+            setSentCode(result.code); // 开发模式可能会返回验证码
+            console.log('🔑 验证码:', result.code);
+          }
+          alert(result.message);
+        } else {
+          alert(result.message);
+        }
+        
       } else {
-        alert(result.message);
+        // ========== 短信验证 ==========
+        // 验证手机号
+        if (!registerForm.phone) {
+          alert(language === 'zh' ? '请先输入手机号' : 
+                language === 'en' ? 'Please enter phone number first' : 
+                'ဖုန်းနံပါတ်ထည့်ပါ');
+          return;
+        }
+
+        // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
+        const phoneRegex = /^0?9\d{7,9}$/;
+        if (!phoneRegex.test(registerForm.phone)) {
+          alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
+                language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
+                'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
+          return;
+        }
+
+        // 确保手机号以0开头（统一格式）
+        const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+        console.log('📱 发送验证码到手机:', normalizedPhone);
+        
+        // 调用SMS服务
+        const { sendVerificationCode } = await import('../services/smsService');
+        const result = await sendVerificationCode(normalizedPhone, language as 'zh' | 'en' | 'my');
+        
+        if (result.success) {
+          setCodeSent(true);
+          setCountdown(60); // 60秒倒计时
+          if (result.code) {
+            setSentCode(result.code); // 开发模式可能会返回验证码
+            console.log('🔑 验证码:', result.code);
+          }
+          alert(result.message);
+        } else {
+          alert(result.message);
+        }
       }
     } catch (error) {
       console.error('发送验证码失败:', error);
@@ -3456,8 +3502,94 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 电话号码 + 验证码按钮（注册模式为两列） */}
-              <div style={{ marginBottom: '1.5rem' }}>
+              {/* 验证方式选择器（仅注册模式显示） */}
+              {!isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '验证方式 *' : language === 'en' ? 'Verification Method *' : 'အတည်ပြုနည်းလမ်း *'}
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    {/* 邮箱验证选项 */}
+                    <button
+                      type="button"
+                      onClick={() => setVerificationType('email')}
+                      style={{
+                        flex: 1,
+                        padding: '1rem',
+                        background: verificationType === 'email' ? 
+                          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
+                          'rgba(255, 255, 255, 0.95)',
+                        color: verificationType === 'email' ? 'white' : '#2c5282',
+                        border: `2px solid ${verificationType === 'email' ? 'transparent' : 'rgba(255, 255, 255, 0.3)'}`,
+                        borderRadius: '12px',
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>📧</span>
+                      {language === 'zh' ? '邮箱验证' : language === 'en' ? 'Email' : 'အီးမေးလ်'}
+                    </button>
+                    
+                    {/* 短信验证选项 */}
+                    <button
+                      type="button"
+                      onClick={() => setVerificationType('sms')}
+                      style={{
+                        flex: 1,
+                        padding: '1rem',
+                        background: verificationType === 'sms' ? 
+                          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
+                          'rgba(255, 255, 255, 0.95)',
+                        color: verificationType === 'sms' ? 'white' : '#2c5282',
+                        border: `2px solid ${verificationType === 'sms' ? 'transparent' : 'rgba(255, 255, 255, 0.3)'}`,
+                        borderRadius: '12px',
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>📱</span>
+                      {language === 'zh' ? '短信验证' : language === 'en' ? 'SMS' : 'SMS'}
+                    </button>
+                  </div>
+                  <small style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.85rem',
+                    marginTop: '0.3rem',
+                    display: 'block'
+                  }}>
+                    {verificationType === 'email' ? 
+                      (language === 'zh' ? '📧 推荐使用邮箱验证，更稳定可靠' : 
+                       language === 'en' ? '📧 Email verification recommended - more reliable' : 
+                       '📧 အီးမေးလ်အတည်ပြုခြင်း အကြံပြုထားသည်') :
+                      (language === 'zh' ? '📱 短信可能被运营商拦截' : 
+                       language === 'en' ? '📱 SMS may be blocked by carriers' : 
+                       '📱 SMS ကို ဝန်ဆောင်မှုပေးသူက ပိတ်ဆို့နိုင်သည်')
+                    }
+                  </small>
+                </div>
+              )}
+
+              {/* 电话号码 + 验证码按钮（仅短信验证模式显示） */}
+              {!isLoginMode && verificationType === 'sms' && (
+                <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ 
                   color: 'white', 
                   display: 'block', 
@@ -3573,6 +3705,7 @@ const HomePage: React.FC = () => {
                    'မြန်မာဖုန်းနံပါတ် (09 သို့မဟုတ် 9 ဖြင့်စတင်သည်)'}
                 </small>
               </div>
+              )}
               
               {/* 验证码输入框（仅注册模式显示） */}
               {!isLoginMode && (
@@ -3684,8 +3817,8 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 电子邮件（可选，仅注册模式显示） */}
-              {!isLoginMode && (
+              {/* 电子邮件（邮箱验证时必填） */}
+              {!isLoginMode && verificationType === 'email' && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
                     color: 'white', 
@@ -3694,28 +3827,72 @@ const HomePage: React.FC = () => {
                     fontWeight: 'bold',
                     fontSize: '1rem'
                   }}>
-                    {language === 'zh' ? '电子邮件（可选）' : language === 'en' ? 'Email (Optional)' : 'အီးမေးလ် (ရွေးချယ်ရန်)'}
+                    {language === 'zh' ? '电子邮箱 *' : language === 'en' ? 'Email Address *' : 'အီးမေးလ်လိပ်စာ *'}
                   </label>
-                  <input
-                    type="email"
-                    value={registerForm.email}
-                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                    placeholder={language === 'zh' ? '例如：example@email.com' : language === 'en' ? 'e.g., example@email.com' : 'ဥပမာ: example@email.com'}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '12px',
-                      fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
-                      outline: 'none',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                  />
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <input
+                      type="email"
+                      value={registerForm.email}
+                      onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                      placeholder={language === 'zh' ? 'example@gmail.com' : language === 'en' ? 'example@gmail.com' : 'example@gmail.com'}
+                      required={verificationType === 'email'}
+                      style={{
+                        flex: '1.2',
+                        padding: '1rem',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '12px',
+                        fontSize: '1rem',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        color: '#2c5282',
+                        fontWeight: '500',
+                        outline: 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    />
+                    
+                    {/* 获取验证码按钮 */}
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={countdown > 0}
+                      style={{
+                        flex: '0.8',
+                        padding: '1rem',
+                        background: countdown > 0 ? '#cbd5e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                        cursor: countdown > 0 ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (countdown === 0) e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      {countdown > 0 ? 
+                        `${countdown}s` : 
+                        (language === 'zh' ? '获取验证码' : language === 'en' ? 'Get Code' : 'ကုဒ်ယူရန်')
+                      }
+                    </button>
+                  </div>
+                  <small style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.85rem',
+                    marginTop: '0.3rem',
+                    display: 'block'
+                  }}>
+                    {language === 'zh' ? '验证码将发送到您的邮箱' : 
+                     language === 'en' ? 'Verification code will be sent to your email' : 
+                     'အတည်ပြုကုဒ်ကို သင့်အီးမေးလ်သို့ ပေးပို့ပါမည်'}
+                  </small>
                 </div>
               )}
 
