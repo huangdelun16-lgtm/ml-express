@@ -738,6 +738,203 @@ export const systemSettingsService = {
   }
 };
 
+// 通知接口
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  recipient_type: 'courier' | 'customer' | 'admin';
+  notification_type: 'package_assigned' | 'status_update' | 'urgent' | 'system';
+  title: string;
+  message: string;
+  package_id?: string;
+  is_read: boolean;
+  created_at: string;
+  read_at?: string;
+  metadata?: any;
+}
+
+// 通知服务
+export const notificationService = {
+  /**
+   * 发送包裹分配通知给快递员
+   */
+  async sendPackageAssignedNotification(
+    courierId: string,
+    courierName: string,
+    packageId: string,
+    packageDetails: {
+      sender: string;
+      receiver: string;
+      receiverAddress: string;
+      deliverySpeed?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      // 检查系统设置中是否启用通知
+      const settings = await systemSettingsService.getSettingsByKeys([
+        'notification.sms_enabled',
+        'notification.email_enabled'
+      ]);
+      
+      const notificationEnabled = settings.some(s => 
+        (s.settings_key === 'notification.sms_enabled' || 
+         s.settings_key === 'notification.email_enabled') && 
+        s.settings_value === 'true'
+      );
+
+      if (!notificationEnabled) {
+        console.log('通知功能未启用，跳过发送');
+        return true; // 不算失败
+      }
+
+      // 构建通知标题和内容
+      let title = '📦 新包裹分配通知';
+      let message = `您好 ${courierName}，系统已为您分配新包裹！\n\n`;
+      message += `📋 包裹编号：${packageId}\n`;
+      message += `📤 寄件人：${packageDetails.sender}\n`;
+      message += `📥 收件人：${packageDetails.receiver}\n`;
+      message += `📍 送达地址：${packageDetails.receiverAddress}\n`;
+      
+      if (packageDetails.deliverySpeed) {
+        const speedText = packageDetails.deliverySpeed === '急送达' ? '⚡ 急送达' : 
+                         packageDetails.deliverySpeed === '定时达' ? '⏰ 定时达' : 
+                         '✓ 准时达';
+        message += `⏱️ 配送速度：${speedText}\n`;
+      }
+      
+      message += `\n请及时取件并开始配送！`;
+
+      // 插入通知记录
+      const { error } = await supabase
+        .from('notifications')
+        .insert([{
+          recipient_id: courierId,
+          recipient_type: 'courier',
+          notification_type: 'package_assigned',
+          title: title,
+          message: message,
+          package_id: packageId,
+          is_read: false,
+          metadata: {
+            package_details: packageDetails,
+            assigned_at: new Date().toISOString(),
+            assigned_by: 'system'
+          }
+        }]);
+
+      if (error) {
+        console.error('发送通知失败:', error);
+        return false;
+      }
+
+      console.log(`✅ 通知已发送给快递员 ${courierName} (${courierId})`);
+      return true;
+    } catch (err) {
+      console.error('发送通知异常:', err);
+      return false;
+    }
+  },
+
+  /**
+   * 获取快递员的未读通知数量
+   */
+  async getUnreadCount(courierId: string): Promise<number> {
+    try {
+      const { data, error, count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', courierId)
+        .eq('recipient_type', 'courier')
+        .eq('is_read', false);
+
+      if (error) {
+        console.error('获取未读通知数量失败:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.error('获取未读通知数量异常:', err);
+      return 0;
+    }
+  },
+
+  /**
+   * 获取快递员的通知列表
+   */
+  async getCourierNotifications(
+    courierId: string,
+    limit: number = 50
+  ): Promise<Notification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_id', courierId)
+        .eq('recipient_type', 'courier')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取通知列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取通知列表异常:', err);
+      return [];
+    }
+  },
+
+  /**
+   * 标记通知为已读
+   */
+  async markAsRead(notificationIds: string[]): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .in('id', notificationIds);
+
+      if (error) {
+        console.error('标记通知已读失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('标记通知已读异常:', err);
+      return false;
+    }
+  },
+
+  /**
+   * 删除通知
+   */
+  async deleteNotifications(notificationIds: string[]): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (error) {
+        console.error('删除通知失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除通知异常:', err);
+      return false;
+    }
+  }
+};
+
 // 用户数据库操作
 export const userService = {
   // 根据电话查找用户

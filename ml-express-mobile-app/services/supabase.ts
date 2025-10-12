@@ -502,6 +502,123 @@ export const deliveryStoreService = {
   }
 };
 
+// 通知接口
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  recipient_type: 'courier' | 'customer' | 'admin';
+  notification_type: 'package_assigned' | 'status_update' | 'urgent' | 'system';
+  title: string;
+  message: string;
+  package_id?: string;
+  is_read: boolean;
+  created_at: string;
+  read_at?: string;
+  metadata?: any;
+}
+
+// 通知服务
+export const notificationService = {
+  /**
+   * 获取快递员的未读通知数量
+   */
+  async getUnreadCount(courierId: string): Promise<number> {
+    try {
+      const { data, error, count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', courierId)
+        .eq('recipient_type', 'courier')
+        .eq('is_read', false);
+
+      if (error) {
+        console.error('获取未读通知数量失败:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.error('获取未读通知数量异常:', err);
+      return 0;
+    }
+  },
+
+  /**
+   * 获取快递员的通知列表
+   */
+  async getCourierNotifications(
+    courierId: string,
+    limit: number = 50
+  ): Promise<Notification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_id', courierId)
+        .eq('recipient_type', 'courier')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取通知列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取通知列表异常:', err);
+      return [];
+    }
+  },
+
+  /**
+   * 标记通知为已读
+   */
+  async markAsRead(notificationIds: string[]): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .in('id', notificationIds);
+
+      if (error) {
+        console.error('标记通知已读失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('标记通知已读异常:', err);
+      return false;
+    }
+  },
+
+  /**
+   * 删除通知
+   */
+  async deleteNotifications(notificationIds: string[]): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (error) {
+        console.error('删除通知失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除通知异常:', err);
+      return false;
+    }
+  }
+};
+
 // 用户服务
 export const userService = {
   // 创建客户

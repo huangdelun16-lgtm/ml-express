@@ -12,9 +12,10 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { packageService, supabase } from '../services/supabase';
+import { packageService, supabase, notificationService, Notification } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
+import { Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -31,11 +32,14 @@ export default function DashboardScreen({ navigation }: any) {
     inProgressPackages: 0,
     completedPackages: 0,
   });
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
 
   useEffect(() => {
     loadUserInfo();
     loadStats();
     requestLocationPermission();
+    checkForNewNotifications(); // 立即检查通知
     
     // 骑手心跳：每5分钟更新一次在线状态和位置
     const heartbeatInterval = setInterval(async () => {
@@ -64,7 +68,15 @@ export default function DashboardScreen({ navigation }: any) {
       }
     }, 5 * 60 * 1000); // 5分钟
 
-    return () => clearInterval(heartbeatInterval);
+    // 🔔 通知轮询：每30秒检查一次新通知
+    const notificationInterval = setInterval(async () => {
+      await checkForNewNotifications();
+    }, 30 * 1000); // 30秒
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      clearInterval(notificationInterval);
+    };
   }, []);
 
   // 请求位置权限
@@ -170,6 +182,60 @@ export default function DashboardScreen({ navigation }: any) {
       console.error('加载统计失败:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 🔔 检查新通知
+  const checkForNewNotifications = async () => {
+    try {
+      const userPosition = await AsyncStorage.getItem('currentUserPosition');
+      if (userPosition !== '骑手' && userPosition !== '骑手队长') {
+        return; // 只对骑手显示通知
+      }
+
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (!courierId) {
+        return;
+      }
+
+      // 获取未读通知数量
+      const count = await notificationService.getUnreadCount(courierId);
+      const previousCount = unreadNotifications;
+      setUnreadNotifications(count);
+
+      // 如果有新通知，获取最新的一条并显示Alert
+      if (count > previousCount && count > 0) {
+        const notifications = await notificationService.getCourierNotifications(courierId, 1);
+        if (notifications.length > 0) {
+          const latest = notifications[0];
+          setLatestNotification(latest);
+          
+          // 显示通知弹窗
+          Alert.alert(
+            latest.title,
+            latest.message,
+            [
+              {
+                text: '稍后查看',
+                style: 'cancel'
+              },
+              {
+                text: '立即查看',
+                onPress: () => {
+                  // 标记为已读
+                  notificationService.markAsRead([latest.id]);
+                  setUnreadNotifications(prev => Math.max(0, prev - 1));
+                  // 跳转到包裹管理页面
+                  navigation.navigate('PackageManagement');
+                }
+              }
+            ],
+            { cancelable: false }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('检查通知失败:', error);
     }
   };
 

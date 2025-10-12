@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
@@ -213,7 +213,20 @@ const RealTimeTracking: React.FC = () => {
       );
 
       if (success) {
-        alert(`包裹 ${packageData.id} 已成功分配给快递员 ${courier.name}`);
+        // 🔔 发送通知给快递员
+        await notificationService.sendPackageAssignedNotification(
+          courier.id,
+          courier.name,
+          packageData.id,
+          {
+            sender: packageData.sender_name,
+            receiver: packageData.receiver_name,
+            receiverAddress: packageData.receiver_address,
+            deliverySpeed: packageData.delivery_speed
+          }
+        );
+
+        alert(`包裹 ${packageData.id} 已成功分配给快递员 ${courier.name}\n📲 通知已发送`);
         setShowAssignModal(false);
         setSelectedPackage(null);
         loadPackages();
