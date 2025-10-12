@@ -101,9 +101,10 @@ exports.handler = async (event, context) => {
     }
 
     // 发送短信（缅甸手机号需要加国际区号 +95）
-    const internationalPhone = phoneNumber.replace(/^0/, '+95');
+    // 09xxxxxxxx -> +959xxxxxxxx
+    const internationalPhone = '+95' + phoneNumber.substring(1);
     
-    console.log(`📱 正在发送验证码到: ${internationalPhone}`);
+    console.log(`📱 正在发送验证码到: ${internationalPhone} (原始号码: ${phoneNumber})`);
     
     const message = await client.messages.create({
       body: messageText,

@@ -37,6 +37,8 @@ exports.handler = async (event, context) => {
     // 解析请求体
     const { phoneNumber, code, language = 'zh' } = JSON.parse(event.body || '{}');
 
+    console.log(`🔍 验证请求: 手机号=${phoneNumber}, 验证码=${code}`);
+
     // 验证参数
     if (!phoneNumber || !code) {
       return {
