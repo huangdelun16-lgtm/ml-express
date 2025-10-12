@@ -2,9 +2,12 @@
 // 路径: /.netlify/functions/send-email-code
 
 const nodemailer = require('nodemailer');
+const { createClient } = require('@supabase/supabase-js');
 
-// 验证码存储（简化版本，生产环境建议使用数据库）
-const verificationCodes = new Map();
+// 初始化 Supabase 客户端
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // 生成6位随机验证码
 function generateVerificationCode() {
@@ -252,11 +255,35 @@ exports.handler = async (event, context) => {
     // 生成验证码
     const code = generateVerificationCode();
 
-    // 存储验证码（5分钟有效期）
-    verificationCodes.set(email, {
-      code: code,
-      expires: Date.now() + 5 * 60 * 1000
-    });
+    // 存储验证码到 Supabase（5分钟有效期）
+    if (supabase) {
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      
+      // 删除该邮箱的旧验证码
+      await supabase
+        .from('verification_codes')
+        .delete()
+        .eq('email', email);
+      
+      // 插入新验证码
+      const { error: insertError } = await supabase
+        .from('verification_codes')
+        .insert({
+          email: email,
+          code: code,
+          expires_at: expiresAt,
+          used: false
+        });
+      
+      if (insertError) {
+        console.error('❌ 存储验证码失败:', insertError);
+        // 继续发送邮件，即使存储失败
+      } else {
+        console.log(`✅ 验证码已存储: ${email} -> ${code}`);
+      }
+    } else {
+      console.warn('⚠️ Supabase 未配置，验证码无法持久化存储');
+    }
 
     // 创建 Nodemailer 传输器
     const transporter = nodemailer.createTransport({

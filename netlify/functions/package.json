@@ -4,6 +4,7 @@
   "description": "Netlify Functions for ML Express",
   "dependencies": {
     "twilio": "^5.3.5",
-    "nodemailer": "^6.9.7"
+    "nodemailer": "^6.9.7",
+    "@supabase/supabase-js": "^2.39.0"
   }
 }
