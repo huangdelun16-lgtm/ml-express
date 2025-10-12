@@ -260,8 +260,19 @@ const HomePage: React.FC = () => {
       
       if (isLoginMode) {
         // ===== 登录模式 =====
+        // 验证邮箱和密码
+        if (!registerForm.email) {
+          alert(language === 'zh' ? '请输入邮箱' : language === 'en' ? 'Please enter email' : 'အီးမေးလ်ထည့်ပါ');
+          return;
+        }
+
+        if (!registerForm.password) {
+          alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
+          return;
+        }
+
         if (!existingUser) {
-          alert(language === 'zh' ? '该手机号未注册，请先注册' : language === 'en' ? 'Phone number not registered, please register first' : 'ဖုန်းနံပါတ်ကို မှတ်ပုံမတင်ရသေးပါ');
+          alert(language === 'zh' ? '该邮箱未注册，请先注册' : language === 'en' ? 'Email not registered, please register first' : 'အီးမေးလ်မှတ်ပုံမတင်ရသေးပါ');
           setIsLoginMode(false);
           return;
         }
@@ -3468,12 +3479,12 @@ const HomePage: React.FC = () => {
               </h2>
               <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
                 {isLoginMode ?
-                  (language === 'zh' ? '请输入您的手机号登录' : 
-                   language === 'en' ? 'Please enter your phone number to login' : 
-                   'သင့်ဖုန်းနံပါတ်ဖြင့် ဝင်ရောက်ပါ') :
-                  (language === 'zh' ? '请填写您的信息，已注册用户将自动登录' : 
-                   language === 'en' ? 'Please fill in your information, registered users will be logged in automatically' : 
-                   'သင့်အချက်အလက်များဖြည့်ပါ၊ မှတ်ပုံတင်ပြီးသူများအလိုအလျောက်ဝင်ပါမည်')
+                  (language === 'zh' ? '请输入您的邮箱和密码登录' : 
+                   language === 'en' ? 'Please enter your email and password to login' : 
+                   'သင့်အီးမေးလ်နှင့် စကားဝှက်ဖြင့် ဝင်ရောက်ပါ') :
+                  (language === 'zh' ? '请填写您的信息完成注册' : 
+                   language === 'en' ? 'Please fill in your information to register' : 
+                   'မှတ်ပုံတင်ရန် သင့်အချက်အလက်များဖြည့်ပါ')
                 }
               </p>
             </div>
@@ -3563,7 +3574,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 3. 密码（仅注册模式显示） */}
+              {/* 3. 密码（注册模式显示，登录模式下移到邮箱后面） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3580,7 +3591,7 @@ const HomePage: React.FC = () => {
                     value={registerForm.password}
                     onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                     placeholder={language === 'zh' ? '请输入密码（至少6位）' : language === 'en' ? 'Enter password (min 6 chars)' : 'စကားဝှက်ထည့်ပါ (အနည်းဆုံး 6 လုံး)'}
-                    required={!isLoginMode}
+                    required
                     minLength={6}
                     style={{
                       width: '100%',
@@ -3637,42 +3648,42 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 5. 电子邮箱 + 验证码（仅注册模式显示） */}
-              {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ 
-                    color: 'white', 
-                    display: 'block', 
-                    marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    {language === 'zh' ? '电子邮箱 *' : language === 'en' ? 'Email Address *' : 'အီးမေးလ်လိပ်စာ *'}
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <input
-                      type="email"
-                      value={registerForm.email}
-                      onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                      placeholder={language === 'zh' ? 'example@gmail.com' : language === 'en' ? 'example@gmail.com' : 'example@gmail.com'}
-                      required={!isLoginMode}
-                      style={{
-                        flex: '1.2',
-                        padding: '1rem',
-                        border: '2px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        color: '#2c5282',
-                        fontWeight: '500',
-                        outline: 'none',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                    />
-                    
-                    {/* 获取验证码按钮 */}
+              {/* 5. 电子邮箱（登录和注册都显示） */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '电子邮箱 *' : language === 'en' ? 'Email Address *' : 'အီးမေးလ်လိပ်စာ *'}
+                </label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <input
+                    type="email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                    placeholder={language === 'zh' ? 'example@gmail.com' : language === 'en' ? 'example@gmail.com' : 'example@gmail.com'}
+                    required
+                    style={{
+                      flex: isLoginMode ? '1' : '1.2',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                  
+                  {/* 获取验证码按钮（仅注册模式显示） */}
+                  {!isLoginMode && (
                     <button
                       type="button"
                       onClick={handleSendVerificationCode}
@@ -3702,7 +3713,9 @@ const HomePage: React.FC = () => {
                         (language === 'zh' ? '获取验证码' : language === 'en' ? 'Get Code' : 'ကုဒ်ယူရန်')
                       }
                     </button>
-                  </div>
+                  )}
+                </div>
+                {!isLoginMode && (
                   <small style={{ 
                     color: 'rgba(255, 255, 255, 0.7)', 
                     fontSize: '0.85rem',
@@ -3713,6 +3726,42 @@ const HomePage: React.FC = () => {
                      language === 'en' ? 'Verification code will be sent to your email' : 
                      'အတည်ပြုကုဒ်ကို သင့်အီးမေးလ်သို့ ပေးပို့ပါမည်'}
                   </small>
+                )}
+              </div>
+
+              {/* 密码（登录模式显示） */}
+              {isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
+                  </label>
+                  <input
+                    type="password"
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    placeholder={language === 'zh' ? '请输入密码' : language === 'en' ? 'Enter password' : 'စကားဝှက်ထည့်ပါ'}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
                 </div>
               )}
 
