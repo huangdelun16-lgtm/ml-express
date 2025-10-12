@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "Netlify Functions for ML Express",
   "dependencies": {
-    "twilio": "^5.3.5",
-    "axios": "^1.7.9",
-    "@vonage/server-sdk": "^3.18.1"
+    "twilio": "^5.3.5"
   }
 }
-
