@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,24 @@ import {
   ActivityIndicator,
   FlatList,
   Linking,
+  Modal,
+  Dimensions,
 } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { packageService, Package, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width, height } = Dimensions.get('window');
 
 export default function MapScreen({ navigation }: any) {
   const [location, setLocation] = useState<any>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDeliveringPackageId, setCurrentDeliveringPackageId] = useState<string | null>(null);
+  const [showMapPreview, setShowMapPreview] = useState(false);
+  const [optimizedPackagesWithCoords, setOptimizedPackagesWithCoords] = useState<any[]>([]);
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     requestLocationPermission();
@@ -307,7 +315,7 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
-  // 导航到所有包裹地址（智能优化路线）
+  // 导航到所有包裹地址（智能优化路线 + 地图预览）
   const handleNavigateAll = async () => {
     if (packages.length === 0) {
       Alert.alert('提示', '暂无待配送包裹');
@@ -329,34 +337,39 @@ export default function MapScreen({ navigation }: any) {
       // 2. 更新包裹列表显示（按优化后的顺序）
       setPackages(optimizedPackages);
 
-      // 3. 构建 Google Maps 导航 URL
-      const origin = `${location.latitude},${location.longitude}`;
-      
-      if (optimizedPackages.length === 1) {
-        // 只有一个包裹，直接导航
-        const destination = encodeURIComponent(optimizedPackages[0].receiver_address);
-        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-        Linking.openURL(url);
-      } else {
-        // 多个包裹，按优化后的顺序添加途经点
-        const destination = encodeURIComponent(optimizedPackages[optimizedPackages.length - 1].receiver_address);
-        
-        // Google Maps 最多支持9个途经点
-        const waypointsLimit = Math.min(optimizedPackages.length - 1, 9);
-        const waypoints = optimizedPackages.slice(0, waypointsLimit).map(pkg => 
-          encodeURIComponent(pkg.receiver_address)
-        ).join('|');
-        
-        // 使用 optimize:true 让 Google Maps 进一步优化路线
-        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
-        
-        console.log('🗺️ 导航 URL:', url);
-        Linking.openURL(url);
-      }
+      // 3. 保存带坐标的优化包裹数据
+      setOptimizedPackagesWithCoords(optimizedPackages);
+
+      // 4. 显示地图预览（带数字标记 1,2,3,4）
+      setShowMapPreview(true);
     } catch (error) {
       console.error('路线规划失败:', error);
       Alert.alert('错误', '路线规划失败，请重试');
     }
+  };
+
+  // 🚀 跳转到Google Maps导航
+  const openGoogleMapsNavigation = () => {
+    if (!location || optimizedPackagesWithCoords.length === 0) return;
+
+    const origin = `${location.latitude},${location.longitude}`;
+    
+    if (optimizedPackagesWithCoords.length === 1) {
+      const destination = encodeURIComponent(optimizedPackagesWithCoords[0].receiver_address);
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+      Linking.openURL(url);
+    } else {
+      const destination = encodeURIComponent(optimizedPackagesWithCoords[optimizedPackagesWithCoords.length - 1].receiver_address);
+      const waypointsLimit = Math.min(optimizedPackagesWithCoords.length - 1, 9);
+      const waypoints = optimizedPackagesWithCoords.slice(0, waypointsLimit).map(pkg => 
+        encodeURIComponent(pkg.receiver_address)
+      ).join('|');
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+      Linking.openURL(url);
+    }
+    
+    // 关闭地图预览
+    setShowMapPreview(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -518,6 +531,123 @@ export default function MapScreen({ navigation }: any) {
           />
         )}
       </View>
+
+      {/* 🗺️ 地图预览Modal（显示数字标记 1,2,3,4） */}
+      <Modal
+        visible={showMapPreview}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapPreview(false)}
+      >
+        <View style={styles.mapModalContainer}>
+          {/* 地图标题栏 */}
+          <View style={styles.mapModalHeader}>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowMapPreview(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.mapModalTitle}>📍 配送路线预览</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* 地图视图 */}
+          {location && optimizedPackagesWithCoords.length > 0 && (
+            <MapView
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              initialRegion={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              }}
+            >
+              {/* 骑手当前位置标记（绿色圆点） */}
+              <Marker
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                title="我的位置"
+                description="骑手当前位置"
+              >
+                <View style={styles.courierMarker}>
+                  <Text style={styles.courierMarkerText}>🏍️</Text>
+                </View>
+              </Marker>
+
+              {/* 包裹目的地标记（数字 1,2,3,4） */}
+              {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
+                if (!pkg.coords) return null;
+                return (
+                  <Marker
+                    key={pkg.id}
+                    coordinate={{
+                      latitude: pkg.coords.lat,
+                      longitude: pkg.coords.lng,
+                    }}
+                    title={`${index + 1}. ${pkg.receiver_name}`}
+                    description={pkg.receiver_address}
+                  >
+                    <View style={styles.packageMarker}>
+                      <Text style={styles.packageMarkerNumber}>{index + 1}</Text>
+                    </View>
+                  </Marker>
+                );
+              })}
+
+              {/* 路线连线 */}
+              {location && optimizedPackagesWithCoords.length > 0 && (
+                <Polyline
+                  coordinates={[
+                    { latitude: location.latitude, longitude: location.longitude },
+                    ...optimizedPackagesWithCoords
+                      .filter((pkg: any) => pkg.coords)
+                      .map((pkg: any) => ({
+                        latitude: pkg.coords.lat,
+                        longitude: pkg.coords.lng,
+                      })),
+                  ]}
+                  strokeColor="#3182ce"
+                  strokeWidth={3}
+                  lineDashPattern={[5, 5]}
+                />
+              )}
+            </MapView>
+          )}
+
+          {/* 底部操作按钮 */}
+          <View style={styles.mapModalFooter}>
+            <TouchableOpacity 
+              style={styles.startNavigationButton}
+              onPress={openGoogleMapsNavigation}
+            >
+              <Text style={styles.startNavigationText}>🚀 开始导航</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 配送顺序列表 */}
+          <View style={styles.routeList}>
+            <Text style={styles.routeListTitle}>配送顺序：</Text>
+            {optimizedPackagesWithCoords.map((pkg: any, index: number) => (
+              <View key={pkg.id} style={styles.routeListItem}>
+                <View style={styles.routeNumber}>
+                  <Text style={styles.routeNumberText}>{index + 1}</Text>
+                </View>
+                <View style={styles.routeInfo}>
+                  <Text style={styles.routeName}>{pkg.receiver_name}</Text>
+                  <Text style={styles.routeDistance}>
+                    {pkg.distance ? `📏 ${pkg.distance.toFixed(1)}km` : ''}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -784,5 +914,148 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     color: '#999',
+  },
+  // 🗺️ 地图预览Modal样式
+  mapModalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  mapModalHeader: {
+    backgroundColor: '#2c5282',
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  mapModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  map: {
+    width: width,
+    height: height * 0.5,
+  },
+  courierMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  courierMarkerText: {
+    fontSize: 20,
+  },
+  packageMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#3182ce',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  packageMarkerNumber: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  mapModalFooter: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  startNavigationButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  startNavigationText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  routeList: {
+    flex: 1,
+    backgroundColor: '#f7fafc',
+    padding: 16,
+  },
+  routeListTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+  },
+  routeListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  routeNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3182ce',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  routeNumberText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  routeName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 2,
+  },
+  routeDistance: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '600',
   },
 });
