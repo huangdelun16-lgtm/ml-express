@@ -25,3 +25,7 @@
 [functions]
   # Functions 超时时间（秒）
   node_bundler = "esbuild"
+
+# 使用插件自动安装 Functions 依赖
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
