@@ -181,7 +181,10 @@ const HomePage: React.FC = () => {
       // 用户已登录，直接打开订单表单
       setShowOrderForm(true);
     } else {
-      // 用户未登录，打开注册窗口
+      // 用户未登录，提示并打开注册窗口
+      alert(language === 'zh' ? '请先注册或登录后再下单' : 
+            language === 'en' ? 'Please register or login before placing an order' : 
+            'အော်ဒါမတင်မီ အကောင့်ဖွင့်ပါ သို့မဟုတ် ဝင်ပါ');
       setShowRegisterModal(true);
     }
   };
@@ -241,7 +244,8 @@ const HomePage: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('ml-express-customer');
-    alert(language === 'zh' ? '已退出登录' : language === 'en' ? 'Logged out' : 'ထွက်ခဲ့ပါပြီ');
+    // 刷新页面以更新UI
+    window.location.reload();
   };
 
   // 语言切换函数
@@ -1232,6 +1236,78 @@ const HomePage: React.FC = () => {
           onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
           onMouseOut={(e) => e.currentTarget.style.color = 'white'}
           >{t.nav.admin}</a>
+          
+          {/* 注册/登录按钮 */}
+          {currentUser ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'rgba(72, 187, 120, 0.2)',
+              border: '2px solid rgba(72, 187, 120, 0.5)',
+              padding: '0.5rem 1rem',
+              borderRadius: '10px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <span style={{ 
+                color: 'white',
+                fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
+                fontWeight: 'bold'
+              }}>
+                {language === 'zh' ? `欢迎，${currentUser.name}` : 
+                 language === 'en' ? `Welcome, ${currentUser.name}` : 
+                 `ကြိုဆိုပါတယ်, ${currentUser.name}`}
+              </span>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.4)',
+                  padding: '0.3rem 0.8rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+              >
+                {language === 'zh' ? '退出' : language === 'en' ? 'Logout' : 'ထွက်'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowRegisterModal(true)}
+              style={{
+                background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.6rem 1.5rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 15px rgba(72, 187, 120, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(72, 187, 120, 0.5)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(72, 187, 120, 0.3)';
+              }}
+            >
+              {language === 'zh' ? '注册/登录' : language === 'en' ? 'Register/Login' : 'အကောင့်ဖွင့်/ဝင်ရန်'}
+            </button>
+          )}
           
           {/* 自定义语言选择器 */}
           <div style={{ position: 'relative' }} data-language-dropdown>
@@ -3098,7 +3174,7 @@ const HomePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(26, 54, 93, 0.9)',
+          background: 'rgba(0, 0, 0, 0.7)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
@@ -3106,7 +3182,7 @@ const HomePage: React.FC = () => {
           zIndex: 3000
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
             padding: window.innerWidth < 768 ? '2rem' : '2.5rem',
             borderRadius: '20px',
             width: window.innerWidth < 768 ? '90%' : '500px',
@@ -3338,40 +3414,6 @@ const HomePage: React.FC = () => {
                 </button>
               </div>
             </form>
-
-            {/* 已有账号提示 */}
-            {currentUser && (
-              <div style={{
-                marginTop: '1.5rem',
-                padding: '1rem',
-                background: 'rgba(72, 187, 120, 0.2)',
-                borderRadius: '10px',
-                border: '1px solid rgba(72, 187, 120, 0.4)',
-                textAlign: 'center'
-              }}>
-                <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                  {language === 'zh' ? `当前登录用户：${currentUser.name}` : 
-                   language === 'en' ? `Current user: ${currentUser.name}` : 
-                   `လက်ရှိအသုံးပြုသူ: ${currentUser.name}`}
-                </p>
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    marginTop: '0.5rem',
-                    background: 'rgba(255, 255, 255, 0.3)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {language === 'zh' ? '退出登录' : language === 'en' ? 'Logout' : 'ထွက်ရန်'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
