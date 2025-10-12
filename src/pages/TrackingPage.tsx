@@ -53,7 +53,7 @@ const TrackingPage: React.FC = () => {
     };
   }, [trackingResult]);
 
-  // 加载快递员位置
+  // 加载快递员位置（带隐私权限检查）
   const loadCourierLocation = async (courierName: string) => {
     try {
       // 从 trackingService 获取活跃的快递员
@@ -62,14 +62,27 @@ const TrackingPage: React.FC = () => {
       
       if (!courier) {
         console.log('未找到快递员:', courierName);
+        setCourierLocation(null);
         return;
       }
       
-      // 获取快递员的位置信息
+      // 🔒 隐私权限检查：只有当前配送包裹的客户能看到骑手位置
+      const currentPackageId = trackingResult?.id;
+      const isAllowedToTrack = courier.current_delivering_package_id === currentPackageId;
+      
+      if (!isAllowedToTrack) {
+        console.log('🔒 隐私保护：骑手正在配送其他包裹，您暂时无法跟踪位置');
+        console.log(`骑手当前配送: ${courier.current_delivering_package_id}, 您的包裹: ${currentPackageId}`);
+        setCourierLocation(null);
+        return;
+      }
+      
+      // ✅ 权限验证通过，获取快递员的位置信息
       const locations = await trackingService.getCourierLocations();
       const courierLocation = locations.find((loc: any) => loc.courier_id === courier.id);
       
       if (courierLocation) {
+        console.log('✅ 位置可见：骑手正在配送您的包裹');
         setCourierLocation({
           lat: courierLocation.latitude,
           lng: courierLocation.longitude,
@@ -78,9 +91,13 @@ const TrackingPage: React.FC = () => {
           vehicle: courier.vehicle_type || '摩托车',
           last_active: courierLocation.last_update
         });
+      } else {
+        console.log('⚠️ 骑手位置信息不可用');
+        setCourierLocation(null);
       }
     } catch (error) {
       console.error('加载快递员位置失败:', error);
+      setCourierLocation(null);
     }
   };
 
@@ -841,18 +858,38 @@ const TrackingPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {courierLocation && (
-                    <div style={{ 
-                      marginTop: '1rem', 
-                      padding: '0.8rem', 
-                      background: 'rgba(56, 161, 105, 0.1)',
-                      borderRadius: '8px',
-                      textAlign: 'center',
-                      color: '#38a169',
-                      fontSize: '0.9rem'
-                    }}>
-                      🔄 {t.tracking.lastUpdate}: {new Date(courierLocation.last_active).toLocaleString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM')}
-                    </div>
+                  {/* 骑手位置信息或隐私提示 */}
+                  {trackingResult.status === '配送中' && (
+                    <>
+                      {courierLocation ? (
+                        <div style={{ 
+                          marginTop: '1rem', 
+                          padding: '0.8rem', 
+                          background: 'rgba(56, 161, 105, 0.1)',
+                          borderRadius: '8px',
+                          textAlign: 'center',
+                          color: '#38a169',
+                          fontSize: '0.9rem'
+                        }}>
+                          🔄 {t.tracking.lastUpdate}: {new Date(courierLocation.last_active).toLocaleString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM')}
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          marginTop: '1rem', 
+                          padding: '0.8rem', 
+                          background: 'rgba(237, 137, 54, 0.1)',
+                          borderRadius: '8px',
+                          textAlign: 'center',
+                          color: '#c05621',
+                          fontSize: '0.9rem',
+                          border: '1px solid rgba(237, 137, 54, 0.3)'
+                        }}>
+                          🔒 {language === 'zh' ? '骑手正在配送其他包裹，稍后开始配送您的包裹时即可查看位置' : 
+                               language === 'en' ? 'Courier is delivering other packages. Location will be visible when delivering yours' : 
+                               'ပို့ဆောင်သူသည် အခြားထုပ်ပိုးများကို ပို့ဆောင်နေသည်'}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

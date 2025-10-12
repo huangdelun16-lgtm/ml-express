@@ -10,17 +10,19 @@ import {
   Linking,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { packageService, Package } from '../services/supabase';
+import { packageService, Package, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MapScreen({ navigation }: any) {
   const [location, setLocation] = useState<any>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentDeliveringPackageId, setCurrentDeliveringPackageId] = useState<string | null>(null);
 
   useEffect(() => {
     requestLocationPermission();
     loadPackages();
+    loadCurrentDeliveringPackage();
   }, []);
 
   const requestLocationPermission = async () => {
@@ -57,6 +59,96 @@ export default function MapScreen({ navigation }: any) {
       console.error('加载包裹失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🚚 加载当前正在配送的包裹ID
+  const loadCurrentDeliveringPackage = async () => {
+    try {
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (!courierId) return;
+
+      const { data, error } = await supabase
+        .from('couriers')
+        .select('current_delivering_package_id')
+        .eq('id', courierId)
+        .single();
+
+      if (error) {
+        console.error('加载当前配送包裹失败:', error);
+        return;
+      }
+
+      setCurrentDeliveringPackageId(data?.current_delivering_package_id || null);
+    } catch (error) {
+      console.error('加载当前配送包裹异常:', error);
+    }
+  };
+
+  // 🚀 开始配送此包裹
+  const startDelivering = async (packageId: string) => {
+    try {
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (!courierId) {
+        Alert.alert('错误', '未找到快递员ID，请重新登录');
+        return;
+      }
+
+      // 更新数据库中骑手的当前配送包裹ID
+      const { error } = await supabase
+        .from('couriers')
+        .update({ current_delivering_package_id: packageId })
+        .eq('id', courierId);
+
+      if (error) {
+        console.error('更新当前配送包裹失败:', error);
+        Alert.alert('错误', '开始配送失败，请重试');
+        return;
+      }
+
+      // 更新包裹状态为"配送中"
+      await packageService.updatePackageStatus(
+        packageId,
+        '配送中',
+        new Date().toLocaleString('zh-CN')
+      );
+
+      setCurrentDeliveringPackageId(packageId);
+      Alert.alert(
+        '✅ 开始配送',
+        '您已开始配送此包裹，客户现在可以实时跟踪您的位置',
+        [{ text: '确定' }]
+      );
+
+      // 刷新包裹列表
+      loadPackages();
+    } catch (error) {
+      console.error('开始配送异常:', error);
+      Alert.alert('错误', '开始配送失败，请重试');
+    }
+  };
+
+  // 🏁 完成配送此包裹
+  const finishDelivering = async (packageId: string) => {
+    try {
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (!courierId) return;
+
+      // 清除当前配送包裹ID
+      const { error } = await supabase
+        .from('couriers')
+        .update({ current_delivering_package_id: null })
+        .eq('id', courierId);
+
+      if (error) {
+        console.error('清除当前配送包裹失败:', error);
+        return;
+      }
+
+      setCurrentDeliveringPackageId(null);
+      Alert.alert('提示', '配送完成，客户将无法继续跟踪您的位置');
+    } catch (error) {
+      console.error('完成配送异常:', error);
     }
   };
 
@@ -286,9 +378,15 @@ export default function MapScreen({ navigation }: any) {
     const speedIcon = item.delivery_speed === '急送达' ? '⚡' : 
                      item.delivery_speed === '定时达' ? '⏰' : '✓';
     
+    // 判断是否为当前配送的包裹
+    const isCurrentDelivering = currentDeliveringPackageId === item.id;
+    
     return (
       <TouchableOpacity
-        style={styles.packageCard}
+        style={[
+          styles.packageCard,
+          isCurrentDelivering && styles.currentDeliveringCard
+        ]}
         onPress={() => navigation.navigate('PackageDetail', { package: item })}
       >
         <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -302,6 +400,11 @@ export default function MapScreen({ navigation }: any) {
               <View style={styles.speedBadge}>
                 <Text style={styles.speedIcon}>{speedIcon}</Text>
                 <Text style={styles.speedText}>{item.delivery_speed}</Text>
+              </View>
+            )}
+            {isCurrentDelivering && (
+              <View style={styles.deliveringBadge}>
+                <Text style={styles.deliveringText}>🚚 配送中</Text>
               </View>
             )}
           </View>
@@ -318,6 +421,33 @@ export default function MapScreen({ navigation }: any) {
               <Text style={styles.distanceText}>{distanceText}</Text>
             )}
           </View>
+
+          {/* 开始/结束配送按钮 */}
+          {item.status === '已取件' || item.status === '配送中' ? (
+            <View style={styles.deliveryActions}>
+              {!isCurrentDelivering ? (
+                <TouchableOpacity 
+                  style={styles.startDeliveryButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    startDelivering(item.id);
+                  }}
+                >
+                  <Text style={styles.startDeliveryText}>🚀 开始配送</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.finishDeliveryButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    finishDelivering(item.id);
+                  }}
+                >
+                  <Text style={styles.finishDeliveryText}>🏁 完成配送</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
         </View>
 
         <TouchableOpacity 
@@ -571,6 +701,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10b981',
     fontWeight: '600',
+  },
+  currentDeliveringCard: {
+    borderWidth: 2,
+    borderColor: '#10b981',
+    backgroundColor: '#f0fdf4',
+  },
+  deliveringBadge: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  deliveringText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  deliveryActions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  startDeliveryButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flex: 1,
+  },
+  startDeliveryText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  finishDeliveryButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flex: 1,
+  },
+  finishDeliveryText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   navButton: {
     width: 60,
