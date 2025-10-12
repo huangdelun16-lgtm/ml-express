@@ -964,6 +964,7 @@ export const userService = {
     phone: string;
     email?: string;
     address: string;
+    password?: string;
   }): Promise<any | null> {
     try {
       const newId = `USR${Date.now().toString().slice(-6)}`;
@@ -973,6 +974,7 @@ export const userService = {
         phone: customerData.phone,
         email: customerData.email || '',
         address: customerData.address,
+        password: customerData.password || '123456', // 默认密码
         user_type: 'customer',
         status: 'active',
         registration_date: new Date().toLocaleDateString('zh-CN'),

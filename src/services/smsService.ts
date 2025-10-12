@@ -113,7 +113,11 @@ export async function verifyCode(
   }
 }
 
+// 添加别名以保持向后兼容
+export const verifyVerificationCode = verifyCode;
+
 export default {
   sendVerificationCode,
-  verifyCode
+  verifyCode,
+  verifyVerificationCode
 };

@@ -102,8 +102,16 @@ const HomePage: React.FC = () => {
     name: '',
     phone: '',
     email: '',
-    address: ''
+    address: '',
+    password: '',
+    confirmPassword: '',
+    verificationCode: ''
   });
+  
+  // 验证码相关状态
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [sentCode, setSentCode] = useState('');
   
   // 系统价格设置
   const [pricingSettings, setPricingSettings] = useState({
@@ -137,6 +145,16 @@ const HomePage: React.FC = () => {
     loadPricingSettings();
     loadUserFromStorage();
   }, []);
+
+  // 验证码倒计时
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
@@ -194,22 +212,26 @@ const HomePage: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 验证表单
+    // 验证手机号
     if (!registerForm.phone) {
       alert(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
       return;
     }
-    
-    // 如果是注册模式，验证姓名
-    if (!isLoginMode && !registerForm.name) {
-      alert(language === 'zh' ? '请填写姓名' : language === 'en' ? 'Please fill in name' : 'နာမည်ဖြည့်ပါ');
-      return;
-    }
 
-    // 验证手机号格式（缅甸手机号）
     const phoneRegex = /^09\d{7,9}$/;
     if (!phoneRegex.test(registerForm.phone)) {
       alert(language === 'zh' ? '请输入有效的缅甸手机号（以09开头）' : language === 'en' ? 'Please enter a valid Myanmar phone number (starting with 09)' : 'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်သည်)');
+      return;
+    }
+
+    // 验证密码
+    if (!registerForm.password) {
+      alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
+      return;
+    }
+
+    if (registerForm.password.length < 6) {
+      alert(language === 'zh' ? '密码至少需要6位' : language === 'en' ? 'Password must be at least 6 characters' : 'စကားဝှက်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
       return;
     }
 
@@ -217,45 +239,159 @@ const HomePage: React.FC = () => {
       // 检查手机号是否已注册
       const existingUser = await userService.getUserByPhone(registerForm.phone);
       
-      if (existingUser) {
-        // 用户已存在，直接登录
+      if (isLoginMode) {
+        // ===== 登录模式 =====
+        if (!existingUser) {
+          alert(language === 'zh' ? '该手机号未注册，请先注册' : language === 'en' ? 'Phone number not registered, please register first' : 'ဖုန်းနံပါတ်ကို မှတ်ပုံမတင်ရသေးပါ');
+          setIsLoginMode(false);
+          return;
+        }
+
+        // 验证密码
+        if (existingUser.password !== registerForm.password) {
+          alert(language === 'zh' ? '密码错误' : language === 'en' ? 'Incorrect password' : 'စကားဝှက်မှားနေပါသည်');
+          return;
+        }
+
+        // 登录成功
         setCurrentUser(existingUser);
         localStorage.setItem('ml-express-customer', JSON.stringify(existingUser));
         setShowRegisterModal(false);
+        alert(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : 
+              language === 'en' ? `Login successful! Welcome back, ${existingUser.name}` : 
+              `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${existingUser.name}`);
         
-        if (isLoginMode) {
-          // 登录模式：显示欢迎消息
-          alert(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : language === 'en' ? `Login successful! Welcome back, ${existingUser.name}` : `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${existingUser.name}`);
-        } else {
-          // 注册模式但用户已存在：自动登录
-          alert(language === 'zh' ? `该手机号已注册，已自动为您登录` : language === 'en' ? `This phone number is already registered, logged in automatically` : `ဤဖုန်းနံပါတ်ကို မှတ်ပုံတင်ပြီးပါပြီ၊ အလိုအလျောက်ဝင်ပါသည်`);
-        }
+        // 清空表单
+        setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+        setCodeSent(false);
+        setCountdown(0);
+        
       } else {
-        // 登录模式但用户不存在
-        if (isLoginMode) {
-          alert(language === 'zh' ? '该手机号未注册，请先注册' : language === 'en' ? 'This phone number is not registered, please register first' : 'ဤဖုန်းနံပါတ်ကို မှတ်ပုံမတင်ရသေးပါ၊ ဦးစွာမှတ်ပုံတင်ပါ');
-          setIsLoginMode(false); // 切换到注册模式
+        // ===== 注册模式 =====
+        
+        // 验证姓名
+        if (!registerForm.name) {
+          alert(language === 'zh' ? '请填写姓名' : language === 'en' ? 'Please fill in name' : 'နာမည်ဖြည့်ပါ');
           return;
         }
+
+        // 验证确认密码
+        if (!registerForm.confirmPassword) {
+          alert(language === 'zh' ? '请确认密码' : language === 'en' ? 'Please confirm password' : 'စကားဝှက်အတည်ပြုပါ');
+          return;
+        }
+
+        if (registerForm.password !== registerForm.confirmPassword) {
+          alert(language === 'zh' ? '两次输入的密码不一致' : language === 'en' ? 'Passwords do not match' : 'စကားဝှက်များ မတူညီပါ');
+          return;
+        }
+
+        // 验证验证码
+        if (!registerForm.verificationCode) {
+          alert(language === 'zh' ? '请输入验证码' : language === 'en' ? 'Please enter verification code' : 'အတည်ပြုကုဒ်ထည့်ပါ');
+          return;
+        }
+
+        // 验证验证码是否正确
+        const { verifyVerificationCode } = await import('../services/smsService');
+        const verifyResult = await verifyVerificationCode(registerForm.phone, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+        
+        if (!verifyResult.success) {
+          alert(verifyResult.message);
+          return;
+        }
+
+        // 检查手机号是否已存在
+        if (existingUser) {
+          alert(language === 'zh' ? '该手机号已注册，请直接登录' : 
+                language === 'en' ? 'Phone number already registered, please login' : 
+                'ဖုန်းနံပါတ်မှတ်ပုံတင်ပြီးပါပြီ၊ ဝင်ပါ');
+          setIsLoginMode(true);
+          return;
+        }
+
         // 创建新用户
-        const newUser = await userService.createCustomer(registerForm);
+        const newUser = await userService.createCustomer({
+          ...registerForm,
+          password: registerForm.password // 添加密码字段
+        });
         
         if (newUser) {
           setCurrentUser(newUser);
           localStorage.setItem('ml-express-customer', JSON.stringify(newUser));
           setShowRegisterModal(false);
           setShowOrderForm(true);
-          alert(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : language === 'en' ? 'Registration successful! Welcome to Myanmar Express' : 'မှတ်ပုံတင်ခြင်း အောင်မြင်ပါသည်!');
+          alert(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : 
+                language === 'en' ? 'Registration successful! Welcome to Myanmar Express' : 
+                'မှတ်ပုံတင်ခြင်း အောင်မြင်ပါသည်!');
           
           // 清空表单
-          setRegisterForm({ name: '', phone: '', email: '', address: '' });
+          setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+          setCodeSent(false);
+          setCountdown(0);
         } else {
-          alert(language === 'zh' ? '注册失败，请稍后重试' : language === 'en' ? 'Registration failed, please try again later' : 'မှတ်ပုံတင်ခြင်း မအောင်မြင်ပါ');
+          alert(language === 'zh' ? '注册失败，请稍后重试' : 
+                language === 'en' ? 'Registration failed, please try again later' : 
+                'မှတ်ပုံတင်ခြင်း မအောင်မြင်ပါ');
         }
       }
     } catch (error) {
       console.error('注册/登录失败:', error);
-      alert(language === 'zh' ? '操作失败，请检查网络连接' : language === 'en' ? 'Operation failed, please check network connection' : 'လုပ်ဆောင်ချက် မအောင်မြင်ပါ');
+      alert(language === 'zh' ? '操作失败，请检查网络连接' : 
+            language === 'en' ? 'Operation failed, please check network connection' : 
+            'လုပ်ဆောင်ချက် မအောင်မြင်ပါ');
+    }
+  };
+
+  // 发送验证码
+  const handleSendVerificationCode = async () => {
+    // 检查倒计时
+    if (countdown > 0) {
+      alert(language === 'zh' ? `请等待 ${countdown} 秒后再试` : 
+            language === 'en' ? `Please wait ${countdown} seconds` : 
+            `${countdown} စက္ကန့် စောင့်ပါ`);
+      return;
+    }
+
+    // 验证手机号
+    if (!registerForm.phone) {
+      alert(language === 'zh' ? '请先输入手机号' : 
+            language === 'en' ? 'Please enter phone number first' : 
+            'ဖုန်းနံပါတ်ထည့်ပါ');
+      return;
+    }
+
+    const phoneRegex = /^09\d{7,9}$/;
+    if (!phoneRegex.test(registerForm.phone)) {
+      alert(language === 'zh' ? '请输入有效的缅甸手机号（以09开头）' : 
+            language === 'en' ? 'Please enter a valid Myanmar phone number (starting with 09)' : 
+            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်သည်)');
+      return;
+    }
+
+    try {
+      console.log('📱 发送验证码到:', registerForm.phone);
+      
+      // 调用SMS服务
+      const { sendVerificationCode } = await import('../services/smsService');
+      const result = await sendVerificationCode(registerForm.phone, language as 'zh' | 'en' | 'my');
+      
+      if (result.success) {
+        setCodeSent(true);
+        setCountdown(60); // 60秒倒计时
+        if (result.code) {
+          setSentCode(result.code); // 开发模式可能会返回验证码
+          console.log('🔑 验证码:', result.code);
+        }
+        alert(result.message);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error('发送验证码失败:', error);
+      alert(language === 'zh' ? '发送失败，请重试' : 
+            language === 'en' ? 'Failed to send, please try again' : 
+            'ပို့ဆောင်မှု မအောင်မြင်ပါ');
     }
   };
 
@@ -3310,7 +3446,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 电话 */}
+              {/* 电话号码 + 验证码按钮（注册模式为两列） */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ 
                   color: 'white', 
@@ -3321,12 +3457,130 @@ const HomePage: React.FC = () => {
                 }}>
                   {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
                 </label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <input
+                    type="tel"
+                    value={registerForm.phone}
+                    onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                    placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
+                    required
+                    style={{
+                      flex: isLoginMode ? '1' : '1.2',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                  
+                  {/* 验证码按钮（仅注册模式显示） */}
+                  {!isLoginMode && (
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={countdown > 0}
+                      style={{
+                        flex: '0.8',
+                        padding: '1rem',
+                        background: countdown > 0 ? '#cbd5e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                        cursor: countdown > 0 ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (countdown === 0) e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      {countdown > 0 ? 
+                        `${countdown}s` : 
+                        (language === 'zh' ? '获取验证码' : language === 'en' ? 'Get Code' : 'ကုဒ်ယူရန်')
+                      }
+                    </button>
+                  )}
+                </div>
+                <small style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: '0.85rem',
+                  marginTop: '0.3rem',
+                  display: 'block'
+                }}>
+                  {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
+                   language === 'en' ? 'Myanmar phone number (starting with 09)' : 
+                   'မြန်မာဖုန်းနံပါတ် (09 ဖြင့်စတင်သည်)'}
+                </small>
+              </div>
+              
+              {/* 验证码输入框（仅注册模式显示） */}
+              {!isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '验证码 *' : language === 'en' ? 'Verification Code *' : 'အတည်ပြုကုဒ် *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={registerForm.verificationCode}
+                    onChange={(e) => setRegisterForm({ ...registerForm, verificationCode: e.target.value })}
+                    placeholder={language === 'zh' ? '请输入6位验证码' : language === 'en' ? 'Enter 6-digit code' : '6 လုံးကုဒ်ထည့်ပါ'}
+                    maxLength={6}
+                    required={!isLoginMode}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease',
+                      letterSpacing: '0.2em'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                </div>
+              )}
+              
+              {/* 输入密码 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
+                </label>
                 <input
-                  type="tel"
-                  value={registerForm.phone}
-                  onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                  placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
+                  type="password"
+                  value={registerForm.password}
+                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入密码（至少6位）' : language === 'en' ? 'Enter password (min 6 chars)' : 'စကားဝှက်ထည့်ပါ (အနည်းဆုံး 6 လုံး)'}
                   required
+                  minLength={6}
                   style={{
                     width: '100%',
                     padding: '1rem',
@@ -3342,17 +3596,44 @@ const HomePage: React.FC = () => {
                   onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                   onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                 />
-                <small style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
-                  fontSize: '0.85rem',
-                  marginTop: '0.3rem',
-                  display: 'block'
-                }}>
-                  {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
-                   language === 'en' ? 'Myanmar phone number (starting with 09)' : 
-                   'မြန်မာဖုန်းနံပါတ် (09 ဖြင့်စတင်သည်)'}
-                </small>
               </div>
+              
+              {/* 确认密码（仅注册模式显示） */}
+              {!isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '确认密码 *' : language === 'en' ? 'Confirm Password *' : 'စကားဝှက်အတည်ပြုပါ *'}
+                  </label>
+                  <input
+                    type="password"
+                    value={registerForm.confirmPassword}
+                    onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                    placeholder={language === 'zh' ? '请再次输入密码' : language === 'en' ? 'Re-enter password' : 'စကားဝှက်ထပ်ထည့်ပါ'}
+                    required={!isLoginMode}
+                    minLength={6}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                </div>
+              )}
 
               {/* 电子邮件（可选，仅注册模式显示） */}
               {!isLoginMode && (
@@ -3467,7 +3748,9 @@ const HomePage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setShowRegisterModal(false);
-                    setRegisterForm({ name: '', phone: '', email: '', address: '' });
+                    setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+                    setCodeSent(false);
+                    setCountdown(0);
                   }}
                   style={{
                     background: 'rgba(255, 255, 255, 0.2)',
