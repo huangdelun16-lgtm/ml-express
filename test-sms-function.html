@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS 功能测试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+            display: block;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+            display: block;
+        }
+        
+        .result.info {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            color: #0c5460;
+            display: block;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .result pre {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 SMS 功能测试工具</h1>
+        <p class="subtitle">测试 Twilio 短信验证码发送功能</p>
+        
+        <div class="form-group">
+            <label>Netlify 站点 URL</label>
+            <input type="text" id="siteUrl" placeholder="https://your-site.netlify.app" value="https://ml-express.netlify.app">
+        </div>
+        
+        <div class="form-group">
+            <label>手机号码</label>
+            <input type="tel" id="phoneNumber" placeholder="09259369349" value="09259369349">
+            <small style="color: #666; display: block; margin-top: 5px;">支持 9xxxxxxxx 或 09xxxxxxxx 格式</small>
+        </div>
+        
+        <div class="form-group">
+            <label>语言</label>
+            <select id="language">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+                <option value="my">မြန်မာ</option>
+            </select>
+        </div>
+        
+        <button onclick="testSMS()">🚀 发送测试短信</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在发送短信...</p>
+        </div>
+        
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        async function testSMS() {
+            const siteUrl = document.getElementById('siteUrl').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const language = document.getElementById('language').value;
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const button = document.querySelector('button');
+            
+            // 验证输入
+            if (!siteUrl) {
+                showResult('error', '错误', '请输入 Netlify 站点 URL');
+                return;
+            }
+            
+            if (!phoneNumber) {
+                showResult('error', '错误', '请输入手机号码');
+                return;
+            }
+            
+            // 规范化手机号
+            let normalizedPhone = phoneNumber;
+            if (/^9\d{7,9}$/.test(phoneNumber)) {
+                normalizedPhone = '0' + phoneNumber;
+            }
+            
+            // 显示加载状态
+            resultDiv.style.display = 'none';
+            loadingDiv.classList.add('active');
+            button.disabled = true;
+            
+            try {
+                console.log('📱 测试参数:', {
+                    url: `${siteUrl}/.netlify/functions/send-sms`,
+                    phoneNumber: normalizedPhone,
+                    language: language
+                });
+                
+                const response = await fetch(`${siteUrl}/.netlify/functions/send-sms`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: normalizedPhone,
+                        language: language
+                    })
+                });
+                
+                const result = await response.json();
+                
+                console.log('📥 响应:', result);
+                
+                if (response.ok && result.success) {
+                    let message = `<strong>✅ 短信发送成功！</strong><br><br>`;
+                    message += `<strong>手机号:</strong> ${normalizedPhone}<br>`;
+                    message += `<strong>国际格式:</strong> +95${normalizedPhone.substring(1)}<br>`;
+                    
+                    if (result.isDevelopmentMode) {
+                        message += `<br><strong>⚠️ 开发模式</strong><br>`;
+                        message += `验证码: <span style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${result.code}</span><br>`;
+                        message += `<small>（开发模式不发送真实短信，请使用此验证码测试）</small>`;
+                    } else {
+                        message += `<br><strong>✉️ 真实短信已发送</strong><br>`;
+                        message += `请检查手机短信收件箱`;
+                        if (result.messageSid) {
+                            message += `<br><strong>Message SID:</strong> ${result.messageSid}`;
+                        }
+                    }
+                    
+                    message += `<br><br><strong>完整响应:</strong><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                    
+                    showResult('success', '成功', message);
+                } else {
+                    let errorMsg = `<strong>❌ 发送失败</strong><br><br>`;
+                    errorMsg += `<strong>状态码:</strong> ${response.status}<br>`;
+                    errorMsg += `<strong>错误信息:</strong> ${result.error || result.message}<br>`;
+                    
+                    if (result.errorCode) {
+                        errorMsg += `<strong>错误代码:</strong> ${result.errorCode}<br>`;
+                    }
+                    
+                    if (result.errorDetails) {
+                        errorMsg += `<strong>详细信息:</strong> ${result.errorDetails}<br>`;
+                    }
+                    
+                    errorMsg += `<br><strong>完整响应:</strong><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                    
+                    // 提供解决建议
+                    errorMsg += `<br><strong>💡 可能的解决方案:</strong><ul style="margin-top: 10px; padding-left: 20px;">`;
+                    
+                    if (result.errorCode === 21211) {
+                        errorMsg += `<li>手机号格式不正确，请检查</li>`;
+                    } else if (result.errorCode === 20003) {
+                        errorMsg += `<li>Twilio 认证失败，请检查 ACCOUNT_SID 和 AUTH_TOKEN</li>`;
+                    } else if (!result.success && result.message?.includes('开发模式')) {
+                        errorMsg += `<li>系统处于开发模式，环境变量未配置</li>`;
+                        errorMsg += `<li>如需发送真实短信，请在 Netlify 配置环境变量</li>`;
+                    } else {
+                        errorMsg += `<li>检查 Netlify Functions 日志获取更多信息</li>`;
+                        errorMsg += `<li>确认 Twilio 账户余额充足</li>`;
+                        errorMsg += `<li>验证手机号码格式正确</li>`;
+                    }
+                    
+                    errorMsg += `</ul>`;
+                    
+                    showResult('error', '失败', errorMsg);
+                }
+            } catch (error) {
+                console.error('❌ 请求失败:', error);
+                
+                let errorMsg = `<strong>❌ 网络请求失败</strong><br><br>`;
+                errorMsg += `<strong>错误:</strong> ${error.message}<br>`;
+                errorMsg += `<br><strong>💡 可能的原因:</strong><ul style="margin-top: 10px; padding-left: 20px;">`;
+                errorMsg += `<li>Netlify 站点 URL 不正确</li>`;
+                errorMsg += `<li>Functions 未部署或未启用</li>`;
+                errorMsg += `<li>CORS 跨域问题</li>`;
+                errorMsg += `<li>网络连接问题</li>`;
+                errorMsg += `</ul>`;
+                
+                showResult('error', '错误', errorMsg);
+            } finally {
+                loadingDiv.classList.remove('active');
+                button.disabled = false;
+            }
+        }
+        
+        function showResult(type, title, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = `<h3>${title}</h3><div>${message}</div>`;
+            resultDiv.style.display = 'block';
+            
+            // 滚动到结果
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // 页面加载时显示提示
+        window.onload = function() {
+            console.log('📱 SMS 测试工具已加载');
+            console.log('👉 请在上方表单中填写信息并点击"发送测试短信"按钮');
+        };
+    </script>
+</body>
+</html>
+
