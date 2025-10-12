@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, testConnection, userService, systemSettingsService } from '../services/supabase';
+import { packageService, testConnection, userService, systemSettingsService, supabase } from '../services/supabase';
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
@@ -112,7 +112,7 @@ const HomePage: React.FC = () => {
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [sentCode, setSentCode] = useState('');
-  const [verificationType, setVerificationType] = useState<'email' | 'sms'>('email'); // 默认使用邮箱验证
+  const [verificationType] = useState<'email' | 'sms'>('email'); // 固定使用邮箱验证
   
   // 系统价格设置
   const [pricingSettings, setPricingSettings] = useState({
@@ -243,8 +243,20 @@ const HomePage: React.FC = () => {
     }
 
     try {
-      // 检查手机号是否已注册（使用统一格式）
-      const existingUser = await userService.getUserByPhone(normalizedPhone);
+      // 检查用户是否已注册（根据验证方式检查）
+      let existingUser;
+      if (verificationType === 'email') {
+        // 邮箱验证：根据邮箱查找用户
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', registerForm.email)
+          .single();
+        existingUser = data;
+      } else {
+        // 短信验证：根据手机号查找用户
+        existingUser = await userService.getUserByPhone(normalizedPhone);
+      }
       
       if (isLoginMode) {
         // ===== 登录模式 =====
@@ -314,19 +326,20 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        // 检查手机号是否已存在
+        // 检查邮箱是否已存在
         if (existingUser) {
-          alert(language === 'zh' ? '该手机号已注册，请直接登录' : 
-                language === 'en' ? 'Phone number already registered, please login' : 
-                'ဖုန်းနံပါတ်မှတ်ပုံတင်ပြီးပါပြီ၊ ဝင်ပါ');
+          alert(language === 'zh' ? '该邮箱已注册，请直接登录' : 
+                language === 'en' ? 'Email already registered, please login' : 
+                'အီးမေးလ်မှတ်ပုံတင်ပြီးပါပြီ၊ ဝင်ပါ');
           setIsLoginMode(true);
           return;
         }
 
-        // 创建新用户（使用统一格式的手机号）
+        // 创建新用户（使用邮箱）
         const newUser = await userService.createCustomer({
           ...registerForm,
-          phone: normalizedPhone, // 使用统一格式的手机号
+          phone: registerForm.phone || '', // 手机号可选
+          email: registerForm.email, // 邮箱必填
           password: registerForm.password // 添加密码字段
         });
         
@@ -3466,7 +3479,9 @@ const HomePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleRegister}>
-              {/* 姓名（仅注册模式显示） */}
+              {/* 新的表单排列顺序 */}
+              
+              {/* 1. 姓名（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3502,7 +3517,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 验证方式选择器（仅注册模式显示） */}
+              {/* 2. 密码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3512,141 +3527,17 @@ const HomePage: React.FC = () => {
                     fontWeight: 'bold',
                     fontSize: '1rem'
                   }}>
-                    {language === 'zh' ? '验证方式 *' : language === 'en' ? 'Verification Method *' : 'အတည်ပြုနည်းလမ်း *'}
+                    {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
                   </label>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    {/* 邮箱验证选项 */}
-                    <button
-                      type="button"
-                      onClick={() => setVerificationType('email')}
-                      style={{
-                        flex: 1,
-                        padding: '1rem',
-                        background: verificationType === 'email' ? 
-                          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
-                          'rgba(255, 255, 255, 0.95)',
-                        color: verificationType === 'email' ? 'white' : '#2c5282',
-                        border: `2px solid ${verificationType === 'email' ? 'transparent' : 'rgba(255, 255, 255, 0.3)'}`,
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem'
-                      }}
-                    >
-                      <span style={{ fontSize: '1.2rem' }}>📧</span>
-                      {language === 'zh' ? '邮箱验证' : language === 'en' ? 'Email' : 'အီးမေးလ်'}
-                    </button>
-                    
-                    {/* 短信验证选项 */}
-                    <button
-                      type="button"
-                      onClick={() => setVerificationType('sms')}
-                      style={{
-                        flex: 1,
-                        padding: '1rem',
-                        background: verificationType === 'sms' ? 
-                          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
-                          'rgba(255, 255, 255, 0.95)',
-                        color: verificationType === 'sms' ? 'white' : '#2c5282',
-                        border: `2px solid ${verificationType === 'sms' ? 'transparent' : 'rgba(255, 255, 255, 0.3)'}`,
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem'
-                      }}
-                    >
-                      <span style={{ fontSize: '1.2rem' }}>📱</span>
-                      {language === 'zh' ? '短信验证' : language === 'en' ? 'SMS' : 'SMS'}
-                    </button>
-                  </div>
-                  <small style={{ 
-                    color: 'rgba(255, 255, 255, 0.7)', 
-                    fontSize: '0.85rem',
-                    marginTop: '0.3rem',
-                    display: 'block'
-                  }}>
-                    {verificationType === 'email' ? 
-                      (language === 'zh' ? '📧 推荐使用邮箱验证，更稳定可靠' : 
-                       language === 'en' ? '📧 Email verification recommended - more reliable' : 
-                       '📧 အီးမေးလ်အတည်ပြုခြင်း အကြံပြုထားသည်') :
-                      (language === 'zh' ? '📱 短信可能被运营商拦截' : 
-                       language === 'en' ? '📱 SMS may be blocked by carriers' : 
-                       '📱 SMS ကို ဝန်ဆောင်မှုပေးသူက ပိတ်ဆို့နိုင်သည်')
-                    }
-                  </small>
-                </div>
-              )}
-
-              {/* 电话号码 + 验证码按钮（仅短信验证模式显示） */}
-              {!isLoginMode && verificationType === 'sms' && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ 
-                  color: 'white', 
-                  display: 'block', 
-                  marginBottom: '0.5rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem'
-                }}>
-                  {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
-                </label>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  {/* 国家区号选择器 */}
-                  <div style={{
-                    flex: '0 0 85px',
-                    position: 'relative'
-                  }}>
-                    <select
-                      style={{
-                        width: '100%',
-                        padding: '1rem 0.5rem',
-                        border: '2px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '12px',
-                        fontSize: '0.95rem',
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        color: '#2c5282',
-                        fontWeight: '600',
-                        outline: 'none',
-                        transition: 'all 0.3s ease',
-                        cursor: 'pointer',
-                        appearance: 'none',
-                        textAlign: 'center'
-                      }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                    >
-                      <option value="+95">🇲🇲 +95</option>
-                    </select>
-                    {/* 自定义下拉箭头 */}
-                    <div style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      pointerEvents: 'none',
-                      color: '#2c5282',
-                      fontSize: '0.7rem'
-                    }}>▼</div>
-                  </div>
-                  
-                  {/* 电话号码输入框 */}
                   <input
-                    type="tel"
-                    value={registerForm.phone}
-                    onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                    placeholder={language === 'zh' ? '9xxxxxxxx' : language === 'en' ? '9xxxxxxxx' : '9xxxxxxxx'}
-                    required
+                    type="password"
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    placeholder={language === 'zh' ? '请输入密码（至少6位）' : language === 'en' ? 'Enter password (min 6 chars)' : 'စကားဝှက်ထည့်ပါ (အနည်းဆုံး 6 လုံး)'}
+                    required={!isLoginMode}
+                    minLength={6}
                     style={{
-                      flex: isLoginMode ? '1' : '1.2',
+                      width: '100%',
                       padding: '1rem',
                       border: '2px solid rgba(255, 255, 255, 0.3)',
                       borderRadius: '12px',
@@ -3660,127 +3551,10 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-                  
-                  {/* 验证码按钮（仅注册模式显示） */}
-                  {!isLoginMode && (
-                    <button
-                      type="button"
-                      onClick={handleSendVerificationCode}
-                      disabled={countdown > 0}
-                      style={{
-                        flex: '0.8',
-                        padding: '1rem',
-                        background: countdown > 0 ? '#cbd5e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold',
-                        cursor: countdown > 0 ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.3s ease',
-                        whiteSpace: 'nowrap'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (countdown === 0) e.currentTarget.style.transform = 'translateY(-2px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      {countdown > 0 ? 
-                        `${countdown}s` : 
-                        (language === 'zh' ? '获取验证码' : language === 'en' ? 'Get Code' : 'ကုဒ်ယူရန်')
-                      }
-                    </button>
-                  )}
-                </div>
-                <small style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
-                  fontSize: '0.85rem',
-                  marginTop: '0.3rem',
-                  display: 'block'
-                }}>
-                  {language === 'zh' ? '请输入缅甸手机号（以09开头，或直接输入9开头）' : 
-                   language === 'en' ? 'Myanmar phone number (09xxxxxxxx or 9xxxxxxxx)' : 
-                   'မြန်မာဖုန်းနံပါတ် (09 သို့မဟုတ် 9 ဖြင့်စတင်သည်)'}
-                </small>
-              </div>
-              )}
-              
-              {/* 验证码输入框（仅注册模式显示） */}
-              {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ 
-                    color: 'white', 
-                    display: 'block', 
-                    marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    {language === 'zh' ? '验证码 *' : language === 'en' ? 'Verification Code *' : 'အတည်ပြုကုဒ် *'}
-                  </label>
-                  <input
-                    type="text"
-                    value={registerForm.verificationCode}
-                    onChange={(e) => setRegisterForm({ ...registerForm, verificationCode: e.target.value })}
-                    placeholder={language === 'zh' ? '请输入6位验证码' : language === 'en' ? 'Enter 6-digit code' : '6 လုံးကုဒ်ထည့်ပါ'}
-                    maxLength={6}
-                    required={!isLoginMode}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '12px',
-                      fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                      letterSpacing: '0.2em'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                  />
                 </div>
               )}
-              
-              {/* 输入密码 */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ 
-                  color: 'white', 
-                  display: 'block', 
-                  marginBottom: '0.5rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem'
-                }}>
-                  {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
-                </label>
-                <input
-                  type="password"
-                  value={registerForm.password}
-                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  placeholder={language === 'zh' ? '请输入密码（至少6位）' : language === 'en' ? 'Enter password (min 6 chars)' : 'စကားဝှက်ထည့်ပါ (အနည်းဆုံး 6 လုံး)'}
-                  required
-                  minLength={6}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    color: '#2c5282',
-                    fontWeight: '500',
-                    outline: 'none',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                />
-              </div>
-              
-              {/* 确认密码（仅注册模式显示） */}
+
+              {/* 3. 确认密码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3817,8 +3591,8 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 电子邮件（邮箱验证时必填） */}
-              {!isLoginMode && verificationType === 'email' && (
+              {/* 4. 电子邮箱 + 验证码（仅注册模式显示） */}
+              {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
                     color: 'white', 
@@ -3835,7 +3609,7 @@ const HomePage: React.FC = () => {
                       value={registerForm.email}
                       onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       placeholder={language === 'zh' ? 'example@gmail.com' : language === 'en' ? 'example@gmail.com' : 'example@gmail.com'}
-                      required={verificationType === 'email'}
+                      required={!isLoginMode}
                       style={{
                         flex: '1.2',
                         padding: '1rem',
@@ -3896,7 +3670,46 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 地址（可选，仅注册模式显示） */}
+              {/* 5. 验证码（仅注册模式显示） */}
+              {!isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '验证码 *' : language === 'en' ? 'Verification Code *' : 'အတည်ပြုကုဒ် *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={registerForm.verificationCode}
+                    onChange={(e) => setRegisterForm({ ...registerForm, verificationCode: e.target.value })}
+                    placeholder={language === 'zh' ? '请输入6位验证码' : language === 'en' ? 'Enter 6-digit code' : '6 လုံးကုဒ်ထည့်ပါ'}
+                    maxLength={6}
+                    required={!isLoginMode}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1.2rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '600',
+                      outline: 'none',
+                      transition: 'all 0.3s ease',
+                      letterSpacing: '0.5em',
+                      textAlign: 'center'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                </div>
+              )}
+
+              {/* 6. 地址（可选，仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '2rem' }}>
                   <label style={{ 
