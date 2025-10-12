@@ -94,6 +94,16 @@ const HomePage: React.FC = () => {
   const [paymentQRCode, setPaymentQRCode] = useState<string>('');
   // const [orderData, setOrderData] = useState<any>(null);
   
+  // 用户认证相关状态
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [registerForm, setRegisterForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+  
   // 系统价格设置
   const [pricingSettings, setPricingSettings] = useState({
     baseFee: 1500,
@@ -124,7 +134,20 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     setIsVisible(true);
     loadPricingSettings();
+    loadUserFromStorage();
   }, []);
+
+  // 从本地存储加载用户信息
+  const loadUserFromStorage = () => {
+    const savedUser = localStorage.getItem('ml-express-customer');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('加载用户信息失败:', error);
+      }
+    }
+  };
 
   // 从系统设置加载价格配置
   const loadPricingSettings = async () => {
@@ -150,6 +173,75 @@ const HomePage: React.FC = () => {
       console.error('加载价格设置失败:', error);
       // 使用默认值
     }
+  };
+
+  // 处理"立即下单"按钮点击
+  const handleOrderButtonClick = () => {
+    if (currentUser) {
+      // 用户已登录，直接打开订单表单
+      setShowOrderForm(true);
+    } else {
+      // 用户未登录，打开注册窗口
+      setShowRegisterModal(true);
+    }
+  };
+
+  // 处理用户注册
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // 验证表单
+    if (!registerForm.name || !registerForm.phone) {
+      alert(language === 'zh' ? '请填写姓名和电话' : language === 'en' ? 'Please fill in name and phone' : 'နာမည်နှင့် ဖုန်းနံပါတ်ဖြည့်ပါ');
+      return;
+    }
+
+    // 验证手机号格式（缅甸手机号）
+    const phoneRegex = /^09\d{7,9}$/;
+    if (!phoneRegex.test(registerForm.phone)) {
+      alert(language === 'zh' ? '请输入有效的缅甸手机号（以09开头）' : language === 'en' ? 'Please enter a valid Myanmar phone number (starting with 09)' : 'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်သည်)');
+      return;
+    }
+
+    try {
+      // 检查手机号是否已注册
+      const existingUser = await userService.getUserByPhone(registerForm.phone);
+      
+      if (existingUser) {
+        // 用户已存在，直接登录
+        setCurrentUser(existingUser);
+        localStorage.setItem('ml-express-customer', JSON.stringify(existingUser));
+        setShowRegisterModal(false);
+        setShowOrderForm(true);
+        alert(language === 'zh' ? `欢迎回来，${existingUser.name}！` : language === 'en' ? `Welcome back, ${existingUser.name}!` : `ပြန်လာရတာကြိုဆိုပါတယ်, ${existingUser.name}!`);
+      } else {
+        // 创建新用户
+        const newUser = await userService.createCustomer(registerForm);
+        
+        if (newUser) {
+          setCurrentUser(newUser);
+          localStorage.setItem('ml-express-customer', JSON.stringify(newUser));
+          setShowRegisterModal(false);
+          setShowOrderForm(true);
+          alert(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : language === 'en' ? 'Registration successful! Welcome to Myanmar Express' : 'မှတ်ပုံတင်ခြင်း အောင်မြင်ပါသည်!');
+          
+          // 清空表单
+          setRegisterForm({ name: '', phone: '', email: '', address: '' });
+        } else {
+          alert(language === 'zh' ? '注册失败，请稍后重试' : language === 'en' ? 'Registration failed, please try again later' : 'မှတ်ပုံတင်ခြင်း မအောင်မြင်ပါ');
+        }
+      }
+    } catch (error) {
+      console.error('注册/登录失败:', error);
+      alert(language === 'zh' ? '操作失败，请检查网络连接' : language === 'en' ? 'Operation failed, please check network connection' : 'လုပ်ဆောင်ချက် မအောင်မြင်ပါ');
+    }
+  };
+
+  // 处理用户登出
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('ml-express-customer');
+    alert(language === 'zh' ? '已退出登录' : language === 'en' ? 'Logged out' : 'ထွက်ခဲ့ပါပြီ');
   };
 
   // 语言切换函数
@@ -1318,7 +1410,7 @@ const HomePage: React.FC = () => {
             animation: 'fadeInUp 1s ease-out 0.3s both'
           }}>
           <button
-            onClick={() => setShowOrderForm(true)}
+            onClick={handleOrderButtonClick}
             style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 color: '#1e293b',
@@ -2994,6 +3086,292 @@ const HomePage: React.FC = () => {
                 {t.ui.cancel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 用户注册/登录模态窗口 */}
+      {showRegisterModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(26, 54, 93, 0.9)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: window.innerWidth < 768 ? '2rem' : '2.5rem',
+            borderRadius: '20px',
+            width: window.innerWidth < 768 ? '90%' : '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 25px 70px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            animation: 'fadeInUp 0.5s ease-out'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>📝</div>
+              <h2 style={{ color: 'white', margin: 0, fontSize: '1.8rem', fontWeight: 'bold' }}>
+                {language === 'zh' ? '用户注册/登录' : language === 'en' ? 'Register / Login' : 'အကောင့်ဖွင့်ရန် / ဝင်ရန်'}
+              </h2>
+              <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
+                {language === 'zh' ? '请填写您的信息，已注册用户将自动登录' : 
+                 language === 'en' ? 'Please fill in your information, registered users will be logged in automatically' : 
+                 'သင့်အချက်အလက်များဖြည့်ပါ၊ မှတ်ပုံတင်ပြီးသူများအလိုအလျောက်ဝင်ပါမည်'}
+              </p>
+            </div>
+
+            <form onSubmit={handleRegister}>
+              {/* 姓名 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '姓名 *' : language === 'en' ? 'Name *' : 'နာမည် *'}
+                </label>
+                <input
+                  type="text"
+                  value={registerForm.name}
+                  onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入您的姓名' : language === 'en' ? 'Enter your name' : 'သင့်နာမည်ထည့်ပါ'}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                />
+              </div>
+
+              {/* 电话 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
+                </label>
+                <input
+                  type="tel"
+                  value={registerForm.phone}
+                  onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                  placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                />
+                <small style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: '0.85rem',
+                  marginTop: '0.3rem',
+                  display: 'block'
+                }}>
+                  {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
+                   language === 'en' ? 'Myanmar phone number (starting with 09)' : 
+                   'မြန်မာဖုန်းနံပါတ် (09 ဖြင့်စတင်သည်)'}
+                </small>
+              </div>
+
+              {/* 电子邮件（可选） */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '电子邮件（可选）' : language === 'en' ? 'Email (Optional)' : 'အီးမေးလ် (ရွေးချယ်ရန်)'}
+                </label>
+                <input
+                  type="email"
+                  value={registerForm.email}
+                  onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                  placeholder={language === 'zh' ? '例如：example@email.com' : language === 'en' ? 'e.g., example@email.com' : 'ဥပမာ: example@email.com'}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                />
+              </div>
+
+              {/* 地址（可选） */}
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={{ 
+                  color: 'white', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  {language === 'zh' ? '地址（可选）' : language === 'en' ? 'Address (Optional)' : 'လိပ်စာ (ရွေးချယ်ရန်)'}
+                </label>
+                <textarea
+                  value={registerForm.address}
+                  onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入您的地址' : language === 'en' ? 'Enter your address' : 'သင့်လိပ်စာထည့်ပါ'}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                />
+              </div>
+
+              {/* 按钮区 */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem',
+                justifyContent: 'center',
+                flexDirection: window.innerWidth < 768 ? 'column' : 'row'
+              }}>
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1rem 2.5rem',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 15px rgba(72, 187, 120, 0.4)',
+                    flex: 1
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(72, 187, 120, 0.5)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(72, 187, 120, 0.4)';
+                  }}
+                >
+                  {language === 'zh' ? '确认' : language === 'en' ? 'Confirm' : 'အတည်ပြုရန်'}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegisterModal(false);
+                    setRegisterForm({ name: '', phone: '', email: '', address: '' });
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '2px solid white',
+                    padding: '1rem 2.5rem',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    transition: 'all 0.3s ease',
+                    flex: 1
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                >
+                  {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မလုပ်တော့'}
+                </button>
+              </div>
+            </form>
+
+            {/* 已有账号提示 */}
+            {currentUser && (
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                background: 'rgba(72, 187, 120, 0.2)',
+                borderRadius: '10px',
+                border: '1px solid rgba(72, 187, 120, 0.4)',
+                textAlign: 'center'
+              }}>
+                <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
+                  {language === 'zh' ? `当前登录用户：${currentUser.name}` : 
+                   language === 'en' ? `Current user: ${currentUser.name}` : 
+                   `လက်ရှိအသုံးပြုသူ: ${currentUser.name}`}
+                </p>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    marginTop: '0.5rem',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {language === 'zh' ? '退出登录' : language === 'en' ? 'Logout' : 'ထွက်ရန်'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
