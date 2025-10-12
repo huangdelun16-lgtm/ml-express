@@ -218,11 +218,17 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    const phoneRegex = /^09\d{7,9}$/;
+    // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
+    const phoneRegex = /^0?9\d{7,9}$/;
     if (!phoneRegex.test(registerForm.phone)) {
-      alert(language === 'zh' ? '请输入有效的缅甸手机号（以09开头）' : language === 'en' ? 'Please enter a valid Myanmar phone number (starting with 09)' : 'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်သည်)');
+      alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
+            language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
+            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
       return;
     }
+
+    // 统一格式为 09xxxxxxxx
+    const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
 
     // 验证密码
     if (!registerForm.password) {
@@ -236,8 +242,8 @@ const HomePage: React.FC = () => {
     }
 
     try {
-      // 检查手机号是否已注册
-      const existingUser = await userService.getUserByPhone(registerForm.phone);
+      // 检查手机号是否已注册（使用统一格式）
+      const existingUser = await userService.getUserByPhone(normalizedPhone);
       
       if (isLoginMode) {
         // ===== 登录模式 =====
@@ -310,9 +316,10 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        // 创建新用户
+        // 创建新用户（使用统一格式的手机号）
         const newUser = await userService.createCustomer({
           ...registerForm,
+          phone: normalizedPhone, // 使用统一格式的手机号
           password: registerForm.password // 添加密码字段
         });
         
@@ -361,20 +368,23 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    const phoneRegex = /^09\d{7,9}$/;
+    // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
+    const phoneRegex = /^0?9\d{7,9}$/;
     if (!phoneRegex.test(registerForm.phone)) {
-      alert(language === 'zh' ? '请输入有效的缅甸手机号（以09开头）' : 
-            language === 'en' ? 'Please enter a valid Myanmar phone number (starting with 09)' : 
-            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်သည်)');
+      alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
+            language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
+            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
       return;
     }
 
     try {
-      console.log('📱 发送验证码到:', registerForm.phone);
+      // 确保手机号以0开头（统一格式）
+      const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+      console.log('📱 发送验证码到:', normalizedPhone);
       
       // 调用SMS服务
       const { sendVerificationCode } = await import('../services/smsService');
-      const result = await sendVerificationCode(registerForm.phone, language as 'zh' | 'en' | 'my');
+      const result = await sendVerificationCode(normalizedPhone, language as 'zh' | 'en' | 'my');
       
       if (result.success) {
         setCodeSent(true);
@@ -3458,11 +3468,50 @@ const HomePage: React.FC = () => {
                   {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
                 </label>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {/* 国家区号选择器 */}
+                  <div style={{
+                    flex: '0 0 85px',
+                    position: 'relative'
+                  }}>
+                    <select
+                      style={{
+                        width: '100%',
+                        padding: '1rem 0.5rem',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '12px',
+                        fontSize: '0.95rem',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        color: '#2c5282',
+                        fontWeight: '600',
+                        outline: 'none',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer',
+                        appearance: 'none',
+                        textAlign: 'center'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    >
+                      <option value="+95">🇲🇲 +95</option>
+                    </select>
+                    {/* 自定义下拉箭头 */}
+                    <div style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: '#2c5282',
+                      fontSize: '0.7rem'
+                    }}>▼</div>
+                  </div>
+                  
+                  {/* 电话号码输入框 */}
                   <input
                     type="tel"
                     value={registerForm.phone}
                     onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                    placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
+                    placeholder={language === 'zh' ? '9xxxxxxxx' : language === 'en' ? '9xxxxxxxx' : '9xxxxxxxx'}
                     required
                     style={{
                       flex: isLoginMode ? '1' : '1.2',
@@ -3519,9 +3568,9 @@ const HomePage: React.FC = () => {
                   marginTop: '0.3rem',
                   display: 'block'
                 }}>
-                  {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
-                   language === 'en' ? 'Myanmar phone number (starting with 09)' : 
-                   'မြန်မာဖုန်းနံပါတ် (09 ဖြင့်စတင်သည်)'}
+                  {language === 'zh' ? '请输入缅甸手机号（以09开头，或直接输入9开头）' : 
+                   language === 'en' ? 'Myanmar phone number (09xxxxxxxx or 9xxxxxxxx)' : 
+                   'မြန်မာဖုန်းနံပါတ် (09 သို့မဟုတ် 9 ဖြင့်စတင်သည်)'}
                 </small>
               </div>
               
