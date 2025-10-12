@@ -193,26 +193,37 @@ export default function MapScreen({ navigation }: any) {
     // 尝试从地址中提取坐标（某些系统会在地址中包含坐标）
     const coordMatch = address.match(/(\d+\.\d+),\s*(\d+\.\d+)/);
     if (coordMatch) {
-      return {
+      const coords = {
         lat: parseFloat(coordMatch[1]),
         lng: parseFloat(coordMatch[2])
       };
+      console.log(`✅ 从地址中提取坐标: ${address} → ${coords.lat}, ${coords.lng}`);
+      return coords;
     }
 
     // 如果没有坐标，使用 Google Geocoding API
     try {
       const encodedAddress = encodeURIComponent(address);
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`
-      );
+      const apiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&region=mm&key=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`;
+      
+      console.log(`🌐 调用地理编码API: ${address.substring(0, 50)}...`);
+      const response = await fetch(apiUrl);
       const data = await response.json();
       
-      if (data.results && data.results.length > 0) {
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
         const location = data.results[0].geometry.location;
-        return { lat: location.lat, lng: location.lng };
+        const coords = { lat: location.lat, lng: location.lng };
+        console.log(`✅ 地理编码成功: ${address.substring(0, 30)}... → ${coords.lat}, ${coords.lng}`);
+        return coords;
+      } else {
+        console.warn(`⚠️ 地理编码失败: ${address}`);
+        console.warn(`   状态: ${data.status}, 结果数: ${data.results?.length || 0}`);
+        if (data.error_message) {
+          console.warn(`   错误: ${data.error_message}`);
+        }
       }
     } catch (error) {
-      console.error('地理编码失败:', error);
+      console.error(`❌ 地理编码API错误: ${address}`, error);
     }
 
     return null;
@@ -229,12 +240,17 @@ export default function MapScreen({ navigation }: any) {
       const packagesWithCoords = await Promise.all(
         packagesList.map(async (pkg) => {
           const coords = await parseCoordinatesFromAddress(pkg.receiver_address);
-          const distance = coords 
-            ? calculateDistance(location.latitude, location.longitude, coords.lat, coords.lng)
-            : 999; // 如果无法获取坐标，设置为最远
+          let distance = null;
+          
+          if (coords) {
+            distance = calculateDistance(location.latitude, location.longitude, coords.lat, coords.lng);
+          } else {
+            console.warn(`⚠️ 无法解析地址: ${pkg.receiver_address}`);
+          }
           
           // 计算优先级分数（越小越优先）
-          let priorityScore = distance;
+          // 如果无法获取坐标，设置为最远（999）用于排序，但不显示
+          let priorityScore = distance !== null ? distance : 999;
           
           // 急送达优先级最高（减少50%距离权重）
           if (pkg.delivery_speed === '急送达') {
@@ -382,9 +398,10 @@ export default function MapScreen({ navigation }: any) {
   };
 
   const renderPackageItem = ({ item, index }: { item: Package, index: number }) => {
-    // 显示距离信息（如果有）
-    const distanceText = (item as any).distance 
-      ? `📏 ${((item as any).distance as number).toFixed(1)}km` 
+    // 显示距离信息（如果有且有效）
+    const itemDistance = (item as any).distance;
+    const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999
+      ? `📏 ${itemDistance.toFixed(1)}km` 
       : '';
     
     // 显示配送速度图标
@@ -640,7 +657,9 @@ export default function MapScreen({ navigation }: any) {
                 <View style={styles.routeInfo}>
                   <Text style={styles.routeName}>{pkg.receiver_name}</Text>
                   <Text style={styles.routeDistance}>
-                    {pkg.distance ? `📏 ${pkg.distance.toFixed(1)}km` : ''}
+                    {pkg.distance !== null && pkg.distance !== 999
+                      ? `📏 ${pkg.distance.toFixed(1)}km`
+                      : '📍 地址待确认'}
                   </Text>
                 </View>
               </View>
