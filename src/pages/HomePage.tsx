@@ -3517,7 +3517,53 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 2. 密码（仅注册模式显示） */}
+              {/* 2. 电话号码（仅注册模式显示） */}
+              {!isLoginMode && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ 
+                    color: 'white', 
+                    display: 'block', 
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={registerForm.phone}
+                    onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                    placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
+                    required={!isLoginMode}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      color: '#2c5282',
+                      fontWeight: '500',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                  />
+                  <small style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.85rem',
+                    marginTop: '0.3rem',
+                    display: 'block'
+                  }}>
+                    {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
+                     language === 'en' ? 'Enter Myanmar phone number (starting with 09)' : 
+                     'မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်)'}
+                  </small>
+                </div>
+              )}
+
+              {/* 3. 密码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3554,7 +3600,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 3. 确认密码（仅注册模式显示） */}
+              {/* 4. 确认密码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3591,7 +3637,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 4. 电子邮箱 + 验证码（仅注册模式显示） */}
+              {/* 5. 电子邮箱 + 验证码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3670,7 +3716,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 5. 验证码（仅注册模式显示） */}
+              {/* 6. 验证码（仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ 
@@ -3709,7 +3755,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* 6. 地址（可选，仅注册模式显示） */}
+              {/* 7. 地址（可选，仅注册模式显示） */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '2rem' }}>
                   <label style={{ 
