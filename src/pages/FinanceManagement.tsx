@@ -94,7 +94,8 @@ const FinanceManagement: React.FC = () => {
       recentProfit: '利润',
       dailyAvg: '日均',
       profitMargin: '利润率',
-      dataAnalysis: '数据趋势分析'
+      dataAnalysis: '数据趋势分析',
+      income: '收入'
     },
     en: {
       analysisPeriod: 'Analysis Period',
@@ -108,7 +109,8 @@ const FinanceManagement: React.FC = () => {
       recentProfit: 'Profit',
       dailyAvg: 'Daily Avg',
       profitMargin: 'Profit Margin',
-      dataAnalysis: 'Data Trend Analysis'
+      dataAnalysis: 'Data Trend Analysis',
+      income: 'Income'
     },
     my: {
       analysisPeriod: 'ခွဲခြမ်းစိတ်ဖြာမှုကာလ',
@@ -122,7 +124,8 @@ const FinanceManagement: React.FC = () => {
       recentProfit: 'အမြတ်',
       dailyAvg: 'နေ့စဉ်ပျမ်းမျှ',
       profitMargin: 'အမြတ်နှုန်း',
-      dataAnalysis: 'ဒေတာခေတ်ရေးခွဲခြမ်းစိတ်ဖြာခြင်း'
+      dataAnalysis: 'ဒေတာခေတ်ရေးခွဲခြမ်းစိတ်ဖြာခြင်း',
+      income: 'ဝင်ငွေ'
     }
   }[language as 'zh' | 'en' | 'my'] || {
     analysisPeriod: '分析周期',
@@ -136,7 +139,8 @@ const FinanceManagement: React.FC = () => {
     recentProfit: '利润',
     dailyAvg: '日均',
     profitMargin: '利润率',
-    dataAnalysis: '数据趋势分析'
+    dataAnalysis: '数据趋势分析',
+    income: '收入'
   };
   
   // 根据时间周期获取天数
