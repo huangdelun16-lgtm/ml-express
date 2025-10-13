@@ -214,22 +214,26 @@ const HomePage: React.FC = () => {
     e.preventDefault();
     
     // 验证手机号
-    if (!registerForm.phone) {
-      alert(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
-      return;
-    }
+    // 注册模式下验证电话号码（登录模式不需要）
+    let normalizedPhone = '';
+    if (!isLoginMode) {
+      if (!registerForm.phone) {
+        alert(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
+        return;
+      }
 
-    // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
-    const phoneRegex = /^0?9\d{7,9}$/;
-    if (!phoneRegex.test(registerForm.phone)) {
-      alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
-            language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
-            'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
-      return;
-    }
+      // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
+      const phoneRegex = /^0?9\d{7,9}$/;
+      if (!phoneRegex.test(registerForm.phone)) {
+        alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
+              language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
+              'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
+        return;
+      }
 
-    // 统一格式为 09xxxxxxxx
-    const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+      // 统一格式为 09xxxxxxxx
+      normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+    }
 
     // 验证密码
     if (!registerForm.password) {
