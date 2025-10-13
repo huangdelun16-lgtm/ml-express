@@ -39,6 +39,7 @@ const EmployeeSupervision: React.FC = () => {
     
     // 日期筛选
     if (filterDate !== 'all') {
+      if (!log.created_at) return false; // 如果没有创建时间，则过滤掉
       const logDate = new Date(log.created_at);
       const now = new Date();
       
