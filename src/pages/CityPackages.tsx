@@ -118,15 +118,19 @@ const CityPackages: React.FC = () => {
     // 按日期过滤
     if (selectedDate) {
       filteredPackages = filteredPackages.filter(pkg => {
-        const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+        const dateStr = pkg.created_at || pkg.create_time;
+        if (!dateStr) return false;
+        const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
         return pkgDate === selectedDate;
       });
     }
     
     // 按创建时间倒序排列
     return filteredPackages.sort((a, b) => {
-      const dateA = new Date(a.created_at || a.create_time).getTime();
-      const dateB = new Date(b.created_at || b.create_time).getTime();
+      const dateStrA = a.created_at || a.create_time;
+      const dateStrB = b.created_at || b.create_time;
+      const dateA = dateStrA ? new Date(dateStrA).getTime() : 0;
+      const dateB = dateStrB ? new Date(dateStrB).getTime() : 0;
       return dateB - dateA;
     });
   };
@@ -135,8 +139,11 @@ const CityPackages: React.FC = () => {
   const getAvailableDates = () => {
     const dates = new Set<string>();
     packages.forEach(pkg => {
-      const date = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
-      dates.add(date);
+      const dateStr = pkg.created_at || pkg.create_time;
+      if (dateStr) {
+        const date = new Date(dateStr).toLocaleDateString('zh-CN');
+        dates.add(date);
+      }
     });
     return Array.from(dates).sort((a, b) => {
       // 按日期倒序排列（最新的在前）
@@ -1508,7 +1515,9 @@ const CityPackages: React.FC = () => {
                         fontWeight: '600'
                       }}>
                         {packages.filter(pkg => {
-                          const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                          const dateStr = pkg.created_at || pkg.create_time;
+                          if (!dateStr) return false;
+                          const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
                           return pkgDate === new Date().toLocaleDateString('zh-CN');
                         }).length}
                       </span>
@@ -1560,7 +1569,9 @@ const CityPackages: React.FC = () => {
                         fontWeight: '600'
                       }}>
                         {packages.filter(pkg => {
-                          const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                          const dateStr = pkg.created_at || pkg.create_time;
+                          if (!dateStr) return false;
+                          const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
                           return pkgDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
                         }).length}
                       </span>
@@ -1612,7 +1623,9 @@ const CityPackages: React.FC = () => {
                         fontWeight: '600'
                       }}>
                         {packages.filter(pkg => {
-                          const pkgDate = new Date(pkg.created_at || pkg.create_time);
+                          const dateStr = pkg.created_at || pkg.create_time;
+                          if (!dateStr) return false;
+                          const pkgDate = new Date(dateStr);
                           const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
                           return pkgDate >= sevenDaysAgo;
                         }).length}
@@ -1730,7 +1743,9 @@ const CityPackages: React.FC = () => {
                   }}>
                     {getAvailableDates().map((date, index) => {
                       const datePackages = packages.filter(pkg => {
-                        const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                        const dateStr = pkg.created_at || pkg.create_time;
+                        if (!dateStr) return false;
+                        const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
                         return pkgDate === date;
                       });
                       
