@@ -1046,19 +1046,474 @@ const FinanceManagement: React.FC = () => {
         )}
 
         {activeTab === 'analytics' && (
-          <div
-            style={{
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: '24px', color: 'white', fontSize: '1.8rem' }}>📈 数据趋势分析</h3>
+            
+            {/* 时间范围选择 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: '20px',
+              marginBottom: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ color: 'white', fontWeight: '600', fontSize: '1rem' }}>📅 分析周期：</div>
+              {['最近7天', '最近30天', '最近90天', '全部'].map((period) => (
+                <button
+                  key={period}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  {period}
+                </button>
+              ))}
+            </div>
+
+            {/* 关键指标卡片 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '18px',
+              marginBottom: '24px'
+            }}>
+              {(() => {
+                const today = new Date();
+                const last30Days = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                
+                // 最近30天的数据
+                const recentRecords = records.filter(r => {
+                  const recordDate = new Date(r.record_date);
+                  return recordDate >= last30Days;
+                });
+                
+                const recentPackages = packages.filter(pkg => {
+                  const pkgDate = pkg.created_at ? new Date(pkg.created_at) : pkg.create_time ? new Date(pkg.create_time) : null;
+                  return pkgDate && pkgDate >= last30Days;
+                });
+                
+                const recentIncome = recentRecords.filter(r => r.record_type === 'income').reduce((sum, r) => sum + (r.amount || 0), 0);
+                const recentExpense = recentRecords.filter(r => r.record_type === 'expense').reduce((sum, r) => sum + (r.amount || 0), 0);
+                const recentPackageIncome = recentPackages.filter(pkg => pkg.status === '已送达').reduce((sum, pkg) => {
+                  const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                  return sum + price;
+                }, 0);
+                const recentPackageCount = recentPackages.filter(pkg => pkg.status === '已送达').length;
+                
+                // 计算增长率（与总数据对比）
+                const totalIncome = records.filter(r => r.record_type === 'income').reduce((sum, r) => sum + (r.amount || 0), 0);
+                const avgDailyIncome = totalIncome / Math.max(records.length, 1);
+                const recentAvgDailyIncome = recentIncome / 30;
+                const incomeGrowth = avgDailyIncome > 0 ? ((recentAvgDailyIncome - avgDailyIncome) / avgDailyIncome * 100) : 0;
+                
+                return (
+                  <>
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(46, 213, 115, 0.2) 0%, rgba(46, 213, 115, 0.05) 100%)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid rgba(46, 213, 115, 0.3)',
+                      boxShadow: '0 8px 20px rgba(46, 213, 115, 0.2)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
+                          💰 最近30天收入
+                        </div>
+                        <div style={{
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          background: incomeGrowth >= 0 ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 107, 107, 0.3)',
+                          color: incomeGrowth >= 0 ? '#2ecc71' : '#ff6b6b',
+                          fontSize: '0.85rem',
+                          fontWeight: '600'
+                        }}>
+                          {incomeGrowth >= 0 ? '↗' : '↘'} {Math.abs(incomeGrowth).toFixed(1)}%
+                        </div>
+                      </div>
+                      <div style={{ color: '#2ecc71', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                        {recentIncome.toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
+                        日均: {(recentIncome / 30).toLocaleString()} MMK
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(255, 107, 107, 0.2) 0%, rgba(255, 107, 107, 0.05) 100%)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid rgba(255, 107, 107, 0.3)',
+                      boxShadow: '0 8px 20px rgba(255, 107, 107, 0.2)'
+                    }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
+                        💸 最近30天支出
+                      </div>
+                      <div style={{ color: '#ff6b6b', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                        {recentExpense.toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
+                        日均: {(recentExpense / 30).toLocaleString()} MMK
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(108, 92, 231, 0.2) 0%, rgba(108, 92, 231, 0.05) 100%)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid rgba(108, 92, 231, 0.3)',
+                      boxShadow: '0 8px 20px rgba(108, 92, 231, 0.2)'
+                    }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
+                        📦 最近30天包裹
+                      </div>
+                      <div style={{ color: '#6c5ce7', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                        {recentPackageCount} 个
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
+                        收入: {recentPackageIncome.toLocaleString()} MMK
+                      </div>
+                    </div>
+
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(0, 206, 201, 0.2) 0%, rgba(0, 206, 201, 0.05) 100%)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: '1px solid rgba(0, 206, 201, 0.3)',
+                      boxShadow: '0 8px 20px rgba(0, 206, 201, 0.2)'
+                    }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
+                        💎 最近30天利润
+                      </div>
+                      <div style={{ 
+                        color: recentIncome - recentExpense >= 0 ? '#00cec9' : '#ff6b6b', 
+                        fontSize: '2rem', 
+                        fontWeight: '700', 
+                        marginBottom: '8px' 
+                      }}>
+                        {(recentIncome - recentExpense).toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
+                        利润率: {recentIncome > 0 ? ((recentIncome - recentExpense) / recentIncome * 100).toFixed(1) : 0}%
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* 月度趋势分析 */}
+            <div style={{
               background: 'rgba(255, 255, 255, 0.12)',
               borderRadius: '20px',
               padding: '24px',
+              marginBottom: '24px',
               border: '1px solid rgba(255, 255, 255, 0.18)',
               boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)'
-            }}
-          >
-            <h3 style={{ marginTop: 0, color: 'white' }}>趋势分析 (敬请期待)</h3>
-            <p style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-              即将上线：收入/支出趋势图、快递员佣金统计、成本结构分析等高级分析模块。
-            </p>
+            }}>
+              <h4 style={{ marginTop: 0, color: 'white', marginBottom: '20px', fontSize: '1.3rem' }}>📊 月度收支趋势</h4>
+              
+              {(() => {
+                // 按月份分组统计
+                const monthlyData: Record<string, { income: number, expense: number, packageIncome: number, packageCount: number, courierKm: number }> = {};
+                
+                // 处理财务记录
+                records.forEach(record => {
+                  const date = new Date(record.record_date);
+                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  
+                  if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = { income: 0, expense: 0, packageIncome: 0, packageCount: 0, courierKm: 0 };
+                  }
+                  
+                  if (record.record_type === 'income') {
+                    monthlyData[monthKey].income += record.amount || 0;
+                  } else {
+                    monthlyData[monthKey].expense += record.amount || 0;
+                  }
+                });
+                
+                // 处理包裹数据
+                packages.forEach(pkg => {
+                  const dateStr = pkg.created_at || pkg.create_time;
+                  if (!dateStr) return;
+                  
+                  const date = new Date(dateStr);
+                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  
+                  if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = { income: 0, expense: 0, packageIncome: 0, packageCount: 0, courierKm: 0 };
+                  }
+                  
+                  if (pkg.status === '已送达') {
+                    const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                    monthlyData[monthKey].packageIncome += price;
+                    monthlyData[monthKey].packageCount += 1;
+                    monthlyData[monthKey].courierKm += (pkg.delivery_distance || 0);
+                  }
+                });
+                
+                // 排序并获取最近6个月
+                const sortedMonths = Object.keys(monthlyData).sort().slice(-6);
+                
+                if (sortedMonths.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                      暂无月度数据
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div>
+                    {/* 简化版柱状图 */}
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '300px', marginBottom: '24px' }}>
+                      {sortedMonths.map(month => {
+                        const data = monthlyData[month];
+                        const maxValue = Math.max(...sortedMonths.map(m => Math.max(monthlyData[m].income, monthlyData[m].expense)));
+                        const incomeHeight = (data.income / maxValue) * 250;
+                        const expenseHeight = (data.expense / maxValue) * 250;
+                        
+                        return (
+                          <div key={month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', height: '250px' }}>
+                              <div
+                                style={{
+                                  width: '40px',
+                                  height: `${incomeHeight}px`,
+                                  background: 'linear-gradient(180deg, #2ecc71 0%, #27ae60 100%)',
+                                  borderRadius: '8px 8px 0 0',
+                                  position: 'relative',
+                                  boxShadow: '0 4px 12px rgba(46, 204, 113, 0.3)',
+                                  transition: 'all 0.3s ease'
+                                }}
+                                title={`收入: ${data.income.toLocaleString()} MMK`}
+                              />
+                              <div
+                                style={{
+                                  width: '40px',
+                                  height: `${expenseHeight}px`,
+                                  background: 'linear-gradient(180deg, #e74c3c 0%, #c0392b 100%)',
+                                  borderRadius: '8px 8px 0 0',
+                                  position: 'relative',
+                                  boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)',
+                                  transition: 'all 0.3s ease'
+                                }}
+                                title={`支出: ${data.expense.toLocaleString()} MMK`}
+                              />
+                            </div>
+                            <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: '500', textAlign: 'center' }}>
+                              {month.split('-')[1]}月
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 图例 */}
+                    <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', marginBottom: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '20px', height: '20px', background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)', borderRadius: '4px' }} />
+                        <span style={{ color: 'white', fontSize: '0.9rem' }}>收入</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '20px', height: '20px', background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)', borderRadius: '4px' }} />
+                        <span style={{ color: 'white', fontSize: '0.9rem' }}>支出</span>
+                      </div>
+                    </div>
+
+                    {/* 月度详细数据表格 */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
+                            <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>月份</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>收入</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>支出</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>利润</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>包裹数</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>包裹收入</th>
+                            <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontSize: '0.9rem' }}>配送距离</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedMonths.map(month => {
+                            const data = monthlyData[month];
+                            const profit = data.income - data.expense;
+                            
+                            return (
+                              <tr key={month} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                <td style={{ padding: '12px', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {month}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#2ecc71', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {data.income.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#e74c3c', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {data.expense.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: profit >= 0 ? '#00cec9' : '#ff6b6b', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {profit.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                                  {data.packageCount} 个
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#6c5ce7', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {data.packageIncome.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', color: '#fd79a8', fontSize: '0.9rem', fontWeight: '600' }}>
+                                  {data.courierKm.toFixed(2)} KM
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 业务分析 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+              gap: '20px'
+            }}>
+              {/* 包裹类型分布 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.18)'
+              }}>
+                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>📦 包裹类型分布</h4>
+                {(() => {
+                  const typeStats: Record<string, number> = {};
+                  packages.filter(pkg => pkg.status === '已送达').forEach(pkg => {
+                    const type = pkg.package_type || '未知';
+                    typeStats[type] = (typeStats[type] || 0) + 1;
+                  });
+                  
+                  const total = Object.values(typeStats).reduce((sum, count) => sum + count, 0);
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {Object.entries(typeStats).map(([type, count]) => {
+                        const percentage = (count / total * 100).toFixed(1);
+                        return (
+                          <div key={type}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                              <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem' }}>{type}</span>
+                              <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>{count}个 ({percentage}%)</span>
+                            </div>
+                            <div style={{ 
+                              height: '8px', 
+                              background: 'rgba(255, 255, 255, 0.1)', 
+                              borderRadius: '4px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{ 
+                                width: `${percentage}%`, 
+                                height: '100%', 
+                                background: 'linear-gradient(90deg, #6c5ce7 0%, #a29bfe 100%)',
+                                transition: 'width 0.5s ease'
+                              }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 骑手效率排名 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.18)'
+              }}>
+                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>🏆 骑手效率排名 TOP 5</h4>
+                {(() => {
+                  const courierStats: Record<string, { count: number, km: number }> = {};
+                  
+                  packages.filter(pkg => pkg.status === '已送达' && pkg.courier && pkg.courier !== '待分配').forEach(pkg => {
+                    const courier = pkg.courier;
+                    if (!courierStats[courier]) {
+                      courierStats[courier] = { count: 0, km: 0 };
+                    }
+                    courierStats[courier].count++;
+                    courierStats[courier].km += (pkg.delivery_distance || 0);
+                  });
+                  
+                  const topCouriers = Object.entries(courierStats)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 5);
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {topCouriers.map(([courier, stats], index) => {
+                        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+                        return (
+                          <div key={courier} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px'
+                          }}>
+                            <div style={{ fontSize: '1.5rem' }}>{medals[index]}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: 'white', fontSize: '0.95rem', fontWeight: '600', marginBottom: '4px' }}>
+                                {courier}
+                              </div>
+                              <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>
+                                {stats.count}单 · {stats.km.toFixed(1)} KM
+                              </div>
+                            </div>
+                            <div style={{ 
+                              color: '#2ecc71', 
+                              fontSize: '1.2rem', 
+                              fontWeight: '700' 
+                            }}>
+                              {stats.count}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
 
