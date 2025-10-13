@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { financeService, FinanceRecord, auditLogService, packageService, Package } from '../services/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
 type FilterStatus = 'all' | FinanceRecord['status'];
@@ -44,6 +45,7 @@ const paymentOptions = [
   { value: 'bank_transfer', label: '银行转账' }
 ];
 
+
 const categoryOptions = [
   '同城配送',
   '次日配送',
@@ -70,11 +72,125 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
 
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
+  const [timePeriod, setTimePeriod] = useState<'7days' | '30days' | '90days' | 'all'>('30days'); // 时间周期状态
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // 多语言翻译
+  const t = {
+    zh: {
+      analysisPeriod: '分析周期',
+      last7Days: '最近7天',
+      last30Days: '最近30天',
+      last90Days: '最近90天',
+      all: '全部',
+      recentIncome: '收入',
+      recentExpense: '支出',
+      recentPackages: '包裹',
+      recentProfit: '利润',
+      dailyAvg: '日均',
+      profitMargin: '利润率',
+      dataAnalysis: '数据趋势分析'
+    },
+    en: {
+      analysisPeriod: 'Analysis Period',
+      last7Days: 'Last 7 Days',
+      last30Days: 'Last 30 Days',
+      last90Days: 'Last 90 Days',
+      all: 'All',
+      recentIncome: 'Income',
+      recentExpense: 'Expense',
+      recentPackages: 'Packages',
+      recentProfit: 'Profit',
+      dailyAvg: 'Daily Avg',
+      profitMargin: 'Profit Margin',
+      dataAnalysis: 'Data Trend Analysis'
+    },
+    my: {
+      analysisPeriod: 'ခွဲခြမ်းစိတ်ဖြာမှုကာလ',
+      last7Days: 'နောက်ဆုံး ၇ ရက်',
+      last30Days: 'နောက်ဆုံး ၃၀ ရက်',
+      last90Days: 'နောက်ဆုံး ၉၀ ရက်',
+      all: 'အားလုံး',
+      recentIncome: 'ဝင်ငွေ',
+      recentExpense: 'အသုံးစရိတ်',
+      recentPackages: 'ပစ္စည်းများ',
+      recentProfit: 'အမြတ်',
+      dailyAvg: 'နေ့စဉ်ပျမ်းမျှ',
+      profitMargin: 'အမြတ်နှုန်း',
+      dataAnalysis: 'ဒေတာခေတ်ရေးခွဲခြမ်းစိတ်ဖြာခြင်း'
+    }
+  }[language as 'zh' | 'en' | 'my'] || {
+    analysisPeriod: '分析周期',
+    last7Days: '最近7天',
+    last30Days: '最近30天',
+    last90Days: '最近90天',
+    all: '全部',
+    recentIncome: '收入',
+    recentExpense: '支出',
+    recentPackages: '包裹',
+    recentProfit: '利润',
+    dailyAvg: '日均',
+    profitMargin: '利润率',
+    dataAnalysis: '数据趋势分析'
+  };
+  
+  // 根据时间周期获取天数
+  const getDaysFromPeriod = (period: typeof timePeriod): number | null => {
+    switch (period) {
+      case '7days': return 7;
+      case '30days': return 30;
+      case '90days': return 90;
+      case 'all': return null;
+      default: return 30;
+    }
+  };
+  
+  // 根据时间周期筛选数据
+  const filterByTimePeriod = <T extends { record_date?: string; created_at?: string; create_time?: string }>(
+    data: T[],
+    period: typeof timePeriod,
+    dateField: 'record_date' | 'created_at' | 'create_time' = 'record_date'
+  ): T[] => {
+    const days = getDaysFromPeriod(period);
+    if (days === null) return data;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return data.filter(item => {
+      const dateStr = item[dateField];
+      if (!dateStr) {
+        // 对于包裹，尝试其他日期字段
+        if ('created_at' in item && item.created_at) {
+          const date = new Date(item.created_at);
+          return date >= cutoffDate;
+        }
+        if ('create_time' in item && item.create_time) {
+          const date = new Date(item.create_time);
+          return date >= cutoffDate;
+        }
+        return false;
+      }
+      const date = new Date(dateStr);
+      return date >= cutoffDate;
+    });
+  };
+  
+  // 获取当前周期的显示文本
+  const getPeriodLabel = (): string => {
+    switch (timePeriod) {
+      case '7days': return t.last7Days;
+      case '30days': return t.last30Days;
+      case '90days': return t.last90Days;
+      case 'all': return t.all;
+      default: return t.last30Days;
+    }
+  };
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
@@ -1047,7 +1163,7 @@ const FinanceManagement: React.FC = () => {
 
         {activeTab === 'analytics' && (
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: '24px', color: 'white', fontSize: '1.8rem' }}>📈 数据趋势分析</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '24px', color: 'white', fontSize: '1.8rem' }}>📈 {t.dataAnalysis}</h3>
             
             {/* 时间范围选择 */}
             <div style={{
@@ -1061,31 +1177,42 @@ const FinanceManagement: React.FC = () => {
               alignItems: 'center',
               flexWrap: 'wrap'
             }}>
-              <div style={{ color: 'white', fontWeight: '600', fontSize: '1rem' }}>📅 分析周期：</div>
-              {['最近7天', '最近30天', '最近90天', '全部'].map((period) => (
+              <div style={{ color: 'white', fontWeight: '600', fontSize: '1rem' }}>📅 {t.analysisPeriod}：</div>
+              {[
+                { key: '7days', label: t.last7Days },
+                { key: '30days', label: t.last30Days },
+                { key: '90days', label: t.last90Days },
+                { key: 'all', label: t.all }
+              ].map((period) => (
                 <button
-                  key={period}
+                  key={period.key}
+                  onClick={() => setTimePeriod(period.key as typeof timePeriod)}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: `2px solid ${timePeriod === period.key ? '#4facfe' : 'rgba(255, 255, 255, 0.3)'}`,
+                    background: timePeriod === period.key ? 'rgba(79, 172, 254, 0.3)' : 'rgba(255, 255, 255, 0.15)',
                     color: 'white',
                     cursor: 'pointer',
                     fontSize: '0.9rem',
-                    fontWeight: '500',
-                    transition: 'all 0.3s ease'
+                    fontWeight: timePeriod === period.key ? '700' : '500',
+                    transition: 'all 0.3s ease',
+                    boxShadow: timePeriod === period.key ? '0 4px 15px rgba(79, 172, 254, 0.4)' : 'none'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    if (timePeriod !== period.key) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    }
                     e.currentTarget.style.transform = 'translateY(-2px)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    if (timePeriod !== period.key) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    }
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  {period}
+                  {period.label}
                 </button>
               ))}
             </div>
@@ -1098,19 +1225,12 @@ const FinanceManagement: React.FC = () => {
               marginBottom: '24px'
             }}>
               {(() => {
-                const today = new Date();
-                const last30Days = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                // 根据选择的时间周期筛选数据
+                const recentRecords = filterByTimePeriod(records, timePeriod, 'record_date');
+                const recentPackages = filterByTimePeriod(packages, timePeriod);
                 
-                // 最近30天的数据
-                const recentRecords = records.filter(r => {
-                  const recordDate = new Date(r.record_date);
-                  return recordDate >= last30Days;
-                });
-                
-                const recentPackages = packages.filter(pkg => {
-                  const pkgDate = pkg.created_at ? new Date(pkg.created_at) : pkg.create_time ? new Date(pkg.create_time) : null;
-                  return pkgDate && pkgDate >= last30Days;
-                });
+                // 获取天数用于日均计算
+                const days = getDaysFromPeriod(timePeriod) || Math.max(records.length, 1);
                 
                 const recentIncome = recentRecords.filter(r => r.record_type === 'income').reduce((sum, r) => sum + (r.amount || 0), 0);
                 const recentExpense = recentRecords.filter(r => r.record_type === 'expense').reduce((sum, r) => sum + (r.amount || 0), 0);
@@ -1123,7 +1243,7 @@ const FinanceManagement: React.FC = () => {
                 // 计算增长率（与总数据对比）
                 const totalIncome = records.filter(r => r.record_type === 'income').reduce((sum, r) => sum + (r.amount || 0), 0);
                 const avgDailyIncome = totalIncome / Math.max(records.length, 1);
-                const recentAvgDailyIncome = recentIncome / 30;
+                const recentAvgDailyIncome = recentIncome / days;
                 const incomeGrowth = avgDailyIncome > 0 ? ((recentAvgDailyIncome - avgDailyIncome) / avgDailyIncome * 100) : 0;
                 
                 return (
@@ -1137,7 +1257,7 @@ const FinanceManagement: React.FC = () => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                         <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
-                          💰 最近30天收入
+                          💰 {getPeriodLabel()}{t.recentIncome}
                         </div>
                         <div style={{
                           padding: '4px 10px',
@@ -1154,7 +1274,7 @@ const FinanceManagement: React.FC = () => {
                         {recentIncome.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
-                        日均: {(recentIncome / 30).toLocaleString()} MMK
+                        {t.dailyAvg}: {(recentIncome / days).toLocaleString()} MMK
                       </div>
                     </div>
 
@@ -1166,13 +1286,13 @@ const FinanceManagement: React.FC = () => {
                       boxShadow: '0 8px 20px rgba(255, 107, 107, 0.2)'
                     }}>
                       <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
-                        💸 最近30天支出
+                        💸 {getPeriodLabel()}{t.recentExpense}
                       </div>
                       <div style={{ color: '#ff6b6b', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
                         {recentExpense.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
-                        日均: {(recentExpense / 30).toLocaleString()} MMK
+                        {t.dailyAvg}: {(recentExpense / days).toLocaleString()} MMK
                       </div>
                     </div>
 
@@ -1184,13 +1304,13 @@ const FinanceManagement: React.FC = () => {
                       boxShadow: '0 8px 20px rgba(108, 92, 231, 0.2)'
                     }}>
                       <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
-                        📦 最近30天包裹
+                        📦 {getPeriodLabel()}{t.recentPackages}
                       </div>
                       <div style={{ color: '#6c5ce7', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
-                        {recentPackageCount} 个
+                        {recentPackageCount} {language === 'zh' ? '个' : language === 'en' ? '' : 'ခု'}
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
-                        收入: {recentPackageIncome.toLocaleString()} MMK
+                        {t.income}: {recentPackageIncome.toLocaleString()} MMK
                       </div>
                     </div>
 
@@ -1202,7 +1322,7 @@ const FinanceManagement: React.FC = () => {
                       boxShadow: '0 8px 20px rgba(0, 206, 201, 0.2)'
                     }}>
                       <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
-                        💎 最近30天利润
+                        💎 {getPeriodLabel()}{t.recentProfit}
                       </div>
                       <div style={{ 
                         color: recentIncome - recentExpense >= 0 ? '#00cec9' : '#ff6b6b', 
@@ -1213,7 +1333,7 @@ const FinanceManagement: React.FC = () => {
                         {(recentIncome - recentExpense).toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
-                        利润率: {recentIncome > 0 ? ((recentIncome - recentExpense) / recentIncome * 100).toFixed(1) : 0}%
+                        {t.profitMargin}: {recentIncome > 0 ? ((recentIncome - recentExpense) / recentIncome * 100).toFixed(1) : 0}%
                       </div>
                     </div>
                   </>
