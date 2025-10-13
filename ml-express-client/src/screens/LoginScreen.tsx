@@ -7,8 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
@@ -20,10 +25,13 @@ export default function LoginScreen({ navigation }: any) {
 
   const t = {
     zh: {
+      welcome: '欢迎回来',
       title: '登录',
+      subtitle: '登录您的账户继续使用服务',
       email: '电子邮箱',
       password: '密码',
       loginButton: '登录',
+      guestMode: '访客模式',
       noAccount: '还没有账号？',
       register: '立即注册',
       emailPlaceholder: '请输入邮箱',
@@ -31,12 +39,16 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: '登录成功',
       loginFailed: '登录失败',
       fillAllFields: '请填写所有字段',
+      guestModeDesc: '以访客身份浏览',
     },
     en: {
+      welcome: 'Welcome Back',
       title: 'Login',
+      subtitle: 'Sign in to your account to continue',
       email: 'Email',
       password: 'Password',
       loginButton: 'Login',
+      guestMode: 'Guest Mode',
       noAccount: "Don't have an account?",
       register: 'Register Now',
       emailPlaceholder: 'Enter email',
@@ -44,12 +56,16 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: 'Login successful',
       loginFailed: 'Login failed',
       fillAllFields: 'Please fill all fields',
+      guestModeDesc: 'Browse as guest',
     },
     my: {
+      welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
       title: 'ဝင်ရောက်ရန်',
+      subtitle: 'သင့်အကောင့်သို့ဝင်ရောက်ပါ',
       email: 'အီးမေးလ်',
       password: 'စကားဝှက်',
       loginButton: 'ဝင်ရောက်',
+      guestMode: 'ဧည့်သည်မုဒ်',
       noAccount: 'အကောင့်မရှိသေးဘူးလား?',
       register: 'စာရင်းသွင်း',
       emailPlaceholder: 'အီးမေးလ်ထည့်ပါ',
@@ -57,6 +73,7 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: 'အောင်မြင်စွာဝင်ရောက်ပြီး',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
       fillAllFields: 'အချက်အလက်အားလုံးဖြည့်ပါ',
+      guestModeDesc: 'ဧည့်သည်အနေဖြင့်ကြည့်ရှုရန်',
     },
   };
 
@@ -90,111 +107,246 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  const handleGuestMode = async () => {
+    try {
+      await AsyncStorage.setItem('userId', 'guest');
+      await AsyncStorage.setItem('isGuest', 'true');
+      navigation.replace('Main');
+    } catch (error) {
+      console.error('访客模式错误:', error);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>🚚</Text>
-        <Text style={styles.title}>{currentT.title}</Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{currentT.email}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={currentT.emailPlaceholder}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{currentT.password}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={currentT.passwordPlaceholder}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={handleLogin}
-          disabled={loading}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <LinearGradient
+        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>{currentT.loginButton}</Text>
-          )}
-        </TouchableOpacity>
+          {/* Header with Logo */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/logo-large.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.welcomeText}>{currentT.welcome}</Text>
+            <Text style={styles.title}>{currentT.title}</Text>
+            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
+          </View>
 
-        <View style={styles.registerPrompt}>
-          <Text style={styles.registerText}>{currentT.noAccount} </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.registerLink}>{currentT.register}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+          {/* Login Form Card */}
+          <View style={styles.formCard}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{currentT.email}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={currentT.emailPlaceholder}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{currentT.password}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={currentT.passwordPlaceholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.loginGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.loginButtonText}>{currentT.loginButton}</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Guest Mode Button */}
+            <TouchableOpacity
+              style={styles.guestButton}
+              onPress={handleGuestMode}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.guestIcon}>👤</Text>
+              <View>
+                <Text style={styles.guestButtonText}>{currentT.guestMode}</Text>
+                <Text style={styles.guestButtonDesc}>{currentT.guestModeDesc}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Register Prompt */}
+            <View style={styles.registerPrompt}>
+              <Text style={styles.registerText}>{currentT.noAccount} </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                <Text style={styles.registerLink}>{currentT.register}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7fafc',
+  },
+  gradient: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
   header: {
-    backgroundColor: '#2c5282',
-    padding: 40,
-    paddingTop: 80,
     alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#ffffff',
+    padding: 12,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
   },
   logo: {
-    fontSize: 60,
-    marginBottom: 16,
+    width: '100%',
+    height: '100%',
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#ffffff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  form: {
+  subtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+  },
+  formCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    borderRadius: 24,
     padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#1e293b',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+    color: '#1e293b',
   },
   loginButton: {
-    backgroundColor: '#3182ce',
+    marginTop: 8,
+    borderRadius: 12,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  loginGradient: {
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 24,
   },
   loginButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  guestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  guestIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  guestButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  guestButtonDesc: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
   },
   registerPrompt: {
     flexDirection: 'row',
@@ -202,13 +354,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   registerText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#64748b',
   },
   registerLink: {
-    fontSize: 16,
-    color: '#3182ce',
-    fontWeight: '600',
+    fontSize: 15,
+    color: '#3b82f6',
+    fontWeight: '700',
   },
 });
-
