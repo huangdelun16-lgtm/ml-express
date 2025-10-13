@@ -358,10 +358,9 @@ const AccountManagement: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    部门
+                    部门 *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="department"
                     value={formData.department}
                     onChange={handleInputChange}
@@ -373,17 +372,27 @@ const AccountManagement: React.FC = () => {
                       background: 'rgba(15, 32, 60, 0.55)',
                       color: 'white',
                       fontSize: '1rem',
-                      outline: 'none'
+                      outline: 'none',
+                      cursor: 'pointer'
                     }}
-                  />
+                    required
+                  >
+                    <option value="" style={{ color: '#000' }}>请选择部门</option>
+                    <option value="运营部" style={{ color: '#000' }}>运营部</option>
+                    <option value="配送部" style={{ color: '#000' }}>配送部</option>
+                    <option value="客服部" style={{ color: '#000' }}>客服部</option>
+                    <option value="财务部" style={{ color: '#000' }}>财务部</option>
+                    <option value="技术部" style={{ color: '#000' }}>技术部</option>
+                    <option value="人事部" style={{ color: '#000' }}>人事部</option>
+                    <option value="市场部" style={{ color: '#000' }}>市场部</option>
+                  </select>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    职位
+                    职位 *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="position"
                     value={formData.position}
                     onChange={handleInputChange}
@@ -395,9 +404,22 @@ const AccountManagement: React.FC = () => {
                       background: 'rgba(15, 32, 60, 0.55)',
                       color: 'white',
                       fontSize: '1rem',
-                      outline: 'none'
+                      outline: 'none',
+                      cursor: 'pointer'
                     }}
-                  />
+                    required
+                  >
+                    <option value="" style={{ color: '#000' }}>请选择职位</option>
+                    <option value="总经理" style={{ color: '#000' }}>总经理</option>
+                    <option value="部门经理" style={{ color: '#000' }}>部门经理</option>
+                    <option value="主管" style={{ color: '#000' }}>主管</option>
+                    <option value="骑手队长" style={{ color: '#000' }}>骑手队长</option>
+                    <option value="骑手" style={{ color: '#000' }}>骑手</option>
+                    <option value="客服专员" style={{ color: '#000' }}>客服专员</option>
+                    <option value="财务专员" style={{ color: '#000' }}>财务专员</option>
+                    <option value="技术专员" style={{ color: '#000' }}>技术专员</option>
+                    <option value="操作员" style={{ color: '#000' }}>操作员</option>
+                  </select>
                 </div>
 
                 <div>
