@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { useApp } from '../contexts/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,217 +18,336 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { language } = useApp();
+  const scrollY = new Animated.Value(0);
 
   const t = {
     zh: {
       title: '缅甸同城快递',
       subtitle: '快速、安全、可靠的同城配送服务',
+      welcome: '欢迎使用',
       placeOrder: '立即下单',
       trackOrder: '追踪订单',
       myOrders: '我的订单',
-      services: '我们的服务',
-      service1Title: '⚡ 快速配送',
-      service1Desc: '准时达1小时内\n急送达30分钟',
-      service2Title: '🛡️ 安全可靠',
-      service2Desc: '专业团队\n全程保障',
-      service3Title: '📍 实时追踪',
-      service3Desc: '随时查看\n包裹位置',
-      service4Title: '💰 价格透明',
-      service4Desc: '明码标价\n无隐藏费用',
-      whyChooseUs: '为什么选择我们？',
-      feature1: '7x24小时服务',
+      profile: '个人中心',
+      services: '核心服务',
+      service1Title: '快速配送',
+      service1Desc: '准时达1小时内送达\n急送达30分钟内送达\n定时达按您指定时间',
+      service2Title: '安全可靠',
+      service2Desc: '专业配送团队\n全程保险保障\n包裹实时监控',
+      service3Title: '实时追踪',
+      service3Desc: '随时查看包裹位置\n配送员实时定位\n送达及时通知',
+      service4Title: '价格透明',
+      service4Desc: '明码标价计费\n无隐藏费用\n多种支付方式',
+      features: '为什么选择我们？',
+      feature1: '7×24小时客服',
       feature2: '覆盖全缅甸主要城市',
       feature3: '专业配送团队',
       feature4: '智能路线优化',
+      feature5: '包裹保险',
+      feature6: '实时客服支持',
+      recentOrders: '最近订单',
+      viewAll: '查看全部',
+      noOrders: '暂无订单',
       contact: '联系我们',
       phone: '客服热线',
       email: '商务合作',
+      callNow: '立即拨打',
+      sendEmail: '发送邮件',
     },
     en: {
       title: 'Myanmar City Express',
       subtitle: 'Fast, Safe, and Reliable Same-City Delivery',
+      welcome: 'Welcome',
       placeOrder: 'Place Order',
       trackOrder: 'Track Order',
       myOrders: 'My Orders',
-      services: 'Our Services',
-      service1Title: '⚡ Fast Delivery',
-      service1Desc: 'On-Time within 1 hour\nExpress in 30 mins',
-      service2Title: '🛡️ Safe & Reliable',
-      service2Desc: 'Professional team\nFull guarantee',
-      service3Title: '📍 Real-time Tracking',
-      service3Desc: 'Check package\nlocation anytime',
-      service4Title: '💰 Transparent Pricing',
-      service4Desc: 'Clear prices\nNo hidden fees',
-      whyChooseUs: 'Why Choose Us?',
-      feature1: '24/7 Service',
-      feature2: 'Coverage across Myanmar',
-      feature3: 'Professional Delivery Team',
+      profile: 'Profile',
+      services: 'Core Services',
+      service1Title: 'Fast Delivery',
+      service1Desc: 'On-Time: within 1 hour\nExpress: within 30 mins\nScheduled: your time',
+      service2Title: 'Safe & Reliable',
+      service2Desc: 'Professional team\nFull insurance\nReal-time monitoring',
+      service3Title: 'Real-time Tracking',
+      service3Desc: 'Check package location\nCourier live tracking\nDelivery notifications',
+      service4Title: 'Transparent Pricing',
+      service4Desc: 'Clear pricing rules\nNo hidden fees\nMultiple payments',
+      features: 'Why Choose Us?',
+      feature1: '24/7 Customer Service',
+      feature2: 'Myanmar-wide Coverage',
+      feature3: 'Professional Team',
       feature4: 'Smart Route Optimization',
+      feature5: 'Package Insurance',
+      feature6: 'Live Support',
+      recentOrders: 'Recent Orders',
+      viewAll: 'View All',
+      noOrders: 'No Orders',
       contact: 'Contact Us',
-      phone: 'Customer Service',
+      phone: 'Hotline',
       email: 'Business',
+      callNow: 'Call Now',
+      sendEmail: 'Send Email',
     },
     my: {
       title: 'မြန်မာမြို့တွင်းအမြန်ပို့ဆောင်ရေး',
       subtitle: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်စိတ်ချရသော ဝန်ဆောင်မှု',
+      welcome: 'ကြိုဆိုပါတယ်',
       placeOrder: 'အမှာစာတင်',
       trackOrder: 'ခြေရာခံ',
       myOrders: 'ကျွန်ုပ်၏အမှာစာများ',
-      services: 'ကျွန်ုပ်တို့၏ဝန်ဆောင်မှုများ',
-      service1Title: '⚡ မြန်ဆန်သောပို့ဆောင်ရေး',
-      service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့',
-      service2Title: '🛡️ ဘေးကင်းယုံကြည်',
-      service2Desc: 'ပရော်ဖက်ရှင်နယ်\nအဖွဲ့',
-      service3Title: '📍 တိုက်ရိုက်ခြေရာခံ',
-      service3Desc: 'အချိန်မရွေး\nစစ်ဆေးနိုင်',
-      service4Title: '💰 ပွင့်လင်းသောစျေးနှုန်း',
-      service4Desc: 'ရှင်းလင်းသော\nစျေးနှုန်း',
-      whyChooseUs: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
+      profile: 'ကိုယ်ရေးအချက်အလက်',
+      services: 'အဓိကဝန်ဆောင်မှုများ',
+      service1Title: 'မြန်ဆန်သောပို့ဆောင်ရေး',
+      service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့\nသင်သတ်မှတ်သောအချိန်',
+      service2Title: 'ဘေးကင်းယုံကြည်',
+      service2Desc: 'ပရော်ဖက်ရှင်နယ်အဖွဲ့\nအာမခံအပြည့်အဝ\nတိုက်ရိုက်စောင့်ကြည့်',
+      service3Title: 'တိုက်ရိုက်ခြေရာခံ',
+      service3Desc: 'အချိန်မရွေးစစ်ဆေးနိုင်\nမော်တော်ဆိုင်ကယ်တည်နေရာ\nသတင်းအကြောင်းကြားချက်',
+      service4Title: 'ပွင့်လင်းသောစျေးနှုန်း',
+      service4Desc: 'ရှင်းလင်းသောစျေးနှုန်း\nလျှို့ဝှက်ကုန်ကျစရိတ်မရှိ\nငွေပေးချေမှုနည်းလမ်းများစွာ',
+      features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
       feature1: '၂၄နာရီဝန်ဆောင်မှု',
-      feature2: 'မြန်မာတစ်နိုင်ငံလုံးဝန်ဆောင်မှု',
+      feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
       feature3: 'ကျွမ်းကျင်သောအဖွဲ့',
       feature4: 'စမတ်လမ်းကြောင်း',
+      feature5: 'အာမခံ',
+      feature6: 'တိုက်ရိုက်ပံ့ပိုး',
+      recentOrders: 'မကြာသေးမီအမှာစာများ',
+      viewAll: 'အားလုံးကြည့်',
+      noOrders: 'အမှာစာမရှိ',
       contact: 'ဆက်သွယ်ရန်',
       phone: 'ဖောက်သည်ဝန်ဆောင်မှု',
       email: 'စီးပွားရေး',
+      callNow: 'ခေါ်ဆိုပါ',
+      sendEmail: 'အီးမေးလ်ပို့ပါ',
     },
   };
 
   const currentT = t[language];
 
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.9],
+    extrapolate: 'clamp',
+  });
+
+  const headerScale = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.95],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
       >
-        {/* Hero Section with Gradient Background */}
-        <LinearGradient
-          colors={['#1a365d', '#2c5282', '#3182ce']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroSection}
-        >
-          <View style={styles.heroOverlay} />
-          
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/logo-large.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+        {/* Hero Section with Web Background */}
+        <Animated.View style={{ opacity: headerOpacity, transform: [{ scale: headerScale }] }}>
+          <LinearGradient
+            colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroSection}
+          >
+            {/* Logo */}
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/logo-large.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.welcomeText}>{currentT.welcome}</Text>
+            <Text style={styles.title}>{currentT.title}</Text>
+            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Quick Action Cards - 4 Cards in Grid */}
+        <View style={styles.quickActionsContainer}>
+          <View style={styles.quickActionsGrid}>
+            {/* Place Order */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('PlaceOrder')}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#f59e0b', '#d97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <Text style={styles.quickActionIcon}>📦</Text>
+                </View>
+                <Text style={styles.quickActionText}>{currentT.placeOrder}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Track Order */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('TrackOrder')}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <Text style={styles.quickActionIcon}>🔍</Text>
+                </View>
+                <Text style={styles.quickActionText}>{currentT.trackOrder}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* My Orders */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('MyOrders')}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#8b5cf6', '#7c3aed']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <Text style={styles.quickActionIcon}>📋</Text>
+                </View>
+                <Text style={styles.quickActionText}>{currentT.myOrders}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Profile */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <Text style={styles.quickActionIcon}>👤</Text>
+                </View>
+                <Text style={styles.quickActionText}>{currentT.profile}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-
-          {/* Title */}
-          <Text style={styles.title}>{currentT.title}</Text>
-          <Text style={styles.subtitle}>{currentT.subtitle}</Text>
-
-          {/* Main Action Button */}
-          <TouchableOpacity
-            style={styles.mainActionButton}
-            onPress={() => navigation.navigate('PlaceOrder')}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#f59e0b', '#d97706']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.mainActionGradient}
-            >
-              <Text style={styles.mainActionIcon}>📦</Text>
-              <Text style={styles.mainActionText}>{currentT.placeOrder}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </LinearGradient>
-
-        {/* Quick Action Buttons */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickActionButton}
-            onPress={() => navigation.navigate('TrackOrder')}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={['#ffffff', '#f7fafc']}
-              style={styles.quickActionGradient}
-            >
-              <View style={styles.quickActionIconContainer}>
-                <Text style={styles.quickActionIcon}>🔍</Text>
-              </View>
-              <Text style={styles.quickActionText}>{currentT.trackOrder}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionButton}
-            onPress={() => navigation.navigate('MyOrders')}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={['#ffffff', '#f7fafc']}
-              style={styles.quickActionGradient}
-            >
-              <View style={styles.quickActionIconContainer}>
-                <Text style={styles.quickActionIcon}>📋</Text>
-              </View>
-              <Text style={styles.quickActionText}>{currentT.myOrders}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         </View>
 
         {/* Services Section */}
-        <View style={styles.servicesSection}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{currentT.services}</Text>
           
           <View style={styles.servicesGrid}>
-            {[
-              { title: currentT.service1Title, desc: currentT.service1Desc, colors: ['#fef3c7', '#fde68a'] },
-              { title: currentT.service2Title, desc: currentT.service2Desc, colors: ['#dbeafe', '#bfdbfe'] },
-              { title: currentT.service3Title, desc: currentT.service3Desc, colors: ['#dcfce7', '#bbf7d0'] },
-              { title: currentT.service4Title, desc: currentT.service4Desc, colors: ['#fce7f3', '#fbcfe8'] },
-            ].map((service, index) => (
-              <View key={index} style={styles.serviceCardWrapper}>
-                <LinearGradient
-                  colors={service.colors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.serviceCard}
-                >
-                  <Text style={styles.serviceTitle}>{service.title}</Text>
-                  <Text style={styles.serviceDesc}>{service.desc}</Text>
-                </LinearGradient>
-              </View>
-            ))}
+            {/* Service 1 */}
+            <View style={styles.serviceCard}>
+              <LinearGradient
+                colors={['#fef3c7', '#fde68a', '#fbbf24']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.serviceGradient}
+              >
+                <View style={styles.serviceIconBg}>
+                  <Text style={styles.serviceIcon}>⚡</Text>
+                </View>
+                <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Service 2 */}
+            <View style={styles.serviceCard}>
+              <LinearGradient
+                colors={['#dbeafe', '#bfdbfe', '#60a5fa']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.serviceGradient}
+              >
+                <View style={styles.serviceIconBg}>
+                  <Text style={styles.serviceIcon}>🛡️</Text>
+                </View>
+                <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Service 3 */}
+            <View style={styles.serviceCard}>
+              <LinearGradient
+                colors={['#dcfce7', '#bbf7d0', '#4ade80']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.serviceGradient}
+              >
+                <View style={styles.serviceIconBg}>
+                  <Text style={styles.serviceIcon}>📍</Text>
+                </View>
+                <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Service 4 */}
+            <View style={styles.serviceCard}>
+              <LinearGradient
+                colors={['#fce7f3', '#fbcfe8', '#f472b6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.serviceGradient}
+              >
+                <View style={styles.serviceIconBg}>
+                  <Text style={styles.serviceIcon}>💰</Text>
+                </View>
+                <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
+              </LinearGradient>
+            </View>
           </View>
         </View>
 
-        {/* Why Choose Us Section */}
-        <LinearGradient
-          colors={['#f8fafc', '#ffffff']}
-          style={styles.featuresSection}
-        >
-          <Text style={styles.sectionTitle}>{currentT.whyChooseUs}</Text>
+        {/* Features Section */}
+        <View style={[styles.section, styles.featuresSection]}>
+          <Text style={styles.sectionTitle}>{currentT.features}</Text>
           
           <View style={styles.featuresGrid}>
             {[
-              { icon: '⏰', text: currentT.feature1 },
-              { icon: '🗺️', text: currentT.feature2 },
-              { icon: '👥', text: currentT.feature3 },
-              { icon: '🚀', text: currentT.feature4 },
+              { icon: '⏰', text: currentT.feature1, color: '#3b82f6' },
+              { icon: '🗺️', text: currentT.feature2, color: '#10b981' },
+              { icon: '👥', text: currentT.feature3, color: '#8b5cf6' },
+              { icon: '🚀', text: currentT.feature4, color: '#f59e0b' },
+              { icon: '📋', text: currentT.feature5, color: '#ef4444' },
+              { icon: '💬', text: currentT.feature6, color: '#06b6d4' },
             ].map((feature, index) => (
-              <View key={index} style={styles.featureItem}>
-                <View style={styles.featureIconContainer}>
+              <View key={index} style={styles.featureCard}>
+                <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
                   <Text style={styles.featureIcon}>{feature.icon}</Text>
                 </View>
                 <Text style={styles.featureText}>{feature.text}</Text>
               </View>
             ))}
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Contact Section */}
-        <View style={styles.contactSection}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{currentT.contact}</Text>
           
           <TouchableOpacity
@@ -236,7 +356,7 @@ export default function HomeScreen({ navigation }: any) {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
+              colors={['#3b82f6', '#2563eb', '#1d4ed8']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.contactGradient}
@@ -248,6 +368,9 @@ export default function HomeScreen({ navigation }: any) {
                 <Text style={styles.contactLabel}>{currentT.phone}</Text>
                 <Text style={styles.contactValue}>+95 912 345 6789</Text>
               </View>
+              <View style={styles.contactArrow}>
+                <Text style={styles.arrowIcon}>→</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -257,7 +380,7 @@ export default function HomeScreen({ navigation }: any) {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={['#8b5cf6', '#7c3aed']}
+              colors={['#8b5cf6', '#7c3aed', '#6d28d9']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.contactGradient}
@@ -269,13 +392,16 @@ export default function HomeScreen({ navigation }: any) {
                 <Text style={styles.contactLabel}>{currentT.email}</Text>
                 <Text style={styles.contactValue}>support@mlexpress.com</Text>
               </View>
+              <View style={styles.contactArrow}>
+                <Text style={styles.arrowIcon}>→</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
         {/* Footer Spacing */}
         <View style={styles.footer} />
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -283,224 +409,196 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
   },
   content: {
     flex: 1,
   },
   heroSection: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
     paddingBottom: 40,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  heroOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 15,
-    marginBottom: 20,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#ffffff',
+    padding: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
   },
   logo: {
     width: '100%',
     height: '100%',
   },
+  welcomeText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#e5e7eb',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
-    marginBottom: 30,
-    paddingHorizontal: 20,
-    lineHeight: 22,
+    paddingHorizontal: 16,
+    lineHeight: 20,
   },
-  mainActionButton: {
-    width: width - 80,
-    borderRadius: 16,
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+  quickActionsContainer: {
+    marginTop: -24,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  mainActionGradient: {
+  quickActionsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 16,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  mainActionIcon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  mainActionText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 16,
-    marginTop: -20,
-  },
-  quickActionButton: {
-    flex: 1,
+  quickActionCard: {
+    width: (width - 44) / 2,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 6,
   },
   quickActionGradient: {
-    padding: 20,
+    padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    minHeight: 120,
+    justifyContent: 'center',
   },
   quickActionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#f0f9ff',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   quickActionIcon: {
-    fontSize: 28,
+    fontSize: 26,
   },
   quickActionText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
+    fontWeight: 'bold',
+    color: '#ffffff',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  servicesSection: {
-    padding: 20,
-    paddingTop: 32,
+  section: {
+    padding: 16,
+    paddingTop: 24,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 16,
   },
   servicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    justifyContent: 'space-between',
+    gap: 12,
   },
-  serviceCardWrapper: {
-    width: (width - 56) / 2,
+  serviceCard: {
+    width: (width - 44) / 2,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
   },
-  serviceCard: {
-    padding: 20,
+  serviceGradient: {
+    padding: 16,
     borderRadius: 16,
-    minHeight: 140,
+    minHeight: 180,
+  },
+  serviceIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
+  },
+  serviceIcon: {
+    fontSize: 24,
   },
   serviceTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 8,
-    lineHeight: 22,
   },
   serviceDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#475569',
     lineHeight: 18,
   },
   featuresSection: {
-    padding: 20,
-    paddingVertical: 32,
+    backgroundColor: '#ffffff',
+    marginHorizontal: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 10,
   },
-  featureItem: {
-    width: (width - 56) / 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 16,
+  featureCard: {
+    width: (width - 52) / 3,
+    backgroundColor: '#f8fafc',
+    padding: 12,
     borderRadius: 12,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#e2e8f0',
   },
   featureIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f0f9ff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginBottom: 8,
   },
   featureIcon: {
-    fontSize: 22,
+    fontSize: 20,
   },
   featureText: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: '#334155',
-    lineHeight: 18,
-  },
-  contactSection: {
-    padding: 20,
-    paddingTop: 12,
-    paddingBottom: 20,
+    textAlign: 'center',
+    lineHeight: 15,
   },
   contactCard: {
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -511,35 +609,48 @@ const styles = StyleSheet.create({
   contactGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     borderRadius: 16,
   },
   contactIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   contactIcon: {
-    fontSize: 28,
+    fontSize: 24,
   },
   contactInfo: {
     flex: 1,
   },
   contactLabel: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: 2,
   },
   contactValue: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#ffffff',
   },
+  contactArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowIcon: {
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
   footer: {
-    height: 40,
+    height: 32,
   },
 });

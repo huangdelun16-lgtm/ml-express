@@ -3,8 +3,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, StyleSheet, Platform } from 'react-native';
 import { AppProvider, useApp } from './src/contexts/AppContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -27,19 +28,31 @@ function ClientTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#2c5282',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: '#1e40af',
+        tabBarInactiveTintColor: '#64748b',
         tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 8,
+          backgroundColor: '#ffffff',
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 88 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
-          borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
-          backgroundColor: '#fff',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}
     >
@@ -48,8 +61,10 @@ function ClientTabs() {
         component={HomeScreen}
         options={{
           tabBarLabel: language === 'zh' ? '首页' : language === 'en' ? 'Home' : 'ပင်မ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🏠</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Text style={{ fontSize: 26 }}>🏠</Text>
+            </View>
           ),
         }}
       />
@@ -58,8 +73,10 @@ function ClientTabs() {
         component={PlaceOrderScreen}
         options={{
           tabBarLabel: language === 'zh' ? '下单' : language === 'en' ? 'Order' : 'အမှာစာ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>📦</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Text style={{ fontSize: 26 }}>📦</Text>
+            </View>
           ),
         }}
       />
@@ -67,9 +84,11 @@ function ClientTabs() {
         name="MyOrders"
         component={MyOrdersScreen}
         options={{
-          tabBarLabel: language === 'zh' ? '我的订单' : language === 'en' ? 'My Orders' : 'ကျွန်ုပ်၏အမှာစာများ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>📋</Text>
+          tabBarLabel: language === 'zh' ? '订单' : language === 'en' ? 'Orders' : 'အမှာစာများ',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Text style={{ fontSize: 26 }}>📋</Text>
+            </View>
           ),
         }}
       />
@@ -78,8 +97,10 @@ function ClientTabs() {
         component={TrackOrderScreen}
         options={{
           tabBarLabel: language === 'zh' ? '追踪' : language === 'en' ? 'Track' : 'ခြေရာခံ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🔍</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Text style={{ fontSize: 26 }}>🔍</Text>
+            </View>
           ),
         }}
       />
@@ -88,14 +109,31 @@ function ClientTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>👤</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+              <Text style={{ fontSize: 26 }}>👤</Text>
+            </View>
           ),
         }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  tabIconActive: {
+    backgroundColor: '#eff6ff',
+    transform: [{ scale: 1.1 }],
+  },
+});
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -116,9 +154,15 @@ export default function App() {
 
   if (isLoggedIn === null) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2c5282" />
-      </View>
+      <LinearGradient
+        colors={['#b0d3e8', '#93b4c5', '#7895a3']}
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+      >
+        <ActivityIndicator size="large" color="#ffffff" />
+        <Text style={{ color: '#ffffff', marginTop: 16, fontSize: 16, fontWeight: '600' }}>
+          加载中...
+        </Text>
+      </LinearGradient>
     );
   }
 
@@ -129,17 +173,43 @@ export default function App() {
           initialRouteName={isLoggedIn ? "Main" : "Login"}
           screenOptions={{
             headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
           }}
         >
           {/* 登录注册页面 */}
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+          <Stack.Screen 
+            name="Register" 
+            component={RegisterScreen}
+            options={{
+              animation: 'slide_from_bottom',
+            }}
+          />
           
           {/* 主应用 */}
-          <Stack.Screen name="Main" component={ClientTabs} />
+          <Stack.Screen 
+            name="Main" 
+            component={ClientTabs}
+            options={{
+              animation: 'fade',
+            }}
+          />
           
           {/* 其他页面 */}
-          <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
+          <Stack.Screen 
+            name="OrderDetail" 
+            component={OrderDetailScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </AppProvider>
