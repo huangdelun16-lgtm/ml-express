@@ -12,6 +12,7 @@ const EmployeeSupervision: React.FC = () => {
   const [filterUser, setFilterUser] = useState<string>('all');
   const [filterModule, setFilterModule] = useState<string>('all');
   const [filterAction, setFilterAction] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<string>('all');
   const [searchText, setSearchText] = useState<string>('');
   
   useEffect(() => {
@@ -35,6 +36,25 @@ const EmployeeSupervision: React.FC = () => {
     if (filterModule !== 'all' && log.module !== filterModule) return false;
     if (filterAction !== 'all' && log.action_type !== filterAction) return false;
     if (searchText && !log.action_description.toLowerCase().includes(searchText.toLowerCase())) return false;
+    
+    // 日期筛选
+    if (filterDate !== 'all') {
+      const logDate = new Date(log.created_at);
+      const now = new Date();
+      
+      if (filterDate === 'today') {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (logDate < today) return false;
+      } else if (filterDate === 'yesterday') {
+        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (logDate < yesterday || logDate >= today) return false;
+      } else if (filterDate === 'last7days') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (logDate < sevenDaysAgo) return false;
+      }
+    }
+    
     return true;
   });
 
@@ -207,7 +227,7 @@ const EmployeeSupervision: React.FC = () => {
         }}
       >
         <h3 style={{ marginTop: 0, marginBottom: '16px' }}>筛选条件</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '12px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', opacity: 0.9 }}>员工</label>
             <select
@@ -255,6 +275,24 @@ const EmployeeSupervision: React.FC = () => {
               <option value="logout" style={{ color: '#000' }}>登出</option>
               <option value="view" style={{ color: '#000' }}>查看</option>
               <option value="export" style={{ color: '#000' }}>导出</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', opacity: 0.9 }}>📅 日期筛选</label>
+            <select
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              style={{
+                ...inputStyle,
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
+                borderColor: 'rgba(59, 130, 246, 0.4)',
+                fontWeight: '500'
+              }}
+            >
+              <option value="all" style={{ color: '#000' }}>全部日期</option>
+              <option value="today" style={{ color: '#000' }}>☀️ 今天</option>
+              <option value="yesterday" style={{ color: '#000' }}>🌙 昨天</option>
+              <option value="last7days" style={{ color: '#000' }}>📊 最近7天</option>
             </select>
           </div>
           <div>
