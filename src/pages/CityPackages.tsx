@@ -335,11 +335,11 @@ const CityPackages: React.FC = () => {
         zIndex: 1
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-              {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
-            </h1>
-            <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+            {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
+          </h1>
+          <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
               {language === 'zh' ? '管理缅甸同城快递包裹' : 'Manage local express packages in Myanmar'}
             </p>
             
@@ -368,24 +368,28 @@ const CityPackages: React.FC = () => {
                         boxShadow: selectedStatus === 'all' ? '0 4px 15px rgba(255, 255, 255, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>总包裹: </span>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                        {language === 'zh' ? '总包裹: ' : language === 'en' ? 'Total: ' : 'စုစုပေါင်း: '}
+                      </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{stats.total}</span>
-                    </div>
+        </div>
                     <div 
                       onClick={() => handleStatusClick('待取件')}
-                      style={{ 
+          style={{
                         background: selectedStatus === '待取件' ? 'rgba(243, 156, 18, 0.4)' : 'rgba(243, 156, 18, 0.2)', 
                         padding: '12px 20px', 
                         borderRadius: '25px',
                         backdropFilter: 'blur(10px)',
                         border: selectedStatus === '待取件' ? '2px solid rgba(243, 156, 18, 0.6)' : '1px solid rgba(243, 156, 18, 0.3)',
-                        cursor: 'pointer',
+            cursor: 'pointer',
                         transition: 'all 0.3s ease',
                         transform: selectedStatus === '待取件' ? 'scale(1.05)' : 'scale(1)',
                         boxShadow: selectedStatus === '待取件' ? '0 4px 15px rgba(243, 156, 18, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>待取件: </span>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                        {language === 'zh' ? '待取件: ' : language === 'en' ? 'Pending: ' : 'စောင့်ဆိုင်းဆဲ: '}
+                      </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#f39c12' }}>{stats.pending}</span>
                     </div>
                     <div 
@@ -394,7 +398,7 @@ const CityPackages: React.FC = () => {
                         background: selectedStatus === '已取件' ? 'rgba(52, 152, 219, 0.4)' : 'rgba(52, 152, 219, 0.2)', 
                         padding: '12px 20px', 
                         borderRadius: '25px',
-                        backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(10px)',
                         border: selectedStatus === '已取件' ? '2px solid rgba(52, 152, 219, 0.6)' : '1px solid rgba(52, 152, 219, 0.3)',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
@@ -402,7 +406,9 @@ const CityPackages: React.FC = () => {
                         boxShadow: selectedStatus === '已取件' ? '0 4px 15px rgba(52, 152, 219, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已取件: </span>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                        {language === 'zh' ? '已取件: ' : language === 'en' ? 'Picked Up: ' : 'ကောက်ယူပြီး: '}
+                      </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#3498db' }}>{stats.pickedUp}</span>
                     </div>
                     <div 
@@ -419,7 +425,9 @@ const CityPackages: React.FC = () => {
                         boxShadow: selectedStatus === '配送中' ? '0 4px 15px rgba(155, 89, 182, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>配送中: </span>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                        {language === 'zh' ? '配送中: ' : language === 'en' ? 'Delivering: ' : 'ပို့ဆောင်နေဆဲ: '}
+                      </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#9b59b6' }}>{stats.delivering}</span>
                     </div>
                     <div 
@@ -436,9 +444,11 @@ const CityPackages: React.FC = () => {
                         boxShadow: selectedStatus === '已送达' ? '0 4px 15px rgba(39, 174, 96, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>已送达: </span>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                        {language === 'zh' ? '已送达: ' : language === 'en' ? 'Delivered: ' : 'ပေးပို့ပြီး: '}
+                      </span>
                       <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#27ae60' }}>{stats.delivered}</span>
-                    </div>
+      </div>
                   </>
                 );
               })()}
@@ -456,7 +466,7 @@ const CityPackages: React.FC = () => {
                 cursor: 'pointer',
                 fontSize: '0.9rem',
                 fontWeight: '500',
-                display: 'flex',
+        display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
                 boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)',
@@ -464,41 +474,41 @@ const CityPackages: React.FC = () => {
                 textShadow: 'none'
               }}
             >
-              🔍 {language === 'zh' ? '查询单号' : 'Search Package'}
+              🔍 {language === 'zh' ? '查询单号' : language === 'en' ? 'Search Package' : 'ပါဆယ်ရှာဖွေရန်'}
             </button>
             
-            <button
+        <button
               onClick={() => setShowDatePicker(true)}
-              style={{
+          style={{
                 background: 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+            color: 'white',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
                 padding: '0.75rem 1.5rem',
                 borderRadius: '8px',
-                cursor: 'pointer',
+            cursor: 'pointer',
                 fontSize: '0.9rem',
                 fontWeight: '500',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(10px)',
                 transition: 'all 0.3s ease',
                 textShadow: 'none'
-              }}
-            >
-              📅 {language === 'zh' ? '日期筛选' : 'Date Filter'}
+          }}
+        >
+              📅 {language === 'zh' ? '日期筛选' : language === 'en' ? 'Date Filter' : 'ရက်စွဲစစ်ထုတ်ရန်'}
               {selectedDate && <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>({formatDateDisplay(selectedDate)})</span>}
-            </button>
+        </button>
             
-            <button
+        <button
               onClick={loadPackages}
-              style={{
+          style={{
                 background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                color: 'white',
+            color: 'white',
                 border: 'none',
                 padding: '0.75rem 1.5rem',
                 borderRadius: '8px',
-                cursor: 'pointer',
+            cursor: 'pointer',
                 fontSize: '0.9rem',
                 fontWeight: '500',
                 display: 'flex',
@@ -509,7 +519,7 @@ const CityPackages: React.FC = () => {
                 textShadow: 'none'
               }}
             >
-              🔄 {language === 'zh' ? '刷新状态' : 'Refresh Status'}
+              🔄 {language === 'zh' ? '刷新状态' : language === 'en' ? 'Refresh Status' : 'အခြေအနေမွမ်းမံရန်'}
             </button>
             
             <button
@@ -581,32 +591,32 @@ const CityPackages: React.FC = () => {
                 }
               }}
             >
-              ← {language === 'zh' ? '返回后台' : 'Back to Admin'}
-            </button>
+              ← {language === 'zh' ? '返回后台' : language === 'en' ? 'Back to Admin' : 'စီမံခန့်ခွဲမှုသို့ပြန်သွားရန်'}
+        </button>
           </div>
         </div>
       </div>
 
       {/* 包裹列表 */}
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '15px',
-        padding: '20px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
-            <p>加载中...</p>
-          </div>
-        ) : (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '15px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
+          position: 'relative',
+          zIndex: 1
+        }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+              <p>加载中...</p>
+            </div>
+          ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
             {/* 过滤状态提示 */}
             {(selectedStatus || selectedDate) && (
-              <div style={{
+            <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
                 padding: '15px',
@@ -661,7 +671,7 @@ const CityPackages: React.FC = () => {
             )}
             
             {getFilteredPackages().length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
+                <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
                 <p>{
                   selectedStatus || selectedDate 
                     ? `没有找到符合条件的包裹` 
@@ -683,81 +693,81 @@ const CityPackages: React.FC = () => {
                     清除所有筛选
                   </button>
                 )}
-              </div>
-            ) : (
+                </div>
+              ) : (
               getFilteredPackages().map((pkg) => (
-                <div key={pkg.id} style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
+              <div key={pkg.id} style={{
+                background: 'rgba(255, 255, 255, 0.1)',
                   borderRadius: '8px',
                   padding: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
                     marginBottom: '10px'
-                  }}>
-                    <div>
+                }}>
+                  <div>
                       <h3 style={{ color: 'white', margin: '0 0 3px 0', fontSize: '1.1rem' }}>
-                        {pkg.id} - {pkg.package_type}
-                      </h3>
+                      {pkg.id} - {pkg.package_type}
+                    </h3>
                       <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
-                        创建时间: {pkg.create_time}
-                      </p>
-                    </div>
-                    <div style={{
-                      background: getStatusColor(pkg.status),
-                      color: 'white',
+                      创建时间: {pkg.create_time}
+                    </p>
+                  </div>
+                  <div style={{
+                    background: getStatusColor(pkg.status),
+                    color: 'white',
                       padding: '4px 12px',
                       borderRadius: '15px',
                       fontSize: '0.8rem',
-                      fontWeight: 'bold'
-                    }}>
-                      {getStatusText(pkg.status)}
-                    </div>
+                    fontWeight: 'bold'
+                  }}>
+                    {getStatusText(pkg.status)}
                   </div>
+                </div>
 
-                  <div style={{
-                    display: 'grid',
+                <div style={{
+                  display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '10px',
                     marginBottom: '10px'
-                  }}>
-                    <div>
+                }}>
+                  <div>
                       <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>寄件人</h4>
                       <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
-                        {pkg.sender_name} - {pkg.sender_phone}
-                      </p>
-                    </div>
-                    <div>
+                      {pkg.sender_name} - {pkg.sender_phone}
+                    </p>
+                  </div>
+                  <div>
                       <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>收件人</h4>
                       <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
-                        {pkg.receiver_name} - {pkg.receiver_phone}
-                      </p>
-                    </div>
+                      {pkg.receiver_name} - {pkg.receiver_phone}
+                    </p>
                   </div>
+                </div>
 
-                  <div style={{
-                    display: 'flex',
+                <div style={{
+                  display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
-                    gap: '10px',
+                  gap: '10px',
                     flexWrap: 'wrap',
                     marginTop: '8px'
-                  }}>
+                }}>
                     {/* 左侧状态操作按钮 */}
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      {pkg.status === '待取件' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '已取件')}
-                          style={{
-                            background: '#3498db',
-                            color: 'white',
-                            border: 'none',
+                  {pkg.status === '待取件' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '已取件')}
+                      style={{
+                        background: '#3498db',
+                        color: 'white',
+                        border: 'none',
                             padding: '8px 14px',
-                            borderRadius: '5px',
-                            cursor: 'pointer',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
                             fontSize: '0.8rem',
                             fontWeight: '500',
                             minHeight: '32px',
@@ -766,19 +776,19 @@ const CityPackages: React.FC = () => {
                             justifyContent: 'center'
                           }}
                         >
-                          标记已取件
-                        </button>
-                      )}
-                      {pkg.status === '已取件' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '配送中')}
-                          style={{
-                            background: '#9b59b6',
-                            color: 'white',
-                            border: 'none',
+                          {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
+                    </button>
+                  )}
+                  {pkg.status === '已取件' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '配送中')}
+                      style={{
+                        background: '#9b59b6',
+                        color: 'white',
+                        border: 'none',
                             padding: '10px 18px',
                             borderRadius: '6px',
-                            cursor: 'pointer',
+                        cursor: 'pointer',
                             fontSize: '0.9rem',
                             fontWeight: '500',
                             minHeight: '40px',
@@ -787,19 +797,19 @@ const CityPackages: React.FC = () => {
                             justifyContent: 'center'
                           }}
                         >
-                          开始配送
-                        </button>
-                      )}
-                      {pkg.status === '配送中' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '已送达')}
-                          style={{
-                            background: '#27ae60',
-                            color: 'white',
-                            border: 'none',
+                          {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
+                    </button>
+                  )}
+                  {pkg.status === '配送中' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '已送达')}
+                      style={{
+                        background: '#27ae60',
+                        color: 'white',
+                        border: 'none',
                             padding: '10px 18px',
                             borderRadius: '6px',
-                            cursor: 'pointer',
+                        cursor: 'pointer',
                             fontSize: '0.9rem',
                             fontWeight: '500',
                             minHeight: '40px',
@@ -808,9 +818,9 @@ const CityPackages: React.FC = () => {
                             justifyContent: 'center'
                           }}
                         >
-                          标记已送达
-                        </button>
-                      )}
+                          {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
+                    </button>
+                  )}
                     </div>
                     
                     {/* 右侧功能按钮 */}
@@ -847,18 +857,18 @@ const CityPackages: React.FC = () => {
                           e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
-                        📱 寄件码
+                        📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
                       </button>
                       
-                      <button
-                        onClick={() => handleViewDetail(pkg)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                  <button
+                    onClick={() => handleViewDetail(pkg)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
                           padding: '8px 14px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
                           fontSize: '0.8rem',
                           fontWeight: '500',
                           minHeight: '32px',
@@ -874,17 +884,17 @@ const CityPackages: React.FC = () => {
                           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                         }}
                       >
-                        查看详情
-                      </button>
+                        {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
+                  </button>
                       
                     </div>
-                  </div>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+              </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
       {/* 寄件码模态框 */}
       {showPickupCodeModal && selectedPackageForPickup && (
@@ -903,7 +913,7 @@ const CityPackages: React.FC = () => {
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-            borderRadius: '15px',
+          borderRadius: '15px',
             padding: '25px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
             maxWidth: '500px',
@@ -921,8 +931,8 @@ const CityPackages: React.FC = () => {
               marginBottom: '25px'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-                📱 寄件码
-              </h2>
+                📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
+          </h2>
               <button
                 onClick={closePickupCodeModal}
                 style={{
@@ -936,7 +946,7 @@ const CityPackages: React.FC = () => {
                   transition: 'all 0.3s ease'
                 }}
               >
-                ✕ 关闭
+                ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
               </button>
             </div>
 
@@ -989,10 +999,10 @@ const CityPackages: React.FC = () => {
                     <img 
                       src={qrCodeDataUrl} 
                       alt="寄件码二维码" 
-                      style={{
+                  style={{
                         width: '220px',
                         height: '220px',
-                        borderRadius: '8px',
+                    borderRadius: '8px',
                         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
                       }}
                     />
@@ -1058,12 +1068,12 @@ const CityPackages: React.FC = () => {
               <button
                 onClick={saveQRCode}
                 disabled={!qrCodeDataUrl}
-                style={{
+                  style={{
                   background: qrCodeDataUrl ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)' : 'rgba(255, 255, 255, 0.1)',
                   color: 'white',
                   border: 'none',
                   padding: '12px 24px',
-                  borderRadius: '8px',
+                    borderRadius: '8px',
                   cursor: qrCodeDataUrl ? 'pointer' : 'not-allowed',
                   fontSize: '1rem',
                   fontWeight: '500',
@@ -1095,8 +1105,8 @@ const CityPackages: React.FC = () => {
               <button
                 onClick={closePickupCodeModal}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
                   padding: '12px 24px',
                   borderRadius: '8px',
@@ -1146,7 +1156,7 @@ const CityPackages: React.FC = () => {
             padding: '25px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
             maxWidth: '500px',
-            width: '100%',
+                    width: '100%',
             textAlign: 'center'
           }}>
             <div style={{
@@ -1165,8 +1175,8 @@ const CityPackages: React.FC = () => {
                   setSearchResult(null);
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
                   border: '1px solid rgba(255,255,255,0.2)',
                   padding: '8px 16px',
                   borderRadius: '20px',
@@ -1175,9 +1185,9 @@ const CityPackages: React.FC = () => {
                   transition: 'all 0.3s ease'
                 }}
               >
-                ✕ 关闭
+                ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
               </button>
-            </div>
+              </div>
 
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
@@ -1189,18 +1199,18 @@ const CityPackages: React.FC = () => {
                 请输入包裹单号、寄件人姓名、收件人姓名或电话号码
               </p>
               
-              <input
-                type="text"
+                <input
+                  type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="例如：MDY20251006172107 或 张三 或 13800138000"
-                style={{
-                  width: '100%',
+                  style={{
+                    width: '100%',
                   padding: '12px 16px',
-                  borderRadius: '8px',
+                    borderRadius: '8px',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
                   fontSize: '1rem',
                   marginBottom: '15px',
                   outline: 'none'
@@ -1254,13 +1264,13 @@ const CityPackages: React.FC = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  取消
+                  {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}
                 </button>
               </div>
             </div>
 
             {/* 搜索提示 */}
-            <div style={{
+              <div style={{
               background: 'rgba(255, 255, 255, 0.05)',
               padding: '15px',
               borderRadius: '10px',
@@ -1310,13 +1320,13 @@ const CityPackages: React.FC = () => {
               marginBottom: '25px'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-                📅 选择日期
+                📅 {language === 'zh' ? '选择日期' : language === 'en' ? 'Select Date' : 'ရက်စွဲရွေးချယ်ရန်'}
               </h2>
               <button
                 onClick={() => setShowDatePicker(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
                   border: '1px solid rgba(255,255,255,0.2)',
                   padding: '8px 16px',
                   borderRadius: '20px',
@@ -1325,12 +1335,12 @@ const CityPackages: React.FC = () => {
                   transition: 'all 0.3s ease'
                 }}
               >
-                ✕ 关闭
+                ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
               </button>
             </div>
 
             <div style={{
-              background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(255, 255, 255, 0.1)',
               padding: '20px',
               borderRadius: '15px',
               marginBottom: '20px'
@@ -1371,7 +1381,7 @@ const CityPackages: React.FC = () => {
                     }}
                     style={{
                       background: selectedDate === date ? 'rgba(39, 174, 96, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
+                  color: 'white',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
                       padding: '12px 20px',
                       borderRadius: '8px',
@@ -1434,7 +1444,7 @@ const CityPackages: React.FC = () => {
               marginBottom: '25px'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-                🖼️ 包裹送达图片
+                🖼️ {language === 'zh' ? '包裹送达图片' : language === 'en' ? 'Delivery Photos' : 'ပို့ဆောင်ပြီးဓာတ်ပုံများ'}
               </h2>
               <button
                 onClick={() => setShowPhotoModal(false)}
@@ -1449,7 +1459,7 @@ const CityPackages: React.FC = () => {
                   transition: 'all 0.3s ease'
                 }}
               >
-                ✕ 关闭
+                ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
               </button>
             </div>
 
@@ -1528,42 +1538,42 @@ const CityPackages: React.FC = () => {
             overflow: 'auto'
           }}>
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
               marginBottom: '25px'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
                 📦 包裹详情
               </h2>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <button
+              <button
                   onClick={() => findPackagePhotos(selectedPackage.id)}
-                  style={{
+                style={{
                     background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
-                    color: 'white',
+                  color: 'white',
                     border: 'none',
                     padding: '8px 16px',
                     borderRadius: '20px',
-                    cursor: 'pointer',
+                  cursor: 'pointer',
                     fontSize: '0.9rem',
                     fontWeight: '500',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     boxShadow: '0 2px 8px rgba(230, 126, 34, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(230, 126, 34, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(230, 126, 34, 0.3)';
                   }}
                 >
-                  🖼️ 图片
+                  🖼️ {language === 'zh' ? '图片' : language === 'en' ? 'Photos' : 'ဓာတ်ပုံများ'}
                 </button>
                 <button
                   onClick={closeDetailModal}
@@ -1578,14 +1588,14 @@ const CityPackages: React.FC = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  ✕ 关闭
-                </button>
+                  ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
+              </button>
               </div>
             </div>
 
             <div style={{ display: 'grid', gap: '20px' }}>
               {/* 基本信息 */}
-              <div style={{
+            <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
                 padding: '20px',
@@ -1598,7 +1608,7 @@ const CityPackages: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>包裹编号:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.id}</span>
-                  </div>
+              </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>包裹类型:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.package_type}</span>
@@ -1650,14 +1660,14 @@ const CityPackages: React.FC = () => {
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>地址:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.sender_address}</span>
                   </div>
-                </div>
               </div>
+            </div>
 
               {/* 收件人信息 */}
-              <div style={{
+            <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-                padding: '20px',
+              padding: '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
@@ -1676,14 +1686,14 @@ const CityPackages: React.FC = () => {
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>地址:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.receiver_address}</span>
                   </div>
-                </div>
               </div>
+            </div>
 
               {/* 配送信息 */}
-              <div style={{
+            <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-                padding: '20px',
+              padding: '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
@@ -1704,13 +1714,13 @@ const CityPackages: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'rgba(255,255,255,0.8)' }}>送达时间:</span>
                       <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.delivery_time}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
+                </div>
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
