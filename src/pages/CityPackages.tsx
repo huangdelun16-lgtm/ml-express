@@ -1290,7 +1290,7 @@ const CityPackages: React.FC = () => {
         </div>
       )}
 
-      {/* 日期选择器模态框 */}
+      {/* 现代化日期筛选模态框 */}
       {showDatePicker && (
         <div style={{
           position: 'fixed',
@@ -1298,118 +1298,602 @@ const CityPackages: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          animation: 'fadeIn 0.3s ease'
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
-            borderRadius: '15px',
-            padding: '25px',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            maxWidth: '400px',
-            width: '100%',
-            textAlign: 'center'
+            background: 'linear-gradient(145deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)',
+            borderRadius: '24px',
+            padding: '0',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 100px rgba(49, 130, 206, 0.2)',
+            maxWidth: '900px',
+            width: '95%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
+            {/* 头部 */}
             <div style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+              padding: '24px 32px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '25px'
+              alignItems: 'center'
             }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-                📅 {language === 'zh' ? '选择日期' : language === 'en' ? 'Select Date' : 'ရက်စွဲရွေးချယ်ရန်'}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #3182ce 0%, #2563eb 100%)',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  boxShadow: '0 4px 12px rgba(49, 130, 206, 0.4)'
+                }}>
+                  📅
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                    {language === 'zh' ? '高级筛选' : language === 'en' ? 'Advanced Filter' : 'အဆင့်မြင့်စစ်ထုတ်ရန်'}
+                  </h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
+                    {language === 'zh' ? '按日期、状态和排序筛选包裹' : language === 'en' ? 'Filter packages by date, status and sort' : 'ရက်စွဲ၊ အခြေအနေနှင့် စီစစ်ရန်'}
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowDatePicker(false)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
                   border: '1px solid rgba(255,255,255,0.2)',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.3s ease'
+                  fontSize: '1.2rem',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                  e.currentTarget.style.transform = 'rotate(90deg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'rotate(0deg)';
                 }}
               >
-                ✕ {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
+                ✕
               </button>
             </div>
 
+            {/* 主体内容 */}
             <div style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-              padding: '20px',
-              borderRadius: '15px',
-              marginBottom: '20px'
+              padding: '32px',
+              maxHeight: 'calc(90vh - 140px)',
+              overflow: 'auto'
             }}>
-              <button
-                onClick={() => {
-                  setSelectedDate(null);
-                  setShowDatePicker(false);
-                }}
-                style={{
-                  background: selectedDate === null ? 'rgba(39, 174, 96, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  padding: '12px 20px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  width: '100%',
-                  marginBottom: '10px',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                全部日期 ({packages.length} 个包裹)
-              </button>
-              
-              {getAvailableDates().map((date) => {
-                const datePackages = packages.filter(pkg => {
-                  const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
-                  return pkgDate === date;
-                }).length;
-                
-                return (
-                  <button
-                    key={date}
-                    onClick={() => {
-                      setSelectedDate(date);
-                      setShowDatePicker(false);
-                    }}
-                    style={{
-                      background: selectedDate === date ? 'rgba(39, 174, 96, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      padding: '12px 20px',
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                {/* 左侧：预设日期范围 */}
+                <div>
+                  <h3 style={{
+                    color: 'white',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      width: '32px',
+                      height: '32px',
                       borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                      width: '100%',
-                      marginBottom: '10px',
-                      transition: 'all 0.3s ease',
-                      textAlign: 'left',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span>{formatDateDisplay(date)}</span>
-                    <span style={{ 
-                      background: 'rgba(255, 255, 255, 0.2)', 
-                      padding: '4px 8px', 
-                      borderRadius: '12px',
-                      fontSize: '0.8rem'
-                    }}>
-                      {datePackages} 个包裹
-                    </span>
-                  </button>
-                );
-              })}
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px'
+                    }}>⚡</span>
+                    {language === 'zh' ? '快速选择' : language === 'en' ? 'Quick Select' : 'အမြန်ရွေး'}
+                  </h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* 全部日期 */}
+                    <button
+                      onClick={() => {
+                        setSelectedDate(null);
+                        setSelectedStatus(null);
+                      }}
+                      style={{
+                        background: selectedDate === null ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        color: 'white',
+                        border: selectedDate === null ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.15)',
+                        padding: '14px 20px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: selectedDate === null ? '600' : '500',
+                        transition: 'all 0.3s ease',
+                        textAlign: 'left',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: selectedDate === null ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedDate !== null) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedDate !== null) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }
+                      }}
+                    >
+                      <span>
+                        🗓️ {language === 'zh' ? '全部日期' : language === 'en' ? 'All Dates' : 'ရက်စွဲအားလုံး'}
+                      </span>
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600'
+                      }}>
+                        {packages.length}
+                      </span>
+                    </button>
+
+                    {/* 今天 */}
+                    <button
+                      onClick={() => {
+                        const today = new Date().toLocaleDateString('zh-CN');
+                        setSelectedDate(today);
+                      }}
+                      style={{
+                        background: selectedDate === new Date().toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        color: 'white',
+                        border: selectedDate === new Date().toLocaleDateString('zh-CN') ? '2px solid #3b82f6' : '2px solid rgba(255, 255, 255, 0.15)',
+                        padding: '14px 20px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: selectedDate === new Date().toLocaleDateString('zh-CN') ? '600' : '500',
+                        transition: 'all 0.3s ease',
+                        textAlign: 'left',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: selectedDate === new Date().toLocaleDateString('zh-CN') ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedDate !== new Date().toLocaleDateString('zh-CN')) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedDate !== new Date().toLocaleDateString('zh-CN')) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }
+                      }}
+                    >
+                      <span>
+                        ☀️ {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}
+                      </span>
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600'
+                      }}>
+                        {packages.filter(pkg => {
+                          const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                          return pkgDate === new Date().toLocaleDateString('zh-CN');
+                        }).length}
+                      </span>
+                    </button>
+
+                    {/* 昨天 */}
+                    <button
+                      onClick={() => {
+                        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
+                        setSelectedDate(yesterday);
+                      }}
+                      style={{
+                        background: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        color: 'white',
+                        border: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '2px solid #8b5cf6' : '2px solid rgba(255, 255, 255, 0.15)',
+                        padding: '14px 20px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '600' : '500',
+                        transition: 'all 0.3s ease',
+                        textAlign: 'left',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '0 4px 12px rgba(139, 92, 246, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedDate !== new Date(Date.now() - 86400000).toLocaleDateString('zh-CN')) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedDate !== new Date(Date.now() - 86400000).toLocaleDateString('zh-CN')) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }
+                      }}
+                    >
+                      <span>
+                        🌙 {language === 'zh' ? '昨天' : language === 'en' ? 'Yesterday' : 'မနေ့က'}
+                      </span>
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600'
+                      }}>
+                        {packages.filter(pkg => {
+                          const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                          return pkgDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
+                        }).length}
+                      </span>
+                    </button>
+
+                    {/* 最近7天 */}
+                    <button
+                      onClick={() => {
+                        // 这里可以实现最近7天的逻辑
+                        setSelectedDate('last7days');
+                      }}
+                      style={{
+                        background: selectedDate === 'last7days' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        color: 'white',
+                        border: selectedDate === 'last7days' ? '2px solid #f59e0b' : '2px solid rgba(255, 255, 255, 0.15)',
+                        padding: '14px 20px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: selectedDate === 'last7days' ? '600' : '500',
+                        transition: 'all 0.3s ease',
+                        textAlign: 'left',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: selectedDate === 'last7days' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedDate !== 'last7days') {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedDate !== 'last7days') {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }
+                      }}
+                    >
+                      <span>
+                        📊 {language === 'zh' ? '最近7天' : language === 'en' ? 'Last 7 Days' : 'ပြီးခဲ့သော ၇ ရက်'}
+                      </span>
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600'
+                      }}>
+                        {packages.filter(pkg => {
+                          const pkgDate = new Date(pkg.created_at || pkg.create_time);
+                          const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+                          return pkgDate >= sevenDaysAgo;
+                        }).length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* 状态筛选 */}
+                  <h3 style={{
+                    color: 'white',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    marginTop: '24px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px'
+                    }}>🎯</span>
+                    {language === 'zh' ? '按状态筛选' : language === 'en' ? 'Filter by Status' : 'အခြေအနေအလိုက်'}
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {[
+                      { status: null, label: language === 'zh' ? '全部状态' : language === 'en' ? 'All Status' : 'အားလုံး', icon: '📦', color: '#64748b' },
+                      { status: '待取件', label: language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်', icon: '📮', color: '#f59e0b' },
+                      { status: '已取件', label: language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး', icon: '📬', color: '#3b82f6' },
+                      { status: '配送中', label: language === 'zh' ? '配送中' : language === 'en' ? 'In Transit' : 'ပို့ဆောင်နေသည်', icon: '🚚', color: '#8b5cf6' },
+                      { status: '已送达', label: language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး', icon: '✅', color: '#10b981' }
+                    ].map(({ status, label, icon, color }) => (
+                      <button
+                        key={status || 'all'}
+                        onClick={() => setSelectedStatus(status)}
+                        style={{
+                          background: selectedStatus === status ? `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` : 'rgba(255, 255, 255, 0.06)',
+                          color: 'white',
+                          border: selectedStatus === status ? `2px solid ${color}` : '2px solid rgba(255, 255, 255, 0.1)',
+                          padding: '10px 16px',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          fontSize: '0.95rem',
+                          fontWeight: selectedStatus === status ? '600' : '500',
+                          transition: 'all 0.3s ease',
+                          textAlign: 'left',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          boxShadow: selectedStatus === status ? `0 4px 12px ${color}40` : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedStatus !== status) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedStatus !== status) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }
+                        }}
+                      >
+                        <span>{icon} {label}</span>
+                        <span style={{
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600'
+                        }}>
+                          {status ? packages.filter(pkg => pkg.status === status).length : packages.length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 右侧：所有日期列表 */}
+                <div>
+                  <h3 style={{
+                    color: 'white',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px'
+                    }}>📋</span>
+                    {language === 'zh' ? '历史日期' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
+                  </h3>
+
+                  <div style={{
+                    maxHeight: '450px',
+                    overflowY: 'auto',
+                    paddingRight: '8px'
+                  }}>
+                    {getAvailableDates().map((date, index) => {
+                      const datePackages = packages.filter(pkg => {
+                        const pkgDate = new Date(pkg.created_at || pkg.create_time).toLocaleDateString('zh-CN');
+                        return pkgDate === date;
+                      });
+                      
+                      const isSelected = selectedDate === date;
+                      
+                      return (
+                        <button
+                          key={date}
+                          onClick={() => setSelectedDate(date)}
+                          style={{
+                            background: isSelected ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' : 'rgba(255, 255, 255, 0.06)',
+                            color: 'white',
+                            border: isSelected ? '2px solid #06b6d4' : '2px solid rgba(255, 255, 255, 0.1)',
+                            padding: '12px 16px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            fontSize: '0.95rem',
+                            width: '100%',
+                            marginBottom: '8px',
+                            transition: 'all 0.3s ease',
+                            textAlign: 'left',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            boxShadow: isSelected ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              e.currentTarget.style.transform = 'translateX(4px)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                              e.currentTarget.style.transform = 'translateX(0)';
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontWeight: '600' }}>
+                              📅 {formatDateDisplay(date)}
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', opacity: 0.8 }}>
+                              <span>📦 {datePackages.length}</span>
+                              <span>✅ {datePackages.filter(p => p.status === '已送达').length}</span>
+                              <span>🚚 {datePackages.filter(p => p.status === '配送中').length}</span>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span style={{ fontSize: '1.2rem' }}>✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 底部操作按钮 */}
+              <div style={{
+                marginTop: '24px',
+                paddingTop: '24px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setSelectedStatus(null);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    padding: '12px 24px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  🔄 {language === 'zh' ? '重置筛选' : language === 'en' ? 'Reset Filter' : 'ပြန်လည်သတ်မှတ်'}
+                </button>
+                <button
+                  onClick={() => setShowDatePicker(false)}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: '2px solid #10b981',
+                    padding: '12px 32px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                  }}
+                >
+                  ✓ {language === 'zh' ? '应用筛选' : language === 'en' ? 'Apply Filter' : 'သုံးမည်'}
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* 添加动画样式 */}
+          <style>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+            
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            
+            /* 自定义滚动条 */
+            div::-webkit-scrollbar {
+              width: 8px;
+            }
+            
+            div::-webkit-scrollbar-track {
+              background: rgba(255, 255, 255, 0.05);
+              borderRadius: 10px;
+            }
+            
+            div::-webkit-scrollbar-thumb {
+              background: rgba(255, 255, 255, 0.2);
+              borderRadius: 10px;
+            }
+            
+            div::-webkit-scrollbar-thumb:hover {
+              background: rgba(255, 255, 255, 0.3);
+            }
+          `}</style>
         </div>
       )}
 
