@@ -15,10 +15,12 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { packageService, Package, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useApp } from '../contexts/AppContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function MapScreen({ navigation }: any) {
+  const { language } = useApp();
   const [location, setLocation] = useState<any>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
@@ -463,7 +465,9 @@ export default function MapScreen({ navigation }: any) {
                     startDelivering(item.id);
                   }}
                 >
-                  <Text style={styles.startDeliveryText}>🚀 开始配送</Text>
+                  <Text style={styles.startDeliveryText}>
+                    🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity 
@@ -473,7 +477,9 @@ export default function MapScreen({ navigation }: any) {
                     finishDelivering(item.id);
                   }}
                 >
-                  <Text style={styles.finishDeliveryText}>🏁 完成配送</Text>
+                  <Text style={styles.finishDeliveryText}>
+                    🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete Delivery' : 'ပို့ဆောင်မှုပြီးမြောက်'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -488,7 +494,9 @@ export default function MapScreen({ navigation }: any) {
           }}
         >
           <Text style={styles.navButtonText}>🗺️</Text>
-          <Text style={styles.navButtonLabel}>导航</Text>
+          <Text style={styles.navButtonLabel}>
+            {language === 'zh' ? '导航' : language === 'en' ? 'Navigate' : 'လမ်းညွှန်'}
+          </Text>
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -497,7 +505,9 @@ export default function MapScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🗺️ 配送路线</Text>
+        <Text style={styles.headerTitle}>
+          🗺️ {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်လမ်းကြောင်း'}
+        </Text>
         <TouchableOpacity onPress={loadPackages} style={styles.refreshButton}>
           <Text style={styles.refreshText}>🔄</Text>
         </TouchableOpacity>
@@ -507,7 +517,9 @@ export default function MapScreen({ navigation }: any) {
         <View style={styles.locationCard}>
           <Text style={styles.locationIcon}>📍</Text>
           <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>我的位置</Text>
+            <Text style={styles.locationTitle}>
+              {language === 'zh' ? '我的位置' : language === 'en' ? 'My Location' : 'ကျွန်ုပ်၏တည်နေရာ'}
+            </Text>
             <Text style={styles.locationCoords}>
               {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
             </Text>
@@ -519,7 +531,9 @@ export default function MapScreen({ navigation }: any) {
           >
             <Text style={styles.navigateAllIcon}>🧭</Text>
             <Text style={styles.navigateAllText}>
-              {packages.length > 0 ? `规划路线 (${packages.length}站)` : '暂无任务'}
+              {packages.length > 0 
+                ? (language === 'zh' ? `规划路线 (${packages.length}站)` : language === 'en' ? `Plan Route (${packages.length} stops)` : `လမ်းကြောင်းစီစဉ် (${packages.length} ဂိတ်)`)
+                : (language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိ')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -527,7 +541,7 @@ export default function MapScreen({ navigation }: any) {
 
       <View style={styles.listContainer}>
         <Text style={styles.listTitle}>
-          📦 配送顺序 ({packages.length})
+          📦 {language === 'zh' ? `配送顺序 (${packages.length})` : language === 'en' ? `Delivery Order (${packages.length})` : `ပို့ဆောင်မည့်အစဉ် (${packages.length})`}
         </Text>
         
         {loading ? (
@@ -642,13 +656,17 @@ export default function MapScreen({ navigation }: any) {
               style={styles.startNavigationButton}
               onPress={openGoogleMapsNavigation}
             >
-              <Text style={styles.startNavigationText}>🚀 开始导航</Text>
+              <Text style={styles.startNavigationText}>
+                🚀 {language === 'zh' ? '开始导航' : language === 'en' ? 'Start Navigation' : 'လမ်းညွှန်စတင်ရန်'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* 配送顺序列表 */}
           <View style={styles.routeList}>
-            <Text style={styles.routeListTitle}>配送顺序：</Text>
+            <Text style={styles.routeListTitle}>
+              {language === 'zh' ? '配送顺序：' : language === 'en' ? 'Delivery Order:' : 'ပို့ဆောင်မည့်အစဉ်:'}
+            </Text>
             {optimizedPackagesWithCoords.map((pkg: any, index: number) => (
               <View key={pkg.id} style={styles.routeListItem}>
                 <View style={styles.routeNumber}>

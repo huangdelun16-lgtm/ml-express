@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View, Text } from 'react-native';
-import { AppProvider } from './contexts/AppContext';
+import { AppProvider, useApp } from './contexts/AppContext';
 
 // 引入所有页面
 import LoginScreen from './screens/LoginScreen';
@@ -27,6 +27,8 @@ const Tab = createBottomTabNavigator();
 
 // 管理员/经理底部导航
 function AdminTabs() {
+  const { language } = useApp();
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -51,7 +53,7 @@ function AdminTabs() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarLabel: '首页',
+          tabBarLabel: language === 'zh' ? '首页' : language === 'en' ? 'Home' : 'ပင်မ',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>🏠</Text>
           ),
@@ -61,7 +63,7 @@ function AdminTabs() {
         name="Map"
         component={MapScreen}
         options={{
-          tabBarLabel: '地图',
+          tabBarLabel: language === 'zh' ? '地图' : language === 'en' ? 'Map' : 'မြေပုံ',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>🗺️</Text>
           ),
@@ -71,7 +73,7 @@ function AdminTabs() {
         name="Scan"
         component={ScanScreen}
         options={{
-          tabBarLabel: '扫码',
+          tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>📷</Text>
           ),
@@ -81,7 +83,7 @@ function AdminTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: '我的',
+          tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>👤</Text>
           ),
@@ -93,6 +95,8 @@ function AdminTabs() {
 
 // 快递员底部导航
 function CourierTabs() {
+  const { language } = useApp();
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -116,7 +120,7 @@ function CourierTabs() {
         name="MyTasks"
         component={MyTasksScreen}
         options={{
-          tabBarLabel: '我的任务',
+          tabBarLabel: language === 'zh' ? '我的任务' : language === 'en' ? 'My Tasks' : 'ကျွန်ုပ်၏တာဝန်',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>📦</Text>
           ),
@@ -126,7 +130,7 @@ function CourierTabs() {
         name="Map"
         component={MapScreen}
         options={{
-          tabBarLabel: '地图',
+          tabBarLabel: language === 'zh' ? '地图' : language === 'en' ? 'Map' : 'မြေပုံ',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>🗺️</Text>
           ),
@@ -136,7 +140,7 @@ function CourierTabs() {
         name="Scan"
         component={ScanScreen}
         options={{
-          tabBarLabel: '扫码',
+          tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>📷</Text>
           ),
@@ -146,7 +150,7 @@ function CourierTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: '我的',
+          tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 24 }}>👤</Text>
           ),
