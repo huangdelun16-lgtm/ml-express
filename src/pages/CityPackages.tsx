@@ -1425,7 +1425,7 @@ const CityPackages: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1000
+          zIndex: 1100
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
