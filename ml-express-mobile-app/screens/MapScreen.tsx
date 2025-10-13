@@ -517,9 +517,11 @@ export default function MapScreen({ navigation }: any) {
         <View style={styles.locationCard}>
           <Text style={styles.locationIcon}>📍</Text>
           <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>
-              {language === 'zh' ? '我的位置' : language === 'en' ? 'My Location' : 'ကျွန်ုပ်၏တည်နေရာ'}
-            </Text>
+            {language !== 'my' && (
+              <Text style={styles.locationTitle}>
+                {language === 'zh' ? '我的位置' : 'My Location'}
+              </Text>
+            )}
             <Text style={styles.locationCoords}>
               {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
             </Text>
