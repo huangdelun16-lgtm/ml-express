@@ -3,7 +3,7 @@
     "name": "缅甸同城快递-客户端",
     "slug": "ml-express-client",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
+    "sdkVersion": "51.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
