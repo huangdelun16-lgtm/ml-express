@@ -75,7 +75,7 @@ function AdminTabs() {
         options={{
           tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>📷</Text>
+            <Text style={{ fontSize: 24 }}>🖼️</Text>
           ),
         }}
       />
@@ -142,7 +142,7 @@ function CourierTabs() {
         options={{
           tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>📷</Text>
+            <Text style={{ fontSize: 24 }}>🖼️</Text>
           ),
         }}
       />
