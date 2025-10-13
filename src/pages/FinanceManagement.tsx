@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord, auditLogService } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService, packageService, Package } from '../services/supabase';
 
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
 type FilterStatus = 'all' | FinanceRecord['status'];
@@ -72,6 +72,7 @@ const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [records, setRecords] = useState<FinanceRecord[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -93,7 +94,9 @@ const FinanceManagement: React.FC = () => {
     totalIncome: 0,
     totalExpense: 0,
     netProfit: 0,
-    pendingPayments: 0
+    pendingPayments: 0,
+    packageIncome: 0, // 添加包裹收入
+    packageCount: 0 // 添加包裹数量
   });
 
   useEffect(() => {
@@ -107,22 +110,37 @@ const FinanceManagement: React.FC = () => {
       const netProfit = totalIncome - totalExpense;
       const pendingPayments = records.filter(r => r.status === 'pending').reduce((sum, record) => sum + (record.amount || 0), 0);
       
+      // 计算包裹收入（只统计已送达的包裹）
+      const deliveredPackages = packages.filter(pkg => pkg.status === '已送达');
+      const packageIncome = deliveredPackages.reduce((sum, pkg) => {
+        const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+        return sum + price;
+      }, 0);
+      const packageCount = deliveredPackages.length;
+      
       setSummary({
         totalIncome,
         totalExpense,
         netProfit,
-        pendingPayments
+        pendingPayments,
+        packageIncome,
+        packageCount
       });
     };
     
     calculateSummary();
-  }, [records]);
+  }, [records, packages]);
 
   const loadRecords = async () => {
     try {
       setLoading(true);
-      const data = await financeService.getAllRecords();
-      setRecords(data);
+      // 同时加载财务记录和包裹数据
+      const [financeData, packageData] = await Promise.all([
+        financeService.getAllRecords(),
+        packageService.getAllPackages()
+      ]);
+      setRecords(financeData);
+      setPackages(packageData);
     } catch (error) {
       console.error('加载财务数据失败:', error);
       // 添加用户友好的错误提示
@@ -498,6 +516,7 @@ const FinanceManagement: React.FC = () => {
             {renderSummaryCard('总支出', summary.totalExpense, '已完成的所有支出记录总和', '#ff7979')}
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
+            {renderSummaryCard('包裹收入', summary.packageIncome, `已送达包裹总收入 (${summary.packageCount}个)`, '#6c5ce7')}
           </div>
         )}
 
@@ -1060,9 +1079,9 @@ const FinanceManagement: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'income' && r.category.includes('包裹')).length}
+                    {packages.filter(pkg => pkg.status === '已送达').length}
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹收入笔数</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹数量</div>
                 </div>
                 <div style={{
                   background: 'rgba(34, 197, 94, 0.2)',
@@ -1072,52 +1091,47 @@ const FinanceManagement: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'income' && r.category.includes('包裹')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                    {packages.filter(pkg => pkg.status === '已送达').reduce((sum, pkg) => {
+                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                      return sum + price;
+                    }, 0).toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹收入总额</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹收入</div>
+                </div>
+                <div style={{
+                  background: 'rgba(251, 191, 36, 0.2)',
+                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消').length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>进行中的包裹</div>
+                </div>
+                <div style={{
+                  background: 'rgba(251, 191, 36, 0.2)',
+                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消').reduce((sum, pkg) => {
+                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                      return sum + price;
+                    }, 0).toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>预期收入</div>
                 </div>
               </div>
             </div>
 
-            {/* 包裹支出统计 */}
-            <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>包裹支出统计</h4>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
-                marginBottom: '16px'
-              }}>
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'expense' && r.category.includes('包裹')).length}
-                  </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹支出笔数</div>
-                </div>
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'expense' && r.category.includes('包裹')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
-                  </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>包裹支出总额</div>
-                </div>
-              </div>
-            </div>
 
             {/* 包裹收支记录表格 */}
             <div style={{ marginTop: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近包裹收支记录</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近包裹收入记录 (最新20个)</h4>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
@@ -1128,48 +1142,60 @@ const FinanceManagement: React.FC = () => {
                   <thead>
                     <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>订单ID</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>类型</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>寄件人</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>收件人</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>包裹类型</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>金额</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>状态</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>日期</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达时间</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {records.filter(r => r.category.includes('包裹')).slice(0, 10).map((record) => (
-                      <tr key={record.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {record.order_id || 'N/A'}
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.8rem',
-                            background: record.record_type === 'income' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                            color: record.record_type === 'income' ? '#22c55e' : '#ef4444'
-                          }}>
-                            {record.record_type === 'income' ? '收入' : '支出'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {record.amount?.toLocaleString()} {record.currency}
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.8rem',
-                            background: record.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
-                            color: record.status === 'completed' ? '#22c55e' : '#fbbf24'
-                          }}>
-                            {record.status === 'completed' ? '已完成' : '待处理'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {new Date(record.record_date).toLocaleDateString()}
+                    {packages.filter(pkg => pkg.status === '已送达').slice(0, 20).map((pkg) => {
+                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                      return (
+                        <tr key={pkg.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            {pkg.id}
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            {pkg.sender_name}
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            {pkg.receiver_name}
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            {pkg.package_type}
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            <span style={{ color: '#22c55e', fontWeight: 'bold' }}>
+                              {price.toLocaleString()} MMK
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              background: 'rgba(34, 197, 94, 0.2)',
+                              color: '#22c55e'
+                            }}>
+                              已送达
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                            {pkg.delivery_time || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {packages.filter(pkg => pkg.status === '已送达').length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          暂无已送达的包裹记录
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
