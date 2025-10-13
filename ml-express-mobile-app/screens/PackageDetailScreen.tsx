@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 export default function PackageDetailScreen({ route, navigation }: any) {
   const { package: pkg } = route.params;
@@ -28,6 +29,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  
+  // 扫码相关状态
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scannedData, setScannedData] = useState<string | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -227,6 +234,60 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     }
   };
 
+  // 扫码相关函数
+  const handleStartScan = async () => {
+    try {
+      // 检查权限
+      if (!permission) {
+        Alert.alert('错误', '无法访问相机权限');
+        return;
+      }
+
+      if (!permission.granted) {
+        const result = await requestPermission();
+        if (!result.granted) {
+          Alert.alert('权限被拒绝', '需要相机权限才能扫码');
+          return;
+        }
+      }
+
+      setScanning(true);
+      setScannedData(null);
+    } catch (error) {
+      console.error('开始扫码失败:', error);
+      Alert.alert('错误', '无法启动扫码功能');
+    }
+  };
+
+  const handleScanCode = (data: string) => {
+    if (!data || scannedData) return; // 如果已经扫描过，忽略
+
+    console.log('扫描到数据:', data);
+    setScannedData(data);
+    setScanning(false);
+
+    // 显示扫描结果
+    Alert.alert(
+      '扫码成功',
+      `扫描结果：\n${data}\n\n包裹ID: ${currentPackage.id}`,
+      [
+        {
+          text: '确定',
+          onPress: () => {
+            // 可以在这里添加处理扫码结果的逻辑
+            // 例如验证包裹码、更新状态等
+          }
+        }
+      ]
+    );
+  };
+
+  const handleOpenScanModal = () => {
+    setShowScanModal(true);
+    setScanning(false);
+    setScannedData(null);
+  };
+
   const updateStatus = async (newStatus: string) => {
     const oldStatus = currentPackage.status;
     
@@ -385,7 +446,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={styles.newActionButtonText}>📍 送货地址</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.newActionButton} onPress={() => navigation.navigate('Scan', { packageId: currentPackage.id })}>
+          <TouchableOpacity style={styles.newActionButton} onPress={handleOpenScanModal}>
             <Text style={styles.newActionButtonText}>📱 扫码</Text>
           </TouchableOpacity>
           
@@ -590,6 +651,77 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                     <Text style={styles.cameraButtonText}>📷 去拍照</Text>
                   </TouchableOpacity>
                 </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 扫码模态框 */}
+      <Modal
+        visible={showScanModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowScanModal(false);
+          setScanning(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.scanModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📱 扫码</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowScanModal(false);
+                  setScanning(false);
+                }}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.scanContent}>
+              {scanning ? (
+                <View style={styles.scanCameraContainer}>
+                  <CameraView
+                    style={styles.scanCamera}
+                    facing="back"
+                    onBarcodeScanned={({ data }) => handleScanCode(data)}
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr', 'pdf417', 'aztec', 'ean13', 'ean8', 'upc_e', 'code128', 'code39', 'codabar'],
+                    }}
+                  />
+                  <View style={styles.scanOverlay}>
+                    <View style={styles.scanFrame}>
+                      <View style={[styles.scanCorner, styles.scanCornerTopLeft]} />
+                      <View style={[styles.scanCorner, styles.scanCornerTopRight]} />
+                      <View style={[styles.scanCorner, styles.scanCornerBottomLeft]} />
+                      <View style={[styles.scanCorner, styles.scanCornerBottomRight]} />
+                    </View>
+                    <Text style={styles.scanInstruction}>
+                      将二维码/条形码对准扫描框
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.scanStartContent}>
+                  <Text style={styles.scanInstruction}>
+                    点击开始扫码，扫描包裹二维码或条形码
+                  </Text>
+                  
+                  <TouchableOpacity style={styles.scanStartButton} onPress={handleStartScan}>
+                    <Text style={styles.scanStartButtonText}>📱 开始扫码</Text>
+                  </TouchableOpacity>
+                  
+                  {scannedData && (
+                    <View style={styles.scanResult}>
+                      <Text style={styles.scanResultLabel}>扫描结果：</Text>
+                      <Text style={styles.scanResultText}>{scannedData}</Text>
+                    </View>
+                  )}
+                </View>
               )}
             </View>
           </View>
@@ -891,5 +1023,117 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  // 扫码相关样式
+  scanModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '95%',
+    height: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  scanContent: {
+    flex: 1,
+    padding: 20,
+  },
+  scanCameraContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  scanCamera: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  scanOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    position: 'relative',
+  },
+  scanCorner: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderColor: '#27ae60',
+    borderWidth: 3,
+  },
+  scanCornerTopLeft: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+  },
+  scanCornerTopRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+  },
+  scanCornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+  },
+  scanCornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+  },
+  scanInstruction: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 12,
+    borderRadius: 8,
+  },
+  scanStartContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanStartButton: {
+    backgroundColor: '#27ae60',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  scanStartButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scanResult: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    width: '100%',
+  },
+  scanResultLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  scanResultText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
   },
 });
