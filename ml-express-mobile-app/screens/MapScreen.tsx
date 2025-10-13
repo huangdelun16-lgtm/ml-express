@@ -518,16 +518,15 @@ export default function MapScreen({ navigation }: any) {
           <Text style={styles.locationIcon}>📍</Text>
           <View style={styles.locationInfo}>
             {language !== 'my' && (
-              <Text style={styles.locationTitle}>
-                {language === 'zh' ? '我的位置' : 'My Location'}
-              </Text>
+              <>
+                <Text style={styles.locationTitle}>
+                  {language === 'zh' ? '我的位置' : 'My Location'}
+                </Text>
+                <Text style={styles.locationCoords}>
+                  {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                </Text>
+              </>
             )}
-            <Text style={[
-              styles.locationCoords,
-              language === 'my' && { writingDirection: 'ltr', fontSize: 14, fontWeight: '600' }
-            ]}>
-              {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-            </Text>
           </View>
           <TouchableOpacity 
             style={[styles.navigateAllButton, packages.length === 0 && styles.navigateAllButtonDisabled]}
