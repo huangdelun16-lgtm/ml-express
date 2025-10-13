@@ -17,7 +17,7 @@ import { supabase, adminAccountService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
 export default function SettingsScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme } = useApp();
   const [settings, setSettings] = useState({
     notifications: true,
     language: 'zh',
@@ -86,15 +86,30 @@ export default function SettingsScreen({ navigation }: any) {
   const changeLanguage = async (lang: string) => {
     const newSettings = { ...settings, language: lang };
     await saveSettings(newSettings);
+    await setAppLanguage(lang); // 更新全局语言状态
     setShowLanguageModal(false);
-    Alert.alert('设置已更新', `语言已切换为${lang === 'zh' ? '中文' : 'English'}`);
+    
+    const langName = lang === 'zh' ? '中文' : lang === 'en' ? 'English' : 'မြန်မာ';
+    Alert.alert(
+      language === 'zh' ? '设置已更新' : language === 'en' ? 'Settings Updated' : 'အပြင်အဆင်ပြောင်းလဲပြီး',
+      language === 'zh' ? `语言已切换为${langName}` : language === 'en' ? `Language changed to ${langName}` : `ဘာသာစကားပြောင်းလဲပြီး ${langName}`
+    );
   };
 
   const changeTheme = async (theme: string) => {
     const newSettings = { ...settings, theme };
     await saveSettings(newSettings);
+    await setAppTheme(theme); // 更新全局主题状态
     setShowThemeModal(false);
-    Alert.alert('设置已更新', `主题已切换为${theme === 'light' ? '浅色' : '深色'}模式`);
+    
+    const themeName = theme === 'light' 
+      ? (language === 'zh' ? '浅色' : language === 'en' ? 'Light' : 'အလင်း')
+      : (language === 'zh' ? '深色' : language === 'en' ? 'Dark' : 'အမှောင်');
+    
+    Alert.alert(
+      language === 'zh' ? '设置已更新' : language === 'en' ? 'Settings Updated' : 'အပြင်အဆင်ပြောင်းလဲပြီး',
+      language === 'zh' ? `主题已切换为${themeName}模式` : language === 'en' ? `Theme changed to ${themeName} mode` : `အပြင်အဆင်ပြောင်းလဲပြီး ${themeName}`
+    );
   };
 
   const handleChangePassword = async () => {
@@ -165,81 +180,83 @@ export default function SettingsScreen({ navigation }: any) {
 
   const settingSections = [
     {
-      title: language === 'zh' ? '通用设置' : 'General Settings',
+      title: language === 'zh' ? '通用设置' : language === 'en' ? 'General Settings' : 'ယေဘုယျချိန်ညှိမှု',
       items: [
         { 
           icon: '🔔', 
-          label: language === 'zh' ? '推送通知' : 'Push Notifications', 
+          label: language === 'zh' ? '推送通知' : language === 'en' ? 'Push Notifications' : 'အသိပေးချက်များ', 
           subtitle: settings.notifications 
-            ? (language === 'zh' ? '已开启' : 'Enabled') 
-            : (language === 'zh' ? '已关闭' : 'Disabled'), 
+            ? (language === 'zh' ? '已开启' : language === 'en' ? 'Enabled' : 'ဖွင့်ထားသည်') 
+            : (language === 'zh' ? '已关闭' : language === 'en' ? 'Disabled' : 'ပိတ်ထားသည်'), 
           action: toggleNotifications,
           hasSwitch: true,
           switchValue: settings.notifications,
         },
         { 
           icon: '🌐', 
-          label: language === 'zh' ? '语言设置' : 'Language Settings', 
-          subtitle: settings.language === 'zh' ? '中文' : 'English', 
+          label: language === 'zh' ? '语言设置' : language === 'en' ? 'Language Settings' : 'ဘာသာစကားချိန်ညှိမှု', 
+          subtitle: settings.language === 'zh' ? '中文' : settings.language === 'en' ? 'English' : 'မြန်မာ', 
           action: () => setShowLanguageModal(true)
         },
         { 
           icon: '🎨', 
-          label: language === 'zh' ? '主题模式' : 'Theme Mode', 
+          label: language === 'zh' ? '主题模式' : language === 'en' ? 'Theme Mode' : 'အပြင်အဆင်ပုံစံ', 
           subtitle: settings.theme === 'light' 
-            ? (language === 'zh' ? '浅色模式' : 'Light Mode') 
-            : (language === 'zh' ? '深色模式' : 'Dark Mode'), 
+            ? (language === 'zh' ? '浅色模式' : language === 'en' ? 'Light Mode' : 'အလင်းပုံစံ') 
+            : (language === 'zh' ? '深色模式' : language === 'en' ? 'Dark Mode' : 'အမှောင်ပုံစံ'), 
           action: () => setShowThemeModal(true)
         },
       ]
     },
     {
-      title: language === 'zh' ? '账户与安全' : 'Account & Security',
+      title: language === 'zh' ? '账户与安全' : language === 'en' ? 'Account & Security' : 'အကောင့်နှင့်လုံခြုံရေး',
       items: [
         {
           icon: '👤',
-          label: language === 'zh' ? '修改用户名' : 'Change Username',
-          subtitle: language === 'zh' ? '更改登录用户名' : 'Change login username',
+          label: language === 'zh' ? '修改用户名' : language === 'en' ? 'Change Username' : 'အသုံးပြုသူအမည်ပြောင်းရန်',
+          subtitle: language === 'zh' ? '更改登录用户名' : language === 'en' ? 'Change login username' : 'အကောင့်ဝင်ရောက်ရန်အမည်ပြောင်းရန်',
           action: () => setShowUsernameModal(true)
         },
         {
           icon: '🔐',
-          label: language === 'zh' ? '修改密码' : 'Change Password',
-          subtitle: language === 'zh' ? '保护账户安全' : 'Protect account security',
+          label: language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက်ပြောင်းရန်',
+          subtitle: language === 'zh' ? '保护账户安全' : language === 'en' ? 'Protect account security' : 'အကောင့်လုံခြုံရေးကာကွယ်ရန်',
           action: () => setShowPasswordModal(true)
         },
         { 
           icon: '📱', 
-          label: language === 'zh' ? '权限管理' : 'Permission Management', 
-          subtitle: language === 'zh' ? '管理应用权限' : 'Manage app permissions', 
+          label: language === 'zh' ? '权限管理' : language === 'en' ? 'Permission Management' : 'ခွင့်ပြုချက်စီမံခန့်ခွဲမှု', 
+          subtitle: language === 'zh' ? '管理应用权限' : language === 'en' ? 'Manage app permissions' : 'အက်ပ်ခွင့်ပြုချက်များစီမံရန်', 
           action: checkPermissions
         },
         { 
           icon: '🛡️', 
-          label: language === 'zh' ? '隐私设置' : 'Privacy Settings', 
-          subtitle: language === 'zh' ? '数据隐私保护' : 'Data privacy protection', 
+          label: language === 'zh' ? '隐私设置' : language === 'en' ? 'Privacy Settings' : 'ကိုယ်ရေးကိုယ်တာချိန်ညှိမှု', 
+          subtitle: language === 'zh' ? '数据隐私保护' : language === 'en' ? 'Data privacy protection' : 'ဒေတာကိုယ်ရေးလုံခြုံရေး', 
           action: () => Alert.alert(
-            language === 'zh' ? '隐私设置' : 'Privacy Settings',
+            language === 'zh' ? '隐私设置' : language === 'en' ? 'Privacy Settings' : 'ကိုယ်ရေးကိုယ်တာချိန်ညှိမှု',
             language === 'zh' 
               ? '🔒 数据加密存储\n📍 位置信息保护\n👤 个人信息安全\n\n我们严格保护您的隐私'
-              : '🔒 Encrypted data storage\n📍 Location information protection\n👤 Personal information security\n\nWe strictly protect your privacy'
+              : language === 'en' 
+              ? '🔒 Encrypted data storage\n📍 Location information protection\n👤 Personal information security\n\nWe strictly protect your privacy'
+              : '🔒 ဒေတာကုဒ်ဝှက်သိမ်းဆည်းမှု\n📍 တည်နေရာအချက်အလက်ကာကွယ်မှု\n👤 ကိုယ်ရေးကိုယ်တာအချက်အလက်လုံခြုံရေး\n\nသင့်ကိုယ်ရေးကိုယ်တာကို ကျွန်ုပ်တို့တင်းကြပ်စွာကာကွယ်ပါသည်'
           )
         },
       ]
     },
     {
-      title: language === 'zh' ? '帮助与支持' : 'Help & Support',
+      title: language === 'zh' ? '帮助与支持' : language === 'en' ? 'Help & Support' : 'အကူအညီနှင့်ပံ့ပိုးမှု',
       items: [
         { 
           icon: 'ℹ️', 
-          label: language === 'zh' ? '关于我们' : 'About Us', 
+          label: language === 'zh' ? '关于我们' : language === 'en' ? 'About Us' : 'ကျွန်ုပ်တို့အကြောင်း', 
           subtitle: 'Market Link Express', 
           action: () => setShowAboutModal(true)
         },
         { 
           icon: '📖', 
-          label: language === 'zh' ? '使用帮助' : 'User Guide', 
-          subtitle: language === 'zh' ? '功能使用指南' : 'Feature usage guide', 
+          label: language === 'zh' ? '使用帮助' : language === 'en' ? 'User Guide' : 'အသုံးပြုရန်လမ်းညွှန်', 
+          subtitle: language === 'zh' ? '功能使用指南' : language === 'en' ? 'Feature usage guide' : 'လုပ်ဆောင်ချက်အသုံးပြုရန်လမ်းညွှန်', 
           action: () => setShowHelpModal(true)
         },
         { 
@@ -265,7 +282,7 @@ export default function SettingsScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>⚙️ {language === 'zh' ? '设置系统' : 'System Settings'}</Text>
+        <Text style={styles.headerTitle}>⚙️ {language === 'zh' ? '设置系统' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု'}</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -326,7 +343,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🔐 {language === 'zh' ? '修改密码' : 'Change Password'}</Text>
+              <Text style={styles.modalTitle}>🔐 {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက်ပြောင်းရန်'}</Text>
               <TouchableOpacity onPress={() => setShowPasswordModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -374,10 +391,10 @@ export default function SettingsScreen({ navigation }: any) {
                     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>取消</Text>
+                  <Text style={styles.cancelButtonText}>{language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.submitButton} onPress={handleChangePassword}>
-                  <Text style={styles.submitButtonText}>确认修改</Text>
+                  <Text style={styles.submitButtonText}>{language === 'zh' ? '确认修改' : language === 'en' ? 'Confirm Change' : 'အတည်ပြုပြောင်းလဲရန်'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -395,7 +412,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>👤 {language === 'zh' ? '修改用户名' : 'Change Username'}</Text>
+              <Text style={styles.modalTitle}>👤 {language === 'zh' ? '修改用户名' : language === 'en' ? 'Change Username' : 'အသုံးပြုသူအမည်ပြောင်းရန်'}</Text>
               <TouchableOpacity onPress={() => setShowUsernameModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -421,10 +438,10 @@ export default function SettingsScreen({ navigation }: any) {
                     setUsernameForm({ currentUsername: '', newUsername: '' });
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>{language === 'zh' ? '取消' : 'Cancel'}</Text>
+                  <Text style={styles.cancelButtonText}>{language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.submitButton} onPress={handleChangeUsername}>
-                  <Text style={styles.submitButtonText}>{language === 'zh' ? '确认修改' : 'Confirm Change'}</Text>
+                  <Text style={styles.submitButtonText}>{language === 'zh' ? '确认修改' : language === 'en' ? 'Confirm Change' : 'အတည်ပြုပြောင်းလဲရန်'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -442,7 +459,9 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.smallModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🌐 语言设置</Text>
+              <Text style={styles.modalTitle}>
+                🌐 {language === 'zh' ? '语言设置' : language === 'en' ? 'Language Settings' : 'ဘာသာစကားချိန်ညှိမှု'}
+              </Text>
               <TouchableOpacity onPress={() => setShowLanguageModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -483,7 +502,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.smallModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🎨 主题模式</Text>
+              <Text style={styles.modalTitle}>🎨 {language === 'zh' ? '主题模式' : language === 'en' ? 'Theme Mode' : 'အပြင်အဆင်ပုံစံ'}</Text>
               <TouchableOpacity onPress={() => setShowThemeModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -525,7 +544,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>ℹ️ 关于我们</Text>
+              <Text style={styles.modalTitle}>ℹ️ {language === 'zh' ? '关于我们' : language === 'en' ? 'About Us' : 'ကျွန်ုပ်တို့အကြောင်း'}</Text>
               <TouchableOpacity onPress={() => setShowAboutModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -592,7 +611,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📖 使用帮助</Text>
+              <Text style={styles.modalTitle}>📖 {language === 'zh' ? '使用帮助' : language === 'en' ? 'User Guide' : 'အသုံးပြုရန်လမ်းညွှန်'}</Text>
               <TouchableOpacity onPress={() => setShowHelpModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -655,7 +674,7 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📱 权限管理</Text>
+              <Text style={styles.modalTitle}>📱 {language === 'zh' ? '权限管理' : language === 'en' ? 'Permission Management' : 'ခွင့်ပြုချက်စီမံခန့်ခွဲမှု'}</Text>
               <TouchableOpacity onPress={() => setShowPermissionsModal(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
