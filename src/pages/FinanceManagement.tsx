@@ -96,7 +96,9 @@ const FinanceManagement: React.FC = () => {
     netProfit: 0,
     pendingPayments: 0,
     packageIncome: 0, // 添加包裹收入
-    packageCount: 0 // 添加包裹数量
+    packageCount: 0, // 添加包裹数量
+    courierKmCost: 0, // 快递员公里费用
+    totalKm: 0 // 总配送公里数
   });
 
   useEffect(() => {
@@ -118,13 +120,22 @@ const FinanceManagement: React.FC = () => {
       }, 0);
       const packageCount = deliveredPackages.length;
       
+      // 计算快递员公里费用（只统计已送达的包裹）
+      const COURIER_KM_RATE = 500; // 每公里500 MMK
+      const totalKm = deliveredPackages.reduce((sum, pkg) => {
+        return sum + (pkg.delivery_distance || 0);
+      }, 0);
+      const courierKmCost = totalKm * COURIER_KM_RATE;
+      
       setSummary({
         totalIncome,
         totalExpense,
         netProfit,
         pendingPayments,
         packageIncome,
-        packageCount
+        packageCount,
+        courierKmCost,
+        totalKm
       });
     };
     
@@ -517,6 +528,7 @@ const FinanceManagement: React.FC = () => {
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
             {renderSummaryCard('包裹收入', summary.packageIncome, `已送达包裹总收入 (${summary.packageCount}个)`, '#6c5ce7')}
+            {renderSummaryCard('骑手公里费用', summary.courierKmCost, `总配送距离 ${summary.totalKm.toFixed(2)} KM (500 MMK/KM)`, '#fd79a8')}
           </div>
         )}
 
@@ -1215,9 +1227,69 @@ const FinanceManagement: React.FC = () => {
           >
             <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>🚚 骑手收支记录</h3>
             
+            {/* 骑手公里费用统计 */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📍 骑手公里费用统计</h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  background: 'rgba(253, 121, 168, 0.2)',
+                  border: '1px solid rgba(253, 121, 168, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {summary.totalKm.toFixed(2)} KM
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>总配送距离</div>
+                </div>
+                <div style={{
+                  background: 'rgba(253, 121, 168, 0.2)',
+                  border: '1px solid rgba(253, 121, 168, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    500 MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>每公里费率</div>
+                </div>
+                <div style={{
+                  background: 'rgba(253, 121, 168, 0.2)',
+                  border: '1px solid rgba(253, 121, 168, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {summary.courierKmCost.toLocaleString()} MMK
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>公里费用总额</div>
+                </div>
+                <div style={{
+                  background: 'rgba(253, 121, 168, 0.2)',
+                  border: '1px solid rgba(253, 121, 168, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {packages.filter(pkg => pkg.status === '已送达').length}
+                  </div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹数</div>
+                </div>
+              </div>
+            </div>
+
             {/* 骑手收入统计 */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>骑手收入统计</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>💰 骑手佣金统计</h4>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -1287,9 +1359,89 @@ const FinanceManagement: React.FC = () => {
               </div>
             </div>
 
+            {/* 骑手公里费用明细表 */}
+            <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📋 骑手公里费用明细 (按骑手统计)</h4>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手ID</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达包裹数</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>总配送距离</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>公里费用</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>平均每单距离</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // 按骑手分组统计
+                      const courierStats: Record<string, { count: number, totalKm: number }> = {};
+                      const COURIER_KM_RATE = 500;
+                      
+                      packages.filter(pkg => pkg.status === '已送达' && pkg.courier && pkg.courier !== '待分配').forEach(pkg => {
+                        const courierId = pkg.courier;
+                        if (!courierStats[courierId]) {
+                          courierStats[courierId] = { count: 0, totalKm: 0 };
+                        }
+                        courierStats[courierId].count++;
+                        courierStats[courierId].totalKm += (pkg.delivery_distance || 0);
+                      });
+                      
+                      const courierList = Object.entries(courierStats).sort((a, b) => b[1].totalKm - a[1].totalKm);
+                      
+                      if (courierList.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
+                              暂无骑手配送记录
+                            </td>
+                          </tr>
+                        );
+                      }
+                      
+                      return courierList.map(([courierId, stats]) => {
+                        const avgKm = stats.totalKm / stats.count;
+                        const cost = stats.totalKm * COURIER_KM_RATE;
+                        
+                        return (
+                          <tr key={courierId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                              {courierId}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {stats.count} 个
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              <span style={{ color: '#74b9ff', fontWeight: 'bold' }}>
+                                {stats.totalKm.toFixed(2)} KM
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              <span style={{ color: '#fd79a8', fontWeight: 'bold' }}>
+                                {cost.toLocaleString()} MMK
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {avgKm.toFixed(2)} KM
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* 骑手收支记录表格 */}
             <div style={{ marginTop: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近骑手收支记录</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📄 最近骑手佣金记录</h4>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
