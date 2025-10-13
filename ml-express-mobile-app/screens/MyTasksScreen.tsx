@@ -19,6 +19,7 @@ import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useApp } from '../contexts/AppContext';
 
 interface Package {
   id: string;
@@ -39,6 +40,7 @@ interface Package {
 }
 
 const MyTasksScreen: React.FC = () => {
+  const { language } = useApp();
   const [packages, setPackages] = useState<Package[]>([]);
   const [groupedPackages, setGroupedPackages] = useState<{[key: string]: Package[]}>({});
   const [loading, setLoading] = useState(true);
@@ -232,16 +234,16 @@ const MyTasksScreen: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case '已取件':
-        return '已取件';
+        return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
       case '配送中':
       case '配送进行中':
-        return '配送中';
+        return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
       case '已送达':
-        return '已送达';
+        return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
       case '已取消':
-        return '已取消';
+        return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
       default:
-        return '未知状态';
+        return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
     }
   };
 
@@ -586,7 +588,9 @@ const MyTasksScreen: React.FC = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>包裹详情</Text>
+            <Text style={styles.modalTitle}>
+              {language === 'zh' ? '包裹详情' : language === 'en' ? 'Package Details' : 'ပက်ကေ့ဂျ်အသေးစိတ်'}
+            </Text>
             <TouchableOpacity
               onPress={() => setShowDetailModal(false)}
               style={styles.closeButton}
@@ -597,7 +601,9 @@ const MyTasksScreen: React.FC = () => {
           
           <ScrollView style={styles.modalBody}>
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>包裹信息</Text>
+              <Text style={styles.sectionTitle}>
+                {language === 'zh' ? '包裹信息' : language === 'en' ? 'Package Info' : 'ပက်ကေ့ဂျ်အချက်အလက်'}
+              </Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>包裹编号：</Text>
                 <Text style={styles.detailValue}>{selectedPackage.id}</Text>
@@ -621,7 +627,9 @@ const MyTasksScreen: React.FC = () => {
             </View>
             
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>寄件人信息</Text>
+              <Text style={styles.sectionTitle}>
+                {language === 'zh' ? '寄件人信息' : language === 'en' ? 'Sender Info' : 'ပေးပို့သူအချက်အလက်'}
+              </Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>姓名：</Text>
                 <Text style={styles.detailValue}>{selectedPackage.sender_name}</Text>
@@ -633,7 +641,9 @@ const MyTasksScreen: React.FC = () => {
             </View>
             
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>收件人信息</Text>
+              <Text style={styles.sectionTitle}>
+                {language === 'zh' ? '收件人信息' : language === 'en' ? 'Receiver Info' : 'လက်ခံသူအချက်အလက်'}
+              </Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>姓名：</Text>
                 <Text style={styles.detailValue}>{selectedPackage.receiver_name}</Text>
@@ -649,7 +659,9 @@ const MyTasksScreen: React.FC = () => {
             </View>
             
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>配送信息</Text>
+              <Text style={styles.sectionTitle}>
+                {language === 'zh' ? '配送信息' : language === 'en' ? 'Delivery Info' : 'ပို့ဆောင်မှုအချက်အလက်'}
+              </Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>状态：</Text>
                 <Text style={[styles.detailValue, { color: getStatusColor(selectedPackage.status) }]}>
@@ -681,15 +693,21 @@ const MyTasksScreen: React.FC = () => {
             {/* 新增功能按钮 */}
             <View style={styles.newActionsContainer}>
               <TouchableOpacity style={styles.newActionButton} onPress={handleShowAddress}>
-                <Text style={styles.newActionButtonText}>📍 送货地址</Text>
+                <Text style={styles.newActionButtonText}>
+                  📍 {language === 'zh' ? '送货地址' : language === 'en' ? 'Address' : 'လိပ်စာ'}
+                </Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.newActionButton} onPress={() => setShowCameraModal(true)}>
-                <Text style={styles.newActionButtonText}>📷 摄像机</Text>
+                <Text style={styles.newActionButtonText}>
+                  📷 {language === 'zh' ? '摄像机' : language === 'en' ? 'Camera' : 'ကင်မရာ'}
+                </Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.newActionButton} onPress={() => setShowPhotoModal(true)}>
-                <Text style={styles.newActionButtonText}>📸 上传照片</Text>
+                <Text style={styles.newActionButtonText}>
+                  📸 {language === 'zh' ? '上传照片' : language === 'en' ? 'Upload Photo' : 'ဓာတ်ပုံတင်'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -711,8 +729,13 @@ const MyTasksScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>我的任务</Text>
-          <Text style={styles.headerSubtitle}>当前骑手：{currentCourierName || '加载中...'}</Text>
+          <Text style={styles.headerTitle}>
+            {language === 'zh' ? '我的任务' : language === 'en' ? 'My Tasks' : 'ကျွန်ုပ်၏တာဝန်'}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {language === 'zh' ? '当前骑手：' : language === 'en' ? 'Current Rider: ' : 'လက်ရှိမောင်းသူ: '}
+            {currentCourierName || (language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'ခေါင်းစဉ်...')}
+          </Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
@@ -720,7 +743,7 @@ const MyTasksScreen: React.FC = () => {
             onPress={() => setShowDatePicker(true)}
           >
             <Text style={styles.dateButtonText}>
-              📅 日期
+              📅 {language === 'zh' ? '日期' : language === 'en' ? 'Date' : 'နေ့စွဲ'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -729,7 +752,7 @@ const MyTasksScreen: React.FC = () => {
             disabled={refreshing}
           >
             <Text style={styles.refreshButtonText}>
-              {refreshing ? '🔄' : '🔄'} 刷新
+              {refreshing ? '🔄' : '🔄'} {language === 'zh' ? '刷新' : language === 'en' ? 'Refresh' : 'ပြန်လည်ဖွင့်'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -738,8 +761,12 @@ const MyTasksScreen: React.FC = () => {
       {packages.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyTitle}>暂无任务</Text>
-          <Text style={styles.emptySubtitle}>您当前没有分配的包裹任务</Text>
+          <Text style={styles.emptyTitle}>
+            {language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိ'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {language === 'zh' ? '您当前没有分配的包裹任务' : language === 'en' ? 'You have no assigned packages' : 'သင့်အား ပက်ကေ့ဂျ်များ မှာထားခြင်းမရှိပါ'}
+          </Text>
         </View>
       ) : (
         <ScrollView
@@ -752,13 +779,17 @@ const MyTasksScreen: React.FC = () => {
           {selectedDate && (
             <View style={styles.filterInfo}>
               <Text style={styles.filterText}>
-                显示日期：{selectedDate} ({groupedPackages[selectedDate]?.length || 0} 个包裹)
+                {language === 'zh' ? '显示日期：' : language === 'en' ? 'Date: ' : 'နေ့စွဲ: '}
+                {selectedDate} ({groupedPackages[selectedDate]?.length || 0} 
+                {language === 'zh' ? ' 个包裹' : language === 'en' ? ' packages' : ' ပက်ကေ့ဂျ်'})
               </Text>
               <TouchableOpacity 
                 style={styles.clearFilterButton}
                 onPress={() => setSelectedDate(null)}
               >
-                <Text style={styles.clearFilterText}>清除过滤</Text>
+                <Text style={styles.clearFilterText}>
+                  {language === 'zh' ? '清除过滤' : language === 'en' ? 'Clear' : 'ရှင်းလင်း'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -771,7 +802,8 @@ const MyTasksScreen: React.FC = () => {
                 <View style={styles.dateHeader}>
                   <Text style={styles.dateTitle}>{dateKey}</Text>
                   <Text style={styles.dateSubtitle}>
-                    {groupedPackages[dateKey].length} 个包裹
+                    {groupedPackages[dateKey].length} 
+                    {language === 'zh' ? ' 个包裹' : language === 'en' ? ' packages' : ' ပက်ကေ့ဂျ်'}
                   </Text>
                 </View>
                 
@@ -789,28 +821,38 @@ const MyTasksScreen: React.FC = () => {
                     </View>
                     
                     <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>收件人：</Text>
+                      <Text style={styles.infoLabel}>
+                        {language === 'zh' ? '收件人：' : language === 'en' ? 'Receiver: ' : 'လက်ခံသူ: '}
+                      </Text>
                       <Text style={styles.infoValue}>{item.receiver_name}</Text>
                     </View>
                     
                     <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>收件地址：</Text>
+                      <Text style={styles.infoLabel}>
+                        {language === 'zh' ? '收件地址：' : language === 'en' ? 'Address: ' : 'လိပ်စာ: '}
+                      </Text>
                       <Text style={styles.infoValue}>{item.receiver_address}</Text>
                     </View>
                     
                     <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>包裹类型：</Text>
+                      <Text style={styles.infoLabel}>
+                        {language === 'zh' ? '包裹类型：' : language === 'en' ? 'Type: ' : 'အမျိုးအစား: '}
+                      </Text>
                       <Text style={styles.infoValue}>{item.package_type}</Text>
                     </View>
                     
                     <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>重量：</Text>
+                      <Text style={styles.infoLabel}>
+                        {language === 'zh' ? '重量：' : language === 'en' ? 'Weight: ' : 'အလေးချိန်: '}
+                      </Text>
                       <Text style={styles.infoValue}>{item.weight}kg</Text>
                     </View>
                     
                     {item.delivery_time && (
                       <View style={styles.packageInfo}>
-                        <Text style={styles.infoLabel}>送达时间：</Text>
+                        <Text style={styles.infoLabel}>
+                          {language === 'zh' ? '送达时间：' : language === 'en' ? 'Delivered: ' : 'ပို့ဆောင်ပြီး: '}
+                        </Text>
                         <Text style={styles.infoValue}>
                           {new Date(item.delivery_time).toLocaleString('zh-CN')}
                         </Text>
@@ -836,7 +878,9 @@ const MyTasksScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📅 选择日期</Text>
+              <Text style={styles.modalTitle}>
+                📅 {language === 'zh' ? '选择日期' : language === 'en' ? 'Select Date' : 'နေ့စွဲရွေးချယ်'}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowDatePicker(false)}
                 style={styles.closeButton}
@@ -860,13 +904,13 @@ const MyTasksScreen: React.FC = () => {
                   styles.dateItemText,
                   !selectedDate && styles.selectedDateItemText
                 ]}>
-                  全部日期
+                  {language === 'zh' ? '全部日期' : language === 'en' ? 'All Dates' : 'အားလုံးနေ့စွဲများ'}
                 </Text>
                 <Text style={[
                   styles.dateItemCount,
                   !selectedDate && styles.selectedDateItemCount
                 ]}>
-                  {packages.length} 个包裹
+                  {packages.length} {language === 'zh' ? '个包裹' : language === 'en' ? 'packages' : 'ပက်ကေ့ဂျ်'}
                 </Text>
               </TouchableOpacity>
               
@@ -892,7 +936,7 @@ const MyTasksScreen: React.FC = () => {
                     styles.dateItemCount,
                     selectedDate === date && styles.selectedDateItemCount
                   ]}>
-                    {groupedPackages[date]?.length || 0} 个包裹
+                    {groupedPackages[date]?.length || 0} {language === 'zh' ? '个包裹' : language === 'en' ? 'packages' : 'ပက်ကေ့ဂျ်'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -911,7 +955,9 @@ const MyTasksScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📍 送货地址</Text>
+              <Text style={styles.modalTitle}>
+                📍 {language === 'zh' ? '送货地址' : language === 'en' ? 'Delivery Address' : 'ပို့ဆောင်မည့်လိပ်စာ'}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowAddressModal(false)}
                 style={styles.closeButton}
@@ -954,7 +1000,9 @@ const MyTasksScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📷 拍照功能</Text>
+              <Text style={styles.modalTitle}>
+                📷 {language === 'zh' ? '拍照功能' : language === 'en' ? 'Camera' : 'ဓာတ်ပုံရိုက်'}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowCameraModal(false)}
                 style={styles.closeButton}
@@ -995,7 +1043,9 @@ const MyTasksScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.scanModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📱 扫码功能</Text>
+              <Text style={styles.modalTitle}>
+                📱 {language === 'zh' ? '扫码功能' : language === 'en' ? 'Scan Code' : 'ကုဒ်စကင်'}
+              </Text>
               <TouchableOpacity
                 onPress={handleStopScan}
                 style={styles.closeButton}
@@ -1060,7 +1110,9 @@ const MyTasksScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📸 上传照片</Text>
+              <Text style={styles.modalTitle}>
+                📸 {language === 'zh' ? '上传照片' : language === 'en' ? 'Upload Photo' : 'ဓာတ်ပုံတင်'}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowPhotoModal(false)}
                 style={styles.closeButton}
