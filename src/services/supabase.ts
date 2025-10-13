@@ -1551,3 +1551,437 @@ export const deliveryPhotoService = {
     }
   }
 };
+
+// =====================================================
+// 骑手工资管理相关接口
+// =====================================================
+
+export interface CourierSalary {
+  id?: number;
+  courier_id: string;
+  courier_name: string;
+  
+  // 结算周期
+  settlement_period: 'weekly' | 'monthly';
+  period_start_date: string;
+  period_end_date: string;
+  
+  // 工资组成
+  base_salary: number; // 基本工资
+  km_fee: number; // 公里费
+  delivery_bonus: number; // 配送奖金（按单数）
+  performance_bonus: number; // 绩效奖金
+  overtime_pay: number; // 加班费
+  tip_amount: number; // 小费
+  
+  // 扣款项
+  deduction_amount: number; // 扣款（违规、赔偿等）
+  
+  // 统计数据
+  total_deliveries: number; // 总配送单数
+  total_km: number; // 总配送公里数
+  on_time_deliveries: number; // 准时送达数
+  late_deliveries: number; // 延迟送达数
+  
+  // 工资总额
+  gross_salary: number; // 应发工资
+  net_salary: number; // 实发工资
+  
+  // 状态
+  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  
+  // 支付信息
+  payment_method?: string;
+  payment_reference?: string;
+  payment_date?: string;
+  
+  // 备注
+  notes?: string;
+  admin_notes?: string;
+  
+  // 审核信息
+  approved_by?: string;
+  approved_at?: string;
+  
+  // 时间戳
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CourierSalaryDetail {
+  id?: number;
+  salary_id: number;
+  courier_id: string;
+  detail_type: 'base_salary' | 'km_fee' | 'delivery_bonus' | 'performance_bonus' | 'overtime' | 'tip' | 'deduction';
+  description: string;
+  amount: number;
+  package_id?: string;
+  related_date?: string;
+  created_at?: string;
+}
+
+export interface CourierPaymentRecord {
+  id?: number;
+  salary_id: number;
+  courier_id: string;
+  courier_name: string;
+  amount: number;
+  payment_method: string;
+  payment_reference?: string;
+  payment_status: 'pending' | 'success' | 'failed';
+  account_holder?: string;
+  account_number?: string;
+  bank_name?: string;
+  notes?: string;
+  failure_reason?: string;
+  processed_by?: string;
+  processed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CourierPerformance {
+  id?: number;
+  courier_id: string;
+  courier_name: string;
+  period_start_date: string;
+  period_end_date: string;
+  total_deliveries: number;
+  completed_deliveries: number;
+  on_time_rate: number;
+  customer_rating: number;
+  complaint_count: number;
+  reward_points: number;
+  penalty_points: number;
+  bonus_amount: number;
+  deduction_amount: number;
+  performance_grade?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 骑手工资管理服务
+export const courierSalaryService = {
+  // 获取所有工资记录
+  async getAllSalaries(): Promise<CourierSalary[]> {
+    try {
+      const { data, error } = await supabase
+        .from('courier_salaries')
+        .select('*')
+        .order('period_end_date', { ascending: false });
+
+      if (error) {
+        console.error('获取工资记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取工资记录异常:', err);
+      return [];
+    }
+  },
+
+  // 根据骑手ID获取工资记录
+  async getSalariesByCourier(courierId: string): Promise<CourierSalary[]> {
+    try {
+      const { data, error } = await supabase
+        .from('courier_salaries')
+        .select('*')
+        .eq('courier_id', courierId)
+        .order('period_end_date', { ascending: false });
+
+      if (error) {
+        console.error('获取骑手工资记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取骑手工资记录异常:', err);
+      return [];
+    }
+  },
+
+  // 根据状态获取工资记录
+  async getSalariesByStatus(status: CourierSalary['status']): Promise<CourierSalary[]> {
+    try {
+      const { data, error } = await supabase
+        .from('courier_salaries')
+        .select('*')
+        .eq('status', status)
+        .order('period_end_date', { ascending: false });
+
+      if (error) {
+        console.error('获取指定状态工资记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取指定状态工资记录异常:', err);
+      return [];
+    }
+  },
+
+  // 创建工资记录
+  async createSalary(salary: Omit<CourierSalary, 'id'>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salaries')
+        .insert([salary]);
+
+      if (error) {
+        console.error('创建工资记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('创建工资记录异常:', err);
+      return false;
+    }
+  },
+
+  // 更新工资记录
+  async updateSalary(id: number, updates: Partial<CourierSalary>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salaries')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新工资记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新工资记录异常:', err);
+      return false;
+    }
+  },
+
+  // 批量审核工资
+  async batchApproveSalaries(ids: number[], approvedBy: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salaries')
+        .update({
+          status: 'approved',
+          approved_by: approvedBy,
+          approved_at: new Date().toISOString()
+        })
+        .in('id', ids);
+
+      if (error) {
+        console.error('批量审核工资失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('批量审核工资异常:', err);
+      return false;
+    }
+  },
+
+  // 发放工资
+  async paySalary(id: number, paymentInfo: {
+    payment_method: string;
+    payment_reference?: string;
+    payment_date: string;
+  }): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salaries')
+        .update({
+          status: 'paid',
+          ...paymentInfo
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('发放工资失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('发放工资异常:', err);
+      return false;
+    }
+  },
+
+  // 删除工资记录
+  async deleteSalary(id: number): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salaries')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除工资记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除工资记录异常:', err);
+      return false;
+    }
+  },
+
+  // 获取工资明细
+  async getSalaryDetails(salaryId: number): Promise<CourierSalaryDetail[]> {
+    try {
+      const { data, error } = await supabase
+        .from('courier_salary_details')
+        .select('*')
+        .eq('salary_id', salaryId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('获取工资明细失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取工资明细异常:', err);
+      return [];
+    }
+  },
+
+  // 添加工资明细
+  async addSalaryDetail(detail: Omit<CourierSalaryDetail, 'id'>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_salary_details')
+        .insert([detail]);
+
+      if (error) {
+        console.error('添加工资明细失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('添加工资明细异常:', err);
+      return false;
+    }
+  },
+
+  // 获取支付记录
+  async getPaymentRecords(salaryId?: number): Promise<CourierPaymentRecord[]> {
+    try {
+      let query = supabase
+        .from('courier_payment_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (salaryId) {
+        query = query.eq('salary_id', salaryId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('获取支付记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取支付记录异常:', err);
+      return [];
+    }
+  },
+
+  // 创建支付记录
+  async createPaymentRecord(record: Omit<CourierPaymentRecord, 'id'>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_payment_records')
+        .insert([record]);
+
+      if (error) {
+        console.error('创建支付记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('创建支付记录异常:', err);
+      return false;
+    }
+  },
+
+  // 获取绩效记录
+  async getPerformanceRecords(courierId?: string): Promise<CourierPerformance[]> {
+    try {
+      let query = supabase
+        .from('courier_performance')
+        .select('*')
+        .order('period_end_date', { ascending: false });
+
+      if (courierId) {
+        query = query.eq('courier_id', courierId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('获取绩效记录失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取绩效记录异常:', err);
+      return [];
+    }
+  },
+
+  // 创建绩效记录
+  async createPerformance(performance: Omit<CourierPerformance, 'id'>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_performance')
+        .insert([performance]);
+
+      if (error) {
+        console.error('创建绩效记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('创建绩效记录异常:', err);
+      return false;
+    }
+  },
+
+  // 更新绩效记录
+  async updatePerformance(id: number, updates: Partial<CourierPerformance>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('courier_performance')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新绩效记录失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新绩效记录异常:', err);
+      return false;
+    }
+  }
+};
