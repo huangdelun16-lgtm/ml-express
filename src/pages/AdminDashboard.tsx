@@ -86,50 +86,50 @@ const AdminDashboard: React.FC = () => {
   // 所有卡片数据及其权限配置
   const allCardData = [
     {
-      title: language === 'zh' ? '同城包裹' : 'City Packages',
-      description: language === 'zh' ? '同城快递包裹管理' : 'Local express package management',
+      title: language === 'zh' ? '同城包裹' : language === 'en' ? 'City Packages' : 'မြို့တွင်းပက်ကေ့ဂျ်များ',
+      description: language === 'zh' ? '同城快递包裹管理' : language === 'en' ? 'Local express package management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု',
       color: '#2c5282',
       icon: '📦',
       roles: ['admin', 'manager', 'operator', 'finance'] // 所有角色都可访问
     },
     {
-      title: language === 'zh' ? '用户管理' : 'User Management',
-      description: language === 'zh' ? '客户信息和行为分析' : 'Customer info and behavior analysis',
+      title: language === 'zh' ? '用户管理' : language === 'en' ? 'User Management' : 'အသုံးပြုသူစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '客户信息和行为分析' : language === 'en' ? 'Customer info and behavior analysis' : 'ဖောက်သည်အချက်အလက်နှင့်အပြုအမူခွဲခြမ်းစိတ်ဖြာမှု',
       color: '#3182ce',
       icon: '👥',
       roles: ['admin', 'manager'] // 仅管理员和经理可访问
     },
     {
-      title: language === 'zh' ? '快递员管理' : 'Courier Management',
-      description: language === 'zh' ? '快递员信息和业绩管理' : 'Courier info and performance management',
+      title: language === 'zh' ? '快递员管理' : language === 'en' ? 'Courier Management' : 'ကောင်ရီယာစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '快递员信息和业绩管理' : language === 'en' ? 'Courier info and performance management' : 'ကောင်ရီယာအချက်အလက်နှင့်စွမ်းဆောင်ရည်စီမံခန့်ခွဲမှု',
       color: '#2c5282',
       icon: '🚚',
       roles: ['admin', 'manager'] // 仅管理员和经理可访问
     },
     {
-      title: language === 'zh' ? '快递店管理' : 'Delivery Store Management',
-      description: language === 'zh' ? '配送网点、自提点和分拣中心' : 'Distribution points, pickup points and sorting centers',
+      title: language === 'zh' ? '快递店管理' : language === 'en' ? 'Delivery Store Management' : 'ပို့ဆောင်ရေးစတိုးစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '配送网点、自提点和分拣中心' : language === 'en' ? 'Distribution points, pickup points and sorting centers' : 'ဖြန့်ဖြူးရေးအမှတ်များ၊ ကောက်ယူရေးအမှတ်များနှင့်ခွဲခြားစိစစ်ရေးဌာန',
       color: '#38a169',
       icon: '🏪',
       roles: ['admin', 'manager'] // 管理员和经理可访问
     },
     {
-      title: language === 'zh' ? '财务管理' : 'Finance Management',
-      description: language === 'zh' ? '收入统计和佣金管理' : 'Income statistics and commission management',
+      title: language === 'zh' ? '财务管理' : language === 'en' ? 'Finance Management' : 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '收入统计和佣金管理' : language === 'en' ? 'Income statistics and commission management' : 'ဝင်ငွေစာရင်းအင်းနှင့်ကော်မရှင်စီမံခန့်ခွဲမှု',
       color: '#3182ce',
       icon: '💰',
       roles: ['admin', 'manager', 'finance'] // 管理员、经理和财务可访问
     },
     {
-      title: language === 'zh' ? '实时跟踪' : 'Real-time Tracking',
-      description: language === 'zh' ? 'GPS位置监控和路线跟踪' : 'GPS location monitoring and route tracking',
+      title: language === 'zh' ? '实时跟踪' : language === 'en' ? 'Real-time Tracking' : 'အချိန်နှင့်တစ်ပြေးညီခြေရာခံမှု',
+      description: language === 'zh' ? 'GPS位置监控和路线跟踪' : language === 'en' ? 'GPS location monitoring and route tracking' : 'GPS တည်နေရာစောင့်ကြည့်ခြင်းနှင့်လမ်းကြောင်းခြေရာခံခြင်း',
       color: '#2c5282',
       icon: '📍',
       roles: ['admin', 'manager', 'operator'] // 管理员、经理和操作员可访问
     },
     {
-      title: language === 'zh' ? '系统设置' : 'System Settings',
-      description: language === 'zh' ? '价格规则和系统配置' : 'Price rules and system configuration',
+      title: language === 'zh' ? '系统设置' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု',
+      description: language === 'zh' ? '价格规则和系统配置' : language === 'en' ? 'Price rules and system configuration' : 'စျေးနှုန်းစည်းမျဉ်းများနှင့်စနစ်စီမံဖွဲ့စည်းမှု',
       color: '#3182ce',
       icon: '⚙️',
       roles: ['admin'] // 仅管理员可访问
@@ -140,20 +140,20 @@ const AdminDashboard: React.FC = () => {
   const cardData = allCardData.filter(card => card.roles.includes(currentUserRole));
 
   const handleCardClick = (title: string) => {
-    // 根据卡片标题（支持中英文）导航到对应页面
-    if (title === '同城包裹' || title === 'City Packages') {
+    // 根据卡片标题（支持中英缅文）导航到对应页面
+    if (title === '同城包裹' || title === 'City Packages' || title === 'မြို့တွင်းပက်ကေ့ဂျ်များ') {
       navigate('/admin/city-packages');
-    } else if (title === '用户管理' || title === 'User Management') {
+    } else if (title === '用户管理' || title === 'User Management' || title === 'အသုံးပြုသူစီမံခန့်ခွဲမှု') {
       navigate('/admin/users');
-    } else if (title === '快递员管理' || title === 'Courier Management') {
+    } else if (title === '快递员管理' || title === 'Courier Management' || title === 'ကောင်ရီယာစီမံခန့်ခွဲမှု') {
       navigate('/admin/couriers');
-    } else if (title === '快递店管理' || title === 'Delivery Store Management') {
+    } else if (title === '快递店管理' || title === 'Delivery Store Management' || title === 'ပို့ဆောင်ရေးစတိုးစီမံခန့်ခွဲမှု') {
       navigate('/admin/delivery-stores');
-    } else if (title === '财务管理' || title === 'Finance Management') {
+    } else if (title === '财务管理' || title === 'Finance Management' || title === 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု') {
       navigate('/admin/finance');
-    } else if (title === '实时跟踪' || title === 'Real-time Tracking') {
+    } else if (title === '实时跟踪' || title === 'Real-time Tracking' || title === 'အချိန်နှင့်တစ်ပြေးညီခြေရာခံမှု') {
       navigate('/admin/tracking');
-    } else if (title === '系统设置' || title === 'System Settings') {
+    } else if (title === '系统设置' || title === 'System Settings' || title === 'စနစ်ချိန်ညှိမှု') {
       navigate('/admin/settings');
     }
   };
@@ -249,6 +249,7 @@ const AdminDashboard: React.FC = () => {
           >
             <option value="zh" style={{ color: '#000' }}>中文</option>
             <option value="en" style={{ color: '#000' }}>English</option>
+            <option value="my" style={{ color: '#000' }}>မြန်မာ</option>
           </select>
 
           {/* 用户信息 */}
@@ -278,13 +279,13 @@ const AdminDashboard: React.FC = () => {
           >
             <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{currentUserName}</div>
             <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px' }}>
-              {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : 'System Admin')}
-              {currentUserRole === 'manager' && (language === 'zh' ? '经理' : 'Manager')}
-              {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : 'Operator')}
-              {currentUserRole === 'finance' && (language === 'zh' ? '财务' : 'Finance')}
+              {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
+              {currentUserRole === 'manager' && (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
+              {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
+              {currentUserRole === 'finance' && (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
             </div>
             <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px' }}>
-              点击编辑个人信息
+              {language === 'zh' ? '点击编辑个人信息' : language === 'en' ? 'Click to edit profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်နှိပ်ပါ'}
             </div>
           </div>
           
@@ -314,7 +315,7 @@ const AdminDashboard: React.FC = () => {
               e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
             }}
           >
-            {language === 'zh' ? '退出登录' : 'Logout'}
+            {language === 'zh' ? '退出登录' : language === 'en' ? 'Logout' : 'ထွက်ရန်'}
           </button>
         </div>
       </div>
@@ -465,7 +466,7 @@ const AdminDashboard: React.FC = () => {
               fontSize: '1.5rem',
               fontWeight: 'bold'
             }}>
-              编辑个人信息
+              {language === 'zh' ? '编辑个人信息' : language === 'en' ? 'Edit Profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်'}
             </h2>
             
             <form onSubmit={handleUpdateUserInfo}>
@@ -477,7 +478,7 @@ const AdminDashboard: React.FC = () => {
                   fontSize: '0.9rem',
                   fontWeight: '600'
                 }}>
-                  用户名
+                  {language === 'zh' ? '用户名' : language === 'en' ? 'Username' : 'အသုံးပြုသူအမည်'}
                 </label>
                 <input
                   type="text"
@@ -507,7 +508,7 @@ const AdminDashboard: React.FC = () => {
                   fontSize: '0.9rem',
                   fontWeight: '600'
                 }}>
-                  员工姓名
+                  {language === 'zh' ? '员工姓名' : language === 'en' ? 'Employee Name' : 'ဝန်ထမ်းအမည်'}
                 </label>
                 <input
                   type="text"
@@ -537,7 +538,7 @@ const AdminDashboard: React.FC = () => {
                   fontSize: '0.9rem',
                   fontWeight: '600'
                 }}>
-                  新密码 (留空则不修改)
+                  {language === 'zh' ? '新密码 (留空则不修改)' : language === 'en' ? 'New Password (Leave blank to keep current)' : 'စကားဝှက်အသစ် (မပြောင်းလိုပါက ဗလာထားပါ)'}
                 </label>
                 <input
                   type="password"
@@ -555,7 +556,7 @@ const AdminDashboard: React.FC = () => {
                     color: 'white',
                     fontSize: '1rem'
                   }}
-                  placeholder="输入新密码"
+                  placeholder={language === 'zh' ? '输入新密码' : language === 'en' ? 'Enter new password' : 'စကားဝှက်အသစ်ထည့်ပါ'}
                 />
               </div>
 
@@ -578,7 +579,7 @@ const AdminDashboard: React.FC = () => {
                     fontWeight: '600'
                   }}
                 >
-                  取消
+                  {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}
                 </button>
                 <button
                   type="submit"
@@ -593,7 +594,7 @@ const AdminDashboard: React.FC = () => {
                     fontWeight: '600'
                   }}
                 >
-                  保存更改
+                  {language === 'zh' ? '保存更改' : language === 'en' ? 'Save Changes' : 'ပြောင်းလဲမှုများသိမ်းဆည်းရန်'}
                 </button>
               </div>
             </form>
