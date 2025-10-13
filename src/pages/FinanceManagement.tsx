@@ -292,7 +292,7 @@ const FinanceManagement: React.FC = () => {
     } catch (error) {
       console.error('加载财务数据失败:', error);
       // 添加用户友好的错误提示
-      alert('加载财务数据失败，请刷新页面重试');
+      window.alert('加载财务数据失败，请刷新页面重试');
     } finally {
       setLoading(false);
     }
@@ -300,7 +300,7 @@ const FinanceManagement: React.FC = () => {
 
   // 生成本月工资
   const generateMonthlySalaries = async () => {
-    if (!confirm('是否为所有骑手生成本月工资记录？')) return;
+    if (!window.confirm('是否为所有骑手生成本月工资记录？')) return;
     
     setLoading(true);
     try {
@@ -367,11 +367,11 @@ const FinanceManagement: React.FC = () => {
         if (success) successCount++;
       }
       
-      alert(`成功生成 ${successCount} 条工资记录！`);
+      window.alert(`成功生成 ${successCount} 条工资记录！`);
       await loadRecords();
     } catch (error) {
       console.error('生成工资失败:', error);
-      alert('生成工资失败，请重试！');
+      window.alert('生成工资失败，请重试！');
     } finally {
       setLoading(false);
     }
@@ -418,7 +418,7 @@ const FinanceManagement: React.FC = () => {
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount || Number.isNaN(Number(formData.amount))) {
-      alert('请填写有效的金额');
+      window.alert('请填写有效的金额');
       return;
     }
 
@@ -485,11 +485,11 @@ const FinanceManagement: React.FC = () => {
         resetForm();
         setShowForm(false);
       } else {
-        alert('保存失败，请检查日志');
+        window.alert('保存失败，请检查日志');
       }
     } catch (error) {
       console.error('保存财务记录失败:', error);
-      alert('保存失败，请稍后重试');
+      window.alert('保存失败，请稍后重试');
     } finally {
       setIsProcessing(false);
     }
@@ -540,11 +540,11 @@ const FinanceManagement: React.FC = () => {
         
         await loadRecords();
       } else {
-        alert('删除失败，请检查日志');
+        window.alert('删除失败，请检查日志');
       }
     } catch (error) {
       console.error('删除失败:', error);
-      alert('删除失败，请稍后重试');
+      window.alert('删除失败，请稍后重试');
     }
   };
 
@@ -1949,7 +1949,7 @@ const FinanceManagement: React.FC = () => {
                 <>
                   <button
                     onClick={async () => {
-                      if (!confirm(`是否批量审核 ${selectedSalaries.length} 条工资记录？`)) return;
+                      if (!window.confirm(`是否批量审核 ${selectedSalaries.length} 条工资记录？`)) return;
                       
                       setLoading(true);
                       try {
@@ -1959,15 +1959,15 @@ const FinanceManagement: React.FC = () => {
                         );
                         
                         if (success) {
-                          alert('批量审核成功！');
+                          window.alert('批量审核成功！');
                           await loadRecords();
                           setSelectedSalaries([]);
                         } else {
-                          alert('批量审核失败！');
+                          window.alert('批量审核失败！');
                         }
                       } catch (error) {
                         console.error('批量审核失败:', error);
-                        alert('批量审核失败！');
+                        window.alert('批量审核失败！');
                       } finally {
                         setLoading(false);
                       }
@@ -2212,7 +2212,7 @@ const FinanceManagement: React.FC = () => {
                             {salary.status === 'pending' && (
                               <button
                                 onClick={async () => {
-                                  if (!confirm('确认审核通过？')) return;
+                                  if (!window.confirm('确认审核通过？')) return;
                                   
                                   setLoading(true);
                                   try {
@@ -2223,14 +2223,14 @@ const FinanceManagement: React.FC = () => {
                                     });
                                     
                                     if (success) {
-                                      alert('审核成功！');
+                                      window.alert('审核成功！');
                                       await loadRecords();
                                     } else {
-                                      alert('审核失败！');
+                                      window.alert('审核失败！');
                                     }
                                   } catch (error) {
                                     console.error('审核失败:', error);
-                                    alert('审核失败！');
+                                    window.alert('审核失败！');
                                   } finally {
                                     setLoading(false);
                                   }
@@ -2801,7 +2801,7 @@ const FinanceManagement: React.FC = () => {
                     </button>
                     <button
                       onClick={async () => {
-                        if (!confirm(`确认发放 ${selectedSalaries.length} 条工资？`)) return;
+                        if (!window.confirm(`确认发放 ${selectedSalaries.length} 条工资？`)) return;
                         
                         setLoading(true);
                         try {
@@ -2815,13 +2815,13 @@ const FinanceManagement: React.FC = () => {
                             if (success) successCount++;
                           }
                           
-                          alert(`成功发放 ${successCount} 条工资！`);
+                          window.alert(`成功发放 ${successCount} 条工资！`);
                           await loadRecords();
                           setShowPaymentModal(false);
                           setSelectedSalaries([]);
                         } catch (error) {
                           console.error('发放工资失败:', error);
-                          alert('发放工资失败！');
+                          window.alert('发放工资失败！');
                         } finally {
                           setLoading(false);
                         }
