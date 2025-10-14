@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -71,6 +72,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
+  // QR码模态框
+  const [showQRCodeModal, setShowQRCodeModal] = useState(false);
+
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -118,6 +122,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       rateSuccess: '评价成功',
       rateFailed: '评价失败',
       close: '关闭',
+      viewQRCode: '查看QR Code',
+      qrCodeTitle: '订单二维码',
+      saveQRHint: '长按二维码可保存图片',
       loading: '加载中...',
       callPhone: '拨打电话',
       copyOrderNumber: '复制订单号',
@@ -168,6 +175,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       rateSuccess: 'Rated successfully',
       rateFailed: 'Rate failed',
       close: 'Close',
+      viewQRCode: 'View QR Code',
+      qrCodeTitle: 'Order QR Code',
+      saveQRHint: 'Long press to save QR code',
       loading: 'Loading...',
       callPhone: 'Call',
       copyOrderNumber: 'Copy Order No.',
@@ -218,6 +228,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       rateSuccess: 'အောင်မြင်',
       rateFailed: 'မအောင်မြင်',
       close: 'ပိတ်',
+      viewQRCode: 'QR ကုဒ်ကြည့်ရှုရန်',
+      qrCodeTitle: 'အမှာစာ QR ကုဒ်',
+      saveQRHint: 'QR ကုဒ်ကိုသိမ်းဆည်းရန် ရှည်လျား၍နှိပ်ပါ',
       loading: 'တင်နေသည်...',
       callPhone: 'ခေါ်ဆိုမည်',
       copyOrderNumber: 'ကော်ပီကူး',
@@ -619,6 +632,21 @@ export default function OrderDetailScreen({ route, navigation }: any) {
             </LinearGradient>
           </TouchableOpacity>
         )}
+        {/* 查看QR Code按钮 - 所有订单都可以查看 */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => setShowQRCodeModal(true)}
+          activeOpacity={0.7}
+        >
+          <LinearGradient
+            colors={['#2E86AB', '#4CA1CF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.actionButtonGradient}
+          >
+            <Text style={styles.actionButtonText}>📱 {t.viewQRCode}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* 评价弹窗 */}
@@ -685,9 +713,98 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* QR码模态框 */}
+      <Modal
+        visible={showQRCodeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQRCodeModal(false)}
+      >
+        <View style={styles.qrModalOverlay}>
+          <View style={styles.qrModalContent}>
+            <LinearGradient
+              colors={['#2E86AB', '#4CA1CF']}
+              style={styles.qrModalHeader}
+            >
+              <Text style={styles.qrModalTitle}>📱 {t.qrCodeTitle}</Text>
+              <TouchableOpacity
+                onPress={() => setShowQRCodeModal(false)}
+                style={styles.qrModalClose}
+              >
+                <Text style={styles.qrModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={styles.qrModalBody}>
+              <Text style={styles.qrOrderInfo}>📦 {t.orderNumber}</Text>
+              <Text style={styles.qrOrderId}>{order?.id}</Text>
+
+              <View style={styles.qrCodeContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  <QRCode
+                    value={order?.id || ''}
+                    size={220}
+                    color="#2E86AB"
+                    backgroundColor="white"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.qrHint}>{t.saveQRHint}</Text>
+
+              {/* 订单状态和价格 */}
+              <View style={styles.qrInfoRow}>
+                <View style={styles.qrInfoItem}>
+                  <Text style={styles.qrInfoLabel}>{t.status}:</Text>
+                  <Text style={[styles.qrInfoValue, { color: getStatusColor(order?.status || '') }]}>
+                    {order?.status}
+                  </Text>
+                </View>
+                <View style={styles.qrInfoItem}>
+                  <Text style={styles.qrInfoLabel}>{t.totalPrice}:</Text>
+                  <Text style={styles.qrInfoValue}>{order?.price} MMK</Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.qrCloseButton}
+              onPress={() => setShowQRCodeModal(false)}
+            >
+              <LinearGradient
+                colors={['#64748b', '#475569']}
+                style={styles.qrCloseButtonGradient}
+              >
+                <Text style={styles.qrCloseButtonText}>{t.close}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        duration={3000}
+        onHide={() => setToastVisible(false)}
+      />
     </View>
   );
 }
+
+// 获取状态颜色的辅助函数
+const getStatusColor = (status: string) => {
+  const colors: { [key: string]: string } = {
+    '待取件': '#f59e0b',
+    '已取件': '#3b82f6',
+    '配送中': '#8b5cf6',
+    '已送达': '#10b981',
+    '已取消': '#ef4444',
+  };
+  return colors[status] || '#64748b';
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -1024,6 +1141,124 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   modalButtonTextSubmit: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  // QR码模态框样式
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  qrModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 400,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  qrModalHeader: {
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  qrModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  qrModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrModalCloseText: {
+    fontSize: 20,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  qrModalBody: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrOrderInfo: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  qrOrderId: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E86AB',
+    marginBottom: 20,
+  },
+  qrCodeContainer: {
+    marginVertical: 20,
+    alignItems: 'center',
+  },
+  qrCodeWrapper: {
+    padding: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    shadowColor: '#2E86AB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrHint: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  qrInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  qrInfoItem: {
+    alignItems: 'center',
+  },
+  qrInfoLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  qrInfoValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  qrCloseButton: {
+    margin: 20,
+    marginTop: 0,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  qrCloseButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  qrCloseButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',

@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { packageService, systemSettingsService } from '../services/supabase';
@@ -68,6 +69,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
   
+  // QR码模态框
+  const [showQRCodeModal, setShowQRCodeModal] = useState(false);
+  const [qrOrderId, setQrOrderId] = useState('');
+  const [qrOrderPrice, setQrOrderPrice] = useState('');
+  
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
     base_fee: 1000,
@@ -118,6 +124,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
       orderFailed: '订单创建失败',
       creating: '正在创建订单...',
       kmUnit: '公里',
+      orderNumber: '订单号',
+      totalAmount: '总金额',
+      qrHint: '请保存此二维码，用于取件和追踪',
+      viewOrders: '查看订单',
+      continueOrder: '继续下单',
       kgUnit: '公斤',
       placeholders: {
         name: '请输入姓名',
@@ -177,6 +188,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
       orderFailed: 'Failed to create order',
       creating: 'Creating order...',
       kmUnit: 'km',
+      orderNumber: 'Order Number',
+      totalAmount: 'Total Amount',
+      qrHint: 'Please save this QR code for pickup and tracking',
+      viewOrders: 'View Orders',
+      continueOrder: 'Continue Ordering',
       kgUnit: 'kg',
       placeholders: {
         name: 'Enter name',
@@ -236,6 +252,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
       orderFailed: 'အမှာစာဖန်တီးမှုမအောင်မြင်',
       creating: 'အမှာစာဖန်တီးနေသည်...',
       kmUnit: 'ကီလိုမီတာ',
+      orderNumber: 'အမှာစာနံပါတ်',
+      totalAmount: 'စုစုပေါင်းပမာဏ',
+      qrHint: 'ဤ QR ကုဒ်ကိုသိမ်းဆည်းပါ၊ ထုတ်ယူရန်နှင့်ခြေရာခံရန်အတွက်',
+      viewOrders: 'အမှာစာများကြည့်ရန်',
+      continueOrder: 'ဆက်လက်မှာယူမည်',
       kgUnit: 'ကီလိုဂရမ်',
       placeholders: {
         name: 'အမည်ထည့်ပါ',
@@ -535,20 +556,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
 
       if (result.success) {
-        Alert.alert(
-          currentT.orderSuccess,
-          `订单号：${orderId}\n总金额：${price} MMK`,
-          [
-            {
-              text: '查看订单',
-              onPress: () => navigation.navigate('MyOrders'),
-            },
-            {
-              text: '继续下单',
-              onPress: () => resetForm(),
-            },
-          ]
-        );
+        // 显示QR码模态框
+        setQrOrderId(orderId);
+        setQrOrderPrice(price);
+        setShowQRCodeModal(true);
       } else {
         console.error('订单创建失败，返回错误：', result.error);
         const errorMsg = result.error?.message || result.error?.hint || result.error?.details || '请稍后重试';
@@ -1030,6 +1041,79 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* QR码模态框 */}
+      <Modal
+        visible={showQRCodeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQRCodeModal(false)}
+      >
+        <View style={styles.qrModalOverlay}>
+          <View style={styles.qrModalContent}>
+            <LinearGradient
+              colors={['#2E86AB', '#4CA1CF']}
+              style={styles.qrModalHeader}
+            >
+              <Text style={styles.qrModalTitle}>✅ {currentT.orderSuccess}</Text>
+            </LinearGradient>
+
+            <View style={styles.qrModalBody}>
+              <Text style={styles.qrInfoText}>📦 {currentT.orderNumber}</Text>
+              <Text style={styles.qrOrderId}>{qrOrderId}</Text>
+              
+              <Text style={styles.qrInfoText}>💰 {currentT.totalAmount}</Text>
+              <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
+
+              <View style={styles.qrCodeContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  <QRCode
+                    value={qrOrderId}
+                    size={200}
+                    color="#2E86AB"
+                    backgroundColor="white"
+                  />
+                </View>
+                <Text style={styles.qrHint}>
+                  {currentT.qrHint}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.qrModalButtons}>
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={() => {
+                  setShowQRCodeModal(false);
+                  navigation.navigate('MyOrders');
+                }}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.qrButtonGradient}
+                >
+                  <Text style={styles.qrButtonText}>📋 {currentT.viewOrders}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={() => {
+                  setShowQRCodeModal(false);
+                  resetForm();
+                }}
+              >
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  style={styles.qrButtonGradient}
+                >
+                  <Text style={styles.qrButtonText}>➕ {currentT.continueOrder}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1385,6 +1469,104 @@ const styles = StyleSheet.create({
   },
   infoModalButtonText: {
     fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  // QR码模态框样式
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  qrModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 400,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  qrModalHeader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  qrModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  qrModalBody: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrInfoText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 16,
+    marginBottom: 6,
+  },
+  qrOrderId: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E86AB',
+    marginBottom: 8,
+  },
+  qrOrderPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#10b981',
+    marginBottom: 16,
+  },
+  qrCodeContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  qrCodeWrapper: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    shadowColor: '#2E86AB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrHint: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  qrModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    paddingTop: 0,
+  },
+  qrButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  qrButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  qrButtonText: {
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#ffffff',
   },
