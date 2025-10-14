@@ -5,7 +5,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View, Text, StyleSheet, Platform } from 'react-native';
 import { AppProvider, useApp } from './src/contexts/AppContext';
+import { LoadingProvider } from './src/contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -153,65 +155,57 @@ export default function App() {
   };
 
   if (isLoggedIn === null) {
-    return (
-      <LinearGradient
-        colors={['#b0d3e8', '#93b4c5', '#7895a3']}
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-      >
-        <ActivityIndicator size="large" color="#ffffff" />
-        <Text style={{ color: '#ffffff', marginTop: 16, fontSize: 16, fontWeight: '600' }}>
-          加载中...
-        </Text>
-      </LinearGradient>
-    );
+    return <DeliveryLoadingAnimation message="正在启动应用..." showOverlay={true} />;
   }
 
   return (
     <AppProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName={isLoggedIn ? "Main" : "Login"}
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-            animationDuration: 300,
-          }}
-        >
-          {/* 登录注册页面 */}
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{
-              animation: 'fade',
-            }}
-          />
-          <Stack.Screen 
-            name="Register" 
-            component={RegisterScreen}
-            options={{
-              animation: 'slide_from_bottom',
-            }}
-          />
-          
-          {/* 主应用 */}
-          <Stack.Screen 
-            name="Main" 
-            component={ClientTabs}
-            options={{
-              animation: 'fade',
-            }}
-          />
-          
-          {/* 其他页面 */}
-          <Stack.Screen 
-            name="OrderDetail" 
-            component={OrderDetailScreen}
-            options={{
+      <LoadingProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName={isLoggedIn ? "Main" : "Login"}
+            screenOptions={{
+              headerShown: false,
               animation: 'slide_from_right',
+              animationDuration: 300,
             }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+          >
+            {/* 登录注册页面 */}
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+              options={{
+                animation: 'fade',
+              }}
+            />
+            <Stack.Screen 
+              name="Register" 
+              component={RegisterScreen}
+              options={{
+                animation: 'slide_from_bottom',
+              }}
+            />
+            
+            {/* 主应用 */}
+            <Stack.Screen 
+              name="Main" 
+              component={ClientTabs}
+              options={{
+                animation: 'fade',
+              }}
+            />
+            
+            {/* 其他页面 */}
+            <Stack.Screen 
+              name="OrderDetail" 
+              component={OrderDetailScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </LoadingProvider>
     </AppProvider>
   );
 }

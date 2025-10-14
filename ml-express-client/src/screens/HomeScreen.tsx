@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,39 @@ import {
   Dimensions,
   Platform,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { useApp } from '../contexts/AppContext';
+import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { language } = useApp();
+  const { showLoading, hideLoading } = useLoading();
+  const [refreshing, setRefreshing] = useState(false);
   const scrollY = new Animated.Value(0);
+
+  // 下拉刷新处理
+  const onRefresh = async () => {
+    setRefreshing(true);
+    showLoading('刷新数据中...');
+    
+    // 模拟网络请求
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    hideLoading();
+    setRefreshing(false);
+  };
+
+  // 导航处理（带加载效果）
+  const handleNavigateWithLoading = async (screen: string, message: string) => {
+    showLoading(message);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    hideLoading();
+    navigation.navigate(screen);
+  };
 
   const t = {
     zh: {
@@ -146,6 +170,14 @@ export default function HomeScreen({ navigation }: any) {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#3b82f6"
+            colors={['#3b82f6', '#2563eb']}
+          />
+        }
       >
         {/* Hero Section with Web Background */}
         <Animated.View style={{ opacity: headerOpacity, transform: [{ scale: headerScale }] }}>
@@ -177,7 +209,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Place Order */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('PlaceOrder')}
+              onPress={() => handleNavigateWithLoading('PlaceOrder', '正在打开下单页面...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -196,7 +228,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Track Order */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('TrackOrder')}
+              onPress={() => handleNavigateWithLoading('TrackOrder', '正在打开追踪页面...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -215,7 +247,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* My Orders */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('MyOrders')}
+              onPress={() => handleNavigateWithLoading('MyOrders', '正在加载订单列表...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -234,7 +266,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Profile */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => handleNavigateWithLoading('Profile', '正在打开个人中心...')}
               activeOpacity={0.7}
             >
               <LinearGradient
