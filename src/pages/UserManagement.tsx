@@ -10,6 +10,7 @@ interface User {
   phone: string;
   email: string;
   address: string;
+  password?: string;
   user_type: 'customer' | 'courier' | 'admin';
   status: 'active' | 'inactive' | 'suspended';
   registration_date: string;
@@ -39,6 +40,7 @@ const UserManagement: React.FC = () => {
     phone: '',
     email: '',
     address: '',
+    password: '123456',  // 默认密码
     user_type: 'customer' as 'customer' | 'courier' | 'admin',
     status: 'active' as 'active' | 'inactive' | 'suspended',
     notes: ''
@@ -108,6 +110,7 @@ const UserManagement: React.FC = () => {
         phone: '',
         email: '',
         address: '',
+        password: '123456',
         user_type: 'customer',
         status: 'active',
         notes: ''
@@ -126,6 +129,7 @@ const UserManagement: React.FC = () => {
       phone: user.phone,
       email: user.email,
       address: user.address,
+      password: '',  // 编辑时不显示密码，留空表示不修改
       user_type: user.user_type,
       status: user.status,
       notes: user.notes
@@ -137,12 +141,18 @@ const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!editingUser) return;
 
-    const updatedUser = { ...editingUser, ...userForm };
+    // 如果密码为空，则不更新密码字段
+    const updateData = { ...userForm };
+    if (!updateData.password || updateData.password.trim() === '') {
+      delete updateData.password;
+    }
+
+    const updatedUser = { ...editingUser, ...updateData };
 
     try {
       const { error } = await supabase
         .from('users')
-        .update(userForm)
+        .update(updateData)
         .eq('id', editingUser.id);
       
       if (error) {
@@ -159,6 +169,7 @@ const UserManagement: React.FC = () => {
         phone: '',
         email: '',
         address: '',
+        password: '123456',
         user_type: 'customer',
         status: 'active',
         notes: ''
@@ -763,6 +774,22 @@ const UserManagement: React.FC = () => {
                     color: 'white',
                     height: '80px',
                     resize: 'vertical',
+                    fontSize: '1rem',
+                    marginBottom: '10px'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder={editingUser ? "密码（留空则不修改）" : "密码（默认：123456）"}
+                  value={userForm.password}
+                  onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
                     fontSize: '1rem'
                   }}
                 />
