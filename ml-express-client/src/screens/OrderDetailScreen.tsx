@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import Toast from '../components/Toast';
 
 const { width } = Dimensions.get('window');
 
@@ -69,6 +70,11 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [showRateModal, setShowRateModal] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+
+  // Toast状态
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   // 翻译
   const translations: any = {
@@ -226,6 +232,13 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   const t = translations[language] || translations.zh;
 
+  // 显示Toast
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   useEffect(() => {
     loadData();
   }, [orderId]);
@@ -250,9 +263,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       // 加载追踪历史
       const history = await packageService.getTrackingHistory(orderId);
       setTrackingHistory(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载订单详情失败:', error);
-      Alert.alert('错误', '加载订单详情失败');
+      const errorMsg = error?.message || '加载订单详情失败，请稍后重试';
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -380,6 +394,15 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
+      {/* Toast通知 */}
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        duration={3000}
+        onHide={() => setToastVisible(false)}
+      />
+
       {/* 顶部状态栏 */}
       <LinearGradient
         colors={[getStatusColor(order.status), getStatusColor(order.status) + 'dd']}

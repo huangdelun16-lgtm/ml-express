@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import Toast from '../components/Toast';
 
 const { width } = Dimensions.get('window');
 
@@ -49,6 +50,11 @@ export default function MyOrdersScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  
+  // Toast状态
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   // 翻译
   const translations: any = {
@@ -122,6 +128,13 @@ export default function MyOrdersScreen({ navigation }: any) {
 
   const t = translations[language] || translations.zh;
 
+  // 显示Toast
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   // 状态过滤器
   const statusFilters = [
     { key: 'all', label: t.all, color: '#6b7280' },
@@ -175,9 +188,10 @@ export default function MyOrdersScreen({ navigation }: any) {
       const { orders: data } = await packageService.getAllOrders(userId);
       setOrders(data);
       filterOrders(data, selectedStatus);
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载订单失败:', error);
-      Alert.alert('错误', '加载订单失败');
+      const errorMsg = error?.message || '加载订单失败，请稍后重试';
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -241,6 +255,15 @@ export default function MyOrdersScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      {/* Toast通知 */}
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        duration={3000}
+        onHide={() => setToastVisible(false)}
+      />
+
       {/* 顶部渐变背景 */}
       <LinearGradient
         colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
