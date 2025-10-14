@@ -16,9 +16,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import { useLoading } from '../contexts/LoadingContext';
 
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
+  const { showLoading, hideLoading } = useLoading();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,52 +30,55 @@ export default function LoginScreen({ navigation }: any) {
       welcome: '欢迎回来',
       title: '登录',
       subtitle: '登录您的账户继续使用服务',
-      email: '电子邮箱',
+      email: '邮箱/手机号',
       password: '密码',
       loginButton: '登录',
       guestMode: '访客模式',
       noAccount: '还没有账号？',
       register: '立即注册',
-      emailPlaceholder: '请输入邮箱',
+      emailPlaceholder: '请输入邮箱或手机号',
       passwordPlaceholder: '请输入密码',
       loginSuccess: '登录成功',
       loginFailed: '登录失败',
-      fillAllFields: '请填写所有字段',
+      fillAllFields: '请填写邮箱/手机号和密码',
       guestModeDesc: '以访客身份浏览',
+      loggingIn: '正在登录...',
     },
     en: {
       welcome: 'Welcome Back',
       title: 'Login',
       subtitle: 'Sign in to your account to continue',
-      email: 'Email',
+      email: 'Email/Phone',
       password: 'Password',
       loginButton: 'Login',
       guestMode: 'Guest Mode',
       noAccount: "Don't have an account?",
       register: 'Register Now',
-      emailPlaceholder: 'Enter email',
+      emailPlaceholder: 'Enter email or phone number',
       passwordPlaceholder: 'Enter password',
       loginSuccess: 'Login successful',
       loginFailed: 'Login failed',
-      fillAllFields: 'Please fill all fields',
+      fillAllFields: 'Please fill email/phone and password',
       guestModeDesc: 'Browse as guest',
+      loggingIn: 'Logging in...',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
       title: 'ဝင်ရောက်ရန်',
       subtitle: 'သင့်အကောင့်သို့ဝင်ရောက်ပါ',
-      email: 'အီးမေးလ်',
+      email: 'အီးမေးလ်/ဖုန်း',
       password: 'စကားဝှက်',
       loginButton: 'ဝင်ရောက်',
       guestMode: 'ဧည့်သည်မုဒ်',
       noAccount: 'အကောင့်မရှိသေးဘူးလား?',
       register: 'စာရင်းသွင်း',
-      emailPlaceholder: 'အီးမေးလ်ထည့်ပါ',
+      emailPlaceholder: 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ',
       passwordPlaceholder: 'စကားဝှက်ထည့်ပါ',
       loginSuccess: 'အောင်မြင်စွာဝင်ရောက်ပြီး',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
-      fillAllFields: 'အချက်အလက်အားလုံးဖြည့်ပါ',
+      fillAllFields: 'အီးမေးလ်/ဖုန်းနှင့်စကားဝှက်ဖြည့်ပါ',
       guestModeDesc: 'ဧည့်သည်အနေဖြင့်ကြည့်ရှုရန်',
+      loggingIn: 'ဝင်ရောက်နေသည်...',
     },
   };
 
@@ -86,22 +91,29 @@ export default function LoginScreen({ navigation }: any) {
     }
 
     setLoading(true);
+    showLoading(currentT.loggingIn);
+
     try {
-      const result = await customerService.login(email, password);
+      const result = await customerService.login(email.trim(), password);
       
+      hideLoading();
+
       if (result.success && result.data) {
+        // 保存用户信息到本地
         await AsyncStorage.setItem('userId', result.data.id);
         await AsyncStorage.setItem('userEmail', result.data.email);
         await AsyncStorage.setItem('userName', result.data.name);
+        await AsyncStorage.setItem('userPhone', result.data.phone);
         
-        Alert.alert('', currentT.loginSuccess);
         navigation.replace('Main');
       } else {
-        Alert.alert('', currentT.loginFailed);
+        const errorMessage = result.error?.message || currentT.loginFailed;
+        Alert.alert(currentT.loginFailed, errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
+      hideLoading();
       console.error('登录错误:', error);
-      Alert.alert('', currentT.loginFailed);
+      Alert.alert(currentT.loginFailed, error.message || currentT.loginFailed);
     } finally {
       setLoading(false);
     }
