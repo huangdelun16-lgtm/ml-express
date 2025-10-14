@@ -388,6 +388,8 @@ export const packageService = {
   // createPackage 别名（为了兼容性，接受完整的包裹数据）
   async createPackage(packageData: any) {
     try {
+      console.log('开始创建订单，数据：', packageData);
+
       // 提取需要的字段并添加默认值
       const insertData: any = {
         customer_id: packageData.customer_id,
@@ -400,7 +402,7 @@ export const packageService = {
         package_type: packageData.package_type,
         weight: packageData.weight,
         description: packageData.description || '',
-        price: packageData.price,
+        price: String(packageData.price || '0'), // 确保是字符串
         delivery_speed: packageData.delivery_speed || '准时达',
         scheduled_delivery_time: packageData.scheduled_delivery_time || null,
         delivery_distance: packageData.delivery_distance || 0,
@@ -416,13 +418,20 @@ export const packageService = {
         insertData.id = packageData.id;
       }
 
+      console.log('准备插入数据库的数据：', insertData);
+
       const { data, error } = await supabase
         .from('packages')
         .insert([insertData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase插入错误：', error);
+        throw error;
+      }
+
+      console.log('订单创建成功：', data);
       
       // 更新用户订单统计
       if (packageData.customer_id) {
@@ -445,8 +454,16 @@ export const packageService = {
 
       return { success: true, data };
     } catch (error: any) {
-      console.error('创建包裹失败:', error);
-      return { success: false, error: { message: error.message || '创建订单失败' } };
+      console.error('创建包裹失败，完整错误：', JSON.stringify(error, null, 2));
+      return { 
+        success: false, 
+        error: { 
+          message: error.message || error.hint || error.details || '创建订单失败，请检查网络连接',
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        } 
+      };
     }
   },
 

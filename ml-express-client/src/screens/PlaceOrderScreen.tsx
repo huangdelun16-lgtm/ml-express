@@ -542,12 +542,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
           ]
         );
       } else {
-        Alert.alert(currentT.orderFailed, result.error?.message || '请稍后重试');
+        console.error('订单创建失败，返回错误：', result.error);
+        const errorMsg = result.error?.message || result.error?.hint || result.error?.details || '请稍后重试';
+        Alert.alert(
+          currentT.orderFailed, 
+          `${errorMsg}\n错误代码：${result.error?.code || 'UNKNOWN'}`
+        );
       }
     } catch (error: any) {
       hideLoading();
-      console.error('提交订单失败:', error);
-      Alert.alert(currentT.orderFailed, error.message || '请稍后重试');
+      console.error('提交订单异常:', error);
+      Alert.alert(currentT.orderFailed, `异常：${error.message || '请稍后重试'}`);
     }
   };
 
