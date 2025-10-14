@@ -890,6 +890,7 @@ const UserManagement: React.FC = () => {
                     phone: '',
                     email: '',
                     address: '',
+                    password: '123456',
                     user_type: 'customer',
                     status: 'active',
                     notes: ''
