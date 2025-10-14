@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,141 +12,266 @@ import {
   Animated,
   RefreshControl,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { packageService } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
+
+interface OrderStats {
+  total: number;
+  pending: number;
+  inTransit: number;
+  delivered: number;
+  cancelled: number;
+}
+
+interface RecentOrder {
+  id: string;
+  receiver_name: string;
+  receiver_address: string;
+  status: string;
+  created_at: string;
+  price: string;
+}
 
 export default function HomeScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [orderStats, setOrderStats] = useState<OrderStats>({
+    total: 0,
+    pending: 0,
+    inTransit: 0,
+    delivered: 0,
+    cancelled: 0,
+  });
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const scrollY = new Animated.Value(0);
 
-  // 下拉刷新处理
+  const t = {
+    zh: {
+      title: 'MARKET LINK EXPRESS',
+      subtitle: '快速、安全、可靠的同城配送服务',
+      welcome: '欢迎',
+      welcomeBack: '欢迎回来',
+      guest: '访客',
+      placeOrder: '立即下单',
+      trackOrder: '追踪订单',
+      myOrders: '我的订单',
+      profile: '个人中心',
+      orderStats: '订单统计',
+      totalOrders: '全部订单',
+      pendingOrders: '待取件',
+      inTransitOrders: '配送中',
+      deliveredOrders: '已送达',
+      services: '核心服务',
+      service1Title: '快速配送',
+      service1Desc: '准时达1小时内送达\n急送达30分钟内送达',
+      service2Title: '安全可靠',
+      service2Desc: '专业配送团队\n全程保险保障',
+      service3Title: '实时追踪',
+      service3Desc: '随时查看包裹位置\n配送员实时定位',
+      service4Title: '价格透明',
+      service4Desc: '明码标价计费\n无隐藏费用',
+      recentOrders: '最近订单',
+      viewAll: '查看全部',
+      noOrders: '暂无订单',
+      noOrdersDesc: '您还没有创建订单\n点击下方按钮开始下单',
+      receiver: '收件人',
+      address: '地址',
+      status: '状态',
+      price: '金额',
+      contact: '联系我们',
+      phone: '客服热线',
+      email: '商务合作',
+      features: '为什么选择我们',
+      feature1: '7×24小时客服',
+      feature2: '覆盖全缅甸主要城市',
+      feature3: '专业配送团队',
+      feature4: '智能路线优化',
+      loginToSeeOrders: '登录后查看订单',
+      loginNow: '立即登录',
+    },
+    en: {
+      title: 'MARKET LINK EXPRESS',
+      subtitle: 'Fast, Safe, and Reliable Same-City Delivery',
+      welcome: 'Welcome',
+      welcomeBack: 'Welcome Back',
+      guest: 'Guest',
+      placeOrder: 'Place Order',
+      trackOrder: 'Track Order',
+      myOrders: 'My Orders',
+      profile: 'Profile',
+      orderStats: 'Order Statistics',
+      totalOrders: 'Total Orders',
+      pendingOrders: 'Pending',
+      inTransitOrders: 'In Transit',
+      deliveredOrders: 'Delivered',
+      services: 'Core Services',
+      service1Title: 'Fast Delivery',
+      service1Desc: 'On-Time: within 1 hour\nExpress: within 30 mins',
+      service2Title: 'Safe & Reliable',
+      service2Desc: 'Professional team\nFull insurance',
+      service3Title: 'Real-time Tracking',
+      service3Desc: 'Check package location\nCourier live tracking',
+      service4Title: 'Transparent Pricing',
+      service4Desc: 'Clear pricing rules\nNo hidden fees',
+      recentOrders: 'Recent Orders',
+      viewAll: 'View All',
+      noOrders: 'No Orders',
+      noOrdersDesc: 'You haven\'t created any orders yet\nTap below to start',
+      receiver: 'Receiver',
+      address: 'Address',
+      status: 'Status',
+      price: 'Price',
+      contact: 'Contact Us',
+      phone: 'Hotline',
+      email: 'Business',
+      features: 'Why Choose Us',
+      feature1: '24/7 Customer Service',
+      feature2: 'Myanmar-wide Coverage',
+      feature3: 'Professional Team',
+      feature4: 'Smart Route Optimization',
+      loginToSeeOrders: 'Login to see orders',
+      loginNow: 'Login Now',
+    },
+    my: {
+      title: 'MARKET LINK EXPRESS',
+      subtitle: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်ရသော ပို့ဆောင်ရေး',
+      welcome: 'ကြိုဆိုပါတယ်',
+      welcomeBack: 'ပြန်လည်ကြိုဆိုပါတယ်',
+      guest: 'ဧည့်သည်',
+      placeOrder: 'အမှာစာတင်',
+      trackOrder: 'ခြေရာခံ',
+      myOrders: 'ကျွန်ုပ်၏အမှာစာများ',
+      profile: 'ကိုယ်ရေး',
+      orderStats: 'အမှာစာစာရင်းအင်း',
+      totalOrders: 'စုစုပေါင်း',
+      pendingOrders: 'ဆိုင်းငံ့',
+      inTransitOrders: 'ပို့ဆောင်နေဆဲ',
+      deliveredOrders: 'ပို့ဆောင်ပြီး',
+      services: 'အဓိကဝန်ဆောင်မှုများ',
+      service1Title: 'မြန်ဆန်သောပို့ဆောင်ရေး',
+      service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့',
+      service2Title: 'ဘေးကင်းယုံကြည်',
+      service2Desc: 'ပရော်ဖက်ရှင်နယ်အဖွဲ့\nအာမခံအပြည့်အဝ',
+      service3Title: 'တိုက်ရိုက်ခြေရာခံ',
+      service3Desc: 'အချိန်မရွေးစစ်ဆေးနိုင်\nမော်တော်ဆိုင်ကယ်တည်နေရာ',
+      service4Title: 'ပွင့်လင်းသောစျေးနှုန်း',
+      service4Desc: 'ရှင်းလင်းသောစျေးနှုန်း\nလျှို့ဝှက်ကုန်ကျစရိတ်မရှိ',
+      recentOrders: 'မကြာသေးမီအမှာစာများ',
+      viewAll: 'အားလုံးကြည့်',
+      noOrders: 'အမှာစာမရှိသေးပါ',
+      noOrdersDesc: 'သင်မှာယူမှုမရှိသေးပါ\nအောက်ပါခလုတ်ကိုနှိပ်ပြီးစတင်ပါ',
+      receiver: 'လက်ခံသူ',
+      address: 'လိပ်စာ',
+      status: 'အခြေအနေ',
+      price: 'စျေးနှုန်း',
+      contact: 'ဆက်သွယ်ရန်',
+      phone: 'ဖုန်း',
+      email: 'စီးပွားရေး',
+      features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
+      feature1: '၂၄နာရီဝန်ဆောင်မှု',
+      feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
+      feature3: 'ကျွမ်းကျင်သောအဖွဲ့',
+      feature4: 'စမတ်လမ်းကြောင်း',
+      loginToSeeOrders: 'အမှာစာများကြည့်ရန် ဝင်ရောက်ပါ',
+      loginNow: 'ယခုဝင်ရောက်',
+    },
+  };
+
+  const currentT = t[language];
+
+  // 加载用户信息和订单数据
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const storedUserName = await AsyncStorage.getItem('userName');
+      const guestMode = await AsyncStorage.getItem('isGuest');
+      
+      setUserId(storedUserId);
+      setUserName(storedUserName || '');
+      setIsGuest(guestMode === 'true');
+
+      // 如果是已登录用户（非访客），加载订单数据
+      if (storedUserId && guestMode !== 'true') {
+        await loadOrderData(storedUserId);
+      }
+    } catch (error) {
+      console.error('加载用户数据失败:', error);
+    }
+  };
+
+  const loadOrderData = async (customerId: string) => {
+    try {
+      // 获取订单统计
+      const stats = await packageService.getOrderStats(customerId);
+      setOrderStats(stats);
+
+      // 获取最近的订单
+      const orders = await packageService.getRecentOrders(customerId, 3);
+      setRecentOrders(orders as RecentOrder[]);
+    } catch (error) {
+      console.error('加载订单数据失败:', error);
+    }
+  };
+
+  // 下拉刷新
   const onRefresh = async () => {
     setRefreshing(true);
-    showLoading('刷新数据中...');
-    
-    // 模拟网络请求
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    hideLoading();
+    await loadUserData();
     setRefreshing(false);
   };
 
   // 导航处理（带加载效果）
   const handleNavigateWithLoading = async (screen: string, message: string) => {
     showLoading(message);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
     hideLoading();
     navigation.navigate(screen);
   };
 
-  const t = {
-    zh: {
-      title: '缅甸同城快递',
-      subtitle: '快速、安全、可靠的同城配送服务',
-      welcome: '欢迎使用',
-      placeOrder: '立即下单',
-      trackOrder: '追踪订单',
-      myOrders: '我的订单',
-      profile: '个人中心',
-      services: '核心服务',
-      service1Title: '快速配送',
-      service1Desc: '准时达1小时内送达\n急送达30分钟内送达\n定时达按您指定时间',
-      service2Title: '安全可靠',
-      service2Desc: '专业配送团队\n全程保险保障\n包裹实时监控',
-      service3Title: '实时追踪',
-      service3Desc: '随时查看包裹位置\n配送员实时定位\n送达及时通知',
-      service4Title: '价格透明',
-      service4Desc: '明码标价计费\n无隐藏费用\n多种支付方式',
-      features: '为什么选择我们？',
-      feature1: '7×24小时客服',
-      feature2: '覆盖全缅甸主要城市',
-      feature3: '专业配送团队',
-      feature4: '智能路线优化',
-      feature5: '包裹保险',
-      feature6: '实时客服支持',
-      recentOrders: '最近订单',
-      viewAll: '查看全部',
-      noOrders: '暂无订单',
-      contact: '联系我们',
-      phone: '客服热线',
-      email: '商务合作',
-      callNow: '立即拨打',
-      sendEmail: '发送邮件',
-    },
-    en: {
-      title: 'Myanmar City Express',
-      subtitle: 'Fast, Safe, and Reliable Same-City Delivery',
-      welcome: 'Welcome',
-      placeOrder: 'Place Order',
-      trackOrder: 'Track Order',
-      myOrders: 'My Orders',
-      profile: 'Profile',
-      services: 'Core Services',
-      service1Title: 'Fast Delivery',
-      service1Desc: 'On-Time: within 1 hour\nExpress: within 30 mins\nScheduled: your time',
-      service2Title: 'Safe & Reliable',
-      service2Desc: 'Professional team\nFull insurance\nReal-time monitoring',
-      service3Title: 'Real-time Tracking',
-      service3Desc: 'Check package location\nCourier live tracking\nDelivery notifications',
-      service4Title: 'Transparent Pricing',
-      service4Desc: 'Clear pricing rules\nNo hidden fees\nMultiple payments',
-      features: 'Why Choose Us?',
-      feature1: '24/7 Customer Service',
-      feature2: 'Myanmar-wide Coverage',
-      feature3: 'Professional Team',
-      feature4: 'Smart Route Optimization',
-      feature5: 'Package Insurance',
-      feature6: 'Live Support',
-      recentOrders: 'Recent Orders',
-      viewAll: 'View All',
-      noOrders: 'No Orders',
-      contact: 'Contact Us',
-      phone: 'Hotline',
-      email: 'Business',
-      callNow: 'Call Now',
-      sendEmail: 'Send Email',
-    },
-    my: {
-      title: 'မြန်မာမြို့တွင်းအမြန်ပို့ဆောင်ရေး',
-      subtitle: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်စိတ်ချရသော ဝန်ဆောင်မှု',
-      welcome: 'ကြိုဆိုပါတယ်',
-      placeOrder: 'အမှာစာတင်',
-      trackOrder: 'ခြေရာခံ',
-      myOrders: 'ကျွန်ုပ်၏အမှာစာများ',
-      profile: 'ကိုယ်ရေးအချက်အလက်',
-      services: 'အဓိကဝန်ဆောင်မှုများ',
-      service1Title: 'မြန်ဆန်သောပို့ဆောင်ရေး',
-      service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့\nသင်သတ်မှတ်သောအချိန်',
-      service2Title: 'ဘေးကင်းယုံကြည်',
-      service2Desc: 'ပရော်ဖက်ရှင်နယ်အဖွဲ့\nအာမခံအပြည့်အဝ\nတိုက်ရိုက်စောင့်ကြည့်',
-      service3Title: 'တိုက်ရိုက်ခြေရာခံ',
-      service3Desc: 'အချိန်မရွေးစစ်ဆေးနိုင်\nမော်တော်ဆိုင်ကယ်တည်နေရာ\nသတင်းအကြောင်းကြားချက်',
-      service4Title: 'ပွင့်လင်းသောစျေးနှုန်း',
-      service4Desc: 'ရှင်းလင်းသောစျေးနှုန်း\nလျှို့ဝှက်ကုန်ကျစရိတ်မရှိ\nငွေပေးချေမှုနည်းလမ်းများစွာ',
-      features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
-      feature1: '၂၄နာရီဝန်ဆောင်မှု',
-      feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
-      feature3: 'ကျွမ်းကျင်သောအဖွဲ့',
-      feature4: 'စမတ်လမ်းကြောင်း',
-      feature5: 'အာမခံ',
-      feature6: 'တိုက်ရိုက်ပံ့ပိုး',
-      recentOrders: 'မကြာသေးမီအမှာစာများ',
-      viewAll: 'အားလုံးကြည့်',
-      noOrders: 'အမှာစာမရှိ',
-      contact: 'ဆက်သွယ်ရန်',
-      phone: 'ဖောက်သည်ဝန်ဆောင်မှု',
-      email: 'စီးပွားရေး',
-      callNow: 'ခေါ်ဆိုပါ',
-      sendEmail: 'အီးမေးလ်ပို့ပါ',
-    },
+  // 获取状态颜色
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '待取件':
+        return '#f59e0b';
+      case '已取件':
+      case '配送中':
+        return '#3b82f6';
+      case '已送达':
+        return '#10b981';
+      case '已取消':
+        return '#ef4444';
+      default:
+        return '#6b7280';
+    }
   };
 
-  const currentT = t[language];
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 60) return `${minutes}分钟前`;
+    if (hours < 24) return `${hours}小时前`;
+    if (days < 7) return `${days}天前`;
+    return date.toLocaleDateString();
+  };
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
@@ -185,23 +310,96 @@ export default function HomeScreen({ navigation }: any) {
             colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.heroSection}
+            style={styles.headerBackground}
           >
-            {/* Logo */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/logo-large.png')}
+                source={require('../../assets/logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
             </View>
-
-            {/* Title */}
-            <Text style={styles.welcomeText}>{currentT.welcome}</Text>
             <Text style={styles.title}>{currentT.title}</Text>
             <Text style={styles.subtitle}>{currentT.subtitle}</Text>
+            
+            {/* 用户欢迎信息 */}
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeText}>
+                {userName ? `${currentT.welcomeBack}, ${userName}!` : 
+                 isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
+              </Text>
+            </View>
           </LinearGradient>
         </Animated.View>
+
+        {/* 订单统计卡片 */}
+        {!isGuest && userId && (
+          <View style={styles.statsContainer}>
+            <Text style={styles.sectionTitle}>{currentT.orderStats}</Text>
+            <View style={styles.statsGrid}>
+              <TouchableOpacity
+                style={styles.statCard}
+                onPress={() => navigation.navigate('MyOrders')}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statGradient}
+                >
+                  <Text style={styles.statNumber}>{orderStats.total}</Text>
+                  <Text style={styles.statLabel}>{currentT.totalOrders}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statCard}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#f59e0b', '#d97706']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statGradient}
+                >
+                  <Text style={styles.statNumber}>{orderStats.pending}</Text>
+                  <Text style={styles.statLabel}>{currentT.pendingOrders}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statCard}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#8b5cf6', '#7c3aed']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statGradient}
+                >
+                  <Text style={styles.statNumber}>{orderStats.inTransit}</Text>
+                  <Text style={styles.statLabel}>{currentT.inTransitOrders}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statCard}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statGradient}
+                >
+                  <Text style={styles.statNumber}>{orderStats.delivered}</Text>
+                  <Text style={styles.statLabel}>{currentT.deliveredOrders}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Quick Action Cards - 4 Cards in Grid */}
         <View style={styles.quickActionsContainer}>
@@ -209,7 +407,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Place Order */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('PlaceOrder', '正在打开下单页面...')}
+              onPress={() => handleNavigateWithLoading('PlaceOrder', currentT.placeOrder + '...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -228,7 +426,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Track Order */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('TrackOrder', '正在打开追踪页面...')}
+              onPress={() => handleNavigateWithLoading('TrackOrder', currentT.trackOrder + '...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -247,7 +445,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* My Orders */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('MyOrders', '正在加载订单列表...')}
+              onPress={() => handleNavigateWithLoading('MyOrders', currentT.myOrders + '...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -266,7 +464,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* Profile */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('Profile', '正在打开个人中心...')}
+              onPress={() => handleNavigateWithLoading('Profile', currentT.profile + '...')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -284,70 +482,142 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* 最近订单 */}
+        {!isGuest && userId && (
+          <View style={styles.recentOrdersContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{currentT.recentOrders}</Text>
+              {recentOrders.length > 0 && (
+                <TouchableOpacity onPress={() => navigation.navigate('MyOrders')}>
+                  <Text style={styles.viewAllButton}>{currentT.viewAll} →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {recentOrders.length === 0 ? (
+              <View style={styles.noOrdersCard}>
+                <Text style={styles.noOrdersIcon}>📭</Text>
+                <Text style={styles.noOrdersText}>{currentT.noOrders}</Text>
+                <Text style={styles.noOrdersDesc}>{currentT.noOrdersDesc}</Text>
+                <TouchableOpacity
+                  style={styles.startOrderButton}
+                  onPress={() => navigation.navigate('PlaceOrder')}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={['#3b82f6', '#2563eb']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.startOrderGradient}
+                  >
+                    <Text style={styles.startOrderText}>{currentT.placeOrder}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              recentOrders.map((order) => (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.orderCard}
+                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.orderHeader}>
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderReceiver}>
+                        {currentT.receiver}: {order.receiver_name}
+                      </Text>
+                      <Text style={styles.orderAddress} numberOfLines={1}>
+                        📍 {order.receiver_address}
+                      </Text>
+                    </View>
+                    <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
+                      <Text style={styles.orderStatusText}>{order.status}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.orderPrice}>¥{order.price}</Text>
+                    <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* 访客提示 */}
+        {isGuest && (
+          <View style={styles.guestPromptCard}>
+            <Text style={styles.guestPromptIcon}>🔐</Text>
+            <Text style={styles.guestPromptTitle}>{currentT.loginToSeeOrders}</Text>
+            <TouchableOpacity
+              style={styles.guestLoginButton}
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.guestLoginGradient}
+              >
+                <Text style={styles.guestLoginText}>{currentT.loginNow}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Services Section */}
-        <View style={styles.section}>
+        <View style={styles.servicesSection}>
           <Text style={styles.sectionTitle}>{currentT.services}</Text>
-          
           <View style={styles.servicesGrid}>
-            {/* Service 1 */}
             <View style={styles.serviceCard}>
               <LinearGradient
-                colors={['#fef3c7', '#fde68a', '#fbbf24']}
+                colors={['#fbbf24', '#f59e0b']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconBg}>
-                  <Text style={styles.serviceIcon}>⚡</Text>
-                </View>
+                <Text style={styles.serviceIcon}>⚡</Text>
                 <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
                 <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
               </LinearGradient>
             </View>
 
-            {/* Service 2 */}
             <View style={styles.serviceCard}>
               <LinearGradient
-                colors={['#dbeafe', '#bfdbfe', '#60a5fa']}
+                colors={['#60a5fa', '#3b82f6']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconBg}>
-                  <Text style={styles.serviceIcon}>🛡️</Text>
-                </View>
+                <Text style={styles.serviceIcon}>🛡️</Text>
                 <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
                 <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
               </LinearGradient>
             </View>
 
-            {/* Service 3 */}
             <View style={styles.serviceCard}>
               <LinearGradient
-                colors={['#dcfce7', '#bbf7d0', '#4ade80']}
+                colors={['#a78bfa', '#8b5cf6']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconBg}>
-                  <Text style={styles.serviceIcon}>📍</Text>
-                </View>
+                <Text style={styles.serviceIcon}>📍</Text>
                 <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
                 <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
               </LinearGradient>
             </View>
 
-            {/* Service 4 */}
             <View style={styles.serviceCard}>
               <LinearGradient
-                colors={['#fce7f3', '#fbcfe8', '#f472b6']}
+                colors={['#34d399', '#10b981']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconBg}>
-                  <Text style={styles.serviceIcon}>💰</Text>
-                </View>
+                <Text style={styles.serviceIcon}>💰</Text>
                 <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
                 <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
               </LinearGradient>
@@ -355,84 +625,61 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Features Section */}
-        <View style={[styles.section, styles.featuresSection]}>
+        {/* Why Choose Us Section */}
+        <View style={styles.whyChooseUsSection}>
           <Text style={styles.sectionTitle}>{currentT.features}</Text>
-          
-          <View style={styles.featuresGrid}>
-            {[
-              { icon: '⏰', text: currentT.feature1, color: '#3b82f6' },
-              { icon: '🗺️', text: currentT.feature2, color: '#10b981' },
-              { icon: '👥', text: currentT.feature3, color: '#8b5cf6' },
-              { icon: '🚀', text: currentT.feature4, color: '#f59e0b' },
-              { icon: '📋', text: currentT.feature5, color: '#ef4444' },
-              { icon: '💬', text: currentT.feature6, color: '#06b6d4' },
-            ].map((feature, index) => (
-              <View key={index} style={styles.featureCard}>
-                <View style={[styles.featureIconContainer, { backgroundColor: feature.color + '20' }]}>
-                  <Text style={styles.featureIcon}>{feature.icon}</Text>
-                </View>
-                <Text style={styles.featureText}>{feature.text}</Text>
+          <View style={styles.whyChooseUsCard}>
+            {[currentT.feature1, currentT.feature2, currentT.feature3, currentT.feature4].map((feature, index) => (
+              <View key={index} style={styles.featureItem}>
+                <Text style={styles.featureIcon}>✓</Text>
+                <Text style={styles.featureText}>{feature}</Text>
               </View>
             ))}
           </View>
         </View>
 
         {/* Contact Section */}
-        <View style={styles.section}>
+        <View style={styles.contactSection}>
           <Text style={styles.sectionTitle}>{currentT.contact}</Text>
-          
-          <TouchableOpacity
-            style={styles.contactCard}
-            onPress={() => Linking.openURL('tel:+959123456789')}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb', '#1d4ed8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.contactGradient}
+          <View style={styles.contactGrid}>
+            <TouchableOpacity
+              style={styles.contactCard}
+              onPress={() => Linking.openURL('tel:+959123456789')}
+              activeOpacity={0.7}
             >
-              <View style={styles.contactIconContainer}>
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.contactGradient}
+              >
                 <Text style={styles.contactIcon}>📞</Text>
-              </View>
-              <View style={styles.contactInfo}>
                 <Text style={styles.contactLabel}>{currentT.phone}</Text>
-                <Text style={styles.contactValue}>+95 912 345 6789</Text>
-              </View>
-              <View style={styles.contactArrow}>
-                <Text style={styles.arrowIcon}>→</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+                <Text style={styles.contactValue}>+95 9123456789</Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.contactCard}
-            onPress={() => Linking.openURL('mailto:support@mlexpress.com')}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={['#8b5cf6', '#7c3aed', '#6d28d9']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.contactGradient}
+            <TouchableOpacity
+              style={styles.contactCard}
+              onPress={() => Linking.openURL('mailto:info@marketlink.com')}
+              activeOpacity={0.7}
             >
-              <View style={styles.contactIconContainer}>
-                <Text style={styles.contactIcon}>📧</Text>
-              </View>
-              <View style={styles.contactInfo}>
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.contactGradient}
+              >
+                <Text style={styles.contactIcon}>✉️</Text>
                 <Text style={styles.contactLabel}>{currentT.email}</Text>
-                <Text style={styles.contactValue}>support@mlexpress.com</Text>
-              </View>
-              <View style={styles.contactArrow}>
-                <Text style={styles.arrowIcon}>→</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+                <Text style={styles.contactValue}>info@marketlink.com</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Footer Spacing */}
-        <View style={styles.footer} />
+        {/* Bottom Spacing */}
+        <View style={{ height: 100 }} />
       </Animated.ScrollView>
     </View>
   );
@@ -446,56 +693,102 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  heroSection: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+  headerBackground: {
+    paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: 24,
     alignItems: 'center',
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#ffffff',
-    padding: 12,
+    padding: 10,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   logo: {
     width: '100%',
     height: '100%',
   },
-  welcomeText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 8,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
-    paddingHorizontal: 16,
-    lineHeight: 20,
+    marginBottom: 16,
+  },
+  welcomeContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  welcomeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  statsContainer: {
+    paddingHorizontal: 20,
+    marginTop: -20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    width: (width - 56) / 2,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statGradient: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '600',
   },
   quickActionsContainer: {
-    marginTop: -24,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -503,51 +796,195 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quickActionCard: {
-    width: (width - 44) / 2,
+    width: (width - 56) / 2,
     borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
   },
   quickActionGradient: {
-    padding: 16,
-    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
     minHeight: 120,
     justifyContent: 'center',
   },
   quickActionIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 12,
   },
   quickActionIcon: {
-    fontSize: 26,
+    fontSize: 40,
   },
   quickActionText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  section: {
-    padding: 16,
-    paddingTop: 24,
+  recentOrdersContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 22,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    fontSize: 14,
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  noOrdersCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  noOrdersIcon: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
+  noOrdersText: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
+    marginBottom: 8,
+  },
+  noOrdersDesc: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  startOrderButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  startOrderGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+  },
+  startOrderText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  orderCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  orderInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  orderReceiver: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  orderAddress: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  orderStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  orderStatusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 12,
+  },
+  orderPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#3b82f6',
+  },
+  orderTime: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  guestPromptCard: {
+    marginHorizontal: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 24,
+  },
+  guestPromptIcon: {
+    fontSize: 60,
     marginBottom: 16,
+  },
+  guestPromptTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 20,
+  },
+  guestLoginButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  guestLoginGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+  },
+  guestLoginText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  servicesSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   servicesGrid: {
     flexDirection: 'row',
@@ -555,134 +992,102 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   serviceCard: {
-    width: (width - 44) / 2,
+    width: (width - 56) / 2,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  serviceGradient: {
-    padding: 16,
-    borderRadius: 16,
-    minHeight: 180,
-  },
-  serviceIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  serviceIcon: {
-    fontSize: 24,
-  },
-  serviceTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  serviceDesc: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 18,
-  },
-  featuresSection: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-  },
-  featuresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  featureCard: {
-    width: (width - 52) / 3,
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  featureIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  featureIcon: {
-    fontSize: 20,
-  },
-  featureText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#334155',
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-  contactCard: {
-    marginBottom: 12,
-    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
   },
-  contactGradient: {
+  serviceGradient: {
+    padding: 20,
+    minHeight: 160,
+  },
+  serviceIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  serviceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  serviceDesc: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 18,
+  },
+  whyChooseUsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  whyChooseUsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  contactIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  featureIcon: {
+    fontSize: 20,
+    color: '#10b981',
     marginRight: 12,
+    fontWeight: 'bold',
+  },
+  featureText: {
+    fontSize: 15,
+    color: '#1e293b',
+    flex: 1,
+  },
+  contactSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  contactGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contactCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  contactGradient: {
+    padding: 20,
+    alignItems: 'center',
+    minHeight: 140,
+    justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 24,
-  },
-  contactInfo: {
-    flex: 1,
+    fontSize: 32,
+    marginBottom: 12,
   },
   contactLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginBottom: 2,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
   },
   contactValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#ffffff',
-  },
-  contactArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowIcon: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  footer: {
-    height: 32,
   },
 });

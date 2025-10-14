@@ -401,6 +401,55 @@ export const packageService = {
     }
   },
 
+  // 获取客户最近的订单（限制数量）
+  async getRecentOrders(customerId: string, limit: number = 5) {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('获取最近订单失败:', error);
+      return [];
+    }
+  },
+
+  // 获取客户订单统计
+  async getOrderStats(customerId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('status')
+        .eq('customer_id', customerId);
+
+      if (error) throw error;
+
+      const stats = {
+        total: data?.length || 0,
+        pending: data?.filter(p => p.status === '待取件').length || 0,
+        inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
+        delivered: data?.filter(p => p.status === '已送达').length || 0,
+        cancelled: data?.filter(p => p.status === '已取消').length || 0,
+      };
+
+      return stats;
+    } catch (error) {
+      console.error('获取订单统计失败:', error);
+      return {
+        total: 0,
+        pending: 0,
+        inTransit: 0,
+        delivered: 0,
+        cancelled: 0,
+      };
+    }
+  },
+
   // 根据ID获取订单
   async getOrderById(orderId: string) {
     try {
