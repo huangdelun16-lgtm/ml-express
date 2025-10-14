@@ -484,9 +484,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
     try {
       showLoading(currentT.creating, 'package');
 
-      // 生成订单ID
-      const orderId = `PKG${Date.now()}`;
+      // 生成订单ID（与Web端格式一致：MDY年月日时分随机数）
       const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hour = String(now.getHours()).padStart(2, '0');
+      const minute = String(now.getMinutes()).padStart(2, '0');
+      const random1 = Math.floor(Math.random() * 10);
+      const random2 = Math.floor(Math.random() * 10);
+      const orderId = `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+      
       const createTime = now.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
