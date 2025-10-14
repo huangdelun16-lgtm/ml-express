@@ -18,7 +18,7 @@ interface User {
   total_orders: number;
   total_spent: number;
   rating: number;
-  notes: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -125,14 +125,14 @@ const UserManagement: React.FC = () => {
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     setUserForm({
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      address: user.address,
+      name: user.name || '',
+      phone: user.phone || '',
+      email: user.email || '',
+      address: user.address || '',
       password: '',  // 编辑时不显示密码，留空表示不修改
-      user_type: user.user_type,
-      status: user.status,
-      notes: user.notes
+      user_type: user.user_type || 'customer',
+      status: user.status || 'active',
+      notes: user.notes || ''
     });
     // setShowUserForm(true);
   };
