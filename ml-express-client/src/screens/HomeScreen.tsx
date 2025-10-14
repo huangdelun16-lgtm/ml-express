@@ -533,13 +533,13 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                     <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
                       <Text style={styles.orderStatusText}>{order.status}</Text>
-                    </View>
                   </View>
-                  <View style={styles.orderFooter}>
-                    <Text style={styles.orderPrice}>¥{order.price}</Text>
-                    <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
-                  </View>
-                </TouchableOpacity>
+                </View>
+                <View style={styles.orderFooter}>
+                  <Text style={styles.orderPrice}>{order.price} MMK</Text>
+                  <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
+                </View>
+              </TouchableOpacity>
               ))
             )}
           </View>
