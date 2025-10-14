@@ -19,7 +19,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { packageService } from '../services/supabase';
+import { packageService, systemSettingsService } from '../services/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -67,6 +67,19 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 包裹类型说明
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
+  
+  // 计费规则
+  const [pricingSettings, setPricingSettings] = useState({
+    base_fee: 1000,
+    per_km_fee: 500,
+    weight_surcharge: 150,
+    urgent_surcharge: 1500,
+    scheduled_surcharge: 500,
+    oversize_surcharge: 300,
+    fragile_surcharge: 400,
+    food_beverage_surcharge: 300,
+    free_km_threshold: 3,
+  });
 
   const t = {
     zh: {
@@ -260,16 +273,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
     { value: '食品和饮料', label: currentT.packageTypes.foodDrinks },
   ];
 
-  // 配送速度选项
+  // 配送速度选项（从计费规则获取）
   const deliverySpeeds = [
     { value: '准时达', label: currentT.speedStandard, extra: 0 },
-    { value: '急送达', label: currentT.speedExpress, extra: 10 },
-    { value: '定时达', label: currentT.speedScheduled, extra: 5 },
+    { value: '急送达', label: currentT.speedExpress, extra: pricingSettings.urgent_surcharge },
+    { value: '定时达', label: currentT.speedScheduled, extra: pricingSettings.scheduled_surcharge },
   ];
 
-  // 加载用户信息
+  // 加载用户信息和计费规则
   useEffect(() => {
     loadUserInfo();
+    loadPricingSettings();
   }, []);
 
   const loadUserInfo = async () => {
@@ -292,6 +306,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
+  const loadPricingSettings = async () => {
+    try {
+      const settings = await systemSettingsService.getPricingSettings();
+      setPricingSettings(settings);
+    } catch (error) {
+      console.error('加载计费规则失败:', error);
+    }
+  };
+
   // 切换使用我的信息
   useEffect(() => {
     if (useMyInfo) {
@@ -306,17 +329,43 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 计算价格
   useEffect(() => {
     calculatePrice();
-  }, [weight, deliverySpeed, distance]);
+  }, [weight, deliverySpeed, distance, packageType, pricingSettings]);
 
   const calculatePrice = () => {
-    // 基础价格计算逻辑
-    let basePrice = 5; // 起步价 5元
-    let distancePrice = distance * 2; // 每公里2元
-    let weightPrice = parseFloat(weight || '0') * 1; // 每公斤1元
-    let speedExtra = deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0;
+    // 基础价格（起步价）
+    let totalPrice = pricingSettings.base_fee;
     
-    let total = basePrice + distancePrice + weightPrice + speedExtra;
-    setPrice(total.toFixed(2));
+    // 1. 距离费用（超过免费公里数部分）
+    const chargeableDistance = Math.max(0, distance - pricingSettings.free_km_threshold);
+    totalPrice += chargeableDistance * pricingSettings.per_km_fee;
+    
+    // 2. 重量附加费（超重件：重量超过5KG的部分）
+    if (packageType === '超重件（5KG）以上') {
+      const weightValue = parseFloat(weight || '0');
+      const excessWeight = Math.max(0, weightValue - 5);
+      totalPrice += excessWeight * pricingSettings.weight_surcharge;
+    }
+    
+    // 3. 配送速度附加费
+    if (deliverySpeed === '急送达') {
+      totalPrice += pricingSettings.urgent_surcharge;
+    } else if (deliverySpeed === '定时达') {
+      totalPrice += pricingSettings.scheduled_surcharge;
+    }
+    
+    // 4. 包裹类型附加费
+    if (packageType === '超规件（45x60x15cm）以上') {
+      // 超规件：按距离计算附加费
+      totalPrice += distance * pricingSettings.oversize_surcharge;
+    } else if (packageType === '易碎品') {
+      // 易碎品：固定附加费
+      totalPrice += pricingSettings.fragile_surcharge;
+    } else if (packageType === '食品和饮料') {
+      // 食品和饮料：按距离计算附加费
+      totalPrice += distance * pricingSettings.food_beverage_surcharge;
+    }
+    
+    setPrice(Math.round(totalPrice).toString());
   };
 
   // 使用当前位置
@@ -480,7 +529,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       if (result.success) {
         Alert.alert(
           currentT.orderSuccess,
-          `订单号：${orderId}\n总金额：¥${price}`,
+          `订单号：${orderId}\n总金额：${price} MMK`,
           [
             {
               text: '查看订单',
@@ -719,7 +768,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 <View style={styles.radio}>
                   {deliverySpeed === speed.value && <View style={styles.radioInner} />}
                 </View>
-                <View style={styles.radioContent}>
+                  <View style={styles.radioContent}>
                   <Text style={[
                     styles.radioText,
                     deliverySpeed === speed.value && styles.radioTextActive
@@ -727,7 +776,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
                     {speed.label}
                   </Text>
                   {speed.extra > 0 && (
-                    <Text style={styles.extraPrice}>+¥{speed.extra}</Text>
+                    <Text style={styles.extraPrice}>+{speed.extra} MMK</Text>
                   )}
                 </View>
               </TouchableOpacity>
@@ -759,30 +808,56 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
-              <Text style={styles.priceValue}>¥5</Text>
+              <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
-              <Text style={styles.priceValue}>¥{(distance * 2).toFixed(2)}</Text>
+              <Text style={styles.priceValue}>
+                {Math.round(Math.max(0, distance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee)} MMK
+              </Text>
             </View>
-            {parseFloat(weight || '0') > 0 && (
+            {packageType === '超重件（5KG）以上' && parseFloat(weight || '0') > 5 && (
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>重量费:</Text>
-                <Text style={styles.priceValue}>¥{(parseFloat(weight) * 1).toFixed(2)}</Text>
+                <Text style={styles.priceLabel}>超重附加费:</Text>
+                <Text style={styles.priceValue}>
+                  {Math.round(Math.max(0, parseFloat(weight) - 5) * pricingSettings.weight_surcharge)} MMK
+                </Text>
               </View>
             )}
             {deliverySpeed !== '准时达' && (
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
                 <Text style={styles.priceValue}>
-                  ¥{deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0}
+                  {deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0} MMK
+                </Text>
+              </View>
+            )}
+            {packageType === '超规件（45x60x15cm）以上' && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>超规附加费:</Text>
+                <Text style={styles.priceValue}>
+                  {Math.round(distance * pricingSettings.oversize_surcharge)} MMK
+                </Text>
+              </View>
+            )}
+            {packageType === '易碎品' && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>易碎品附加费:</Text>
+                <Text style={styles.priceValue}>{pricingSettings.fragile_surcharge} MMK</Text>
+              </View>
+            )}
+            {packageType === '食品和饮料' && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>食品附加费:</Text>
+                <Text style={styles.priceValue}>
+                  {Math.round(distance * pricingSettings.food_beverage_surcharge)} MMK
                 </Text>
               </View>
             )}
             <View style={styles.priceDivider} />
             <View style={styles.priceRow}>
               <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>
-              <Text style={styles.priceTotal}>¥{price}</Text>
+              <Text style={styles.priceTotal}>{price} MMK</Text>
             </View>
           </View>
         </View>
@@ -800,7 +875,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
             style={styles.submitGradient}
           >
             <Text style={styles.submitText}>{currentT.submitOrder}</Text>
-            <Text style={styles.submitPrice}>¥{price}</Text>
+            <Text style={styles.submitPrice}>{price} MMK</Text>
           </LinearGradient>
         </TouchableOpacity>
 

@@ -518,4 +518,49 @@ export const systemSettingsService = {
       return null;
     }
   },
+
+  // 获取计费规则
+  async getPricingSettings() {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('setting_key, setting_value')
+        .like('setting_key', 'pricing.%');
+
+      if (error) throw error;
+
+      // 转换为对象格式
+      const settings: any = {};
+      data?.forEach((item: any) => {
+        const key = item.setting_key.replace('pricing.', '');
+        settings[key] = parseFloat(item.setting_value) || 0;
+      });
+
+      return {
+        base_fee: settings.base_fee || 1000,
+        per_km_fee: settings.per_km_fee || 500,
+        weight_surcharge: settings.weight_surcharge || 150,
+        urgent_surcharge: settings.urgent_surcharge || 1500,
+        scheduled_surcharge: settings.scheduled_surcharge || 500,
+        oversize_surcharge: settings.oversize_surcharge || 300,
+        fragile_surcharge: settings.fragile_surcharge || 400,
+        food_beverage_surcharge: settings.food_beverage_surcharge || 300,
+        free_km_threshold: settings.free_km_threshold || 3,
+      };
+    } catch (error) {
+      console.error('获取计费设置失败:', error);
+      // 返回默认值
+      return {
+        base_fee: 1000,
+        per_km_fee: 500,
+        weight_surcharge: 150,
+        urgent_surcharge: 1500,
+        scheduled_surcharge: 500,
+        oversize_surcharge: 300,
+        fragile_surcharge: 400,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+      };
+    }
+  },
 };
