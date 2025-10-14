@@ -485,19 +485,142 @@ export const packageService = {
     }
   },
 
-  // 取消订单
-  async cancelOrder(orderId: string) {
+  // 取消订单（增强版，带权限检查）
+  async cancelOrder(orderId: string, customerId: string) {
     try {
+      // 1. 检查订单状态和所有者
+      const { data: order, error: checkError } = await supabase
+        .from('packages')
+        .select('status, customer_id')
+        .eq('id', orderId)
+        .single();
+
+      if (checkError) throw checkError;
+
+      if (!order) {
+        return { success: false, message: '订单不存在' };
+      }
+
+      if (order.customer_id !== customerId) {
+        return { success: false, message: '无权操作此订单' };
+      }
+
+      if (order.status !== '待取件') {
+        return { success: false, message: '只有待取件状态的订单可以取消' };
+      }
+
+      // 2. 更新状态
       const { error } = await supabase
         .from('packages')
-        .update({ status: '已取消' })
+        .update({ 
+          status: '已取消',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', orderId);
 
       if (error) throw error;
-      return true;
+      return { success: true, message: '订单已取消' };
     } catch (error) {
       console.error('取消订单失败:', error);
-      return false;
+      return { success: false, message: '取消订单失败' };
+    }
+  },
+
+  // 评价订单
+  async rateOrder(orderId: string, customerId: string, rating: number, comment?: string) {
+    try {
+      // 1. 检查订单状态和所有者
+      const { data: order, error: checkError } = await supabase
+        .from('packages')
+        .select('status, customer_id, customer_rating')
+        .eq('id', orderId)
+        .single();
+
+      if (checkError) throw checkError;
+
+      if (!order) {
+        return { success: false, message: '订单不存在' };
+      }
+
+      if (order.customer_id !== customerId) {
+        return { success: false, message: '无权操作此订单' };
+      }
+
+      if (order.status !== '已送达') {
+        return { success: false, message: '只有已送达的订单可以评价' };
+      }
+
+      if (order.customer_rating) {
+        return { success: false, message: '该订单已评价过' };
+      }
+
+      // 2. 添加评价
+      const { error } = await supabase
+        .from('packages')
+        .update({ 
+          customer_rating: rating,
+          customer_comment: comment || '',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      return { success: true, message: '评价成功' };
+    } catch (error) {
+      console.error('评价订单失败:', error);
+      return { success: false, message: '评价订单失败' };
+    }
+  },
+
+  // 获取追踪历史
+  async getTrackingHistory(orderId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('tracking_events')
+        .select('*')
+        .eq('package_id', orderId)
+        .order('event_time', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('获取追踪历史失败:', error);
+      return [];
+    }
+  },
+
+  // 获取所有订单（带筛选和分页）
+  async getAllOrders(customerId: string, options?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    try {
+      let query = supabase
+        .from('packages')
+        .select('*', { count: 'exact' })
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+
+      if (options?.status && options.status !== 'all') {
+        query = query.eq('status', options.status);
+      }
+
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+
+      if (options?.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+      return { orders: data || [], total: count || 0 };
+    } catch (error) {
+      console.error('获取订单列表失败:', error);
+      return { orders: [], total: 0 };
     }
   },
 };
