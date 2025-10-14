@@ -468,16 +468,18 @@ export const packageService = {
     }
   },
 
-  // 追踪订单（通过包裹ID或QR码）
+  // 追踪订单（通过包裹ID或寄件码/中转码）
   async trackOrder(trackingCode: string) {
     try {
       const { data, error } = await supabase
         .from('packages')
         .select('*')
-        .or(`id.eq.${trackingCode},qr_code.eq.${trackingCode}`)
-        .single();
+        .or(`id.eq.${trackingCode},sender_code.eq.${trackingCode},transfer_code.eq.${trackingCode}`)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
       return data;
     } catch (error) {
       console.error('追踪订单失败:', error);
