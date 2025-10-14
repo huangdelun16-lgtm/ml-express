@@ -63,6 +63,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
     latitude: 21.9588,
     longitude: 96.0891,
   });
+  
+  // 包裹类型说明
+  const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
+  const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
 
   const t = {
     zh: {
@@ -118,6 +122,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
         fragile: '易碎品',
         foodDrinks: '食品和饮料',
       },
+      packageTypeDetails: {
+        standard: '标准件（45x60x15cm）和（5KG）以内',
+        overweight: '超重件（5KG）以上',
+        oversized: '超规件（45x60x15cm）以上',
+      },
     },
     en: {
       title: 'Place Order',
@@ -172,6 +181,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
         fragile: 'Fragile',
         foodDrinks: 'Food & Drinks',
       },
+      packageTypeDetails: {
+        standard: 'Standard Package (45x60x15cm) and (5KG) or less',
+        overweight: 'Overweight (over 5KG)',
+        oversized: 'Oversized (over 45x60x15cm)',
+      },
     },
     my: {
       title: 'အမှာစာတင်',
@@ -225,6 +239,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
         oversized: 'အရွယ်အစားကြီးပါဆယ်',
         fragile: 'ကျိုးပဲ့လွယ်သောပစ္စည်း',
         foodDrinks: 'အစားအသောက်',
+      },
+      packageTypeDetails: {
+        standard: 'စံပါဆယ် (45x60x15cm) နှင့် (5KG) အောက်',
+        overweight: 'အလေးချိန်ပိုပါဆယ် (5KG အထက်)',
+        oversized: 'အရွယ်အစားကြီးပါဆယ် (45x60x15cm အထက်)',
       },
     },
   };
@@ -495,6 +514,19 @@ export default function PlaceOrderScreen({ navigation }: any) {
     setSenderAddress('');
   };
 
+  // 处理包裹类型点击
+  const handlePackageTypeClick = (typeValue: string) => {
+    setPackageType(typeValue);
+    
+    // 如果是标准件、超重件或超规件，显示详细说明
+    if (typeValue === '标准件（45x60x15cm）和（5KG）以内' ||
+        typeValue === '超重件（5KG）以上' ||
+        typeValue === '超规件（45x60x15cm）以上') {
+      setSelectedPackageTypeInfo(typeValue);
+      setShowPackageTypeInfo(true);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -628,7 +660,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
                     styles.chip,
                     packageType === type.value && styles.chipActive
                   ]}
-                  onPress={() => setPackageType(type.value)}
+                  onPress={() => handlePackageTypeClick(type.value)}
                   activeOpacity={0.7}
                 >
                   <Text style={[
@@ -818,6 +850,97 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </Text>
           </View>
         </View>
+      </Modal>
+
+      {/* 包裹类型说明模态框 */}
+      <Modal
+        visible={showPackageTypeInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPackageTypeInfo(false)}
+      >
+        <TouchableOpacity 
+          style={styles.infoModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPackageTypeInfo(false)}
+        >
+          <View style={styles.infoModalContent}>
+            <View style={styles.infoModalCard}>
+              <View style={styles.infoModalHeader}>
+                <Text style={styles.infoModalTitle}>📦 包裹类型说明</Text>
+                <TouchableOpacity onPress={() => setShowPackageTypeInfo(false)}>
+                  <Text style={styles.infoModalClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.infoModalBody}>
+                {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' && (
+                  <>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>📏 尺寸限制：</Text>
+                      <Text style={styles.infoValue}>45 × 60 × 15 cm 以内</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>⚖️ 重量限制：</Text>
+                      <Text style={styles.infoValue}>5 KG 以内</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoDescription}>
+                        适用于常规大小的包裹，如衣物、文件、小型物品等。
+                      </Text>
+                    </View>
+                  </>
+                )}
+                
+                {selectedPackageTypeInfo === '超重件（5KG）以上' && (
+                  <>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>⚖️ 重量要求：</Text>
+                      <Text style={styles.infoValue}>5 KG 以上</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoDescription}>
+                        适用于重量超过5公斤的包裹。重物品需要额外运费，请确保包装牢固。
+                      </Text>
+                    </View>
+                  </>
+                )}
+                
+                {selectedPackageTypeInfo === '超规件（45x60x15cm）以上' && (
+                  <>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>📏 尺寸要求：</Text>
+                      <Text style={styles.infoValue}>45 × 60 × 15 cm 以上</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoDescription}>
+                        适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.infoModalButton}
+                onPress={() => setShowPackageTypeInfo(false)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.infoModalButtonGradient}
+                >
+                  <Text style={styles.infoModalButtonText}>我知道了</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -1098,5 +1221,83 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
+  },
+  // 包裹类型说明模态框样式
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoModalContent: {
+    width: '90%',
+    maxWidth: 400,
+  },
+  infoModalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  infoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  infoModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  infoModalClose: {
+    fontSize: 24,
+    color: '#94a3b8',
+    fontWeight: 'bold',
+  },
+  infoModalBody: {
+    marginBottom: 24,
+  },
+  infoItem: {
+    marginBottom: 16,
+  },
+  infoLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#3b82f6',
+    marginBottom: 4,
+  },
+  infoDescription: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  infoModalButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  infoModalButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  infoModalButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
 });
