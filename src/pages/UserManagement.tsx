@@ -142,7 +142,7 @@ const UserManagement: React.FC = () => {
     if (!editingUser) return;
 
     // 如果密码为空，则不更新密码字段
-    const updateData = { ...userForm };
+    const updateData: any = { ...userForm };
     if (!updateData.password || updateData.password.trim() === '') {
       delete updateData.password;
     }
