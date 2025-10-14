@@ -243,7 +243,7 @@ export default function MyOrdersScreen({ navigation }: any) {
     <View style={styles.container}>
       {/* 顶部渐变背景 */}
       <LinearGradient
-        colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
