@@ -391,8 +391,12 @@ export const packageService = {
       console.log('开始创建订单，数据：', packageData);
 
       // 提取需要的字段并添加默认值
+      // 注意：packages表没有customer_id字段，我们将客户ID添加到description中
+      const customerNote = packageData.customer_id ? `[客户ID: ${packageData.customer_id}]` : '';
+      const fullDescription = `${customerNote} ${packageData.description || ''}`.trim();
+
       const insertData: any = {
-        customer_id: packageData.customer_id,
+        // 注意：不包含customer_id，因为数据库表中没有这个字段
         sender_name: packageData.sender_name,
         sender_phone: packageData.sender_phone,
         sender_address: packageData.sender_address,
@@ -401,7 +405,7 @@ export const packageService = {
         receiver_address: packageData.receiver_address,
         package_type: packageData.package_type,
         weight: packageData.weight,
-        description: packageData.description || '',
+        description: fullDescription, // 将客户ID包含在描述中
         price: String(packageData.price || '0'), // 确保是字符串
         delivery_speed: packageData.delivery_speed || '准时达',
         scheduled_delivery_time: packageData.scheduled_delivery_time || null,
@@ -433,22 +437,28 @@ export const packageService = {
 
       console.log('订单创建成功：', data);
       
-      // 更新用户订单统计
+      // 更新用户订单统计（如果提供了customer_id）
       if (packageData.customer_id) {
-        const { data: user } = await supabase
-          .from('users')
-          .select('total_orders, total_spent')
-          .eq('id', packageData.customer_id)
-          .single();
-
-        if (user) {
-          await supabase
+        try {
+          const { data: user } = await supabase
             .from('users')
-            .update({
-              total_orders: (user.total_orders || 0) + 1,
-              total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
-            })
-            .eq('id', packageData.customer_id);
+            .select('total_orders, total_spent')
+            .eq('id', packageData.customer_id)
+            .single();
+
+          if (user) {
+            await supabase
+              .from('users')
+              .update({
+                total_orders: (user.total_orders || 0) + 1,
+                total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
+              })
+              .eq('id', packageData.customer_id);
+            console.log('用户统计已更新');
+          }
+        } catch (updateError) {
+          console.warn('更新用户统计失败（不影响订单创建）:', updateError);
+          // 不抛出错误，因为订单已经创建成功
         }
       }
 
@@ -467,13 +477,13 @@ export const packageService = {
     }
   },
 
-  // 获取客户的所有订单
+  // 获取客户的所有订单（通过description中的客户ID匹配）
   async getCustomerOrders(customerId: string) {
     try {
       const { data, error } = await supabase
         .from('packages')
         .select('*')
-        .eq('customer_id', customerId)
+        .ilike('description', `%[客户ID: ${customerId}]%`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -484,13 +494,13 @@ export const packageService = {
     }
   },
 
-  // 获取客户最近的订单（限制数量）
+  // 获取客户最近的订单（限制数量，通过description匹配）
   async getRecentOrders(customerId: string, limit: number = 5) {
     try {
       const { data, error } = await supabase
         .from('packages')
         .select('*')
-        .eq('customer_id', customerId)
+        .ilike('description', `%[客户ID: ${customerId}]%`)
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -502,13 +512,13 @@ export const packageService = {
     }
   },
 
-  // 获取客户订单统计
+  // 获取客户订单统计（通过description匹配）
   async getOrderStats(customerId: string) {
     try {
       const { data, error } = await supabase
         .from('packages')
-        .select('status')
-        .eq('customer_id', customerId);
+        .select('status, description')
+        .ilike('description', `%[客户ID: ${customerId}]%`);
 
       if (error) throw error;
 
@@ -673,7 +683,7 @@ export const packageService = {
     }
   },
 
-  // 获取所有订单（带筛选和分页）
+  // 获取所有订单（带筛选和分页，通过description匹配）
   async getAllOrders(customerId: string, options?: {
     status?: string;
     limit?: number;
@@ -683,7 +693,7 @@ export const packageService = {
       let query = supabase
         .from('packages')
         .select('*', { count: 'exact' })
-        .eq('customer_id', customerId)
+        .ilike('description', `%[客户ID: ${customerId}]%`)
         .order('created_at', { ascending: false });
 
       if (options?.status && options.status !== 'all') {
