@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import LanguageSelector from '../components/LanguageSelector';
 
 export default function RegisterScreen({ navigation }: any) {
   const { language } = useApp();
@@ -212,6 +213,9 @@ export default function RegisterScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Language Selector */}
+          <LanguageSelector />
+
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity 

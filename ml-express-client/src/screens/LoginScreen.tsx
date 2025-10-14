@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import LanguageSelector from '../components/LanguageSelector';
 
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
@@ -43,6 +44,10 @@ export default function LoginScreen({ navigation }: any) {
       fillAllFields: '请填写邮箱/手机号和密码',
       guestModeDesc: '以访客身份浏览',
       loggingIn: '正在登录...',
+      language: '语言',
+      languageChinese: '中文',
+      languageEnglish: 'English',
+      languageBurmese: 'မြန်မာ',
     },
     en: {
       welcome: 'Welcome Back',
@@ -61,6 +66,10 @@ export default function LoginScreen({ navigation }: any) {
       fillAllFields: 'Please fill email/phone and password',
       guestModeDesc: 'Browse as guest',
       loggingIn: 'Logging in...',
+      language: 'Language',
+      languageChinese: '中文',
+      languageEnglish: 'English',
+      languageBurmese: 'မြန်မာ',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
@@ -79,6 +88,10 @@ export default function LoginScreen({ navigation }: any) {
       fillAllFields: 'အီးမေးလ်/ဖုန်းနှင့်စကားဝှက်ဖြည့်ပါ',
       guestModeDesc: 'ဧည့်သည်အနေဖြင့်ကြည့်ရှုရန်',
       loggingIn: 'ဝင်ရောက်နေသည်...',
+      language: 'ဘာသာစကား',
+      languageChinese: '中文',
+      languageEnglish: 'English',
+      languageBurmese: 'မြန်မာ',
     },
   };
 
@@ -145,6 +158,9 @@ export default function LoginScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Language Selector */}
+          <LanguageSelector />
+
           {/* Header with Logo */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
