@@ -10,13 +10,18 @@ import {
   Platform,
   KeyboardAvoidingView,
   Switch,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { packageService } from '../services/supabase';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PlaceOrderScreen({ navigation }: any) {
   const { language } = useApp();
@@ -50,6 +55,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 价格
   const [price, setPrice] = useState('0');
   const [distance, setDistance] = useState(0);
+  
+  // 地图相关
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapType, setMapType] = useState<'sender' | 'receiver'>('sender');
+  const [selectedLocation, setSelectedLocation] = useState({
+    latitude: 21.9588,
+    longitude: 96.0891,
+  });
 
   const t = {
     zh: {
@@ -61,6 +74,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       senderPhone: '寄件人电话',
       senderAddress: '取件地址',
       useCurrentLocation: '使用当前位置',
+      openMap: '打开地图',
       receiverInfo: '收件人信息',
       receiverName: '收件人姓名',
       receiverPhone: '收件人电话',
@@ -98,10 +112,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
       },
       packageTypes: {
         document: '文件',
-        food: '食品',
-        clothing: '衣物',
-        electronics: '电子产品',
-        other: '其他',
+        standard: '标准件',
+        overweight: '超重件',
+        oversized: '超规件',
+        fragile: '易碎品',
+        foodDrinks: '食品和饮料',
       },
     },
     en: {
@@ -113,6 +128,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       senderPhone: 'Sender Phone',
       senderAddress: 'Pickup Address',
       useCurrentLocation: 'Use current location',
+      openMap: 'Open Map',
       receiverInfo: 'Receiver Information',
       receiverName: 'Receiver Name',
       receiverPhone: 'Receiver Phone',
@@ -150,10 +166,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
       },
       packageTypes: {
         document: 'Document',
-        food: 'Food',
-        clothing: 'Clothing',
-        electronics: 'Electronics',
-        other: 'Other',
+        standard: 'Standard Package',
+        overweight: 'Overweight',
+        oversized: 'Oversized',
+        fragile: 'Fragile',
+        foodDrinks: 'Food & Drinks',
       },
     },
     my: {
@@ -165,6 +182,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       senderPhone: 'ပေးပို့သူဖုန်း',
       senderAddress: 'ယူရန်လိပ်စာ',
       useCurrentLocation: 'လက်ရှိတည်နေရာသုံးမည်',
+      openMap: 'မြေပုံဖွင့်',
       receiverInfo: 'လက်ခံသူအချက်အလက်',
       receiverName: 'လက်ခံသူအမည်',
       receiverPhone: 'လက်ခံသူဖုန်း',
@@ -202,23 +220,25 @@ export default function PlaceOrderScreen({ navigation }: any) {
       },
       packageTypes: {
         document: 'စာရွက်စာတမ်း',
-        food: 'အစားအစာ',
-        clothing: 'အဝတ်အစား',
-        electronics: 'အီလက်ထရောနစ်',
-        other: 'အခြား',
+        standard: 'စံပါဆယ်',
+        overweight: 'အလေးချိန်ပိုပါဆယ်',
+        oversized: 'အရွယ်အစားကြီးပါဆယ်',
+        fragile: 'ကျိုးပဲ့လွယ်သောပစ္စည်း',
+        foodDrinks: 'အစားအသောက်',
       },
     },
   };
 
   const currentT = t[language];
 
-  // 包裹类型选项
+  // 包裹类型选项（与Web端一致）
   const packageTypes = [
     { value: '文件', label: currentT.packageTypes.document },
-    { value: '食品', label: currentT.packageTypes.food },
-    { value: '衣物', label: currentT.packageTypes.clothing },
-    { value: '电子产品', label: currentT.packageTypes.electronics },
-    { value: '其他', label: currentT.packageTypes.other },
+    { value: '标准件（45x60x15cm）和（5KG）以内', label: currentT.packageTypes.standard },
+    { value: '超重件（5KG）以上', label: currentT.packageTypes.overweight },
+    { value: '超规件（45x60x15cm）以上', label: currentT.packageTypes.oversized },
+    { value: '易碎品', label: currentT.packageTypes.fragile },
+    { value: '食品和饮料', label: currentT.packageTypes.foodDrinks },
   ];
 
   // 配送速度选项
@@ -309,6 +329,59 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
       console.error('获取位置失败:', error);
       Alert.alert('错误', '获取位置失败，请手动输入地址');
+    }
+  };
+
+  // 打开地图选择器
+  const openMapSelector = async (type: 'sender' | 'receiver') => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('提示', '需要位置权限才能使用地图');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setSelectedLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      setMapType(type);
+      setShowMapModal(true);
+    } catch (error) {
+      console.error('打开地图失败:', error);
+      Alert.alert('错误', '打开地图失败');
+    }
+  };
+
+  // 确认地图位置
+  const confirmMapLocation = async () => {
+    try {
+      showLoading('获取地址中...');
+      
+      const address = await Location.reverseGeocodeAsync({
+        latitude: selectedLocation.latitude,
+        longitude: selectedLocation.longitude,
+      });
+
+      if (address && address[0]) {
+        const addr = address[0];
+        const fullAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
+        const finalAddress = fullAddress || `${selectedLocation.latitude}, ${selectedLocation.longitude}`;
+        
+        if (mapType === 'sender') {
+          setSenderAddress(finalAddress);
+        } else {
+          setReceiverAddress(finalAddress);
+        }
+      }
+      
+      setShowMapModal(false);
+      hideLoading();
+    } catch (error) {
+      hideLoading();
+      console.error('获取地址失败:', error);
+      Alert.alert('错误', '获取地址失败');
     }
   };
 
@@ -523,7 +596,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.receiverAddress} *</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>{currentT.receiverAddress} *</Text>
+              <TouchableOpacity onPress={() => openMapSelector('receiver')}>
+                <Text style={styles.linkButton}>🗺️ {currentT.openMap}</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={receiverAddress}
@@ -696,6 +774,51 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* 地图选择模态框 */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={styles.mapModalContainer}>
+          <View style={styles.mapHeader}>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Text style={styles.mapCloseButton}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.mapTitle}>
+              {mapType === 'sender' ? currentT.senderAddress : currentT.receiverAddress}
+            </Text>
+            <TouchableOpacity onPress={confirmMapLocation}>
+              <Text style={styles.mapConfirmButton}>✓</Text>
+            </TouchableOpacity>
+          </View>
+
+          <MapView
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={{
+              latitude: selectedLocation.latitude,
+              longitude: selectedLocation.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            onPress={(e) => setSelectedLocation(e.nativeEvent.coordinate)}
+          >
+            <Marker
+              coordinate={selectedLocation}
+              draggable
+              onDragEnd={(e) => setSelectedLocation(e.nativeEvent.coordinate)}
+            />
+          </MapView>
+
+          <View style={styles.mapFooter}>
+            <Text style={styles.mapInstructions}>
+              📍 点击地图或拖动标记选择位置
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -924,5 +1047,56 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  // 地图模态框样式
+  mapModalContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 15,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  mapCloseButton: {
+    fontSize: 28,
+    color: '#64748b',
+    fontWeight: 'bold',
+    width: 40,
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    flex: 1,
+    textAlign: 'center',
+  },
+  mapConfirmButton: {
+    fontSize: 28,
+    color: '#3b82f6',
+    fontWeight: 'bold',
+    width: 40,
+    textAlign: 'right',
+  },
+  map: {
+    flex: 1,
+  },
+  mapFooter: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  mapInstructions: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
   },
 });
