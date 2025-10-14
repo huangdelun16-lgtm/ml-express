@@ -140,16 +140,31 @@ export default function MyOrdersScreen({ navigation }: any) {
   const loadCustomerId = async () => {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
+      const isGuest = await AsyncStorage.getItem('isGuest');
+      
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
-        loadOrders(user.id);
+        
+        // 如果是访客，不加载订单
+        if (isGuest === 'true' || user.id === 'guest') {
+          setLoading(false);
+          setOrders([]);
+          setFilteredOrders([]);
+        } else {
+          loadOrders(user.id);
+        }
       } else {
-        Alert.alert('提示', '请先登录');
-        navigation.navigate('Login');
+        // 没有用户信息，跳转登录
+        Alert.alert('提示', '请先登录', [
+          { text: '取消', style: 'cancel' },
+          { text: '去登录', onPress: () => navigation.navigate('Login') }
+        ]);
+        setLoading(false);
       }
     } catch (error) {
       console.error('加载用户信息失败:', error);
+      setLoading(false);
     }
   };
 

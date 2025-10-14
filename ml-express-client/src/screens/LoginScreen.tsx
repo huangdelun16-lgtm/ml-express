@@ -112,7 +112,8 @@ export default function LoginScreen({ navigation }: any) {
       hideLoading();
 
       if (result.success && result.data) {
-        // 保存用户信息到本地
+        // 保存用户信息到本地（保存完整用户对象）
+        await AsyncStorage.setItem('currentUser', JSON.stringify(result.data));
         await AsyncStorage.setItem('userId', result.data.id);
         await AsyncStorage.setItem('userEmail', result.data.email);
         await AsyncStorage.setItem('userName', result.data.name);
@@ -134,6 +135,15 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleGuestMode = async () => {
     try {
+      // 保存访客信息
+      const guestUser = {
+        id: 'guest',
+        name: '访客用户',
+        email: '',
+        phone: '',
+        user_type: 'guest',
+      };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(guestUser));
       await AsyncStorage.setItem('userId', 'guest');
       await AsyncStorage.setItem('isGuest', 'true');
       navigation.replace('Main');
