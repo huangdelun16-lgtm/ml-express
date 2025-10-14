@@ -649,16 +649,25 @@ export const systemSettingsService = {
     try {
       const { data, error } = await supabase
         .from('system_settings')
-        .select('setting_key, setting_value')
-        .like('setting_key', 'pricing.%');
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
 
       if (error) throw error;
 
       // 转换为对象格式
       const settings: any = {};
       data?.forEach((item: any) => {
-        const key = item.setting_key.replace('pricing.', '');
-        settings[key] = parseFloat(item.setting_value) || 0;
+        const key = item.settings_key.replace('pricing.', '');
+        // settings_value 可能是 JSON 字符串，需要解析
+        let value = item.settings_value;
+        if (typeof value === 'string') {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            value = parseFloat(value) || 0;
+          }
+        }
+        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
       });
 
       return {
