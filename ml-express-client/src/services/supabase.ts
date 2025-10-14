@@ -143,6 +143,36 @@ export const customerService = {
     }
   },
 
+  // 更新用户信息
+  async updateUser(userId: string, updateData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  }) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('更新用户信息失败:', error);
+        throw error;
+      }
+
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('更新用户信息失败:', error);
+      return { 
+        success: false, 
+        error: { message: error.message || '更新失败，请重试' }
+      };
+    }
+  },
+
   // 登录
   async login(email: string, password: string) {
     try {
