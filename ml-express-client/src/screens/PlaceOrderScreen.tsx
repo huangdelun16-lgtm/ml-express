@@ -517,7 +517,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
               value={receiverPhone}
               onChangeText={setReceiverPhone}
               placeholder={currentT.placeholders.phone}
-              placeholderTextColor="#9ca3af"}
+              placeholderTextColor="#9ca3af"
               keyboardType="phone-pad"
             />
           </View>
