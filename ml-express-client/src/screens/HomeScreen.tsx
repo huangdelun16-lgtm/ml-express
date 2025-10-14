@@ -763,6 +763,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: (width - 56) / 2,
+    height: 110,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -774,6 +775,8 @@ const styles = StyleSheet.create({
   statGradient: {
     padding: 20,
     alignItems: 'center',
+    height: '100%',
+    justifyContent: 'center',
   },
   statNumber: {
     fontSize: 32,
@@ -797,6 +800,7 @@ const styles = StyleSheet.create({
   },
   quickActionCard: {
     width: (width - 56) / 2,
+    height: 120,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -808,7 +812,7 @@ const styles = StyleSheet.create({
   quickActionGradient: {
     padding: 20,
     alignItems: 'center',
-    minHeight: 120,
+    height: '100%',
     justifyContent: 'center',
   },
   quickActionIconContainer: {
@@ -993,6 +997,7 @@ const styles = StyleSheet.create({
   },
   serviceCard: {
     width: (width - 56) / 2,
+    height: 180,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1003,7 +1008,8 @@ const styles = StyleSheet.create({
   },
   serviceGradient: {
     padding: 20,
-    minHeight: 160,
+    height: '100%',
+    justifyContent: 'flex-start',
   },
   serviceIcon: {
     fontSize: 40,
@@ -1062,6 +1068,7 @@ const styles = StyleSheet.create({
   },
   contactCard: {
     flex: 1,
+    height: 140,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1073,7 +1080,7 @@ const styles = StyleSheet.create({
   contactGradient: {
     padding: 20,
     alignItems: 'center',
-    minHeight: 140,
+    height: '100%',
     justifyContent: 'center',
   },
   contactIcon: {
