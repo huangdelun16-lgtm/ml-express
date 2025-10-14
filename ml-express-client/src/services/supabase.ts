@@ -385,6 +385,71 @@ export const packageService = {
     }
   },
 
+  // createPackage 别名（为了兼容性，接受完整的包裹数据）
+  async createPackage(packageData: any) {
+    try {
+      // 提取需要的字段并添加默认值
+      const insertData: any = {
+        customer_id: packageData.customer_id,
+        sender_name: packageData.sender_name,
+        sender_phone: packageData.sender_phone,
+        sender_address: packageData.sender_address,
+        receiver_name: packageData.receiver_name,
+        receiver_phone: packageData.receiver_phone,
+        receiver_address: packageData.receiver_address,
+        package_type: packageData.package_type,
+        weight: packageData.weight,
+        description: packageData.description || '',
+        price: packageData.price,
+        delivery_speed: packageData.delivery_speed || '准时达',
+        scheduled_delivery_time: packageData.scheduled_delivery_time || null,
+        delivery_distance: packageData.delivery_distance || 0,
+        status: '待取件',
+        create_time: packageData.create_time || new Date().toLocaleString('zh-CN'),
+        pickup_time: '',
+        delivery_time: '',
+        courier: '待分配',
+      };
+
+      // 如果提供了自定义ID，使用它
+      if (packageData.id) {
+        insertData.id = packageData.id;
+      }
+
+      const { data, error } = await supabase
+        .from('packages')
+        .insert([insertData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // 更新用户订单统计
+      if (packageData.customer_id) {
+        const { data: user } = await supabase
+          .from('users')
+          .select('total_orders, total_spent')
+          .eq('id', packageData.customer_id)
+          .single();
+
+        if (user) {
+          await supabase
+            .from('users')
+            .update({
+              total_orders: (user.total_orders || 0) + 1,
+              total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
+            })
+            .eq('id', packageData.customer_id);
+        }
+      }
+
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('创建包裹失败:', error);
+      return { success: false, error: { message: error.message || '创建订单失败' } };
+    }
+  },
+
   // 获取客户的所有订单
   async getCustomerOrders(customerId: string) {
     try {
