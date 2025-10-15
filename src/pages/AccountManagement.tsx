@@ -24,7 +24,27 @@ const AccountManagement: React.FC = () => {
   const [uploadProgresses, setUploadProgresses] = useState<UploadProgress[]>([]);
   const [showUploadProgress, setShowUploadProgress] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [compressionResults, setCompressionResults] = useState<CompressionResult[]>([]);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({ show: false, message: '', type: 'info' });
+
+  // 显示通知
+  const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
+  // 显示确认对话框
+  const showConfirmDialog = (message: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const result = window.confirm(message);
+      resolve(result);
+    });
+  };
 
   const [formData, setFormData] = useState({
     username: '',
@@ -155,10 +175,10 @@ const AccountManagement: React.FC = () => {
       setShowEditModal(false);
       setEditingAccount(null);
       setEditFormData({ username: '', password: '', employee_name: '' });
-      alert('账号信息更新成功！');
+      showNotification('账号信息更新成功！', 'success');
     } catch (error) {
       console.error('更新账号失败:', error);
-      alert('更新账号失败，请重试');
+      showNotification('更新账号失败，请重试', 'error');
     }
   };
 
@@ -201,14 +221,14 @@ const AccountManagement: React.FC = () => {
     if (!validationResult.valid) {
       // 显示验证错误
       const errorMessage = validationResult.allErrors.join('\n');
-      alert(`文件验证失败：\n${errorMessage}`);
+      showNotification(`文件验证失败：${errorMessage}`, 'error');
       return;
     }
 
     // 显示警告（如果有）
     if (validationResult.allWarnings.length > 0) {
       const warningMessage = validationResult.allWarnings.join('\n');
-      const proceed = confirm(`发现以下警告，是否继续上传？\n\n${warningMessage}`);
+      const proceed = await showConfirmDialog(`发现以下警告，是否继续上传？\n\n${warningMessage}`);
       if (!proceed) return;
     }
 
@@ -245,7 +265,7 @@ const AccountManagement: React.FC = () => {
         .map(result => result.compressedFile!);
 
       if (filesToUpload.length === 0) {
-        alert('所有文件压缩失败');
+        showNotification('所有文件压缩失败', 'error');
         return;
       }
 
@@ -278,16 +298,16 @@ const AccountManagement: React.FC = () => {
 
       if (successfulUrls.length > 0) {
         setCvImages(prev => [...prev, ...successfulUrls]);
-        alert(`成功上传 ${successfulUrls.length} 个文件`);
+        showNotification(`成功上传 ${successfulUrls.length} 个文件`, 'success');
       }
 
       if (uploadResults.errorCount > 0) {
-        alert(`${uploadResults.errorCount} 个文件上传失败`);
+        showNotification(`${uploadResults.errorCount} 个文件上传失败`, 'warning');
       }
 
     } catch (error: any) {
       console.error('文件处理失败:', error);
-      alert(`文件处理失败: ${error.message}`);
+      showNotification(`文件处理失败: ${error.message}`, 'error');
       
       // 更新所有进度为错误状态
       const errorProgresses = fileArray.map(file => ({
@@ -304,7 +324,7 @@ const AccountManagement: React.FC = () => {
   // 保存CV图片
   const handleSaveCvImages = async () => {
     if (cvImages.length === 0) {
-      alert('请先上传CV Form');
+      showNotification('请先上传CV Form', 'warning');
       return;
     }
 
@@ -316,7 +336,7 @@ const AccountManagement: React.FC = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟保存延迟
       
-      alert('CV Form保存成功！');
+      showNotification('CV Form保存成功！', 'success');
       setShowCvUploadModal(false);
       setCvImages([]);
       setUploadProgresses([]);
@@ -325,7 +345,7 @@ const AccountManagement: React.FC = () => {
       setCompressionResults([]);
     } catch (error) {
       console.error('保存CV Form失败:', error);
-      alert('保存CV Form失败，请重试');
+      showNotification('保存CV Form失败，请重试', 'error');
     } finally {
       setUploadingCv(false);
     }
@@ -341,13 +361,13 @@ const AccountManagement: React.FC = () => {
         // 从本地状态中移除
         const newImages = cvImages.filter((_, i) => i !== index);
         setCvImages(newImages);
-        alert('图片删除成功');
+        showNotification('图片删除成功', 'success');
       } else {
-        alert(`删除失败: ${deleteResult.error}`);
+        showNotification(`删除失败: ${deleteResult.error}`, 'error');
       }
     } catch (error: any) {
       console.error('删除图片失败:', error);
-      alert(`删除失败: ${error.message}`);
+      showNotification(`删除失败: ${error.message}`, 'error');
     }
   };
 
@@ -1632,6 +1652,42 @@ const AccountManagement: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 通知组件 */}
+      {notification.show && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: notification.type === 'success' ? '#10b981' : 
+                     notification.type === 'error' ? '#ef4444' : 
+                     notification.type === 'warning' ? '#f59e0b' : '#3b82f6',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 10000,
+          maxWidth: '400px',
+          fontSize: '14px',
+          fontWeight: 500,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          {notification.message}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 };
