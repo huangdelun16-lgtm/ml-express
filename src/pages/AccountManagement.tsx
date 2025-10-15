@@ -24,6 +24,7 @@ const AccountManagement: React.FC = () => {
   const [uploadProgresses, setUploadProgresses] = useState<UploadProgress[]>([]);
   const [showUploadProgress, setShowUploadProgress] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [compressionResults, setCompressionResults] = useState<CompressionResult[]>([]);
   const [notification, setNotification] = useState<{
     show: boolean;
     message: string;
