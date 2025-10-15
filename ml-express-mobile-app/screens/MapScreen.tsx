@@ -10,10 +10,13 @@ import {
   Linking,
   Modal,
   Dimensions,
+  Image,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { packageService, Package, supabase } from '../services/supabase';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import { packageService, Package, supabase, deliveryPhotoService, geofenceService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 
@@ -28,6 +31,13 @@ export default function MapScreen({ navigation }: any) {
   const [showMapPreview, setShowMapPreview] = useState(false);
   const [optimizedPackagesWithCoords, setOptimizedPackagesWithCoords] = useState<any[]>([]);
   const mapRef = useRef<MapView>(null);
+  
+  // 拍照相关状态
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [currentPackageForDelivery, setCurrentPackageForDelivery] = useState<Package | null>(null);
 
   useEffect(() => {
     requestLocationPermission();
@@ -138,27 +148,315 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
-  // 🏁 完成配送此包裹
+  // 🏁 完成配送此包裹（自动拍照）
   const finishDelivering = async (packageId: string) => {
     try {
-      const courierId = await AsyncStorage.getItem('currentCourierId');
-      if (!courierId) return;
-
-      // 清除当前配送包裹ID
-      const { error } = await supabase
-        .from('couriers')
-        .update({ current_delivering_package_id: null })
-        .eq('id', courierId);
-
-      if (error) {
-        console.error('清除当前配送包裹失败:', error);
+      // 找到要完成配送的包裹
+      const packageToDeliver = packages.find(pkg => pkg.id === packageId);
+      if (!packageToDeliver) {
+        Alert.alert('错误', '未找到包裹信息');
         return;
       }
 
-      setCurrentDeliveringPackageId(null);
-      Alert.alert('提示', '配送完成，客户将无法继续跟踪您的位置');
+      // 设置当前要完成配送的包裹
+      setCurrentPackageForDelivery(packageToDeliver);
+      
+      // 直接弹出拍照窗口
+      setShowCameraModal(true);
+      
     } catch (error) {
       console.error('完成配送异常:', error);
+      Alert.alert('错误', '操作失败，请重试');
+    }
+  };
+
+  // 📸 打开相机拍照
+  const handleOpenCamera = async () => {
+    try {
+      // 请求相机权限
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      if (cameraPermission.status !== 'granted') {
+        Alert.alert('权限不足', '需要相机权限才能拍照');
+        return;
+      }
+
+      // 启动相机（iOS优化设置 - 极致压缩）
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.3, // iOS专用：降至30%质量，确保流畅上传
+        exif: false, // 禁用EXIF数据以提高性能
+        base64: false, // 不立即生成base64，避免内存问题
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCapturedPhoto(result.assets[0].uri);
+        setShowPhotoModal(true);
+        setShowCameraModal(false);
+      }
+    } catch (error) {
+      console.error('相机错误:', error);
+      Alert.alert('错误', '无法打开相机，请重试');
+    }
+  };
+
+  // 🔄 将图片转换为base64（优化版 - iOS流畅）
+  const convertImageToBase64 = async (imageUri: string): Promise<string> => {
+    try {
+      console.log('🔄 开始转换照片，URI:', imageUri);
+      
+      // 使用fetch获取图片数据（更快）
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      console.log('📦 照片Blob大小:', (blob.size / 1024).toFixed(2), 'KB');
+      
+      // 如果照片仍然太大（>500KB），进一步压缩
+      if (blob.size > 500 * 1024) {
+        console.log('⚠️ 照片过大，需要进一步压缩');
+      }
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        // 添加超时保护
+        const timeout = setTimeout(() => {
+          reject(new Error('FileReader超时'));
+        }, 8000); // 8秒超时
+        
+        reader.onloadend = () => {
+          clearTimeout(timeout);
+          const base64String = reader.result as string;
+          // 移除data:image/jpeg;base64,前缀
+          const base64Data = base64String.split(',')[1];
+          console.log('✅ Base64转换完成，大小:', (base64Data.length / 1024).toFixed(2), 'KB');
+          resolve(base64Data);
+        };
+        
+        reader.onerror = (error) => {
+          clearTimeout(timeout);
+          console.error('❌ FileReader错误:', error);
+          reject(error);
+        };
+        
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('❌ 转换图片为base64失败:', error);
+      return '';
+    }
+  };
+
+  // 📤 上传照片并完成配送
+  const handleUploadPhoto = async () => {
+    if (!capturedPhoto || !currentPackageForDelivery) {
+      Alert.alert('提示', '请先拍照');
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+
+      // 获取当前骑手信息
+      const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+
+      // 1. 获取位置（使用超时保护和较低精度）
+      console.log('📍 正在获取位置...');
+      let latitude = 0;
+      let longitude = 0;
+      
+      try {
+        const locationPermission = await Location.requestForegroundPermissionsAsync();
+        if (locationPermission.status === 'granted') {
+          // 使用较低精度和超时，避免卡顿
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced, // 从 BestForNavigation 改为 Balanced
+            timeInterval: 5000,
+            distanceInterval: 10,
+          });
+
+          // 3秒超时
+          const timeoutPromise = new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error('GPS获取超时')), 3000)
+          );
+
+          const location = await Promise.race([locationPromise, timeoutPromise]) as any;
+          if (location) {
+            latitude = location.coords.latitude;
+            longitude = location.coords.longitude;
+            console.log('✅ 位置获取成功:', latitude, longitude);
+          }
+        }
+      } catch (locationError) {
+        console.warn('⚠️ 位置获取失败，使用默认坐标:', locationError);
+        // 使用默认坐标（曼德勒市中心）
+        latitude = 21.9588;
+        longitude = 96.0891;
+      }
+
+      // 2. 异步保存照片到相册（不阻塞主流程）
+      MediaLibrary.requestPermissionsAsync()
+        .then(mediaPermission => {
+          if (mediaPermission.status === 'granted') {
+            MediaLibrary.saveToLibraryAsync(capturedPhoto).catch(error => {
+              console.log('⚠️ 保存到相册失败:', error);
+            });
+          }
+        })
+        .catch(error => console.log('⚠️ 相册权限请求失败:', error));
+
+      // 3. 转换照片为base64（使用超时保护 - iOS优化）
+      console.log('📸 正在压缩照片...');
+      let photoBase64 = '';
+      
+      try {
+        const base64Promise = convertImageToBase64(capturedPhoto);
+        const timeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('照片转换超时')), 8000) // 从10秒减到8秒
+        );
+
+        photoBase64 = await Promise.race([base64Promise, timeoutPromise]);
+        console.log('✅ 照片转换完成，大小:', (photoBase64.length / 1024).toFixed(2), 'KB');
+        
+        // 检查照片大小，如果太大则警告
+        if (photoBase64.length > 400 * 1024) {
+          console.warn('⚠️ 照片Base64较大:', (photoBase64.length / 1024).toFixed(2), 'KB，上传可能较慢');
+        }
+      } catch (conversionError) {
+        console.error('❌ 照片转换失败:', conversionError);
+        Alert.alert('❌ 错误', '照片处理失败，请重试\n（提示：请在光线充足的地方拍照）');
+        setUploadingPhoto(false);
+        return;
+      }
+
+      // 4. 保存配送照片到数据库（使用超时保护 - iOS优化）
+      console.log('☁️ 正在上传照片到服务器...');
+      let photoSaved = false;
+      
+      try {
+        const uploadPromise = deliveryPhotoService.saveDeliveryPhoto({
+          packageId: currentPackageForDelivery.id,
+          photoBase64: photoBase64,
+          courierName: userName,
+          latitude: latitude,
+          longitude: longitude,
+          locationName: '配送位置'
+        });
+
+        // 12秒上传超时（从15秒减到12秒，更快失败提示）
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('照片上传超时')), 12000)
+        );
+
+        photoSaved = await Promise.race([uploadPromise, timeoutPromise]);
+        
+        if (photoSaved) {
+          console.log('✅ 照片上传成功！');
+        } else {
+          console.log('⚠️ 照片上传失败，但继续更新包裹状态');
+        }
+      } catch (uploadError) {
+        console.error('❌ 照片上传失败:', uploadError);
+        // 显示警告但继续流程
+        console.log('⚠️ 照片上传失败，但继续更新包裹状态');
+      }
+
+      // 5. 更新包裹状态为"已送达"并记录店铺信息
+      console.log('开始更新包裹状态:', {
+        packageId: currentPackageForDelivery.id,
+        status: '已送达',
+        deliveryTime: new Date().toISOString(),
+        courierName: userName
+      });
+
+      const success = await packageService.updatePackageStatus(
+        currentPackageForDelivery.id,
+        '已送达',
+        undefined, // pickupTime
+        new Date().toISOString(), // deliveryTime
+        userName // courierName
+      );
+
+      console.log('包裹状态更新结果:', success);
+
+      if (success) {
+        // 6. 清除当前配送包裹ID
+        const courierId = await AsyncStorage.getItem('currentCourierId');
+        if (courierId) {
+          const { error } = await supabase
+            .from('couriers')
+            .update({ current_delivering_package_id: null })
+            .eq('id', courierId);
+
+          if (error) {
+            console.error('清除当前配送包裹失败:', error);
+          }
+        }
+
+        setCurrentDeliveringPackageId(null);
+
+        // 记录配送证明
+        const deliveryProof = {
+          packageId: currentPackageForDelivery.id,
+          photoUri: capturedPhoto,
+          latitude,
+          longitude,
+          timestamp: new Date().toISOString(),
+          courier: userName,
+          photoUploaded: photoSaved
+        };
+
+        console.log('配送证明记录:', deliveryProof);
+
+        // 生成详细的成功消息
+        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackageForDelivery.id}\n👤 骑手：${userName}\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
+        
+        if (photoSaved) {
+          successMessage += `\n✅ 配送照片已上传到服务器`;
+        } else {
+          successMessage += `\n⚠️ 配送照片已保存到本地相册\n（服务器上传失败，但状态已更新）`;
+        }
+
+        Alert.alert(
+          '✅ 配送完成！',
+          successMessage,
+          [
+            {
+              text: '确定',
+              onPress: () => {
+                setShowPhotoModal(false);
+                setCapturedPhoto(null);
+                setUploadingPhoto(false);
+                setCurrentPackageForDelivery(null);
+                // 刷新包裹列表
+                loadPackages();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          '⚠️ 部分成功', 
+          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
+          [
+            {
+              text: '确定',
+              onPress: () => {
+                setUploadingPhoto(false);
+                setShowPhotoModal(false);
+                setCapturedPhoto(null);
+                setCurrentPackageForDelivery(null);
+              }
+            }
+          ]
+        );
+      }
+
+    } catch (error) {
+      console.error('上传照片失败:', error);
+      Alert.alert('上传失败', '网络错误，请重试');
+      setUploadingPhoto(false);
     }
   };
 
@@ -789,6 +1087,106 @@ export default function MapScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* 📸 拍照Modal */}
+      <Modal
+        visible={showCameraModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.cameraModalContainer}>
+          <View style={styles.cameraModalContent}>
+            <View style={styles.cameraModalHeader}>
+              <Text style={styles.cameraModalTitle}>
+                📸 {language === 'zh' ? '拍摄配送照片' : language === 'en' ? 'Take Delivery Photo' : 'ပို့ဆောင်ရေးဓာတ်ပုံရိုက်ပါ'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowCameraModal(false)}
+                style={styles.cameraModalCloseButton}
+              >
+                <Text style={styles.cameraModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.cameraModalBody}>
+              <Text style={styles.cameraModalDescription}>
+                {language === 'zh' ? '请拍摄包裹送达照片作为配送证明' : language === 'en' ? 'Please take a photo of the delivered package as proof' : 'ပို့ဆောင်ပြီးသားပက်ကေ့ဂျ်ဓာတ်ပုံကို သက်သေအဖြစ် ရိုက်ပါ'}
+              </Text>
+              
+              <TouchableOpacity
+                onPress={handleOpenCamera}
+                style={styles.cameraButton}
+              >
+                <Text style={styles.cameraButtonText}>
+                  📷 {language === 'zh' ? '打开相机' : language === 'en' ? 'Open Camera' : 'ကင်မရာဖွင့်ပါ'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 📷 照片预览Modal */}
+      <Modal
+        visible={showPhotoModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.photoModalContainer}>
+          <View style={styles.photoModalContent}>
+            <View style={styles.photoModalHeader}>
+              <Text style={styles.photoModalTitle}>
+                📷 {language === 'zh' ? '配送照片预览' : language === 'en' ? 'Delivery Photo Preview' : 'ပို့ဆောင်ရေးဓာတ်ပုံအစမ်းကြည့်ရန်'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPhotoModal(false);
+                  setCapturedPhoto(null);
+                  setCurrentPackageForDelivery(null);
+                }}
+                style={styles.photoModalCloseButton}
+              >
+                <Text style={styles.photoModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.photoModalBody}>
+              {capturedPhoto && (
+                <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
+              )}
+              
+              <View style={styles.photoModalActions}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPhotoModal(false);
+                    setCapturedPhoto(null);
+                    setShowCameraModal(true);
+                  }}
+                  style={styles.retakeButton}
+                >
+                  <Text style={styles.retakeButtonText}>
+                    🔄 {language === 'zh' ? '重新拍照' : language === 'en' ? 'Retake' : 'ပြန်ရိုက်ပါ'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={handleUploadPhoto}
+                  disabled={uploadingPhoto}
+                  style={[styles.uploadButton, uploadingPhoto && styles.uploadButtonDisabled]}
+                >
+                  {uploadingPhoto ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.uploadButtonText}>
+                      📤 {language === 'zh' ? '上传并完成配送' : language === 'en' ? 'Upload & Complete' : 'တင်ပြီး ပြီးမြောက်ပါ'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1198,5 +1596,161 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10b981',
     fontWeight: '600',
+  },
+  // 拍照Modal样式
+  cameraModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  cameraModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  cameraModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  cameraModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  cameraModalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraModalCloseText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: 'bold',
+  },
+  cameraModalBody: {
+    padding: 20,
+  },
+  cameraModalDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  cameraButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cameraButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // 照片预览Modal样式
+  photoModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  photoModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  photoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  photoModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  photoModalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModalCloseText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: 'bold',
+  },
+  photoModalBody: {
+    padding: 20,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  photoModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  retakeButton: {
+    flex: 1,
+    backgroundColor: '#6b7280',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  retakeButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  uploadButton: {
+    flex: 2,
+    backgroundColor: '#10b981',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  uploadButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
