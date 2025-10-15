@@ -1,7 +1,7 @@
 # Google Maps API Key 配置指南
 
 ## 问题描述
-当前Google Maps API Key `AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY` 可能无效或配置不正确，导致地图加载失败。
+当前Google Maps API Key `YOUR_GOOGLE_MAPS_API_KEY` 可能无效或配置不正确，导致地图加载失败。
 
 ## 解决方案
 
@@ -41,7 +41,7 @@ https://68e13da28dcb2e0008664abb--market-link-express.netlify.app/*
 
 ### 3. 更新代码中的API Key
 
-将新的API Key替换代码中的 `AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`
+将新的API Key替换代码中的 `YOUR_GOOGLE_MAPS_API_KEY`
 
 **需要更新的文件：**
 - `src/pages/HomePage.tsx`

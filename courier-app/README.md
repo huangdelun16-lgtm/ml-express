@@ -55,7 +55,7 @@ npm run web
 ### API Key设置
 应用已配置Google Maps API Key：
 ```
-AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ### 权限配置

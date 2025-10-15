@@ -10,7 +10,7 @@
 ```
 
 ### 问题原因
-当前的 Google Maps API Key (`AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`) 配置了 HTTP referer 限制，这种限制仅适用于 Web 应用。而 Geocoding API 调用来自移动应用，无法提供 HTTP referer，因此被拒绝。
+当前的 Google Maps API Key (`YOUR_GOOGLE_MAPS_API_KEY`) 配置了 HTTP referer 限制，这种限制仅适用于 Web 应用。而 Geocoding API 调用来自移动应用，无法提供 HTTP referer，因此被拒绝。
 
 ### 影响范围
 - ❌ 路线规划功能无法获取包裹位置坐标

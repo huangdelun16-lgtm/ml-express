@@ -26,7 +26,7 @@ Netlify部署失败是因为检测到了硬编码的Google API密钥，这被认
 
 #### 步骤3：添加以下环境变量
 ```
-REACT_APP_GOOGLE_MAPS_API_KEY = AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+REACT_APP_GOOGLE_MAPS_API_KEY = YOUR_GOOGLE_MAPS_API_KEY
 REACT_APP_SUPABASE_URL = your_supabase_url
 REACT_APP_SUPABASE_ANON_KEY = your_supabase_anon_key
 ```
@@ -41,7 +41,7 @@ REACT_APP_SUPABASE_ANON_KEY = your_supabase_anon_key
 ### 创建 .env 文件
 在项目根目录创建 `.env` 文件：
 ```bash
-REACT_APP_GOOGLE_MAPS_API_KEY=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+REACT_APP_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 REACT_APP_SUPABASE_URL=your_supabase_url
 REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
@@ -49,7 +49,7 @@ REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 移动应用配置
 对于Expo应用，创建 `.env` 文件：
 ```bash
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```

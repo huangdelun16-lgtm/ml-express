@@ -75,7 +75,7 @@ if (canOpen) {
       "UIBackgroundModes": ["location"]
     },
     "config": {
-      "googleMapsApiKey": "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"
+      "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
     }
   }
 }
