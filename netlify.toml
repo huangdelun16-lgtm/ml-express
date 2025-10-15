@@ -9,6 +9,12 @@
 [functions]
   directory = "netlify/functions"
 
+# SPA重定向配置 - 解决React Router路由问题
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 # 禁用密钥扫描以避免误报
 [build.processing]
   skip_processing = false

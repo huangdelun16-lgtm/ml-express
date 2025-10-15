@@ -1,0 +1,4 @@
+# Netlify SPA重定向规则
+# 将所有路由重定向到index.html，让React Router处理
+
+/*    /index.html   200
