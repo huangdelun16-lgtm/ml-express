@@ -6,10 +6,15 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ScanScreen({ navigation }: any) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -19,14 +24,55 @@ export default function ScanScreen({ navigation }: any) {
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false); // 添加处理状态
-  const scannedDataRef = useRef<string | null>(null); // 添加ref来跟踪已扫描的数据
-  const lastScanTimeRef = useRef<number>(0); // 添加时间戳防止快速重复扫描
+  const [isProcessing, setIsProcessing] = useState(false);
+  const scannedDataRef = useRef<string | null>(null);
+  const lastScanTimeRef = useRef<number>(0);
+  
+  // 扫描动画
+  const scanAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(1)).current;
 
   // 加载当前骑手信息 - 必须在所有条件渲染之前
   useEffect(() => {
     loadCurrentCourierInfo();
   }, []);
+
+  // 启动扫描线动画
+  useEffect(() => {
+    if (!scanned && !showManualInput) {
+      // 扫描线动画
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanAnimation, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scanAnimation, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // 脉冲动画
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnimation, {
+            toValue: 1.1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [scanned, showManualInput]);
 
   const loadCurrentCourierInfo = async () => {
     try {
@@ -347,80 +393,160 @@ export default function ScanScreen({ navigation }: any) {
     setManualInput('');
   };
 
+  const scanLineTranslate = scanAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-200, 200],
+  });
+
   return (
     <View style={styles.container}>
       {/* 头部 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>📦 扫描包裹/中转码</Text>
+      <LinearGradient
+        colors={['#2c5282', '#1a365d']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>📦 智能扫码</Text>
+          <Text style={styles.headerSubtitle}>快速扫描包裹 · 中转码</Text>
+        </View>
         <TouchableOpacity 
           onPress={() => setShowManualInput(!showManualInput)}
           style={styles.manualButton}
         >
           <Text style={styles.manualButtonText}>
-            {showManualInput ? '扫码' : '手动输入'}
+            {showManualInput ? '📷 扫码' : '⌨️ 输入'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* 扫码界面 */}
       {!showManualInput ? (
-        <>
+        <View style={styles.scanContainer}>
           {cameraError ? (
             <View style={styles.cameraErrorContainer}>
-              <Text style={styles.cameraErrorIcon}>📷</Text>
+              <View style={styles.errorIconContainer}>
+                <Text style={styles.cameraErrorIcon}>📷</Text>
+              </View>
               <Text style={styles.cameraErrorTitle}>相机启动失败</Text>
               <Text style={styles.cameraErrorDesc}>{cameraError}</Text>
               <TouchableOpacity 
                 style={styles.retryButton}
                 onPress={() => {
                   setCameraError(null);
-                  // 重新请求权限
                   requestPermission();
                 }}
               >
-                <Text style={styles.retryButtonText}>重试</Text>
+                <LinearGradient
+                  colors={['#3498db', '#2980b9']}
+                  style={styles.retryButtonGradient}
+                >
+                  <Text style={styles.retryButtonText}>重试</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
-            <CameraView
-              style={styles.camera}
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'],
-              }}
-              onCameraReady={() => {
-                console.log('相机已准备就绪');
-                setCameraError(null);
-              }}
-              onMountError={(error) => {
-                console.error('相机挂载错误:', error);
-                setCameraError('相机无法启动，请检查设备权限');
-              }}
-            >
-              {/* 扫描框 */}
-              <View style={styles.scanFrame}>
-                <View style={[styles.corner, styles.cornerTopLeft]} />
-                <View style={[styles.corner, styles.cornerTopRight]} />
-                <View style={[styles.corner, styles.cornerBottomLeft]} />
-                <View style={[styles.corner, styles.cornerBottomRight]} />
-              </View>
-            </CameraView>
+            <View style={styles.cameraContainer}>
+              <CameraView
+                style={styles.camera}
+                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barcodeScannerSettings={{
+                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
+                }}
+                onCameraReady={() => {
+                  console.log('相机已准备就绪');
+                  setCameraError(null);
+                }}
+                onMountError={(error) => {
+                  console.error('相机挂载错误:', error);
+                  setCameraError('相机无法启动，请检查设备权限');
+                }}
+              >
+                {/* 遮罩层 */}
+                <View style={styles.maskContainer}>
+                  <View style={styles.maskRow}>
+                    <View style={styles.maskCell} />
+                    <View style={styles.maskMiddle} />
+                    <View style={styles.maskCell} />
+                  </View>
+                  <View style={styles.maskCenter}>
+                    <View style={styles.maskCell} />
+                    <View style={styles.scanArea}>
+                      {/* 扫描框 */}
+                      <Animated.View style={[styles.scanFrame, { transform: [{ scale: pulseAnimation }] }]}>
+                        <View style={[styles.corner, styles.cornerTopLeft]} />
+                        <View style={[styles.corner, styles.cornerTopRight]} />
+                        <View style={[styles.corner, styles.cornerBottomLeft]} />
+                        <View style={[styles.corner, styles.cornerBottomRight]} />
+                        
+                        {/* 扫描线 */}
+                        {!scanned && (
+                          <Animated.View 
+                            style={[
+                              styles.scanLine,
+                              {
+                                transform: [{ translateY: scanLineTranslate }]
+                              }
+                            ]} 
+                          />
+                        )}
+                      </Animated.View>
+                    </View>
+                    <View style={styles.maskCell} />
+                  </View>
+                  <View style={styles.maskRow}>
+                    <View style={styles.maskCell} />
+                    <View style={styles.maskMiddle} />
+                    <View style={styles.maskCell} />
+                  </View>
+                </View>
+              </CameraView>
+            </View>
           )}
 
+          {/* 提示信息 */}
           <View style={styles.instructions}>
-            <Text style={styles.instructionText}>
-              将包裹二维码或中转码对准扫描框
-            </Text>
-            {scanned && (
-              <TouchableOpacity 
-                style={styles.rescanButton}
-                onPress={resetScanState}
-              >
-                <Text style={styles.rescanText}>重新扫描</Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.instructionCard}>
+              {!scanned && !isProcessing ? (
+                <>
+                  <Text style={styles.instructionEmoji}>🎯</Text>
+                  <Text style={styles.instructionTitle}>对准扫描框</Text>
+                  <Text style={styles.instructionText}>
+                    将二维码或条形码对准扫描框
+                  </Text>
+                  <View style={styles.supportedFormats}>
+                    <Text style={styles.formatBadge}>QR码</Text>
+                    <Text style={styles.formatBadge}>条形码</Text>
+                    <Text style={styles.formatBadge}>中转码</Text>
+                  </View>
+                </>
+              ) : isProcessing ? (
+                <>
+                  <Text style={styles.instructionEmoji}>⏳</Text>
+                  <Text style={styles.instructionTitle}>处理中...</Text>
+                  <Text style={styles.instructionText}>
+                    正在查询包裹信息
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.instructionEmoji}>✅</Text>
+                  <Text style={styles.instructionTitle}>扫描成功</Text>
+                  <TouchableOpacity 
+                    style={styles.rescanButton}
+                    onPress={resetScanState}
+                  >
+                    <LinearGradient
+                      colors={['#10b981', '#059669']}
+                      style={styles.rescanButtonGradient}
+                    >
+                      <Text style={styles.rescanText}>🔄 重新扫描</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
-        </>
+        </View>
       ) : (
         /* 手动输入界面 */
         <View style={styles.manualContainer}>
@@ -453,31 +579,122 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   header: {
-    backgroundColor: '#2c5282',
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerContent: {
+    flex: 1,
+  },
   headerTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
   },
   manualButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   manualButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  scanContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  cameraContainer: {
+    flex: 1,
   },
   camera: {
     flex: 1,
+  },
+  maskContainer: {
+    flex: 1,
+  },
+  maskRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  maskCenter: {
+    height: 280,
+    flexDirection: 'row',
+  },
+  maskCell: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  maskMiddle: {
+    width: 280,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  scanArea: {
+    width: 280,
+    height: 280,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 240,
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+  },
+  cornerTopLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: '#10b981',
+  },
+  cornerTopRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderColor: '#10b981',
+  },
+  cornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: '#10b981',
+  },
+  cornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderColor: '#10b981',
+  },
+  scanLine: {
+    width: '100%',
+    height: 2,
+    backgroundColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   cameraErrorContainer: {
     flex: 1,
@@ -486,91 +703,108 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     padding: 40,
   },
+  errorIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   cameraErrorIcon: {
     fontSize: 64,
-    marginBottom: 20,
   },
   cameraErrorTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 12,
     textAlign: 'center',
   },
   cameraErrorDesc: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     marginBottom: 30,
-    lineHeight: 20,
+    lineHeight: 22,
+    maxWidth: 280,
   },
   retryButton: {
-    backgroundColor: '#3498db',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  scanFrame: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  corner: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: '#fff',
-  },
-  cornerTopLeft: {
-    top: -120,
-    left: -120,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-  },
-  cornerTopRight: {
-    top: -120,
-    right: -120,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-  },
-  cornerBottomLeft: {
-    bottom: -120,
-    left: -120,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-  },
-  cornerBottomRight: {
-    bottom: -120,
-    right: -120,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
+    fontWeight: '700',
   },
   instructions: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'transparent',
     padding: 20,
     alignItems: 'center',
   },
+  instructionCard: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 20,
+    padding: 24,
+    width: SCREEN_WIDTH - 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  instructionEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  instructionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
   instructionText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#6b7280',
+    fontSize: 15,
     textAlign: 'center',
+    lineHeight: 22,
+  },
+  supportedFormats: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
+  formatBadge: {
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
   },
   rescanButton: {
-    marginTop: 12,
-    backgroundColor: '#2c5282',
+    marginTop: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  rescanButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   rescanText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   manualContainer: {
     flex: 1,
