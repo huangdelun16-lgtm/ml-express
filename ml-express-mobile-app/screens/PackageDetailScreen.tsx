@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { geofenceService } from '../services/geofenceService';
 
 export default function PackageDetailScreen({ route, navigation }: any) {
   const { package: pkg } = route.params;
@@ -291,6 +292,75 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const updateStatus = async (newStatus: string) => {
     const oldStatus = currentPackage.status;
     
+    // 如果是标记"已送达"，需要先进行地理围栏验证
+    if (newStatus === '已送达') {
+      setUpdating(true);
+      try {
+        const currentUser = await AsyncStorage.getItem('currentUser') || 'unknown';
+        const currentUserName = await AsyncStorage.getItem('currentUserName') || '未知用户';
+        
+        // 执行地理围栏验证
+        console.log('开始地理围栏验证...');
+        const validation = await geofenceService.validateDelivery(
+          currentPackage.id,
+          currentUser,
+          currentUserName,
+          currentPackage.receiver_latitude,
+          currentPackage.receiver_longitude
+        );
+        
+        console.log('地理围栏验证结果:', validation);
+        
+        // 如果不允许送达
+        if (!validation.allowed) {
+          setUpdating(false);
+          Alert.alert(
+            '⚠️ 无法标记已送达',
+            validation.message,
+            [{ text: '我知道了', style: 'default' }]
+          );
+          return;
+        }
+        
+        // 如果允许但有警告
+        if (validation.alertCreated) {
+          Alert.alert(
+            '⚠️ 位置验证警告',
+            validation.message + '\n\n是否继续标记已送达？',
+            [
+              { text: '取消', style: 'cancel', onPress: () => setUpdating(false) },
+              { 
+                text: '继续', 
+                style: 'default',
+                onPress: () => proceedWithStatusUpdate(newStatus, validation.message)
+              }
+            ]
+          );
+          return;
+        }
+        
+        // 位置验证通过，继续更新
+        Alert.alert(
+          '✅ 位置验证通过',
+          validation.message + '\n\n是否确认标记已送达？',
+          [
+            { text: '取消', style: 'cancel', onPress: () => setUpdating(false) },
+            { 
+              text: '确认送达', 
+              style: 'default',
+              onPress: () => proceedWithStatusUpdate(newStatus, validation.message)
+            }
+          ]
+        );
+      } catch (error) {
+        console.error('地理围栏验证异常:', error);
+        setUpdating(false);
+        Alert.alert('错误', '位置验证失败，请重试');
+      }
+      return;
+    }
+    
+    // 其他状态更新（已取件、配送中等）
     Alert.alert(
       '确认更新',
       `将包裹状态从「${oldStatus}」更新为「${newStatus}」？`,
@@ -298,58 +368,67 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         { text: '取消', style: 'cancel' },
         {
           text: '确认',
-          onPress: async () => {
-            setUpdating(true);
-            try {
-              let pickupTime = '';
-              let deliveryTime = '';
-              
-              if (newStatus === '已取件') {
-                pickupTime = new Date().toLocaleString('zh-CN');
-              }
-              if (newStatus === '已送达') {
-                deliveryTime = new Date().toLocaleString('zh-CN');
-              }
-
-              const success = await packageService.updatePackageStatus(
-                currentPackage.id,
-                newStatus,
-                pickupTime,
-                deliveryTime
-              );
-
-              if (success) {
-                // 记录审计日志
-                const currentUser = await AsyncStorage.getItem('currentUser') || 'unknown';
-                const currentUserName = await AsyncStorage.getItem('currentUserName') || '未知用户';
-                
-                await auditLogService.log({
-                  user_id: currentUser,
-                  user_name: currentUserName,
-                  action_type: 'update',
-                  module: 'packages',
-                  target_id: currentPackage.id,
-                  target_name: `包裹 ${currentPackage.id}`,
-                  action_description: `移动端更新包裹状态：${oldStatus} → ${newStatus}`,
-                  old_value: oldStatus,
-                  new_value: newStatus
-                });
-
-                setCurrentPackage({ ...currentPackage, status: newStatus });
-                Alert.alert('成功', '包裹状态已更新');
-              } else {
-                Alert.alert('失败', '状态更新失败，请重试');
-              }
-            } catch (error) {
-              console.error('更新状态失败:', error);
-              Alert.alert('失败', '网络错误，请检查连接');
-            } finally {
-              setUpdating(false);
-            }
-          }
+          onPress: () => proceedWithStatusUpdate(newStatus)
         }
       ]
     );
+  };
+  
+  // 实际执行状态更新的函数
+  const proceedWithStatusUpdate = async (newStatus: string, locationMessage?: string) => {
+    setUpdating(true);
+    try {
+      let pickupTime = '';
+      let deliveryTime = '';
+      
+      if (newStatus === '已取件') {
+        pickupTime = new Date().toLocaleString('zh-CN');
+      }
+      if (newStatus === '已送达') {
+        deliveryTime = new Date().toLocaleString('zh-CN');
+      }
+
+      const success = await packageService.updatePackageStatus(
+        currentPackage.id,
+        newStatus,
+        pickupTime,
+        deliveryTime
+      );
+
+      if (success) {
+        // 记录审计日志
+        const currentUser = await AsyncStorage.getItem('currentUser') || 'unknown';
+        const currentUserName = await AsyncStorage.getItem('currentUserName') || '未知用户';
+        
+        await auditLogService.log({
+          user_id: currentUser,
+          user_name: currentUserName,
+          action_type: 'update',
+          module: 'packages',
+          target_id: currentPackage.id,
+          target_name: `包裹 ${currentPackage.id}`,
+          action_description: `移动端更新包裹状态 → ${newStatus}${locationMessage ? ' (位置已验证)' : ''}`,
+          old_value: currentPackage.status,
+          new_value: newStatus
+        });
+
+        setCurrentPackage({ ...currentPackage, status: newStatus });
+        
+        let successMessage = '包裹状态已更新';
+        if (newStatus === '已送达' && locationMessage) {
+          successMessage += '\n' + locationMessage;
+        }
+        
+        Alert.alert('✅ 成功', successMessage);
+      } else {
+        Alert.alert('❌ 失败', '状态更新失败，请重试');
+      }
+    } catch (error) {
+      console.error('更新状态失败:', error);
+      Alert.alert('❌ 失败', '网络错误，请检查连接');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (

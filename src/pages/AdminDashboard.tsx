@@ -134,6 +134,13 @@ const AdminDashboard: React.FC = () => {
       icon: '⚙️',
       roles: ['admin'] // 仅管理员可访问
     },
+    {
+      title: language === 'zh' ? '配送警报' : language === 'en' ? 'Delivery Alerts' : 'ပို့ဆောင်ရေးသတိပေးချက်များ',
+      description: language === 'zh' ? '骑手异常操作监控和警报管理' : language === 'en' ? 'Courier anomaly monitoring and alert management' : 'ကောင်ရီယာကိစ္စပုံမှန်မဟုတ်သောစောင့်ကြည့်မှုနှင့်သတိပေးချက်စီမံခန့်ခွဲမှု',
+      color: '#dc2626',
+      icon: '🚨',
+      roles: ['admin', 'manager'] // 管理员和经理可访问
+    },
   ];
 
   // 根据当前用户角色筛选可访问的卡片
@@ -155,6 +162,8 @@ const AdminDashboard: React.FC = () => {
       navigate('/admin/tracking');
     } else if (title === '系统设置' || title === 'System Settings' || title === 'စနစ်ချိန်ညှိမှု') {
       navigate('/admin/settings');
+    } else if (title === '配送警报' || title === 'Delivery Alerts' || title === 'ပို့ဆောင်ရေးသတိပေးချက်များ') {
+      navigate('/admin/delivery-alerts');
     }
   };
 

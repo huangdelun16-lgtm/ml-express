@@ -5,6 +5,7 @@ import ServicesPage from './pages/ServicesPage';
 import TrackingPage from './pages/TrackingPage';
 import ContactPage from './pages/ContactPage';
 import AdminLogin from './pages/AdminLogin';
+import DeliveryAlerts from './pages/DeliveryAlerts';
 import AdminDashboard from './pages/AdminDashboard';
 import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
@@ -41,6 +42,7 @@ function App() {
             <Route path="/admin/accounts" element={<AccountManagement />} />
             <Route path="/admin/delivery-stores" element={<DeliveryStoreManagement />} />
             <Route path="/admin/supervision" element={<EmployeeSupervision />} />
+            <Route path="/admin/delivery-alerts" element={<DeliveryAlerts />} />
           </Routes>
         </div>
       </Router>
