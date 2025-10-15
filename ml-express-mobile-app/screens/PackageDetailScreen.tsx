@@ -72,12 +72,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      // 启动相机（优化设置）
+      // 启动相机（iOS优化设置 - 极致压缩）
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.5, // 进一步降低质量（0.5 = 50%），减少上传时间
+        quality: 0.3, // iOS专用：降至30%质量，确保流畅上传
         exif: false, // 禁用EXIF数据以提高性能
         base64: false, // 不立即生成base64，避免内存问题
       });
@@ -93,25 +93,50 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // 将图片转换为base64
+  // 将图片转换为base64（优化版 - iOS流畅）
   const convertImageToBase64 = async (imageUri: string): Promise<string> => {
     try {
+      console.log('🔄 开始转换照片，URI:', imageUri);
+      
+      // 使用fetch获取图片数据（更快）
       const response = await fetch(imageUri);
       const blob = await response.blob();
       
+      console.log('📦 照片Blob大小:', (blob.size / 1024).toFixed(2), 'KB');
+      
+      // 如果照片仍然太大（>500KB），进一步压缩
+      if (blob.size > 500 * 1024) {
+        console.log('⚠️ 照片过大，需要进一步压缩');
+        // 这里可以添加额外的压缩逻辑
+      }
+      
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        
+        // 添加超时保护
+        const timeout = setTimeout(() => {
+          reject(new Error('FileReader超时'));
+        }, 8000); // 8秒超时
+        
         reader.onloadend = () => {
+          clearTimeout(timeout);
           const base64String = reader.result as string;
           // 移除data:image/jpeg;base64,前缀
           const base64Data = base64String.split(',')[1];
+          console.log('✅ Base64转换完成，大小:', (base64Data.length / 1024).toFixed(2), 'KB');
           resolve(base64Data);
         };
-        reader.onerror = reject;
+        
+        reader.onerror = (error) => {
+          clearTimeout(timeout);
+          console.error('❌ FileReader错误:', error);
+          reject(error);
+        };
+        
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('转换图片为base64失败:', error);
+      console.error('❌ 转换图片为base64失败:', error);
       return '';
     }
   };
@@ -174,26 +199,31 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         })
         .catch(error => console.log('⚠️ 相册权限请求失败:', error));
 
-      // 3. 转换照片为base64（使用超时保护）
+      // 3. 转换照片为base64（使用超时保护 - iOS优化）
       console.log('📸 正在压缩照片...');
       let photoBase64 = '';
       
       try {
         const base64Promise = convertImageToBase64(capturedPhoto);
         const timeoutPromise = new Promise<string>((_, reject) => 
-          setTimeout(() => reject(new Error('照片转换超时')), 10000)
+          setTimeout(() => reject(new Error('照片转换超时')), 8000) // 从10秒减到8秒
         );
 
         photoBase64 = await Promise.race([base64Promise, timeoutPromise]);
         console.log('✅ 照片转换完成，大小:', (photoBase64.length / 1024).toFixed(2), 'KB');
+        
+        // 检查照片大小，如果太大则警告
+        if (photoBase64.length > 400 * 1024) {
+          console.warn('⚠️ 照片Base64较大:', (photoBase64.length / 1024).toFixed(2), 'KB，上传可能较慢');
+        }
       } catch (conversionError) {
         console.error('❌ 照片转换失败:', conversionError);
-        Alert.alert('错误', '照片处理失败，请重试');
+        Alert.alert('❌ 错误', '照片处理失败，请重试\n（提示：请在光线充足的地方拍照）');
         setUploadingPhoto(false);
         return;
       }
 
-      // 4. 保存配送照片到数据库（使用超时保护）
+      // 4. 保存配送照片到数据库（使用超时保护 - iOS优化）
       console.log('☁️ 正在上传照片到服务器...');
       let photoSaved = false;
       
@@ -207,9 +237,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           locationName: '配送位置'
         });
 
-        // 15秒上传超时
+        // 12秒上传超时（从15秒减到12秒，更快失败提示）
         const timeoutPromise = new Promise<boolean>((_, reject) => 
-          setTimeout(() => reject(new Error('照片上传超时')), 15000)
+          setTimeout(() => reject(new Error('照片上传超时')), 12000)
         );
 
         photoSaved = await Promise.race([uploadPromise, timeoutPromise]);
