@@ -367,27 +367,100 @@ export default function MapScreen({ navigation }: any) {
   };
 
   // 🚀 跳转到Google Maps导航
-  const openGoogleMapsNavigation = () => {
+  const openGoogleMapsNavigation = async () => {
     if (!location || optimizedPackagesWithCoords.length === 0) return;
 
-    const origin = `${location.latitude},${location.longitude}`;
-    
-    if (optimizedPackagesWithCoords.length === 1) {
-      const destination = encodeURIComponent(optimizedPackagesWithCoords[0].receiver_address);
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-      Linking.openURL(url);
-    } else {
-      const destination = encodeURIComponent(optimizedPackagesWithCoords[optimizedPackagesWithCoords.length - 1].receiver_address);
-      const waypointsLimit = Math.min(optimizedPackagesWithCoords.length - 1, 9);
-      const waypoints = optimizedPackagesWithCoords.slice(0, waypointsLimit).map(pkg => 
-        encodeURIComponent(pkg.receiver_address)
-      ).join('|');
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
-      Linking.openURL(url);
+    try {
+      const origin = `${location.latitude},${location.longitude}`;
+      
+      if (optimizedPackagesWithCoords.length === 1) {
+        // 单个包裹导航
+        const pkg = optimizedPackagesWithCoords[0];
+        const destination = pkg.coords 
+          ? `${pkg.coords.lat},${pkg.coords.lng}`
+          : encodeURIComponent(pkg.receiver_address);
+        
+        // 尝试多种URL方案，确保iOS和Android都能正常工作
+        const urls = [
+          `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`, // Google Maps App (iOS/Android)
+          `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`, // Web fallback
+        ];
+        
+        // 尝试打开Google Maps应用，失败则使用浏览器
+        let opened = false;
+        for (const url of urls) {
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) {
+            await Linking.openURL(url);
+            opened = true;
+            break;
+          }
+        }
+        
+        if (!opened) {
+          // 如果都失败，使用Apple Maps作为iOS备选
+          const appleMapsUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
+          await Linking.openURL(appleMapsUrl);
+        }
+      } else {
+        // 多个包裹导航 - 使用坐标而不是地址
+        const allCoords = optimizedPackagesWithCoords
+          .filter(pkg => pkg.coords)
+          .map(pkg => `${pkg.coords.lat},${pkg.coords.lng}`);
+        
+        if (allCoords.length === 0) {
+          Alert.alert('错误', '无法获取包裹位置坐标，请检查地址设置');
+          return;
+        }
+        
+        const destination = allCoords[allCoords.length - 1];
+        const waypointsLimit = Math.min(allCoords.length - 1, 9); // Google Maps最多支持9个途经点
+        const waypoints = allCoords.slice(0, waypointsLimit).join('|');
+        
+        // 尝试多种URL方案
+        const urls = [
+          `comgooglemaps://?saddr=${origin}&daddr=${destination}&waypoints=${waypoints}&directionsmode=driving`, // Google Maps App
+          `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`, // Web
+        ];
+        
+        let opened = false;
+        for (const url of urls) {
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) {
+            await Linking.openURL(url);
+            opened = true;
+            break;
+          }
+        }
+        
+        if (!opened) {
+          // iOS备选：Apple Maps（但Apple Maps不支持多途经点，所以只导航到最后一个地址）
+          Alert.alert(
+            '提示', 
+            'iOS系统不支持多途经点导航，将只导航到最后一个地址。建议安装Google Maps应用以获得完整路线。',
+            [
+              {
+                text: '取消',
+                style: 'cancel'
+              },
+              {
+                text: '继续',
+                onPress: async () => {
+                  const appleMapsUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
+                  await Linking.openURL(appleMapsUrl);
+                }
+              }
+            ]
+          );
+        }
+      }
+      
+      // 关闭地图预览
+      setShowMapPreview(false);
+    } catch (error) {
+      console.error('打开导航失败:', error);
+      Alert.alert('错误', '无法打开导航应用，请确保已安装Google Maps或Apple Maps');
     }
-    
-    // 关闭地图预览
-    setShowMapPreview(false);
   };
 
   const getStatusColor = (status: string) => {

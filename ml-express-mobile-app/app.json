@@ -14,7 +14,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.marketlinkexpress.staff"
+      "bundleIdentifier": "com.marketlinkexpress.staff",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps",
+          "maps"
+        ],
+        "NSLocationWhenInUseUsageDescription": "需要获取您的位置来显示配送路线和导航",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "需要获取您的位置来提供实时配送服务",
+        "UIBackgroundModes": ["location"]
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY"
+      }
     },
     "android": {
       "adaptiveIcon": {
