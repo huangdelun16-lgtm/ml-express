@@ -13,6 +13,10 @@ const AccountManagement: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [viewingAccount, setViewingAccount] = useState<AdminAccount | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCvUploadModal, setShowCvUploadModal] = useState(false);
+  const [showCvViewModal, setShowCvViewModal] = useState(false);
+  const [cvImages, setCvImages] = useState<string[]>([]);
+  const [uploadingCv, setUploadingCv] = useState(false);
 
   const [formData, setFormData] = useState({
     username: '',
@@ -173,6 +177,64 @@ const AccountManagement: React.FC = () => {
       case 'operator': return '#48bb78';
       case 'finance': return '#ed8936';
       default: return '#a0aec0';
+    }
+  };
+
+  // 处理CV文件上传
+  const handleCvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newImages: string[] = [];
+    
+    Array.from(files).forEach((file) => {
+      // 检查文件类型
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        alert(`文件 ${file.name} 格式不支持，请上传图片或PDF文件`);
+        return;
+      }
+
+      // 检查文件大小 (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`文件 ${file.name} 过大，请选择小于10MB的文件`);
+        return;
+      }
+
+      // 创建预览URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        newImages.push(result);
+        
+        if (newImages.length === Array.from(files).length) {
+          setCvImages(prev => [...prev, ...newImages]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 保存CV图片
+  const handleSaveCvImages = async () => {
+    if (cvImages.length === 0) {
+      alert('请先上传CV Form');
+      return;
+    }
+
+    setUploadingCv(true);
+    try {
+      // 这里应该将图片保存到服务器或数据库
+      // 目前只是模拟保存过程
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      alert('CV Form保存成功！');
+      setShowCvUploadModal(false);
+      setCvImages([]);
+    } catch (error) {
+      console.error('保存CV Form失败:', error);
+      alert('保存CV Form失败，请重试');
+    } finally {
+      setUploadingCv(false);
     }
   };
 
@@ -494,7 +556,7 @@ const AccountManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: '16px', justifyContent: 'center' }}>
                 <button
                   type="submit"
                   style={{
@@ -509,6 +571,22 @@ const AccountManagement: React.FC = () => {
                   }}
                 >
                   创建账号
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCvUploadModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 32px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 600
+                  }}
+                >
+                  📄 上传CV Form
                 </button>
               </div>
             </form>
@@ -1008,7 +1086,34 @@ const AccountManagement: React.FC = () => {
                 )}
               </div>
 
-              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: '16px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    setCvImages(viewingAccount.cv_images || []);
+                    setShowCvViewModal(true);
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 500,
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                    (e.target as HTMLButtonElement).style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
+                    (e.target as HTMLButtonElement).style.boxShadow = 'none';
+                  }}
+                >
+                  📄 查看CV Form
+                </button>
                 <button
                   onClick={() => setShowViewModal(false)}
                   style={{
@@ -1029,6 +1134,336 @@ const AccountManagement: React.FC = () => {
                   onMouseLeave={(e) => {
                     (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
                     (e.target as HTMLButtonElement).style.boxShadow = 'none';
+                  }}
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CV Form 上传模态框 */}
+        {showCvUploadModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'rgba(15, 32, 60, 0.95)',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '90%',
+              maxWidth: '800px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: 'white',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>📄 上传员工CV Form</h2>
+                <button
+                  onClick={() => setShowCvUploadModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '28px',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.background = 'transparent'}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '12px',
+                padding: '24px',
+                marginBottom: '24px',
+                border: '2px dashed rgba(255,255,255,0.3)'
+              }}>
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem' }}>拖拽文件到此处或点击上传</h3>
+                  <p style={{ margin: 0, opacity: 0.7, fontSize: '0.9rem' }}>
+                    支持 JPG、PNG、PDF 格式，单个文件不超过 10MB
+                  </p>
+                </div>
+                
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf"
+                  onChange={handleCvFileUpload}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    background: 'rgba(15, 32, 60, 0.55)',
+                    color: 'white',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+
+              {/* 已上传的CV图片预览 */}
+              {cvImages.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#60a5fa' }}>
+                    已上传的CV Form ({cvImages.length} 张)
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: '16px'
+                  }}>
+                    {cvImages.map((image, index) => (
+                      <div key={index} style={{
+                        position: 'relative',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                      }}>
+                        <img
+                          src={image}
+                          alt={`CV Form ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '120px',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            setCvImages([image]);
+                            setShowCvViewModal(true);
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            const newImages = cvImages.filter((_, i) => i !== index);
+                            setCvImages(newImages);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            background: 'rgba(239, 68, 68, 0.8)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          ×
+                        </button>
+                        <div style={{
+                          fontSize: '0.8rem',
+                          textAlign: 'center',
+                          marginTop: '8px',
+                          opacity: 0.7
+                        }}>
+                          CV Form {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    setCvImages([]);
+                    setShowCvUploadModal(false);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 500
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveCvImages}
+                  disabled={cvImages.length === 0 || uploadingCv}
+                  style={{
+                    background: uploadingCv ? 'rgba(255,255,255,0.3)' : 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    cursor: uploadingCv ? 'not-allowed' : 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    opacity: uploadingCv ? 0.6 : 1
+                  }}
+                >
+                  {uploadingCv ? '保存中...' : '保存CV Form'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CV Form 查看模态框 */}
+        {showCvViewModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'rgba(15, 32, 60, 0.95)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '95%',
+              maxWidth: '1200px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: 'white',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>📄 员工CV Form</h2>
+                <button
+                  onClick={() => setShowCvViewModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '28px',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'}
+                  onMouseLeave={(e) => (e.target as HTMLButtonElement).style.background = 'transparent'}
+                >
+                  ×
+                </button>
+              </div>
+
+              {cvImages.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                  gap: '20px'
+                }}>
+                  {cvImages.map((image, index) => (
+                    <div key={index} style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                      <div style={{
+                        fontSize: '0.9rem',
+                        marginBottom: '12px',
+                        opacity: 0.7,
+                        textAlign: 'center'
+                      }}>
+                        CV Form {index + 1}
+                      </div>
+                      <img
+                        src={image}
+                        alt={`CV Form ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          maxHeight: '600px',
+                          objectFit: 'contain',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s'
+                        }}
+                        onClick={() => window.open(image, '_blank')}
+                        onMouseEnter={(e) => (e.target as HTMLImageElement).style.transform = 'scale(1.02)'}
+                        onMouseLeave={(e) => (e.target as HTMLImageElement).style.transform = 'scale(1)'}
+                      />
+                      <div style={{
+                        textAlign: 'center',
+                        marginTop: '12px',
+                        fontSize: '0.8rem',
+                        opacity: 0.6
+                      }}>
+                        点击图片查看大图
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  <div style={{ fontSize: '64px', marginBottom: '20px', opacity: 0.5 }}>📄</div>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem', opacity: 0.8 }}>
+                    暂无CV Form
+                  </h3>
+                  <p style={{ margin: 0, opacity: 0.6, fontSize: '0.9rem' }}>
+                    该员工尚未上传CV Form
+                  </p>
+                </div>
+              )}
+
+              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                <button
+                  onClick={() => setShowCvViewModal(false)}
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 32px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 500
                   }}
                 >
                   关闭

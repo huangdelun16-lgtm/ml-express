@@ -109,6 +109,7 @@ export interface AdminAccount {
   emergency_phone?: string;
   address?: string;
   notes?: string;
+  cv_images?: string[]; // 新增CV图片字段
   created_by?: string;
   last_login?: string;
   created_at?: string;
