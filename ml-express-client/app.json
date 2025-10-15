@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "缅甸同城快递-客户端",
+    "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
@@ -10,24 +10,38 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2c5282"
+      "backgroundColor": "#2E86AB"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mlexpress.client"
+      "bundleIdentifier": "com.mlexpress.client",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages.",
+        "NSCameraUsageDescription": "MARKET LINK EXPRESS needs access to your camera to scan QR codes and take photos for package verification.",
+        "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save QR codes and package images."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2c5282"
+        "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -37,10 +51,15 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "允许 $(PRODUCT_NAME) 访问您的位置以提供快递服务。"
+          "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
+    }
   }
 }
 
