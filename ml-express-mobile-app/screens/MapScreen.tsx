@@ -190,9 +190,9 @@ export default function MapScreen({ navigation }: any) {
     return R * c;
   };
 
-  // 🗺️ 解析地址中的坐标（如果有）或使用地理编码
+  // 🗺️ 解析地址中的坐标（如果有）或使用简单的地址匹配
   const parseCoordinatesFromAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
-    // 尝试从地址中提取坐标（某些系统会在地址中包含坐标）
+    // 1. 尝试从地址中提取坐标（某些系统会在地址中包含坐标）
     const coordMatch = address.match(/(\d+\.\d+),\s*(\d+\.\d+)/);
     if (coordMatch) {
       const coords = {
@@ -203,32 +203,59 @@ export default function MapScreen({ navigation }: any) {
       return coords;
     }
 
-    // 如果没有坐标，使用 Google Geocoding API
-    try {
-      const encodedAddress = encodeURIComponent(address);
-      const apiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&region=mm&key=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`;
-      
-      console.log(`🌐 调用地理编码API: ${address.substring(0, 50)}...`);
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.results && data.results.length > 0) {
-        const location = data.results[0].geometry.location;
-        const coords = { lat: location.lat, lng: location.lng };
-        console.log(`✅ 地理编码成功: ${address.substring(0, 30)}... → ${coords.lat}, ${coords.lng}`);
-        return coords;
-      } else {
-        console.warn(`⚠️ 地理编码失败: ${address}`);
-        console.warn(`   状态: ${data.status}, 结果数: ${data.results?.length || 0}`);
-        if (data.error_message) {
-          console.warn(`   错误: ${data.error_message}`);
-        }
-      }
-    } catch (error) {
-      console.error(`❌ 地理编码API错误: ${address}`, error);
+    // 2. 检查包裹数据中是否已有坐标（receiver_latitude, receiver_longitude）
+    const pkg = packages.find(p => p.receiver_address === address);
+    if (pkg && (pkg as any).receiver_latitude && (pkg as any).receiver_longitude) {
+      const coords = {
+        lat: parseFloat((pkg as any).receiver_latitude),
+        lng: parseFloat((pkg as any).receiver_longitude)
+      };
+      console.log(`✅ 从包裹数据中读取坐标: ${address} → ${coords.lat}, ${coords.lng}`);
+      return coords;
     }
 
-    return null;
+    // 3. 使用简单的地址关键词匹配（曼德勒常见地点）
+    const mandalayLocations: { [key: string]: { lat: number; lng: number } } = {
+      '曼德勒市中心': { lat: 21.9588, lng: 96.0891 },
+      '曼德勒中心': { lat: 21.9588, lng: 96.0891 },
+      '市中心': { lat: 21.9588, lng: 96.0891 },
+      'Mandalay': { lat: 21.9588, lng: 96.0891 },
+      '曼德勒大学': { lat: 21.9688, lng: 96.0991 },
+      '大学': { lat: 21.9688, lng: 96.0991 },
+      'University': { lat: 21.9688, lng: 96.0991 },
+      '茵雅湖': { lat: 21.9488, lng: 96.0791 },
+      'Inya Lake': { lat: 21.9488, lng: 96.0791 },
+      '66街': { lat: 21.9650, lng: 96.0850 },
+      '66th Street': { lat: 21.9650, lng: 96.0850 },
+      '67街': { lat: 21.9660, lng: 96.0860 },
+      '67th Street': { lat: 21.9660, lng: 96.0860 },
+      '87街': { lat: 21.9700, lng: 96.0900 },
+      '87th Street': { lat: 21.9700, lng: 96.0900 },
+      'Aungmyaythazan': { lat: 21.9550, lng: 96.1000 },
+      'Chanayethazan': { lat: 21.9600, lng: 96.0950 },
+    };
+
+    // 尝试匹配关键词
+    const addressLower = address.toLowerCase();
+    for (const [keyword, coords] of Object.entries(mandalayLocations)) {
+      if (addressLower.includes(keyword.toLowerCase())) {
+        console.log(`✅ 关键词匹配: ${address} → ${keyword} (${coords.lat}, ${coords.lng})`);
+        // 添加小的随机偏移，避免所有包裹在同一位置
+        const randomOffset = () => (Math.random() - 0.5) * 0.01; // ±0.005度偏移（约500米）
+        return {
+          lat: coords.lat + randomOffset(),
+          lng: coords.lng + randomOffset()
+        };
+      }
+    }
+
+    // 4. 如果都无法匹配，使用曼德勒默认位置（带随机偏移）
+    console.warn(`⚠️ 无法解析地址坐标，使用默认位置: ${address}`);
+    const randomOffset = () => (Math.random() - 0.5) * 0.02; // ±0.01度偏移（约1公里）
+    return {
+      lat: 21.9588 + randomOffset(),
+      lng: 96.0891 + randomOffset()
+    };
   };
 
   // 🎯 智能路线优化算法（贪心 + 优先级）
