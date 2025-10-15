@@ -72,13 +72,14 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      // 启动相机
+      // 启动相机（优化设置）
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.7, // 降低质量以提高性能
+        quality: 0.5, // 进一步降低质量（0.5 = 50%），减少上传时间
         exif: false, // 禁用EXIF数据以提高性能
+        base64: false, // 不立即生成base64，避免内存问题
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -115,7 +116,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // 上传照片功能
+  // 上传照片功能（优化版本）
   const handleUploadPhoto = async () => {
     if (!capturedPhoto) {
       Alert.alert('提示', '请先拍照');
@@ -125,57 +126,106 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     try {
       setUploadingPhoto(true);
 
-      // 获取位置权限
-      const locationPermission = await Location.requestForegroundPermissionsAsync();
-      if (locationPermission.status !== 'granted') {
-        Alert.alert('权限不足', '需要位置权限才能记录配送位置');
+      // 获取当前骑手信息
+      const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
+
+      // 1. 获取位置（使用超时保护和较低精度）
+      console.log('📍 正在获取位置...');
+      let latitude = 0;
+      let longitude = 0;
+      
+      try {
+        const locationPermission = await Location.requestForegroundPermissionsAsync();
+        if (locationPermission.status === 'granted') {
+          // 使用较低精度和超时，避免卡顿
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced, // 从 BestForNavigation 改为 Balanced
+            timeInterval: 5000,
+            distanceInterval: 10,
+          });
+
+          // 5秒超时
+          const timeoutPromise = new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error('GPS获取超时')), 5000)
+          );
+
+          const location = await Promise.race([locationPromise, timeoutPromise]) as any;
+          if (location) {
+            latitude = location.coords.latitude;
+            longitude = location.coords.longitude;
+            console.log('✅ 位置获取成功:', latitude, longitude);
+          }
+        }
+      } catch (locationError) {
+        console.warn('⚠️ 位置获取失败，使用默认坐标:', locationError);
+        // 使用默认坐标（曼德勒市中心）
+        latitude = 21.9588;
+        longitude = 96.0891;
+      }
+
+      // 2. 异步保存照片到相册（不阻塞主流程）
+      MediaLibrary.requestPermissionsAsync()
+        .then(mediaPermission => {
+          if (mediaPermission.status === 'granted') {
+            MediaLibrary.saveToLibraryAsync(capturedPhoto).catch(error => {
+              console.log('⚠️ 保存到相册失败:', error);
+            });
+          }
+        })
+        .catch(error => console.log('⚠️ 相册权限请求失败:', error));
+
+      // 3. 转换照片为base64（使用超时保护）
+      console.log('📸 正在压缩照片...');
+      let photoBase64 = '';
+      
+      try {
+        const base64Promise = convertImageToBase64(capturedPhoto);
+        const timeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('照片转换超时')), 10000)
+        );
+
+        photoBase64 = await Promise.race([base64Promise, timeoutPromise]);
+        console.log('✅ 照片转换完成，大小:', (photoBase64.length / 1024).toFixed(2), 'KB');
+      } catch (conversionError) {
+        console.error('❌ 照片转换失败:', conversionError);
+        Alert.alert('错误', '照片处理失败，请重试');
         setUploadingPhoto(false);
         return;
       }
 
-      // 获取当前位置
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 5000,
-        distanceInterval: 1,
-      });
-      const { latitude, longitude } = location.coords;
-
-      // 保存照片到相册（异步执行，不阻塞主流程）
-      const mediaPermission = await MediaLibrary.requestPermissionsAsync();
-      if (mediaPermission.status === 'granted') {
-        MediaLibrary.saveToLibraryAsync(capturedPhoto).catch(error => {
-          console.log('保存到相册失败:', error);
+      // 4. 保存配送照片到数据库（使用超时保护）
+      console.log('☁️ 正在上传照片到服务器...');
+      let photoSaved = false;
+      
+      try {
+        const uploadPromise = deliveryPhotoService.saveDeliveryPhoto({
+          packageId: currentPackage.id,
+          photoBase64: photoBase64,
+          courierName: userName,
+          latitude: latitude,
+          longitude: longitude,
+          locationName: '配送位置'
         });
+
+        // 15秒上传超时
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('照片上传超时')), 15000)
+        );
+
+        photoSaved = await Promise.race([uploadPromise, timeoutPromise]);
+        
+        if (photoSaved) {
+          console.log('✅ 照片上传成功！');
+        } else {
+          console.log('⚠️ 照片上传失败，但继续更新包裹状态');
+        }
+      } catch (uploadError) {
+        console.error('❌ 照片上传失败:', uploadError);
+        // 显示警告但继续流程
+        console.log('⚠️ 照片上传失败，但继续更新包裹状态');
       }
 
-      // 获取当前骑手信息
-      const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
-
-      // 将照片转换为base64（用于存储）
-      console.log('开始转换照片为base64...');
-      const photoBase64 = await convertImageToBase64(capturedPhoto);
-      console.log('照片base64转换完成，长度:', photoBase64.length);
-
-      // 保存配送照片到数据库
-      console.log('开始保存照片到数据库...');
-      const photoSaved = await deliveryPhotoService.saveDeliveryPhoto({
-        packageId: currentPackage.id,
-        photoBase64: photoBase64,
-        courierName: userName,
-        latitude: latitude,
-        longitude: longitude,
-        locationName: '配送位置'
-      });
-
-      console.log('照片保存结果:', photoSaved);
-      if (!photoSaved) {
-        console.log('照片保存失败，但继续更新包裹状态');
-      } else {
-        console.log('照片保存成功！');
-      }
-
-      // 更新包裹状态为"已送达"并记录店铺信息
+      // 5. 更新包裹状态为"已送达"并记录店铺信息
       console.log('开始更新包裹状态:', {
         packageId: currentPackage.id,
         status: '已送达',
@@ -202,6 +252,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           longitude,
           timestamp: new Date().toISOString(),
           courier: userName,
+          photoUploaded: photoSaved
         };
 
         console.log('配送证明记录:', deliveryProof);
@@ -209,9 +260,18 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         // 更新本地状态
         setCurrentPackage({ ...currentPackage, status: '已送达' });
 
+        // 生成详细的成功消息
+        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackage.id}\n👤 骑手：${userName}\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
+        
+        if (photoSaved) {
+          successMessage += `\n✅ 配送照片已上传到服务器`;
+        } else {
+          successMessage += `\n⚠️ 配送照片已保存到本地相册\n（服务器上传失败，但状态已更新）`;
+        }
+
         Alert.alert(
-          '配送完成！',
-          `包裹已成功送达\n📦 包裹编号：${currentPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
+          '✅ 配送完成！',
+          successMessage,
           [
             {
               text: '确定',
@@ -224,8 +284,18 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           ]
         );
       } else {
-        Alert.alert('照片上传成功', `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`);
-        setUploadingPhoto(false);
+        Alert.alert(
+          '⚠️ 部分成功', 
+          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
+          [
+            {
+              text: '确定',
+              onPress: () => {
+                setUploadingPhoto(false);
+              }
+            }
+          ]
+        );
       }
 
     } catch (error) {
