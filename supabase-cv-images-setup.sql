@@ -31,3 +31,4 @@ WHERE cv_images IS NULL;
 -- UPDATE admin_accounts 
 -- SET cv_images = cv_images - 'https://example.com/cv1.jpg'
 -- WHERE employee_id = 'EMP001';
+

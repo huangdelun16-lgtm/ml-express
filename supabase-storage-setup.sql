@@ -41,3 +41,4 @@ FOR DELETE USING (bucket_id = 'cv-forms');
 
 -- 清理脚本（如果需要删除存储桶）
 -- DELETE FROM storage.buckets WHERE id = 'cv-forms';
+

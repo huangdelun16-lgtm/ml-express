@@ -365,3 +365,4 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
 
 // 导出类型
 export type { UploadProgress, ProgressBarProps, BatchProgressProps };
+

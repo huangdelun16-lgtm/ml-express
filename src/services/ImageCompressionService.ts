@@ -235,3 +235,4 @@ export const imageCompressionService = new ImageCompressionService();
 
 // 导出类型
 export type { CompressionConfig, CompressionResult };
+

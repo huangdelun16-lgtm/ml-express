@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAccountService, AdminAccount } from '../services/supabase';
-import { fileUploadService, UploadResult } from '../services/FileUploadService';
+import { fileUploadService } from '../services/FileUploadService';
 import { imageCompressionService, CompressionResult } from '../services/ImageCompressionService';
-import { fileValidationService, BatchValidationResult } from '../services/FileValidationService';
-import { ProgressBar, BatchProgress, UploadProgress } from '../components/UploadProgress';
+import { fileValidationService } from '../services/FileValidationService';
+import { BatchProgress, UploadProgress } from '../components/UploadProgress';
 
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -251,10 +251,10 @@ const AccountManagement: React.FC = () => {
       setCompressionResults(compressionResults);
 
       // 更新进度状态
-      const compressionProgresses = compressionResults.map((result, index) => ({
+      const compressionProgresses: UploadProgress[] = compressionResults.map((result, index) => ({
         fileName: fileArray[index].name,
         progress: result.success ? 30 : 0,
-        status: result.success ? 'pending' : 'error',
+        status: (result.success ? 'pending' : 'error') as 'pending' | 'uploading' | 'completed' | 'error',
         error: result.error,
         fileSize: fileArray[index].size
       }));
@@ -283,10 +283,10 @@ const AccountManagement: React.FC = () => {
       const uploadResults = await fileUploadService.uploadFiles(filesToUpload, formData.employee_id);
 
       // 更新最终进度状态
-      const finalProgresses = uploadResults.results.map((result, index) => ({
+      const finalProgresses: UploadProgress[] = uploadResults.results.map((result, index) => ({
         fileName: filesToUpload[index].name,
         progress: result.success ? 100 : 0,
-        status: result.success ? 'completed' : 'error',
+        status: (result.success ? 'completed' : 'error') as 'pending' | 'uploading' | 'completed' | 'error',
         error: result.error,
         fileSize: filesToUpload[index].size
       }));
@@ -385,25 +385,77 @@ const AccountManagement: React.FC = () => {
     if (selectedFiles.length === 0) return;
     
     // 重新处理失败的文件
-    const failedFiles = uploadProgresses
-      .filter(p => p.status === 'error')
-      .map((_, index) => selectedFiles[index])
-      .filter(Boolean);
+    const failedProgresses = uploadProgresses.filter(p => p.status === 'error');
+    const failedFileNames = failedProgresses.map(p => p.fileName);
+    const failedFiles = selectedFiles.filter(file => failedFileNames.includes(file.name));
 
     if (failedFiles.length === 0) return;
 
-    // 重新上传失败的文件
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = 'image/*,.pdf';
+    // 直接处理失败的文件，而不是模拟事件
+    const fileArray = failedFiles;
     
-    // 模拟重新选择文件
-    const event = {
-      target: { files: failedFiles }
-    } as React.ChangeEvent<HTMLInputElement>;
+    // 第一步：文件验证
+    const validationResult = fileValidationService.validateFiles(fileArray);
     
-    await handleCvFileUpload(event);
+    if (!validationResult.valid) {
+      const errorMessage = validationResult.allErrors.join('\n');
+      showNotification(`文件验证失败：${errorMessage}`, 'error');
+      return;
+    }
+
+    setShowUploadProgress(true);
+
+    try {
+      // 第二步：压缩图片
+      const compressionResults = await imageCompressionService.compressImages(fileArray);
+      
+      // 第三步：上传文件
+      const filesToUpload = compressionResults
+        .filter(result => result.success)
+        .map(result => result.compressedFile!);
+
+      if (filesToUpload.length === 0) {
+        showNotification('所有文件压缩失败', 'error');
+        return;
+      }
+
+      // 执行上传
+      const uploadResults = await fileUploadService.uploadFiles(filesToUpload, formData.employee_id);
+
+      // 更新进度状态
+      const retryProgresses: UploadProgress[] = uploadResults.results.map((result, index) => ({
+        fileName: filesToUpload[index].name,
+        progress: result.success ? 100 : 0,
+        status: (result.success ? 'completed' : 'error') as 'pending' | 'uploading' | 'completed' | 'error',
+        error: result.error,
+        fileSize: filesToUpload[index].size
+      }));
+      
+      // 更新uploadProgresses，替换失败的文件进度
+      const updatedProgresses = uploadProgresses.map(p => {
+        const retryProgress = retryProgresses.find(rp => rp.fileName === p.fileName);
+        return retryProgress || p;
+      });
+      setUploadProgresses(updatedProgresses);
+
+      // 收集成功上传的URL
+      const successfulUrls = uploadResults.results
+        .filter(result => result.success)
+        .map(result => result.url!);
+
+      if (successfulUrls.length > 0) {
+        setCvImages(prev => [...prev, ...successfulUrls]);
+        showNotification(`重试成功上传 ${successfulUrls.length} 个文件`, 'success');
+      }
+
+      if (uploadResults.errorCount > 0) {
+        showNotification(`${uploadResults.errorCount} 个文件重试失败`, 'warning');
+      }
+
+    } catch (error: any) {
+      console.error('重试上传失败:', error);
+      showNotification(`重试失败: ${error.message}`, 'error');
+    }
   };
 
   return (

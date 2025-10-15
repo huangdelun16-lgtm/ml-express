@@ -129,7 +129,8 @@ export class FileValidationService {
     const fileNames = files.map(f => f.name.toLowerCase());
     const duplicateNames = fileNames.filter((name, index) => fileNames.indexOf(name) !== index);
     if (duplicateNames.length > 0) {
-      allWarnings.push(`发现重复文件名: ${[...new Set(duplicateNames)].join(', ')}`);
+      const uniqueDuplicates = Array.from(new Set(duplicateNames));
+      allWarnings.push(`发现重复文件名: ${uniqueDuplicates.join(', ')}`);
     }
 
     const validFiles = results.filter(r => r.valid).length;
@@ -271,3 +272,4 @@ export const fileValidationService = new FileValidationService();
 
 // 导出类型
 export type { ValidationConfig, ValidationResult, FileValidationResult, BatchValidationResult };
+

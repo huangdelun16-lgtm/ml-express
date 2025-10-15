@@ -301,3 +301,4 @@ export const fileUploadService = new FileUploadService();
 
 // 导出类型
 export type { UploadConfig, UploadResult, BatchUploadResult };
+
