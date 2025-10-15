@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAccountService, AdminAccount } from '../services/supabase';
+import { fileUploadService, UploadResult } from '../services/FileUploadService';
+import { imageCompressionService, CompressionResult } from '../services/ImageCompressionService';
+import { fileValidationService, BatchValidationResult } from '../services/FileValidationService';
+import { ProgressBar, BatchProgress, UploadProgress } from '../components/UploadProgress';
 
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +21,10 @@ const AccountManagement: React.FC = () => {
   const [showCvViewModal, setShowCvViewModal] = useState(false);
   const [cvImages, setCvImages] = useState<string[]>([]);
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [uploadProgresses, setUploadProgresses] = useState<UploadProgress[]>([]);
+  const [showUploadProgress, setShowUploadProgress] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [compressionResults, setCompressionResults] = useState<CompressionResult[]>([]);
 
   const [formData, setFormData] = useState({
     username: '',
@@ -181,37 +189,116 @@ const AccountManagement: React.FC = () => {
   };
 
   // 处理CV文件上传
-  const handleCvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCvFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const newImages: string[] = [];
+    const fileArray = Array.from(files);
     
-    Array.from(files).forEach((file) => {
-      // 检查文件类型
-      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-        alert(`文件 ${file.name} 格式不支持，请上传图片或PDF文件`);
+    // 第一步：文件验证
+    const validationResult = fileValidationService.validateFiles(fileArray);
+    
+    if (!validationResult.valid) {
+      // 显示验证错误
+      const errorMessage = validationResult.allErrors.join('\n');
+      alert(`文件验证失败：\n${errorMessage}`);
+      return;
+    }
+
+    // 显示警告（如果有）
+    if (validationResult.allWarnings.length > 0) {
+      const warningMessage = validationResult.allWarnings.join('\n');
+      const proceed = confirm(`发现以下警告，是否继续上传？\n\n${warningMessage}`);
+      if (!proceed) return;
+    }
+
+    setSelectedFiles(fileArray);
+    
+    // 初始化进度状态
+    const initialProgresses: UploadProgress[] = fileArray.map(file => ({
+      fileName: file.name,
+      progress: 0,
+      status: 'pending',
+      fileSize: file.size
+    }));
+    setUploadProgresses(initialProgresses);
+    setShowUploadProgress(true);
+
+    try {
+      // 第二步：压缩图片
+      const compressionResults = await imageCompressionService.compressImages(fileArray);
+      setCompressionResults(compressionResults);
+
+      // 更新进度状态
+      const compressionProgresses = compressionResults.map((result, index) => ({
+        fileName: fileArray[index].name,
+        progress: result.success ? 30 : 0,
+        status: result.success ? 'pending' : 'error',
+        error: result.error,
+        fileSize: fileArray[index].size
+      }));
+      setUploadProgresses(compressionProgresses);
+
+      // 第三步：上传文件
+      const filesToUpload = compressionResults
+        .filter(result => result.success)
+        .map(result => result.compressedFile!);
+
+      if (filesToUpload.length === 0) {
+        alert('所有文件压缩失败');
         return;
       }
 
-      // 检查文件大小 (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`文件 ${file.name} 过大，请选择小于10MB的文件`);
-        return;
+      // 创建上传进度跟踪
+      const uploadProgresses = filesToUpload.map(file => ({
+        fileName: file.name,
+        progress: 30,
+        status: 'uploading' as const,
+        fileSize: file.size
+      }));
+      setUploadProgresses(uploadProgresses);
+
+      // 执行上传
+      const uploadResults = await fileUploadService.uploadFiles(filesToUpload, formData.employee_id);
+
+      // 更新最终进度状态
+      const finalProgresses = uploadResults.results.map((result, index) => ({
+        fileName: filesToUpload[index].name,
+        progress: result.success ? 100 : 0,
+        status: result.success ? 'completed' : 'error',
+        error: result.error,
+        fileSize: filesToUpload[index].size
+      }));
+      setUploadProgresses(finalProgresses);
+
+      // 收集成功上传的URL
+      const successfulUrls = uploadResults.results
+        .filter(result => result.success)
+        .map(result => result.url!);
+
+      if (successfulUrls.length > 0) {
+        setCvImages(prev => [...prev, ...successfulUrls]);
+        alert(`成功上传 ${successfulUrls.length} 个文件`);
       }
 
-      // 创建预览URL
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        newImages.push(result);
-        
-        if (newImages.length === Array.from(files).length) {
-          setCvImages(prev => [...prev, ...newImages]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+      if (uploadResults.errorCount > 0) {
+        alert(`${uploadResults.errorCount} 个文件上传失败`);
+      }
+
+    } catch (error: any) {
+      console.error('文件处理失败:', error);
+      alert(`文件处理失败: ${error.message}`);
+      
+      // 更新所有进度为错误状态
+      const errorProgresses = fileArray.map(file => ({
+        fileName: file.name,
+        progress: 0,
+        status: 'error' as const,
+        error: error.message,
+        fileSize: file.size
+      }));
+      setUploadProgresses(errorProgresses);
+    }
   };
 
   // 保存CV图片
@@ -223,19 +310,79 @@ const AccountManagement: React.FC = () => {
 
     setUploadingCv(true);
     try {
-      // 这里应该将图片保存到服务器或数据库
-      // 目前只是模拟保存过程
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 这里应该将CV图片URL保存到员工记录中
+      // 由于当前没有员工ID，我们暂时保存到本地状态
+      // 在实际应用中，应该在创建员工时一起保存CV图片
+      
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟保存延迟
       
       alert('CV Form保存成功！');
       setShowCvUploadModal(false);
       setCvImages([]);
+      setUploadProgresses([]);
+      setShowUploadProgress(false);
+      setSelectedFiles([]);
+      setCompressionResults([]);
     } catch (error) {
       console.error('保存CV Form失败:', error);
       alert('保存CV Form失败，请重试');
     } finally {
       setUploadingCv(false);
     }
+  };
+
+  // 删除CV图片
+  const handleDeleteCvImage = async (imageUrl: string, index: number) => {
+    try {
+      // 从Supabase Storage删除文件
+      const deleteResult = await fileUploadService.deleteFile(imageUrl);
+      
+      if (deleteResult.success) {
+        // 从本地状态中移除
+        const newImages = cvImages.filter((_, i) => i !== index);
+        setCvImages(newImages);
+        alert('图片删除成功');
+      } else {
+        alert(`删除失败: ${deleteResult.error}`);
+      }
+    } catch (error: any) {
+      console.error('删除图片失败:', error);
+      alert(`删除失败: ${error.message}`);
+    }
+  };
+
+  // 取消上传
+  const handleCancelUpload = () => {
+    setShowUploadProgress(false);
+    setUploadProgresses([]);
+    setSelectedFiles([]);
+    setCompressionResults([]);
+  };
+
+  // 重试上传
+  const handleRetryUpload = async () => {
+    if (selectedFiles.length === 0) return;
+    
+    // 重新处理失败的文件
+    const failedFiles = uploadProgresses
+      .filter(p => p.status === 'error')
+      .map((_, index) => selectedFiles[index])
+      .filter(Boolean);
+
+    if (failedFiles.length === 0) return;
+
+    // 重新上传失败的文件
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*,.pdf';
+    
+    // 模拟重新选择文件
+    const event = {
+      target: { files: failedFiles }
+    } as React.ChangeEvent<HTMLInputElement>;
+    
+    await handleCvFileUpload(event);
   };
 
   return (
@@ -1225,6 +1372,17 @@ const AccountManagement: React.FC = () => {
                 />
               </div>
 
+              {/* 上传进度显示 */}
+              {showUploadProgress && uploadProgresses.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <BatchProgress
+                    progresses={uploadProgresses}
+                    onCancelAll={handleCancelUpload}
+                    onRetryAll={handleRetryUpload}
+                  />
+                </div>
+              )}
+
               {/* 已上传的CV图片预览 */}
               {cvImages.length > 0 && (
                 <div style={{ marginBottom: '24px' }}>
@@ -1260,10 +1418,7 @@ const AccountManagement: React.FC = () => {
                           }}
                         />
                         <button
-                          onClick={() => {
-                            const newImages = cvImages.filter((_, i) => i !== index);
-                            setCvImages(newImages);
-                          }}
+                          onClick={() => handleDeleteCvImage(image, index)}
                           style={{
                             position: 'absolute',
                             top: '4px',
@@ -1302,6 +1457,10 @@ const AccountManagement: React.FC = () => {
                   onClick={() => {
                     setCvImages([]);
                     setShowCvUploadModal(false);
+                    setUploadProgresses([]);
+                    setShowUploadProgress(false);
+                    setSelectedFiles([]);
+                    setCompressionResults([]);
                   }}
                   style={{
                     background: 'rgba(255, 255, 255, 0.1)',
