@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
 interface DeliveryAlert {
@@ -26,6 +27,7 @@ interface DeliveryAlert {
 }
 
 export default function DeliveryAlerts() {
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<DeliveryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all'); // all, pending, resolved
@@ -34,9 +36,17 @@ export default function DeliveryAlerts() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [realTimeStats, setRealTimeStats] = useState({
+    totalAlerts: 0,
+    criticalAlerts: 0,
+    pendingAlerts: 0,
+    resolvedToday: 0
+  });
 
   useEffect(() => {
     loadAlerts();
+    updateRealTimeStats();
     
     // 设置实时订阅
     const subscription = supabase
@@ -49,14 +59,24 @@ export default function DeliveryAlerts() {
           table: 'delivery_alerts'
         },
         (payload) => {
-          console.log('警报更新:', payload);
+          console.log('🚨 实时警报更新:', payload);
           loadAlerts(); // 重新加载警报
+          updateRealTimeStats(); // 更新实时统计
+          
+          // 显示新警报通知
+          if (payload.eventType === 'INSERT') {
+            showNewAlertNotification(payload.new);
+          }
         }
       )
       .subscribe();
 
+    // 设置定时更新统计
+    const statsInterval = setInterval(updateRealTimeStats, 30000); // 每30秒更新一次
+
     return () => {
       subscription.unsubscribe();
+      clearInterval(statsInterval);
     };
   }, [filter, severityFilter]);
 
@@ -88,6 +108,142 @@ export default function DeliveryAlerts() {
       console.error('加载警报异常:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 更新实时统计
+  const updateRealTimeStats = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data: stats, error } = await supabase
+        .from('delivery_alerts')
+        .select('severity, status, resolved_at')
+        .gte('created_at', today);
+
+      if (error) {
+        console.error('获取统计失败:', error);
+        return;
+      }
+
+      const totalAlerts = stats?.length || 0;
+      const criticalAlerts = stats?.filter(s => s.severity === 'critical' && s.status === 'pending').length || 0;
+      const pendingAlerts = stats?.filter(s => s.status === 'pending').length || 0;
+      const resolvedToday = stats?.filter(s => s.resolved_at && s.resolved_at.startsWith(today)).length || 0;
+
+      setRealTimeStats({
+        totalAlerts,
+        criticalAlerts,
+        pendingAlerts,
+        resolvedToday
+      });
+    } catch (error) {
+      console.error('更新统计异常:', error);
+    }
+  };
+
+  // 显示新警报通知
+  const showNewAlertNotification = (newAlert: any) => {
+    const severityEmoji = {
+      'critical': '🚨',
+      'high': '⚠️',
+      'medium': '⚡',
+      'low': 'ℹ️'
+    };
+
+    const alertTypeEmoji = {
+      'distance_violation': '📍',
+      'suspicious_location': '🔍',
+      'location_unavailable': '📵',
+      'time_violation': '⏰',
+      'no_photo': '📸'
+    };
+
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #dc2626 0%, #f87171 100%);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      z-index: 10000;
+      max-width: 400px;
+      animation: slideIn 0.3s ease-out;
+    `;
+
+    notification.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="font-size: 24px;">${severityEmoji[newAlert.severity] || '🚨'}</div>
+        <div>
+          <div style="font-weight: 600; font-size: 16px;">新警报</div>
+          <div style="font-size: 14px; opacity: 0.9;">${alertTypeEmoji[newAlert.alert_type] || '⚠️'} ${newAlert.title}</div>
+          <div style="font-size: 12px; opacity: 0.8;">骑手: ${newAlert.courier_name}</div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // 5秒后自动移除
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 5000);
+  };
+
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      // 清除本地存储
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      
+      // 跳转到登录页
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('退出失败:', error);
+    }
+  };
+
+  // 批量处理警报
+  const handleBatchAction = async (action: 'acknowledge' | 'resolve' | 'dismiss', alertIds: string[]) => {
+    try {
+      setProcessing(true);
+      
+      const updates = {
+        status: action === 'acknowledge' ? 'acknowledged' : 
+                action === 'resolve' ? 'resolved' : 'dismissed',
+        resolved_at: new Date().toISOString(),
+        resolved_by: 'admin',
+        resolution_notes: resolutionNotes || `批量${action === 'acknowledge' ? '确认' : action === 'resolve' ? '解决' : '忽略'}`
+      };
+
+      const { error } = await supabase
+        .from('delivery_alerts')
+        .update(updates)
+        .in('id', alertIds);
+
+      if (error) {
+        console.error('批量处理失败:', error);
+        window.alert('批量处理失败，请重试');
+        return;
+      }
+
+      loadAlerts();
+      updateRealTimeStats();
+      window.alert(`成功${action === 'acknowledge' ? '确认' : action === 'resolve' ? '解决' : '忽略'} ${alertIds.length} 个警报`);
+    } catch (error) {
+      console.error('批量处理异常:', error);
+      window.alert('批量处理失败，请重试');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -209,24 +365,69 @@ export default function DeliveryAlerts() {
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c' }}>
-                🚨 配送警报管理
-              </h1>
-              <p style={{ margin: '8px 0 0 0', color: '#718096', fontSize: '1rem' }}>
-                监控和管理骑手异常操作警报
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c' }}>
+                  🚨 配送警报管理
+                </h1>
+                <p style={{ margin: '8px 0 0 0', color: '#718096', fontSize: '1rem' }}>
+                  监控和管理骑手异常操作警报
+                </p>
+              </div>
+              
+              {/* 退出后台按钮 */}
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '14px 28px',
+                  borderRadius: '10px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'all 0.3s',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>🚪</span>
+                <span>退出后台</span>
+              </button>
             </div>
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              {/* 实时统计卡片 */}
               <div style={{
                 background: 'linear-gradient(135deg, #dc2626 0%, #f87171 100%)',
                 color: 'white',
                 padding: '16px 24px',
                 borderRadius: '12px',
-                textAlign: 'center'
+                textAlign: 'center',
+                position: 'relative'
               }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{criticalCount}</div>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.criticalAlerts}</div>
                 <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>紧急警报</div>
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  width: '8px',
+                  height: '8px',
+                  background: '#10b981',
+                  borderRadius: '50%',
+                  animation: 'pulse 2s infinite'
+                }}></div>
               </div>
               <div style={{
                 background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
@@ -235,7 +436,7 @@ export default function DeliveryAlerts() {
                 borderRadius: '12px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{pendingCount}</div>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.pendingAlerts}</div>
                 <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>待处理</div>
               </div>
               <div style={{
@@ -245,8 +446,18 @@ export default function DeliveryAlerts() {
                 borderRadius: '12px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{alerts.length}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>总警报数</div>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.totalAlerts}</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>今日总数</div>
+              </div>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                color: 'white',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.resolvedToday}</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>今日已解决</div>
               </div>
             </div>
           </div>
@@ -686,6 +897,110 @@ export default function DeliveryAlerts() {
           </div>
         </div>
       )}
+
+      {/* 退出确认对话框 */}
+      {showLogoutConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '24px'
+          }}
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '400px',
+              width: '100%',
+              textAlign: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚪</div>
+            <h2 style={{ margin: '0 0 16px 0', color: '#1a202c' }}>
+              确认退出
+            </h2>
+            <p style={{ margin: '0 0 24px 0', color: '#4a5568' }}>
+              您确定要退出配送警报管理系统吗？
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  background: 'white',
+                  color: '#4a5568',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #dc2626 0%, #f87171 100%)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                确认退出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSS 动画样式 */}
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+          
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+          
+          @keyframes slideOut {
+            from {
+              transform: translateX(0);
+              opacity: 1;
+            }
+            to {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
