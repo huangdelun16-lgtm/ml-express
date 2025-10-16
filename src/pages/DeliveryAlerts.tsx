@@ -685,7 +685,7 @@ export default function DeliveryAlerts() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 1001,
             padding: '24px'
           }}
           onClick={() => setShowPackageDetail(false)}
