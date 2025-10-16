@@ -37,6 +37,10 @@ export default function DeliveryAlerts() {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showPackageDetail, setShowPackageDetail] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [realTimeStats, setRealTimeStats] = useState({
     totalAlerts: 0,
     criticalAlerts: 0,
@@ -199,6 +203,33 @@ export default function DeliveryAlerts() {
         }
       }, 300);
     }, 5000);
+  };
+
+  // 查看包裹详情
+  const handleViewPackageDetail = async (alert: DeliveryAlert) => {
+    try {
+      setLoadingPhotos(true);
+      setSelectedPackage(alert);
+      setShowPackageDetail(true);
+      
+      // 获取包裹照片
+      const { data: photos, error } = await supabase
+        .from('delivery_photos')
+        .select('photo_url')
+        .eq('package_id', alert.package_id)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取照片失败:', error);
+        setPackagePhotos([]);
+      } else {
+        setPackagePhotos(photos?.map(p => p.photo_url) || []);
+      }
+    } catch (error) {
+      console.error('查看包裹详情失败:', error);
+    } finally {
+      setLoadingPhotos(false);
+    }
   };
 
   // 返回仪表板
@@ -620,6 +651,34 @@ export default function DeliveryAlerts() {
                       <div style={{ marginTop: '4px', fontSize: '0.875rem', color: '#4a5568' }}>
                         <strong>包裹:</strong> {alert.package_id}
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewPackageDetail(alert);
+                        }}
+                        style={{
+                          marginTop: '8px',
+                          padding: '6px 12px',
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        📋 详情
+                      </button>
                       {alert.distance_from_destination && (
                         <div style={{
                           marginTop: '8px',
@@ -641,6 +700,147 @@ export default function DeliveryAlerts() {
           )}
         </div>
       </div>
+
+      {/* 包裹详情模态框 */}
+      {showPackageDetail && selectedPackage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '24px'
+          }}
+          onClick={() => setShowPackageDetail(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '800px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 24px 0', color: '#1a202c' }}>
+              📦 包裹详情
+            </h2>
+
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <strong style={{ color: '#4a5568' }}>包裹编号:</strong>
+                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{selectedPackage.package_id}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4a5568' }}>骑手:</strong>
+                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{selectedPackage.courier_name}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4a5568' }}>警报类型:</strong>
+                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{getAlertTypeText(selectedPackage.alert_type)}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4a5568' }}>严重程度:</strong>
+                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{getSeverityText(selectedPackage.severity)}</div>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4a5568' }}>创建时间:</strong>
+                    <div style={{ marginTop: '4px', color: '#1a202c' }}>
+                      {new Date(selectedPackage.created_at).toLocaleString('zh-CN')}
+                    </div>
+                  </div>
+                  {selectedPackage.distance_from_destination && (
+                    <div>
+                      <strong style={{ color: '#4a5568' }}>距离目标:</strong>
+                      <div style={{ marginTop: '4px', color: '#dc2626', fontWeight: 600, fontSize: '1.125rem' }}>
+                        {selectedPackage.distance_from_destination.toFixed(0)} 米
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <strong style={{ color: '#4a5568' }}>警报描述:</strong>
+                  <p style={{ margin: '8px 0 0 0', color: '#1a202c', lineHeight: 1.6 }}>
+                    {selectedPackage.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* 照片查看区域 */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 16px 0', color: '#1a202c' }}>
+                  📸 骑手拍照记录
+                </h3>
+                
+                {loadingPhotos ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ fontSize: '2rem' }}>⏳</div>
+                    <p style={{ color: '#718096', marginTop: '8px' }}>加载照片中...</p>
+                  </div>
+                ) : packagePhotos.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    {packagePhotos.map((photo, index) => (
+                      <div key={index} style={{ textAlign: 'center' }}>
+                        <img
+                          src={photo}
+                          alt={`包裹照片 ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '150px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            border: '2px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => window.open(photo, '_blank')}
+                        />
+                        <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#4a5568' }}>
+                          照片 {index + 1}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px', background: '#f7fafc', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '2rem' }}>📷</div>
+                    <p style={{ color: '#718096', marginTop: '8px' }}>暂无照片记录</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowPackageDetail(false)}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  background: 'white',
+                  color: '#4a5568',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 详情模态框 */}
       {showDetailModal && selectedAlert && (
