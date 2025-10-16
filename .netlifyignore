@@ -1,0 +1,24 @@
+# Netlify Ignore File
+# Files that should be ignored during deployment and secret scanning
+
+# Ignore markdown documentation files
+*.md
+GOOGLE*.md
+NETLIFY*.md
+URGENT*.md
+TYPESCRIPT*.md
+
+# Ignore test files
+test-*.html
+diagnose-*.html
+check-*.html
+
+# Ignore SQL files
+*.sql
+
+# Ignore shell scripts
+*.sh
+
+# Ignore backup files
+*backup*
+*Backup*
