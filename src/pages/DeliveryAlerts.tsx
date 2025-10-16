@@ -36,7 +36,6 @@ export default function DeliveryAlerts() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showPackageDetail, setShowPackageDetail] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
@@ -1087,78 +1086,6 @@ export default function DeliveryAlerts() {
                   </button>
                 </>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 退出确认对话框 */}
-      {showLogoutConfirm && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '24px'
-          }}
-          onClick={() => setShowLogoutConfirm(false)}
-        >
-          <div
-            style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '400px',
-              width: '100%',
-              textAlign: 'center'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚪</div>
-            <h2 style={{ margin: '0 0 16px 0', color: '#1a202c' }}>
-              确认退出
-            </h2>
-            <p style={{ margin: '0 0 24px 0', color: '#4a5568' }}>
-              您确定要退出配送警报管理系统吗？
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  background: 'white',
-                  color: '#4a5568',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleLogout}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #dc2626 0%, #f87171 100%)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
-              >
-                确认退出
-              </button>
             </div>
           </div>
         </div>
