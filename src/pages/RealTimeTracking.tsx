@@ -4,7 +4,10 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
+const GOOGLE_MAPS_API_KEY =
+  import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY ||
+  process.env?.REACT_APP_GOOGLE_MAPS_API_KEY ||
+  "";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
@@ -85,7 +88,7 @@ const RealTimeTracking: React.FC = () => {
     // 如果API密钥缺失，显示警告
     if (!GOOGLE_MAPS_API_KEY) {
       console.error('❌ Google Maps API密钥未设置！');
-      console.log('请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+      console.log('请在Netlify控制台设置环境变量：VITE_GOOGLE_MAPS_API_KEY（或 REACT_APP_GOOGLE_MAPS_API_KEY）');
     }
   }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
