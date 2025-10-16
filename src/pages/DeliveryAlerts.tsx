@@ -201,18 +201,9 @@ export default function DeliveryAlerts() {
     }, 5000);
   };
 
-  // 退出登录
-  const handleLogout = async () => {
-    try {
-      // 清除本地存储
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_user');
-      
-      // 跳转到登录页
-      navigate('/admin/login');
-    } catch (error) {
-      console.error('退出失败:', error);
-    }
+  // 返回仪表板
+  const handleBackToDashboard = () => {
+    navigate('/admin/dashboard');
   };
 
   // 批量处理警报
@@ -378,11 +369,11 @@ export default function DeliveryAlerts() {
                 </p>
               </div>
               
-              {/* 退出后台按钮 */}
+              {/* 返回仪表板按钮 */}
               <button
-                onClick={() => setShowLogoutConfirm(true)}
+                onClick={handleBackToDashboard}
                 style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '14px 28px',
@@ -394,19 +385,19 @@ export default function DeliveryAlerts() {
                   alignItems: 'center',
                   gap: '10px',
                   transition: 'all 0.3s',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                 }}
               >
-                <span style={{ fontSize: '1.2rem' }}>🚪</span>
-                <span>退出后台</span>
+                <span style={{ fontSize: '1.2rem' }}>← </span>
+                <span>返回仪表板</span>
               </button>
             </div>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
