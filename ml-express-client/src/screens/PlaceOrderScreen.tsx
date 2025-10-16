@@ -538,7 +538,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
         receiver_address: receiverAddress,
         package_type: packageType,
         weight: weight,
-        description: description || '',
+        // 核心修正：确保 description 字段包含客户ID标记
+        description: `${description || ''} [客户ID: ${userId}]`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: distance,
