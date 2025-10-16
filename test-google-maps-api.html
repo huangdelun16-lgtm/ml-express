@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        #map {
+            height: 400px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Google Maps API 测试页面</h1>
+        
+        <div class="test-section">
+            <h3>1. API密钥测试</h3>
+            <button onclick="testApiKey()">测试API密钥</button>
+            <div id="apiKeyResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 地图加载测试</h3>
+            <button onclick="loadMap()">加载地图</button>
+            <div id="mapResult"></div>
+            <div id="map"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 环境变量检查</h3>
+            <div id="envCheck"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
+        
+        function testApiKey() {
+            const resultDiv = document.getElementById('apiKeyResult');
+            resultDiv.innerHTML = '<p>正在测试API密钥...</p>';
+            
+            // 测试API密钥是否有效
+            fetch(`https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`)
+                .then(response => {
+                    if (response.ok) {
+                        resultDiv.innerHTML = '<div class="success">✅ API密钥有效！</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="error">❌ API密钥无效！</div>';
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<div class="error">❌ 网络错误: ${error.message}</div>`;
+                });
+        }
+        
+        function loadMap() {
+            const resultDiv = document.getElementById('mapResult');
+            resultDiv.innerHTML = '<p>正在加载地图...</p>';
+            
+            // 动态加载Google Maps API
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&callback=initMap`;
+            script.onerror = function() {
+                resultDiv.innerHTML = '<div class="error">❌ 地图加载失败！</div>';
+            };
+            document.head.appendChild(script);
+        }
+        
+        function initMap() {
+            const resultDiv = document.getElementById('mapResult');
+            resultDiv.innerHTML = '<div class="success">✅ 地图加载成功！</div>';
+            
+            // 创建地图
+            const map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                zoom: 13
+            });
+            
+            // 添加标记
+            new google.maps.Marker({
+                position: { lat: 16.8661, lng: 96.1951 },
+                map: map,
+                title: '仰光市中心'
+            });
+        }
+        
+        // 检查环境变量
+        function checkEnvironment() {
+            const envDiv = document.getElementById('envCheck');
+            envDiv.innerHTML = `
+                <p><strong>当前API密钥:</strong> ${API_KEY}</p>
+                <p><strong>密钥长度:</strong> ${API_KEY.length} 字符</p>
+                <p><strong>密钥格式:</strong> ${API_KEY.startsWith('AIza') ? '✅ 正确' : '❌ 错误'}</p>
+            `;
+        }
+        
+        // 页面加载时检查环境
+        window.onload = function() {
+            checkEnvironment();
+        };
+    </script>
+</body>
+</html>
