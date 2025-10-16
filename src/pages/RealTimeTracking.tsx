@@ -297,8 +297,8 @@ const RealTimeTracking: React.FC = () => {
 
   return (
     <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      minHeight: '100vh', 
+      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
       padding: '2rem'
     }}>
       {/* 顶部导航 */}
