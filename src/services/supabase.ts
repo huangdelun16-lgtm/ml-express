@@ -1607,6 +1607,9 @@ export interface CourierSalary {
   // 时间戳
   created_at?: string;
   updated_at?: string;
+  
+  // 新增字段：关联的包裹ID
+  related_package_ids?: string[];
 }
 
 export interface CourierSalaryDetail {
@@ -1982,6 +1985,31 @@ export const courierSalaryService = {
       return true;
     } catch (err) {
       console.error('更新绩效记录异常:', err);
+      return false;
+    }
+  },
+
+  // 新增：批量标记包裹为已结算
+  async markPackagesAsSettled(packageIds: string[]): Promise<boolean> {
+    if (!packageIds || packageIds.length === 0) {
+      return true; // 没有需要标记的包裹，直接返回成功
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('packages')
+        .update({ is_settled: true })
+        .in('id', packageIds);
+
+      if (error) {
+        console.error('批量标记包裹为已结算失败:', error);
+        return false;
+      }
+
+      console.log(`成功标记 ${packageIds.length} 个包裹为已结算`);
+      return true;
+    } catch (err) {
+      console.error('批量标记包裹为已结算异常:', err);
       return false;
     }
   }

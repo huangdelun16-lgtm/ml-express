@@ -914,6 +914,23 @@ const MyTasksScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
               
+              <TouchableOpacity
+                style={styles.dateItem}
+                onPress={() => {
+                  const today = new Date().toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  });
+                  setSelectedDate(today);
+                  setShowDatePicker(false);
+                }}
+              >
+                <Text style={styles.dateItemText}>
+                  {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}
+                </Text>
+              </TouchableOpacity>
+
               {availableDates.map((date) => (
                 <TouchableOpacity
                   key={date}

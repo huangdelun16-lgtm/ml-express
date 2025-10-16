@@ -328,6 +328,7 @@ const FinanceManagement: React.FC = () => {
         // 计算统计数据
         const totalDeliveries = pkgs.length;
         const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
+        const relatedPackageIds = pkgs.map(p => p.id); // <-- 新增：收集包裹ID
         
         // 计算各项费用
         const COURIER_KM_RATE = 500; // MMK/KM
@@ -360,7 +361,8 @@ const FinanceManagement: React.FC = () => {
           late_deliveries: 0,
           gross_salary: grossSalary,
           net_salary: netSalary,
-          status: 'pending'
+          status: 'pending',
+          related_package_ids: relatedPackageIds, // <-- 新增：保存包裹ID
         };
         
         const success = await courierSalaryService.createSalary(salary);
@@ -2812,7 +2814,16 @@ const FinanceManagement: React.FC = () => {
                               payment_reference: paymentForm.payment_reference,
                               payment_date: paymentForm.payment_date
                             });
-                            if (success) successCount++;
+                            
+                            if (success) {
+                              successCount++;
+                              
+                              // 新增逻辑：标记相关包裹为已结算
+                              const salaryRecord = courierSalaries.find(s => s.id === salaryId);
+                              if (salaryRecord && salaryRecord.related_package_ids) {
+                                await courierSalaryService.markPackagesAsSettled(salaryRecord.related_package_ids);
+                              }
+                            }
                           }
                           
                           window.alert(`成功发放 ${successCount} 条工资！`);
