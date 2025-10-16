@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>环境变量检查工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .check-item {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+        .success { background-color: #d4edda; border-left-color: #28a745; }
+        .error { background-color: #f8d7da; border-left-color: #dc3545; }
+        .warning { background-color: #fff3cd; border-left-color: #ffc107; }
+        .info { background-color: #d1ecf1; border-left-color: #17a2b8; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Netlify 环境变量检查工具</h1>
+        
+        <div class="info">
+            <h3>📋 检查清单</h3>
+            <p>请按照以下步骤检查Netlify环境变量设置：</p>
+        </div>
+
+        <div class="check-item">
+            <h4>1. 登录Netlify控制台</h4>
+            <p>访问 <a href="https://app.netlify.com/" target="_blank">Netlify Dashboard</a></p>
+        </div>
+
+        <div class="check-item">
+            <h4>2. 进入项目设置</h4>
+            <p>选择您的项目 → <strong>Site settings</strong> → <strong>Environment variables</strong></p>
+        </div>
+
+        <div class="check-item">
+            <h4>3. 添加环境变量</h4>
+            <p>点击 <strong>Add variable</strong> 添加以下变量：</p>
+            <ul>
+                <li><code>REACT_APP_GOOGLE_MAPS_API_KEY</code> = <code>AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY</code></li>
+                <li><code>SECRETS_SCAN_SMART_DETECTION_ENABLED</code> = <code>false</code></li>
+            </ul>
+        </div>
+
+        <div class="check-item">
+            <h4>4. 重新部署</h4>
+            <p>进入 <strong>Deploys</strong> → <strong>Trigger deploy</strong> → <strong>Deploy site</strong></p>
+        </div>
+
+        <div class="check-item">
+            <h4>5. 测试环境变量</h4>
+            <button onclick="checkEnvironmentVariables()">检查环境变量</button>
+            <div id="envCheckResult"></div>
+        </div>
+
+        <div class="check-item">
+            <h4>6. 测试API密钥</h4>
+            <button onclick="testApiKey()">测试API密钥</button>
+            <div id="apiKeyResult"></div>
+        </div>
+
+        <div class="check-item">
+            <h4>7. 测试地图加载</h4>
+            <button onclick="testMapLoading()">测试地图加载</button>
+            <div id="mapResult"></div>
+        </div>
+    </div>
+
+    <script>
+        function checkEnvironmentVariables() {
+            const resultDiv = document.getElementById('envCheckResult');
+            
+            // 检查环境变量
+            const apiKey = process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY;
+            
+            if (apiKey) {
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ 环境变量已设置<br>
+                        API Key: ${apiKey.substring(0, 10)}...<br>
+                        长度: ${apiKey.length} 字符
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ 环境变量未设置<br>
+                        请在Netlify控制台添加 REACT_APP_GOOGLE_MAPS_API_KEY
+                    </div>
+                `;
+            }
+        }
+        
+        function testApiKey() {
+            const resultDiv = document.getElementById('apiKeyResult');
+            resultDiv.innerHTML = '<p>正在测试API密钥...</p>';
+            
+            const apiKey = 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
+            
+            // 测试API密钥
+            fetch(`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`)
+                .then(response => {
+                    if (response.ok) {
+                        resultDiv.innerHTML = '<div class="success">✅ API密钥有效！</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="error">❌ API密钥无效！</div>';
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<div class="error">❌ 网络错误: ${error.message}</div>`;
+                });
+        }
+        
+        function testMapLoading() {
+            const resultDiv = document.getElementById('mapResult');
+            resultDiv.innerHTML = '<p>正在测试地图加载...</p>';
+            
+            const apiKey = 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
+            
+            // 动态加载Google Maps API
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initTestMap`;
+            script.onerror = function() {
+                resultDiv.innerHTML = '<div class="error">❌ 地图加载失败！</div>';
+            };
+            document.head.appendChild(script);
+        }
+        
+        function initTestMap() {
+            const resultDiv = document.getElementById('mapResult');
+            resultDiv.innerHTML = '<div class="success">✅ 地图API加载成功！</div>';
+        }
+        
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkEnvironmentVariables();
+        };
+    </script>
+</body>
+</html>
