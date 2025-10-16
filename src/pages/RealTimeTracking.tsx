@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
@@ -62,10 +62,19 @@ const RealTimeTracking: React.FC = () => {
   };
 
   // 加载 Google Maps
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
+  const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: GOOGLE_MAPS_LIBRARIES
   });
+
+  // 调试信息
+  useEffect(() => {
+    console.log('Google Maps API Key:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+    console.log('Map loaded:', isMapLoaded);
+    if (loadError) {
+      console.error('Google Maps load error:', loadError);
+    }
+  }, [isMapLoaded, loadError]);
 
   // 加载包裹数据
   useEffect(() => {
@@ -431,12 +440,26 @@ const RealTimeTracking: React.FC = () => {
                 width: '100%',
                 height: '100%',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: '#f3f4f6',
-                color: '#6b7280'
+                color: '#6b7280',
+                textAlign: 'center',
+                padding: '2rem'
               }}>
-                <div>🌍 地图加载中...</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
+                <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
+                {loadError && (
+                  <div style={{ fontSize: '0.9rem', color: '#ef4444', marginTop: '1rem' }}>
+                    地图加载失败: {loadError.message}
+                  </div>
+                )}
+                {!GOOGLE_MAPS_API_KEY && (
+                  <div style={{ fontSize: '0.9rem', color: '#ef4444', marginTop: '1rem' }}>
+                    Google Maps API密钥未配置
+                  </div>
+                )}
               </div>
             ) : (
               <GoogleMap
