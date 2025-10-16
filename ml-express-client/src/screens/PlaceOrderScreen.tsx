@@ -555,23 +555,27 @@ export default function PlaceOrderScreen({ navigation }: any) {
       
       hideLoading();
 
-      if (result.success) {
+      if (result) { // 假设成功时 result 不为 null
         // 显示QR码模态框
         setQrOrderId(orderId);
         setQrOrderPrice(price);
         setShowQRCodeModal(true);
       } else {
-        console.error('订单创建失败，返回错误：', result.error);
-        const errorMsg = result.error?.message || result.error?.hint || result.error?.details || '请稍后重试';
+        // 由于没有统一的错误对象，我们直接在服务层打印错误
+        // 这里只给用户通用提示
         Alert.alert(
           currentT.orderFailed, 
-          `${errorMsg}\n错误代码：${result.error?.code || 'UNKNOWN'}`
+          '创建失败，请检查网络连接或联系客服。\n错误信息已记录在控制台。'
         );
       }
     } catch (error: any) {
       hideLoading();
-      console.error('提交订单异常:', error);
-      Alert.alert(currentT.orderFailed, `异常：${error.message || '请稍后重试'}`);
+      // 在这里捕获并打印完整的错误信息
+      console.error('【订单创建失败】捕获到异常:', error);
+      Alert.alert(
+        currentT.orderFailed, 
+        `创建失败，请检查网络连接或联系客服。\n错误信息：${error?.message || '未知错误'}`
+      );
     }
   };
 

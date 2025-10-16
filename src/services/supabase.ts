@@ -228,21 +228,22 @@ export const packageService = {
         .single();
       
       if (error) {
-        console.error('创建包裹失败:', error);
-        console.error('错误详情:', {
+        console.error('【Supabase错误】创建包裹失败:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
-          code: error.code
+          code: error.code,
         });
-        return null;
+        // 抛出错误，以便UI层可以捕获
+        throw new Error(`数据库错误: ${error.message} (代码: ${error.code})`);
       }
       
       console.log('包裹创建成功:', data);
       return data;
-    } catch (err) {
-      console.error('创建包裹异常:', err);
-      return null;
+    } catch (err: any) {
+      console.error('【服务层异常】创建包裹时发生未知错误:', err);
+      // 重新抛出错误，确保UI层能接收到
+      throw err;
     }
   },
 
