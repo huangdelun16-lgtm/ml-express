@@ -31,6 +31,11 @@ export interface Package {
   store_receive_code?: string;
   sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
   transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
+  // 新增坐标字段
+  receiver_latitude?: number; // 收件人纬度
+  receiver_longitude?: number; // 收件人经度
+  sender_latitude?: number; // 发件人纬度
+  sender_longitude?: number; // 发件人经度
 }
 
 export interface AdminAccount {

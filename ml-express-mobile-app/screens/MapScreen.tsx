@@ -503,10 +503,10 @@ export default function MapScreen({ navigation }: any) {
 
     // 2. 检查包裹数据中是否已有坐标（receiver_latitude, receiver_longitude）
     const pkg = packages.find(p => p.receiver_address === address);
-    if (pkg && (pkg as any).receiver_latitude && (pkg as any).receiver_longitude) {
+    if (pkg && pkg.receiver_latitude && pkg.receiver_longitude) {
       const coords = {
-        lat: parseFloat((pkg as any).receiver_latitude),
-        lng: parseFloat((pkg as any).receiver_longitude)
+        lat: parseFloat(pkg.receiver_latitude.toString()),
+        lng: parseFloat(pkg.receiver_longitude.toString())
       };
       console.log(`✅ 从包裹数据中读取坐标: ${address} → ${coords.lat}, ${coords.lng}`);
       return coords;
