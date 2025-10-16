@@ -4,9 +4,18 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
+const resolveGoogleMapsKey = (): string | undefined => {
+  try {
+    const meta = (import.meta as unknown as { env?: Record<string, string> }) || {};
+    return meta.env?.VITE_GOOGLE_MAPS_API_KEY;
+  } catch (err) {
+    return undefined;
+  }
+};
+
 const GOOGLE_MAPS_API_KEY =
-  import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY ||
-  process.env?.REACT_APP_GOOGLE_MAPS_API_KEY ||
+  resolveGoogleMapsKey() ||
+  process.env.REACT_APP_GOOGLE_MAPS_API_KEY ||
   "";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
