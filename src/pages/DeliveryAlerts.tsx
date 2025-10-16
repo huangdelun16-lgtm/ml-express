@@ -144,14 +144,14 @@ export default function DeliveryAlerts() {
 
   // 显示新警报通知
   const showNewAlertNotification = (newAlert: any) => {
-    const severityEmoji = {
+    const severityEmoji: { [key: string]: string } = {
       'critical': '🚨',
       'high': '⚠️',
       'medium': '⚡',
       'low': 'ℹ️'
     };
 
-    const alertTypeEmoji = {
+    const alertTypeEmoji: { [key: string]: string } = {
       'distance_violation': '📍',
       'suspicious_location': '🔍',
       'location_unavailable': '📵',
@@ -174,13 +174,16 @@ export default function DeliveryAlerts() {
       animation: slideIn 0.3s ease-out;
     `;
 
+    const severityIcon = severityEmoji[newAlert.severity as string] || '🚨';
+    const alertTypeIcon = alertTypeEmoji[newAlert.alert_type as string] || '⚠️';
+    
     notification.innerHTML = `
       <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="font-size: 24px;">${severityEmoji[newAlert.severity] || '🚨'}</div>
+        <div style="font-size: 24px;">${severityIcon}</div>
         <div>
           <div style="font-weight: 600; font-size: 16px;">新警报</div>
-          <div style="font-size: 14px; opacity: 0.9;">${alertTypeEmoji[newAlert.alert_type] || '⚠️'} ${newAlert.title}</div>
-          <div style="font-size: 12px; opacity: 0.8;">骑手: ${newAlert.courier_name}</div>
+          <div style="font-size: 14px; opacity: 0.9;">${alertTypeIcon} ${newAlert.title || ''}</div>
+          <div style="font-size: 12px; opacity: 0.8;">骑手: ${newAlert.courier_name || ''}</div>
         </div>
       </div>
     `;
