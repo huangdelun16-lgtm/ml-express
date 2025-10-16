@@ -69,12 +69,24 @@ const RealTimeTracking: React.FC = () => {
 
   // 调试信息
   useEffect(() => {
+    console.log('=== Google Maps 调试信息 ===');
     console.log('Google Maps API Key:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+    console.log('API Key length:', GOOGLE_MAPS_API_KEY?.length || 0);
+    console.log('API Key starts with AIza:', GOOGLE_MAPS_API_KEY?.startsWith('AIza') || false);
     console.log('Map loaded:', isMapLoaded);
+    console.log('Load error:', loadError);
+    console.log('========================');
+    
     if (loadError) {
       console.error('Google Maps load error:', loadError);
     }
-  }, [isMapLoaded, loadError]);
+    
+    // 如果API密钥缺失，显示警告
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error('❌ Google Maps API密钥未设置！');
+      console.log('请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+    }
+  }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
   // 加载包裹数据
   useEffect(() => {
@@ -450,16 +462,34 @@ const RealTimeTracking: React.FC = () => {
               }}>
                 <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
                 <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
-                {loadError && (
-                  <div style={{ fontSize: '0.9rem', color: '#ef4444', marginTop: '1rem' }}>
-                    地图加载失败: {loadError.message}
-                  </div>
-                )}
-                {!GOOGLE_MAPS_API_KEY && (
-                  <div style={{ fontSize: '0.9rem', color: '#ef4444', marginTop: '1rem' }}>
-                    Google Maps API密钥未配置
-                  </div>
-                )}
+                
+                {/* 环境变量检查 */}
+                <div style={{ 
+                  marginTop: '1rem', 
+                  padding: '1rem', 
+                  background: '#fff', 
+                  borderRadius: '8px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.9rem',
+                  textAlign: 'left',
+                  maxWidth: '400px'
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>🔧 调试信息</h4>
+                  <div>API密钥状态: {GOOGLE_MAPS_API_KEY ? '✅ 已设置' : '❌ 未设置'}</div>
+                  <div>API密钥长度: {GOOGLE_MAPS_API_KEY?.length || 0} 字符</div>
+                  <div>API密钥格式: {GOOGLE_MAPS_API_KEY?.startsWith('AIza') ? '✅ 正确' : '❌ 错误'}</div>
+                  {loadError && (
+                    <div style={{ color: '#ef4444', marginTop: '0.5rem' }}>
+                      错误: {loadError.message}
+                    </div>
+                  )}
+                  {!GOOGLE_MAPS_API_KEY && (
+                    <div style={{ color: '#ef4444', marginTop: '0.5rem' }}>
+                      ⚠️ 请在Netlify控制台设置环境变量：<br/>
+                      <code>REACT_APP_GOOGLE_MAPS_API_KEY</code>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <GoogleMap
