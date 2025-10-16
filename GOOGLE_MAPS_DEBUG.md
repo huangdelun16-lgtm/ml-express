@@ -18,7 +18,7 @@ console.log('API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
 ### 2. 临时硬编码测试
 如果环境变量有问题，可以临时硬编码测试：
 ```typescript
-const GOOGLE_MAPS_API_KEY = "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
 ```
 
 ### 3. 检查API密钥权限
