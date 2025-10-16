@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: #333;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        code {
+            background: #f8f9fa;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #e83e8c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Google Maps API 测试工具</h1>
+        
+        <div class="info">
+            <h3>📋 测试信息</h3>
+            <div>当前域名: <code id="currentDomain"></code></div>
+            <div>API密钥: <code>AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY</code></div>
+        </div>
+
+        <div id="status"></div>
+
+        <h3>测试步骤</h3>
+        <button onclick="testApiKey()">1. 测试API密钥</button>
+        <button onclick="loadMap()">2. 加载地图</button>
+
+        <div id="map"></div>
+
+        <div id="console" style="background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; max-height: 200px; overflow-y: auto; margin-top: 20px;">
+            <div style="color: #fff; margin-bottom: 10px;">📟 控制台输出：</div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY';
+        const statusDiv = document.getElementById('status');
+        const consoleDiv = document.getElementById('console');
+        
+        // 显示当前域名
+        document.getElementById('currentDomain').textContent = window.location.hostname;
+        
+        // 控制台输出函数
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.style.color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            consoleDiv.appendChild(logEntry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function showStatus(message, type) {
+            statusDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        function testApiKey() {
+            showStatus('🔄 正在测试API密钥...', 'info');
+            log('开始测试API密钥...');
+            
+            fetch(`https://maps.googleapis.com/maps/api/js?key=${API_KEY}`)
+                .then(response => {
+                    log(`API响应状态: ${response.status}`);
+                    if (response.ok) {
+                        showStatus('✅ API密钥有效！状态码: ' + response.status, 'success');
+                        log('✅ API密钥验证成功', 'success');
+                    } else {
+                        showStatus('❌ API密钥无效！状态码: ' + response.status, 'error');
+                        log('❌ API密钥验证失败: ' + response.status, 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('❌ 网络错误: ' + error.message, 'error');
+                    log('❌ 网络错误: ' + error.message, 'error');
+                });
+        }
+        
+        function loadMap() {
+            showStatus('🔄 正在加载地图...', 'info');
+            log('开始加载Google Maps...');
+            
+            // 检查是否已加载
+            if (window.google && window.google.maps) {
+                log('Google Maps已加载，直接初始化地图', 'success');
+                initMap();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap&libraries=places`;
+            script.async = true;
+            script.defer = true;
+            
+            script.onerror = function() {
+                showStatus('❌ 地图加载失败！请检查API密钥配置。', 'error');
+                log('❌ Google Maps脚本加载失败', 'error');
+            };
+            
+            log('Google Maps脚本已添加到页面');
+            document.head.appendChild(script);
+        }
+        
+        function initMap() {
+            try {
+                log('初始化地图...');
+                const mapDiv = document.getElementById('map');
+                
+                const map = new google.maps.Map(mapDiv, {
+                    center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                    zoom: 13
+                });
+                
+                // 添加标记
+                const marker = new google.maps.Marker({
+                    position: { lat: 16.8661, lng: 96.1951 },
+                    map: map,
+                    title: '仰光市中心',
+                    animation: google.maps.Animation.DROP
+                });
+                
+                showStatus('✅ 地图加载成功！Google Maps API 工作正常！', 'success');
+                log('✅ 地图初始化成功！', 'success');
+                log('地图中心: 仰光 (16.8661, 96.1951)', 'success');
+            } catch (error) {
+                showStatus('❌ 地图初始化失败: ' + error.message, 'error');
+                log('❌ 地图初始化错误: ' + error.message, 'error');
+            }
+        }
+        
+        // 页面加载完成后自动测试
+        window.onload = function() {
+            log('页面加载完成');
+            log('当前域名: ' + window.location.hostname);
+            setTimeout(() => {
+                log('自动开始测试...');
+                testApiKey();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
