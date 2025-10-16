@@ -7,6 +7,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="MARKET LINK EXPRESS - 缅甸专业快递服务" />
+    
+    <!-- Content Security Policy - 允许Google Maps加载 -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: https: blob:;
+      font-src 'self' data: https://fonts.gstatic.com;
+      connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://*.supabase.co wss://*.supabase.co;
+      frame-src 'self' https://www.google.com;
+    ">
+    
     <title>MARKET LINK EXPRESS - 缅甸专业快递服务</title>
   </head>
   <body>
