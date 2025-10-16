@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
@@ -460,36 +460,39 @@ const RealTimeTracking: React.FC = () => {
                 textAlign: 'center',
                 padding: '2rem'
               }}>
-                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
-                <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
-                
-                {/* 环境变量检查 */}
-                <div style={{ 
-                  marginTop: '1rem', 
-                  padding: '1rem', 
-                  background: '#fff', 
-                  borderRadius: '8px',
-                  border: '1px solid #ddd',
-                  fontSize: '0.9rem',
-                  textAlign: 'left',
-                  maxWidth: '400px'
-                }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>🔧 调试信息</h4>
-                  <div>API密钥状态: {GOOGLE_MAPS_API_KEY ? '✅ 已设置' : '❌ 未设置'}</div>
-                  <div>API密钥长度: {GOOGLE_MAPS_API_KEY?.length || 0} 字符</div>
-                  <div>API密钥格式: {GOOGLE_MAPS_API_KEY?.startsWith('AIza') ? '✅ 正确' : '❌ 错误'}</div>
-                  {loadError && (
-                    <div style={{ color: '#ef4444', marginTop: '0.5rem' }}>
-                      错误: {loadError.message}
+                {!GOOGLE_MAPS_API_KEY ? (
+                  <>
+                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🚫</div>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem', color: '#ef4444', fontWeight: 'bold' }}>
+                      Google Maps API 密钥缺失
                     </div>
-                  )}
-                  {!GOOGLE_MAPS_API_KEY && (
-                    <div style={{ color: '#ef4444', marginTop: '0.5rem' }}>
-                      ⚠️ 请在Netlify控制台设置环境变量：<br/>
-                      <code>REACT_APP_GOOGLE_MAPS_API_KEY</code>
+                    <div style={{ 
+                      marginTop: '1rem', 
+                      padding: '1rem', 
+                      background: '#fff', 
+                      borderRadius: '8px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.9rem',
+                      textAlign: 'left',
+                      maxWidth: '400px'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>🔧 解决方法</h4>
+                      <p style={{ margin: 0, lineHeight: 1.6 }}>
+                        请在您的网站托管平台（如 Netlify 或 Vercel）的环境变量设置中，添加一个名为 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code> 的变量，并填入您有效的 Google Maps API 密钥。
+                      </p>
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
+                    {loadError && (
+                      <div style={{ color: '#ef4444', marginTop: '0.5rem', background: '#fffbe B', padding: '0.5rem', borderRadius: '4px' }}>
+                        加载错误: {loadError.message}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
               <GoogleMap
