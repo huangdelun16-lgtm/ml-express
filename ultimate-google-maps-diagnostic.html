@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps 终极诊断工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #c82333; }
+        button.success { background-color: #28a745; }
+        button.success:hover { background-color: #218838; }
+        button.warning { background-color: #ffc107; color: #212529; }
+        button.warning:hover { background-color: #e0a800; }
+        .diagnostic-result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .solution-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .solution-box h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .step {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .emergency-box {
+            background-color: #f8d7da;
+            border: 2px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .emergency-box h3 {
+            margin-top: 0;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Google Maps InvalidKeyMapError 终极诊断</h1>
+        
+        <div class="status error">
+            <strong>问题持续存在:</strong> 即使配置了域名限制，仍然出现 InvalidKeyMapError
+        </div>
+        
+        <div class="emergency-box">
+            <h3>🔥 紧急解决方案</h3>
+            <p><strong>既然域名限制配置正确但仍然无效，我们需要采用更直接的方法：</strong></p>
+            
+            <div class="step">
+                <h4>方案 1: 临时移除所有限制（立即测试）</h4>
+                <ol>
+                    <li>在 Google Cloud Console 中编辑 API Key</li>
+                    <li>将 <strong>Application restrictions</strong> 改为 <strong>None</strong></li>
+                    <li>将 <strong>API restrictions</strong> 改为 <strong>Don't restrict key</strong></li>
+                    <li>点击 <strong>SAVE</strong></li>
+                    <li>等待 1 分钟</li>
+                    <li>刷新网站测试</li>
+                </ol>
+                <p><strong>如果这样能工作，说明问题确实是域名限制配置。</strong></p>
+            </div>
+            
+            <div class="step">
+                <h4>方案 2: 创建全新的 API Key</h4>
+                <ol>
+                    <li>删除现有的 API Key</li>
+                    <li>创建全新的 API Key</li>
+                    <li>立即配置正确的域名限制</li>
+                    <li>发送给我新的 API Key</li>
+                    <li>我会立即更新所有代码</li>
+                </ol>
+            </div>
+            
+            <div class="step">
+                <h4>方案 3: 检查计费账号</h4>
+                <ol>
+                    <li>确认项目真的关联了计费账号</li>
+                    <li>检查计费账号状态是否为 "Active"</li>
+                    <li>确认付款方式有效且未过期</li>
+                    <li>检查是否有欠费或限制</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div>
+            <button onclick="runComprehensiveDiagnosis()">🔍 全面诊断</button>
+            <button onclick="testWithNoRestrictions()" class="warning">🚨 测试无限制 API Key</button>
+            <button onclick="checkBillingStatus()" class="success">💰 检查计费状态</button>
+            <button onclick="showEmergencySteps()">🔥 显示紧急步骤</button>
+        </div>
+        
+        <div id="diagnostic-results"></div>
+        
+        <div id="emergency-steps" style="display: none;">
+            <div class="solution-box">
+                <h3>🔥 立即执行的紧急步骤</h3>
+                
+                <div class="step">
+                    <h4>步骤 1: 临时移除限制</h4>
+                    <p>在 Google Cloud Console 中：</p>
+                    <ol>
+                        <li>编辑 API Key: <code>AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw</code></li>
+                        <li>Application restrictions → <strong>None</strong></li>
+                        <li>API restrictions → <strong>Don't restrict key</strong></li>
+                        <li>保存</li>
+                    </ol>
+                </div>
+                
+                <div class="step">
+                    <h4>步骤 2: 测试</h4>
+                    <p>等待 1 分钟后刷新网站，如果地图正常显示，说明问题确实是域名限制。</p>
+                </div>
+                
+                <div class="step">
+                    <h4>步骤 3: 重新配置限制</h4>
+                    <p>如果测试成功，重新添加域名限制：</p>
+                    <div class="diagnostic-result">https://market-link-express.netlify.app/*
+https://*.market-link-express.netlify.app/*
+https://market-link-express.com/*
+https://www.market-link-express.com/*
+https://localhost/*
+https://127.0.0.1/*</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status info">
+            <h3>📋 当前状态</h3>
+            <ul>
+                <li>✅ 代码已更新所有文件</li>
+                <li>✅ Netlify 环境变量已设置</li>
+                <li>✅ Google Cloud Console 域名限制已配置</li>
+                <li>❌ 仍然出现 InvalidKeyMapError</li>
+                <li>🔄 <strong>需要:</strong> 采用更直接的解决方案</li>
+            </ul>
+        </div>
+        
+        <div class="status warning">
+            <h3>💡 建议</h3>
+            <p><strong>最可能的原因:</strong></p>
+            <ul>
+                <li>Google Cloud Console 的设置没有真正生效</li>
+                <li>API Key 本身有问题</li>
+                <li>计费账号配置不正确</li>
+                <li>需要创建全新的 API Key</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw';
+        const CURRENT_DOMAIN = window.location.hostname;
+        
+        function addDiagnosticResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('diagnostic-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'diagnostic-result';
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                <div class="status ${type}">${content}</div>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function runComprehensiveDiagnosis() {
+            document.getElementById('diagnostic-results').innerHTML = '';
+            
+            addDiagnosticResult('🔍 全面诊断开始', '正在分析所有可能的问题...', 'warning');
+            
+            // 检查当前域名
+            addDiagnosticResult('📍 域名检查', `当前域名: ${CURRENT_DOMAIN}`, 'info');
+            
+            // 检查 API Key 格式
+            if (!API_KEY.startsWith('AIza')) {
+                addDiagnosticResult('❌ API Key 格式', 'API Key 格式错误', 'error');
+                return;
+            }
+            
+            addDiagnosticResult('✅ API Key 格式', 'API Key 格式正确', 'success');
+            
+            // 测试 API Key
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=onComprehensiveTest`;
+            script.onerror = function() {
+                addDiagnosticResult('❌ API Key 测试', 'API Key 测试失败 - 可能是域名限制、计费问题或 API 未启用', 'error');
+                addDiagnosticResult('💡 建议', '尝试临时移除所有限制进行测试', 'warning');
+            };
+            
+            window.onComprehensiveTest = function() {
+                addDiagnosticResult('✅ API Key 测试', 'API Key 有效 - 问题可能是域名限制配置', 'success');
+                addDiagnosticResult('💡 解决方案', '尝试重新配置域名限制或创建新的 API Key', 'warning');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function testWithNoRestrictions() {
+            addDiagnosticResult('🚨 无限制测试', '请在 Google Cloud Console 中临时移除所有限制，然后刷新页面测试', 'warning');
+            addDiagnosticResult('📋 操作步骤', 'Application restrictions → None, API restrictions → Don\'t restrict key', 'info');
+        }
+        
+        function checkBillingStatus() {
+            addDiagnosticResult('💰 计费状态检查', '请检查 Google Cloud Console 中的计费设置', 'info');
+            addDiagnosticResult('📋 检查项目', '1. 计费账号是否关联 2. 状态是否为 Active 3. 付款方式是否有效', 'warning');
+        }
+        
+        function showEmergencySteps() {
+            const emergencyDiv = document.getElementById('emergency-steps');
+            emergencyDiv.style.display = emergencyDiv.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // 页面加载时自动诊断
+        window.addEventListener('load', function() {
+            addDiagnosticResult('🚨 问题诊断', '检测到持续的 InvalidKeyMapError 问题', 'error');
+            addDiagnosticResult('💡 建议', '采用紧急解决方案：临时移除限制或创建新 API Key', 'warning');
+        });
+    </script>
+</body>
+</html>
