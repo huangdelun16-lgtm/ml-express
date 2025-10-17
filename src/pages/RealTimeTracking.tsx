@@ -105,10 +105,17 @@ const RealTimeTracking: React.FC = () => {
 
   const loadPackages = async () => {
     const data = await packageService.getAllPackages();
+    console.log('📦 加载的所有包裹:', data);
+    
     // 只显示待分配和配送中的包裹
     const activePackages = data.filter(p => 
       p.status === '待取件' || p.status === '已取件' || p.status === '配送中'
     );
+    
+    console.log('📦 过滤后的活跃包裹:', activePackages);
+    console.log('📦 待取件包裹:', data.filter(p => p.status === '待取件'));
+    console.log('📦 已取件包裹:', data.filter(p => p.status === '已取件'));
+    
     setPackages(activePackages);
   };
 
@@ -267,7 +274,14 @@ const RealTimeTracking: React.FC = () => {
         alert(`包裹 ${packageData.id} 已成功分配给快递员 ${courier.name}\n📲 通知已发送`);
         setShowAssignModal(false);
         setSelectedPackage(null);
-        loadPackages();
+        
+        // 立即重新加载包裹数据
+        console.log('🔄 重新加载包裹数据...');
+        await loadPackages();
+        
+        // 验证包裹状态是否已更新
+        const updatedPackage = await packageService.getPackageById(packageData.id);
+        console.log('🔍 验证包裹状态更新:', updatedPackage);
         
         // 更新快递员的包裹数（实际应该从后端更新）
         setCouriers(prev => prev.map(c => 
