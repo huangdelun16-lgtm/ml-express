@@ -16,28 +16,38 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { packageService, Package, supabase, deliveryPhotoService, geofenceService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { packageService, Package, supabase, deliveryPhotoService, geofenceService } from '../services/supabase';
+import { resolvePackageLocation as resolveLocationUtil, ResolvedLocation, getLocationSourceLabel } from '../utils/locationUtils';
 
 const { width, height } = Dimensions.get('window');
+
+interface PackageWithExtras extends Package {
+  coords?: ResolvedLocation;
+  resolvedAddress?: string;
+  distance?: number | null;
+  priorityScore?: number;
+  locationSource?: ResolvedLocation['source'];
+}
 
 export default function MapScreen({ navigation }: any) {
   const { language } = useApp();
   const [location, setLocation] = useState<any>(null);
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [packages, setPackages] = useState<PackageWithExtras[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDeliveringPackageId, setCurrentDeliveringPackageId] = useState<string | null>(null);
   const [showMapPreview, setShowMapPreview] = useState(false);
-  const [optimizedPackagesWithCoords, setOptimizedPackagesWithCoords] = useState<any[]>([]);
+  const [optimizedPackagesWithCoords, setOptimizedPackagesWithCoords] = useState<PackageWithExtras[]>([]);
   const mapRef = useRef<MapView>(null);
+  const coordinatesCache = useRef<Record<string, ResolvedLocation>>({});
   
   // 拍照相关状态
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [currentPackageForDelivery, setCurrentPackageForDelivery] = useState<Package | null>(null);
+  const [currentPackageForDelivery, setCurrentPackageForDelivery] = useState<PackageWithExtras | null>(null);
 
   useEffect(() => {
     requestLocationPermission();
@@ -72,10 +82,38 @@ export default function MapScreen({ navigation }: any) {
       const allPackages = await packageService.getAllPackages();
       console.log('📱 所有包裹:', allPackages.length);
       
-      const myPackages = allPackages.filter(pkg => 
-        pkg.courier === currentUser && 
-        !['已送达', '已取消'].includes(pkg.status)
-      );
+      const myPackages: PackageWithExtras[] = allPackages
+        .filter(pkg =>
+          pkg.courier === currentUser &&
+          !['已送达', '已取消'].includes(pkg.status)
+        )
+        .map(pkg => {
+          const cached = coordinatesCache.current[pkg.id];
+          if (cached) {
+            return {
+              ...pkg,
+            coords: { ...cached },
+            resolvedAddress: cached.resolvedAddress || pkg.receiver_address,
+            locationSource: cached.source,
+            };
+          }
+
+          const resolved = resolveLocationUtil({
+            id: pkg.id,
+            receiver_address: pkg.receiver_address,
+            receiver_latitude: pkg.receiver_latitude,
+            receiver_longitude: pkg.receiver_longitude,
+          });
+
+          coordinatesCache.current[pkg.id] = resolved;
+
+          return {
+            ...pkg,
+            coords: { ...resolved },
+            resolvedAddress: resolved.resolvedAddress || pkg.receiver_address,
+            locationSource: resolved.source,
+          };
+        });
       
       console.log('📱 我的包裹:', myPackages.length);
       console.log('📱 包裹详情:', myPackages);
@@ -471,18 +509,75 @@ export default function MapScreen({ navigation }: any) {
   };
 
   // 导航到单个地址
-  const handleNavigate = (address: string) => {
-    if (!location) {
-      Alert.alert('提示', '正在获取您的位置，请稍后再试');
+  const getCoordinatesForPackage = async (pkg: PackageWithExtras): Promise<ResolvedLocation | null> => {
+    const cached = coordinatesCache.current[pkg.id];
+    if (cached) {
+      return cached;
+    }
+
+    if (pkg.coords) {
+      coordinatesCache.current[pkg.id] = { ...pkg.coords };
+      return coordinatesCache.current[pkg.id];
+    }
+
+    const resolved = resolveLocationUtil({
+      id: pkg.id,
+      receiver_address: pkg.receiver_address,
+      receiver_latitude: pkg.receiver_latitude,
+      receiver_longitude: pkg.receiver_longitude,
+    });
+
+    coordinatesCache.current[pkg.id] = resolved;
+
+    return resolved;
+  };
+
+  const handleNavigate = async (pkg: PackageWithExtras) => {
+    const coords = pkg.coords || coordinatesCache.current[pkg.id];
+
+    if (!coords || !coords.lat || !coords.lng) {
+      Alert.alert('提示', '订单缺少坐标信息，请联系管理员补全地址坐标');
       return;
     }
 
-    // 使用 Google Maps Directions 从当前位置导航到目标地址
-    const origin = `${location.latitude},${location.longitude}`;
-    const destination = encodeURIComponent(address);
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-    
-    Linking.openURL(url);
+    try {
+      let origin = '';
+      if (location) {
+        origin = `${location.latitude},${location.longitude}`;
+      } else {
+        const currentLocation = await Location.getCurrentPositionAsync({});
+        origin = `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
+        setLocation({
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+        });
+      }
+
+      const destination = `${coords.lat},${coords.lng}`;
+
+      const candidateUrls = [
+        `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`,
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+      ];
+
+      for (const url of candidateUrls) {
+        if (await Linking.canOpenURL(url)) {
+          await Linking.openURL(url);
+          console.log('🧭 启动导航:', {
+            packageId: pkg.id,
+            destination,
+            coordSource: coords.source,
+          });
+          return;
+        }
+      }
+
+      const fallbackUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
+      await Linking.openURL(fallbackUrl);
+    } catch (error) {
+      console.error('打开导航失败:', error);
+      Alert.alert('错误', '无法打开导航应用，请确保已安装Google Maps或Apple Maps');
+    }
   };
 
   // 🧮 计算两点之间的直线距离（哈弗辛公式）
@@ -499,75 +594,8 @@ export default function MapScreen({ navigation }: any) {
   };
 
   // 🗺️ 解析地址中的坐标（如果有）或使用简单的地址匹配
-  const parseCoordinatesFromAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
-    // 1. 尝试从地址中提取坐标（某些系统会在地址中包含坐标）
-    const coordMatch = address.match(/(\d+\.\d+),\s*(\d+\.\d+)/);
-    if (coordMatch) {
-      const coords = {
-        lat: parseFloat(coordMatch[1]),
-        lng: parseFloat(coordMatch[2])
-      };
-      console.log(`✅ 从地址中提取坐标: ${address} → ${coords.lat}, ${coords.lng}`);
-      return coords;
-    }
-
-    // 2. 检查包裹数据中是否已有坐标（receiver_latitude, receiver_longitude）
-    const pkg = packages.find(p => p.receiver_address === address);
-    if (pkg && pkg.receiver_latitude && pkg.receiver_longitude) {
-      const coords = {
-        lat: parseFloat(pkg.receiver_latitude.toString()),
-        lng: parseFloat(pkg.receiver_longitude.toString())
-      };
-      console.log(`✅ 从包裹数据中读取坐标: ${address} → ${coords.lat}, ${coords.lng}`);
-      return coords;
-    }
-
-    // 3. 使用简单的地址关键词匹配（曼德勒常见地点）
-    const mandalayLocations: { [key: string]: { lat: number; lng: number } } = {
-      '曼德勒市中心': { lat: 21.9588, lng: 96.0891 },
-      '曼德勒中心': { lat: 21.9588, lng: 96.0891 },
-      '市中心': { lat: 21.9588, lng: 96.0891 },
-      'Mandalay': { lat: 21.9588, lng: 96.0891 },
-      '曼德勒大学': { lat: 21.9688, lng: 96.0991 },
-      '大学': { lat: 21.9688, lng: 96.0991 },
-      'University': { lat: 21.9688, lng: 96.0991 },
-      '茵雅湖': { lat: 21.9488, lng: 96.0791 },
-      'Inya Lake': { lat: 21.9488, lng: 96.0791 },
-      '66街': { lat: 21.9650, lng: 96.0850 },
-      '66th Street': { lat: 21.9650, lng: 96.0850 },
-      '67街': { lat: 21.9660, lng: 96.0860 },
-      '67th Street': { lat: 21.9660, lng: 96.0860 },
-      '87街': { lat: 21.9700, lng: 96.0900 },
-      '87th Street': { lat: 21.9700, lng: 96.0900 },
-      'Aungmyaythazan': { lat: 21.9550, lng: 96.1000 },
-      'Chanayethazan': { lat: 21.9600, lng: 96.0950 },
-    };
-
-    // 尝试匹配关键词
-    const addressLower = address.toLowerCase();
-    for (const [keyword, coords] of Object.entries(mandalayLocations)) {
-      if (addressLower.includes(keyword.toLowerCase())) {
-        console.log(`✅ 关键词匹配: ${address} → ${keyword} (${coords.lat}, ${coords.lng})`);
-        // 添加小的随机偏移，避免所有包裹在同一位置
-        const randomOffset = () => (Math.random() - 0.5) * 0.01; // ±0.005度偏移（约500米）
-        return {
-          lat: coords.lat + randomOffset(),
-          lng: coords.lng + randomOffset()
-        };
-      }
-    }
-
-    // 4. 如果都无法匹配，使用曼德勒默认位置（带随机偏移）
-    console.warn(`⚠️ 无法解析地址坐标，使用默认位置: ${address}`);
-    const randomOffset = () => (Math.random() - 0.5) * 0.02; // ±0.01度偏移（约1公里）
-    return {
-      lat: 21.9588 + randomOffset(),
-      lng: 96.0891 + randomOffset()
-    };
-  };
-
   // 🎯 智能路线优化算法（贪心 + 优先级）
-  const optimizeDeliveryRoute = async (packagesList: Package[]): Promise<Package[]> => {
+  const optimizeDeliveryRoute = async (packagesList: PackageWithExtras[]): Promise<PackageWithExtras[]> => {
     if (!location || packagesList.length <= 1) {
       return packagesList;
     }
@@ -576,7 +604,8 @@ export default function MapScreen({ navigation }: any) {
       // 1. 为每个包裹计算坐标和距离
       const packagesWithCoords = await Promise.all(
         packagesList.map(async (pkg) => {
-          const coords = await parseCoordinatesFromAddress(pkg.receiver_address);
+          const coordsInfo = await getCoordinatesForPackage(pkg);
+          const coords = coordsInfo ? { ...coordsInfo } : undefined;
           let distance = null;
           
           if (coords) {
@@ -611,8 +640,10 @@ export default function MapScreen({ navigation }: any) {
           return {
             ...pkg,
             coords,
+            resolvedAddress: coords?.resolvedAddress || pkg.resolvedAddress,
             distance,
-            priorityScore
+            priorityScore,
+            locationSource: coords?.source || pkg.locationSource,
           };
         })
       );
@@ -623,7 +654,7 @@ export default function MapScreen({ navigation }: any) {
       });
 
       // 3. 使用贪心算法进一步优化路线（最近邻算法）
-      const optimizedRoute: Package[] = [];
+      const optimizedRoute: PackageWithExtras[] = [];
       const remaining = [...sortedPackages];
       let currentLat = location.latitude;
       let currentLng = location.longitude;
@@ -711,8 +742,9 @@ export default function MapScreen({ navigation }: any) {
       if (optimizedPackagesWithCoords.length === 1) {
         // 单个包裹导航
         const pkg = optimizedPackagesWithCoords[0];
-        const destination = pkg.coords 
-          ? `${pkg.coords.lat},${pkg.coords.lng}`
+        const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
+        const destination = coords
+          ? `${coords.lat},${coords.lng}`
           : encodeURIComponent(pkg.receiver_address);
         
         // 尝试多种URL方案，确保iOS和Android都能正常工作
@@ -739,9 +771,13 @@ export default function MapScreen({ navigation }: any) {
         }
       } else {
         // 多个包裹导航 - 使用坐标而不是地址
-        const allCoords = optimizedPackagesWithCoords
-          .filter(pkg => pkg.coords)
-          .map(pkg => `${pkg.coords.lat},${pkg.coords.lng}`);
+        const allCoords: string[] = [];
+        for (const pkg of optimizedPackagesWithCoords) {
+          const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
+          if (coords) {
+            allCoords.push(`${coords.lat},${coords.lng}`);
+          }
+        }
         
         if (allCoords.length === 0) {
           Alert.alert('错误', '无法获取包裹位置坐标，请检查地址设置');
@@ -807,7 +843,7 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
-  const renderPackageItem = ({ item, index }: { item: Package, index: number }) => {
+  const renderPackageItem = ({ item, index }: { item: PackageWithExtras; index: number }) => {
     // 显示距离信息（如果有且有效）
     const itemDistance = (item as any).distance;
     const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999 && typeof itemDistance === 'number'
@@ -827,7 +863,7 @@ export default function MapScreen({ navigation }: any) {
           styles.packageCard,
           isCurrentDelivering && styles.currentDeliveringCard
         ]}
-        onPress={() => navigation.navigate('PackageDetail', { package: item })}
+          onPress={() => navigation.navigate('PackageDetail', { package: item })}
       >
         <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.numberText}>{index + 1}</Text>
@@ -853,12 +889,19 @@ export default function MapScreen({ navigation }: any) {
           <Text style={styles.address} numberOfLines={2}>{item.receiver_address}</Text>
           
           <View style={styles.packageMeta}>
-            <View style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}>
+            <View style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}> 
               <Text style={styles.statusText}>{item.status}</Text>
             </View>
             <Text style={styles.packageType}>{item.package_type} · {item.weight}</Text>
             {distanceText && (
               <Text style={styles.distanceText}>{distanceText}</Text>
+            )}
+            <Text style={styles.locationSourceTag}>
+              {`📡 ${getLocationSourceLabel(item.locationSource)}`}
+              {item.resolvedAddress && item.resolvedAddress !== item.receiver_address ? ` · ${item.resolvedAddress}` : ''}
+            </Text>
+            {item.coords && (
+              <Text style={styles.coordsText}>🧭 {item.coords.lat.toFixed(6)}, {item.coords.lng.toFixed(6)}</Text>
             )}
           </View>
 
@@ -898,7 +941,7 @@ export default function MapScreen({ navigation }: any) {
           style={styles.navButton}
           onPress={(e) => {
             e.stopPropagation();
-            handleNavigate(item.receiver_address);
+            handleNavigate(item);
           }}
         >
           <Text style={styles.navButtonText}>🗺️</Text>
@@ -1091,6 +1134,13 @@ export default function MapScreen({ navigation }: any) {
                       ? `📏 ${pkg.distance.toFixed(1)}km`
                       : '📍 地址待确认'}
                   </Text>
+                  <Text style={styles.routeSource}>
+                    {`📡 ${getLocationSourceLabel(pkg.locationSource)}`}
+                    {pkg.resolvedAddress && pkg.resolvedAddress !== pkg.receiver_address ? ` · ${pkg.resolvedAddress}` : ''}
+                  </Text>
+                  {pkg.coords && (
+                    <Text style={styles.routeCoords}>🧭 {pkg.coords.lat.toFixed(6)}, {pkg.coords.lng.toFixed(6)}</Text>
+                  )}
                 </View>
               </View>
             ))}
@@ -1762,5 +1812,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  coordsText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  routeCoords: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
 });

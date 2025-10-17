@@ -75,8 +75,9 @@ const HomePage: React.FC = () => {
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
+  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{lat: number; lng: number} | null>(null);
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
@@ -1243,7 +1244,11 @@ const HomePage: React.FC = () => {
       packageType: formData.get('packageType') as string,
       weight: formData.get('weight') as string,
       deliverySpeed: formData.get('deliverySpeed') as string,
-      scheduledTime: scheduledDeliveryTime || null
+      scheduledTime: scheduledDeliveryTime || null,
+      senderLatitude: selectedSenderLocation?.lat || null,
+      senderLongitude: selectedSenderLocation?.lng || null,
+      receiverLatitude: selectedReceiverLocation?.lat || null,
+      receiverLongitude: selectedReceiverLocation?.lng || null,
     };
     
     // 验证必填字段
@@ -1379,6 +1384,24 @@ const HomePage: React.FC = () => {
         </div>
       </div>
     );
+  };
+
+  const captureMapSelection = () => {
+    const addressInput = document.getElementById('map-address-input') as HTMLInputElement | null;
+    if (!mapSelectionType || !addressInput) return;
+
+    const targetField = mapSelectionType === 'sender'
+      ? document.querySelector('textarea[name="senderAddress"]') as HTMLTextAreaElement | null
+      : document.querySelector('textarea[name="receiverAddress"]') as HTMLTextAreaElement | null;
+
+    if (targetField && addressInput.value.trim()) {
+      targetField.value = addressInput.value.trim();
+      if (mapSelectionType === 'sender') {
+        setSelectedSenderLocation(mapClickPosition);
+      } else {
+        setSelectedReceiverLocation(mapClickPosition);
+      }
+    }
   };
 
   return (
@@ -2425,9 +2448,13 @@ const HomePage: React.FC = () => {
                     sender_name: orderInfo.senderName,
                     sender_phone: orderInfo.senderPhone,
                     sender_address: orderInfo.senderAddress,
+                    sender_latitude: orderInfo.senderLatitude,
+                    sender_longitude: orderInfo.senderLongitude,
                     receiver_name: orderInfo.receiverName,
                     receiver_phone: orderInfo.receiverPhone,
                     receiver_address: orderInfo.receiverAddress,
+                    receiver_latitude: orderInfo.receiverLatitude,
+                    receiver_longitude: orderInfo.receiverLongitude,
                     package_type: orderInfo.packageType,
                     weight: orderInfo.weight,
                     delivery_speed: orderInfo.deliverySpeed,
@@ -3229,21 +3256,34 @@ const HomePage: React.FC = () => {
                     
                     if (targetField) {
                       targetField.value = completeAddress;
-                      // 添加视觉反馈
                       targetField.style.borderColor = '#38a169';
                       targetField.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
-                      
-                      // 短暂显示成功提示
+
                       setTimeout(() => {
                         targetField.style.borderColor = '#e2e8f0';
                         targetField.style.boxShadow = 'none';
                       }, 2000);
+
+                      // 优先使用 selectedLocation (POI点击) 的坐标，其次使用 mapClickPosition (右键点击)
+                      const finalCoords = selectedLocation 
+                        ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
+                        : mapClickPosition;
+
+                      if (finalCoords) {
+                        if (mapSelectionType === 'sender') {
+                          setSelectedSenderLocation(finalCoords);
+                          console.log('✅ 寄件地址坐标已保存:', finalCoords);
+                        } else if (mapSelectionType === 'receiver') {
+                          setSelectedReceiverLocation(finalCoords);
+                          console.log('✅ 收件地址坐标已保存:', finalCoords);
+                        }
+                      } else {
+                        console.warn('⚠️ 未能获取坐标信息');
+                      }
                     }
-                    
-                    // 显示成功消息
+
                     alert(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
-                    
-                    // 清理状态并关闭模态窗口
+
                     setMapClickPosition(null);
                     setSelectedLocation(null);
                     setShowMapModal(false);
@@ -3271,6 +3311,8 @@ const HomePage: React.FC = () => {
               
               <button
                 onClick={() => {
+                  captureMapSelection();
+                  setMapClickPosition(null);
                   setShowMapModal(false);
                   setMapSelectionType(null);
                 }}
@@ -3285,8 +3327,8 @@ const HomePage: React.FC = () => {
                   fontSize: '1rem',
                   transition: 'all 0.3s ease'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
                 {t.ui.cancelPayment}
               </button>
