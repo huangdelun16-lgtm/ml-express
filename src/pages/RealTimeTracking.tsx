@@ -496,7 +496,7 @@ const RealTimeTracking: React.FC = () => {
                     </>
                   )}
                 </div>
-              ) : mapContainerRef.current ? (
+              ) : (
                 <GoogleMap
                   key={selectedCity}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
