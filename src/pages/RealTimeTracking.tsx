@@ -4,9 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 
-                           (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || 
-                           "";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
