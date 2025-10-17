@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API Key 使用限制检查工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .log { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+            max-height: 300px; 
+            overflow-y: auto; 
+        }
+        .check-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .check-item.error { border-left-color: #dc3545; background-color: #f8d7da; }
+        .check-item.success { border-left-color: #28a745; background-color: #d4edda; }
+        .check-item.warning { border-left-color: #ffc107; background-color: #fff3cd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Google Maps API Key 使用限制检查工具</h1>
+        
+        <div>
+            <label for="apiKey">请输入您的 Google Maps API Key:</label>
+            <input type="text" id="apiKey" placeholder="AIza...">
+            <button onclick="checkApiKeyRestrictions()">检查 API Key 限制</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div id="checks"></div>
+        
+        <div>
+            <h3>📋 检查结果日志</h3>
+            <div id="log" class="log"></div>
+        </div>
+        
+        <div>
+            <h3>🛠️ 常见限制错误解决方案</h3>
+            <div id="solutions"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentApiKey = '';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}\n`;
+            logDiv.textContent += logMessage;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            updateStatus(message, type);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function addCheckItem(title, status, details) {
+            const checksDiv = document.getElementById('checks');
+            const checkDiv = document.createElement('div');
+            checkDiv.className = `check-item ${status}`;
+            checkDiv.innerHTML = `
+                <h4>${title}</h4>
+                <p>${details}</p>
+            `;
+            checksDiv.appendChild(checkDiv);
+        }
+        
+        function checkApiKeyRestrictions() {
+            currentApiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!currentApiKey) {
+                updateStatus('请输入 API Key', 'error');
+                return;
+            }
+            
+            if (!currentApiKey.startsWith('AIza')) {
+                updateStatus('API Key 格式错误：应该以 "AIza" 开头', 'error');
+                return;
+            }
+            
+            // 清空之前的结果
+            document.getElementById('checks').innerHTML = '';
+            document.getElementById('log').textContent = '';
+            document.getElementById('solutions').innerHTML = '';
+            
+            log('开始检查 API Key 使用限制...');
+            
+            // 执行各种检查
+            checkApiKeyFormat();
+            checkApiKeyValidity();
+            checkDomainRestrictions();
+            checkApiRestrictions();
+            checkQuotaLimits();
+            checkBillingStatus();
+        }
+        
+        function checkApiKeyFormat() {
+            log('检查 API Key 格式...');
+            
+            if (currentApiKey.length < 35) {
+                addCheckItem('❌ API Key 格式检查', 'error', 'API Key 长度不足，应该至少 35 个字符');
+                log('❌ API Key 长度不足', 'error');
+                return;
+            }
+            
+            if (!currentApiKey.match(/^AIza[0-9A-Za-z_-]{35}$/)) {
+                addCheckItem('❌ API Key 格式检查', 'error', 'API Key 格式不正确');
+                log('❌ API Key 格式不正确', 'error');
+                return;
+            }
+            
+            addCheckItem('✅ API Key 格式检查', 'success', 'API Key 格式正确');
+            log('✅ API Key 格式正确', 'success');
+        }
+        
+        function checkApiKeyValidity() {
+            log('检查 API Key 有效性...');
+            
+            // 使用 Google Maps API 测试
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${currentApiKey}&callback=onApiKeyTest`;
+            script.onerror = function() {
+                addCheckItem('❌ API Key 有效性检查', 'error', 'API Key 无效或已过期');
+                log('❌ API Key 无效或已过期', 'error');
+                showSolutions(['invalid_key']);
+            };
+            
+            window.onApiKeyTest = function() {
+                addCheckItem('✅ API Key 有效性检查', 'success', 'API Key 有效');
+                log('✅ API Key 有效', 'success');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function checkDomainRestrictions() {
+            log('检查域名限制...');
+            
+            const currentDomain = window.location.hostname;
+            log(`当前域名: ${currentDomain}`);
+            
+            // 测试不同域名的访问
+            const testDomains = [
+                'market-link-express.com',
+                'www.market-link-express.com',
+                'market-link-express.netlify.app',
+                'localhost',
+                '127.0.0.1'
+            ];
+            
+            const isCurrentDomainAllowed = testDomains.some(domain => 
+                currentDomain === domain || currentDomain.endsWith('.' + domain)
+            );
+            
+            if (isCurrentDomainAllowed) {
+                addCheckItem('✅ 域名限制检查', 'success', `当前域名 ${currentDomain} 在允许列表中`);
+                log('✅ 域名限制检查通过', 'success');
+            } else {
+                addCheckItem('❌ 域名限制检查', 'error', `当前域名 ${currentDomain} 可能不在允许列表中`);
+                log('❌ 域名限制检查失败', 'error');
+                showSolutions(['domain_restriction']);
+            }
+        }
+        
+        function checkApiRestrictions() {
+            log('检查 API 限制...');
+            
+            // 测试不同的 API 端点
+            const apis = [
+                { name: 'Maps JavaScript API', url: 'https://maps.googleapis.com/maps/api/js' },
+                { name: 'Places API', url: 'https://maps.googleapis.com/maps/api/place' },
+                { name: 'Geocoding API', url: 'https://maps.googleapis.com/maps/api/geocode' }
+            ];
+            
+            apis.forEach(api => {
+                fetch(`${api.url}?key=${currentApiKey}`, { method: 'HEAD' })
+                    .then(response => {
+                        if (response.ok) {
+                            addCheckItem(`✅ ${api.name}`, 'success', 'API 访问正常');
+                            log(`✅ ${api.name} 访问正常`, 'success');
+                        } else {
+                            addCheckItem(`❌ ${api.name}`, 'error', `API 访问失败: ${response.status}`);
+                            log(`❌ ${api.name} 访问失败: ${response.status}`, 'error');
+                            showSolutions(['api_restriction']);
+                        }
+                    })
+                    .catch(error => {
+                        addCheckItem(`❌ ${api.name}`, 'error', `网络错误: ${error.message}`);
+                        log(`❌ ${api.name} 网络错误: ${error.message}`, 'error');
+                    });
+            });
+        }
+        
+        function checkQuotaLimits() {
+            log('检查配额限制...');
+            
+            // 尝试多次调用 API 来测试配额
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < 5; i++) {
+                fetch(`https://maps.googleapis.com/maps/api/js?key=${currentApiKey}`, { method: 'HEAD' })
+                    .then(response => {
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                            if (response.status === 429) {
+                                addCheckItem('❌ 配额限制检查', 'error', 'API 配额已超出限制');
+                                log('❌ API 配额已超出限制', 'error');
+                                showSolutions(['quota_exceeded']);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        errorCount++;
+                    });
+            }
+            
+            setTimeout(() => {
+                if (errorCount === 0) {
+                    addCheckItem('✅ 配额限制检查', 'success', 'API 配额充足');
+                    log('✅ API 配额充足', 'success');
+                }
+            }, 2000);
+        }
+        
+        function checkBillingStatus() {
+            log('检查计费状态...');
+            
+            // 通过 API 调用测试计费状态
+            fetch(`https://maps.googleapis.com/maps/api/js?key=${currentApiKey}`, { method: 'HEAD' })
+                .then(response => {
+                    if (response.status === 403) {
+                        addCheckItem('❌ 计费状态检查', 'error', 'API Key 可能没有关联有效的计费账户');
+                        log('❌ 计费状态检查失败', 'error');
+                        showSolutions(['billing_issue']);
+                    } else if (response.ok) {
+                        addCheckItem('✅ 计费状态检查', 'success', '计费账户正常');
+                        log('✅ 计费账户正常', 'success');
+                    }
+                })
+                .catch(error => {
+                    addCheckItem('❌ 计费状态检查', 'error', `检查失败: ${error.message}`);
+                    log('❌ 计费状态检查失败', 'error');
+                });
+        }
+        
+        function showSolutions(errorTypes) {
+            const solutionsDiv = document.getElementById('solutions');
+            let solutionsHtml = '<h4>🔧 解决方案:</h4>';
+            
+            errorTypes.forEach(errorType => {
+                switch (errorType) {
+                    case 'invalid_key':
+                        solutionsHtml += `
+                            <div class="check-item error">
+                                <h5>API Key 无效</h5>
+                                <p>1. 检查 API Key 是否正确复制<br>
+                                2. 在 Google Cloud Console 中确认 API Key 状态<br>
+                                3. 重新生成新的 API Key</p>
+                            </div>
+                        `;
+                        break;
+                    case 'domain_restriction':
+                        solutionsHtml += `
+                            <div class="check-item warning">
+                                <h5>域名限制问题</h5>
+                                <p>1. 访问 Google Cloud Console → Credentials<br>
+                                2. 编辑您的 API Key<br>
+                                3. 在 "Application restrictions" 中添加以下域名:<br>
+                                <code>https://${window.location.hostname}/*</code><br>
+                                <code>https://market-link-express.com/*</code><br>
+                                <code>https://*.netlify.app/*</code></p>
+                            </div>
+                        `;
+                        break;
+                    case 'api_restriction':
+                        solutionsHtml += `
+                            <div class="check-item warning">
+                                <h5>API 限制问题</h5>
+                                <p>1. 访问 Google Cloud Console → APIs & Services → Library<br>
+                                2. 启用以下 API:<br>
+                                - Maps JavaScript API<br>
+                                - Places API<br>
+                                - Geocoding API</p>
+                            </div>
+                        `;
+                        break;
+                    case 'quota_exceeded':
+                        solutionsHtml += `
+                            <div class="check-item error">
+                                <h5>配额超出限制</h5>
+                                <p>1. 检查 Google Cloud Console 中的配额使用情况<br>
+                                2. 增加配额限制或等待配额重置<br>
+                                3. 检查是否有异常的 API 调用</p>
+                            </div>
+                        `;
+                        break;
+                    case 'billing_issue':
+                        solutionsHtml += `
+                            <div class="check-item error">
+                                <h5>计费账户问题</h5>
+                                <p>1. 检查 Google Cloud Console 中的计费设置<br>
+                                2. 确认计费账户状态正常<br>
+                                3. 添加有效的付款方式</p>
+                            </div>
+                        `;
+                        break;
+                }
+            });
+            
+            solutionsDiv.innerHTML = solutionsHtml;
+        }
+        
+        // 页面加载时的提示
+        window.addEventListener('load', function() {
+            updateStatus('请输入您的 Google Maps API Key 进行限制检查', 'info');
+        });
+    </script>
+</body>
+</html>
