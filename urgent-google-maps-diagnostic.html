@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps InvalidKeyMapError 紧急诊断</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #c82333; }
+        button.success { background-color: #28a745; }
+        button.success:hover { background-color: #218838; }
+        .diagnostic-result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .solution-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .solution-box h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .step {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Google Maps InvalidKeyMapError 紧急诊断工具</h1>
+        
+        <div class="status error">
+            <strong>检测到问题:</strong> Google Maps 显示 InvalidKeyMapError 错误
+        </div>
+        
+        <div class="solution-box">
+            <h3>🔧 立即解决方案</h3>
+            <p><strong>问题原因:</strong> API Key 的域名限制设置不正确，当前域名 <code>market-link-express.netlify.app</code> 不在允许列表中。</p>
+            
+            <div class="step">
+                <h4>步骤 1: 访问 Google Cloud Console</h4>
+                <p>打开 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> → 选择您的项目</p>
+            </div>
+            
+            <div class="step">
+                <h4>步骤 2: 编辑 API Key</h4>
+                <p>进入 <strong>APIs & Services</strong> → <strong>Credentials</strong> → 找到 API Key <code>AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw</code> → 点击编辑</p>
+            </div>
+            
+            <div class="step">
+                <h4>步骤 3: 配置域名限制</h4>
+                <p>在 <strong>Application restrictions</strong> 部分：</p>
+                <ul>
+                    <li>选择 <strong>HTTP referrers (websites)</strong></li>
+                    <li><strong>删除所有现有域名</strong></li>
+                    <li><strong>添加以下域名</strong>（每行一个）：</li>
+                </ul>
+                <div class="diagnostic-result">https://market-link-express.netlify.app/*
+https://*.market-link-express.netlify.app/*
+https://market-link-express.com/*
+https://www.market-link-express.com/*
+https://localhost/*
+https://127.0.0.1/*</div>
+            </div>
+            
+            <div class="step">
+                <h4>步骤 4: 保存并等待</h4>
+                <p>点击 <strong>SAVE</strong> → 等待 1-2 分钟让更改生效 → 刷新网站测试</p>
+            </div>
+        </div>
+        
+        <div>
+            <button onclick="diagnoseCurrentIssue()">🔍 诊断当前问题</button>
+            <button onclick="testApiKeyWithCurrentDomain()" class="success">✅ 测试 API Key</button>
+            <button onclick="showEmergencySolution()">🚨 紧急解决方案</button>
+        </div>
+        
+        <div id="diagnostic-results"></div>
+        
+        <div id="emergency-solution" style="display: none;">
+            <div class="solution-box">
+                <h3>🚨 紧急解决方案（临时）</h3>
+                <p>如果域名限制配置不起作用，可以临时移除限制：</p>
+                
+                <div class="step">
+                    <h4>临时移除域名限制</h4>
+                    <ol>
+                        <li>在 Google Cloud Console 中编辑 API Key</li>
+                        <li>将 <strong>Application restrictions</strong> 改为 <strong>None</strong></li>
+                        <li>点击 <strong>SAVE</strong></li>
+                        <li>等待 1-2 分钟</li>
+                        <li>刷新网站测试地图</li>
+                    </ol>
+                    <p><strong>⚠️ 重要:</strong> 测试成功后，请重新添加域名限制以确保安全！</p>
+                </div>
+                
+                <div class="step">
+                    <h4>检查其他可能问题</h4>
+                    <ul>
+                        <li>确认 <strong>Maps JavaScript API</strong> 已启用</li>
+                        <li>确认 <strong>Places API</strong> 已启用</li>
+                        <li>确认 <strong>Geocoding API</strong> 已启用</li>
+                        <li>确认项目已关联 <strong>计费账号</strong></li>
+                        <li>确认计费账号状态为 <strong>Active</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status info">
+            <h3>📋 检查清单</h3>
+            <ul>
+                <li>✅ API Key 格式正确: AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw</li>
+                <li>✅ 代码已更新所有相关文件</li>
+                <li>✅ Netlify 环境变量已设置</li>
+                <li>🔄 <strong>需要检查:</strong> Google Cloud Console 域名限制</li>
+                <li>🔄 <strong>需要检查:</strong> API 启用状态</li>
+                <li>🔄 <strong>需要检查:</strong> 计费账号状态</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw';
+        const CURRENT_DOMAIN = window.location.hostname;
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            if (statusDiv) {
+                statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            }
+        }
+        
+        function addDiagnosticResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('diagnostic-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'diagnostic-result';
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                <div class="status ${type}">${content}</div>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function diagnoseCurrentIssue() {
+            document.getElementById('diagnostic-results').innerHTML = '';
+            
+            addDiagnosticResult('🔍 问题诊断', '正在分析 InvalidKeyMapError 错误...', 'warning');
+            
+            // 检查当前域名
+            addDiagnosticResult('📍 当前域名检查', `当前访问域名: ${CURRENT_DOMAIN}`, 'info');
+            
+            // 检查 API Key 格式
+            if (!API_KEY.startsWith('AIza')) {
+                addDiagnosticResult('❌ API Key 格式', 'API Key 格式错误：应该以 "AIza" 开头', 'error');
+                return;
+            }
+            
+            addDiagnosticResult('✅ API Key 格式', 'API Key 格式正确', 'success');
+            
+            // 分析可能的域名限制问题
+            const allowedDomains = [
+                'market-link-express.netlify.app',
+                'market-link-express.com',
+                'www.market-link-express.com',
+                'localhost',
+                '127.0.0.1'
+            ];
+            
+            const isDomainAllowed = allowedDomains.some(domain => 
+                CURRENT_DOMAIN === domain || CURRENT_DOMAIN.endsWith('.' + domain)
+            );
+            
+            if (isDomainAllowed) {
+                addDiagnosticResult('✅ 域名检查', `域名 ${CURRENT_DOMAIN} 应该在允许列表中`, 'success');
+            } else {
+                addDiagnosticResult('❌ 域名检查', `域名 ${CURRENT_DOMAIN} 可能不在 Google Cloud Console 的允许列表中`, 'error');
+            }
+            
+            addDiagnosticResult('🎯 解决方案', '请在 Google Cloud Console 中添加当前域名到 HTTP referrers 限制中', 'warning');
+        }
+        
+        function testApiKeyWithCurrentDomain() {
+            addDiagnosticResult('🧪 API Key 测试', '正在测试 API Key 有效性...', 'warning');
+            
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=onApiKeyTest`;
+            script.onerror = function() {
+                addDiagnosticResult('❌ API Key 测试', 'API Key 测试失败，可能是域名限制或计费问题', 'error');
+            };
+            
+            window.onApiKeyTest = function() {
+                addDiagnosticResult('✅ API Key 测试', 'API Key 有效，Google Maps API 加载成功', 'success');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function showEmergencySolution() {
+            const emergencyDiv = document.getElementById('emergency-solution');
+            emergencyDiv.style.display = emergencyDiv.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // 页面加载时自动诊断
+        window.addEventListener('load', function() {
+            diagnoseCurrentIssue();
+        });
+    </script>
+</body>
+</html>
