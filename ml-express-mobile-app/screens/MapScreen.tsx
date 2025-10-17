@@ -67,12 +67,22 @@ export default function MapScreen({ navigation }: any) {
     try {
       setLoading(true);
       const currentUser = await AsyncStorage.getItem('currentUserName') || '';
+      console.log('📱 当前用户:', currentUser);
+      
       const allPackages = await packageService.getAllPackages();
+      console.log('📱 所有包裹:', allPackages.length);
       
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === currentUser && 
         !['已送达', '已取消'].includes(pkg.status)
       );
+      
+      console.log('📱 我的包裹:', myPackages.length);
+      console.log('📱 包裹详情:', myPackages);
+      
+      // 调试：显示所有快递员姓名
+      const allCouriers = [...new Set(allPackages.map(pkg => pkg.courier).filter(Boolean))];
+      console.log('📱 所有快递员:', allCouriers);
       
       setPackages(myPackages);
     } catch (error) {

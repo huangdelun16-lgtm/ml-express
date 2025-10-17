@@ -175,12 +175,21 @@ const MyTasksScreen: React.FC = () => {
       
       // 获取当前骑手信息
       const userName = await AsyncStorage.getItem('currentUserName') || '';
+      console.log('📱 MyTasks - 当前用户:', userName);
       
       // 过滤出分配给当前骑手的包裹（包括已送达的包裹）
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === userName && 
         (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
       );
+      
+      console.log('📱 MyTasks - 所有包裹:', allPackages.length);
+      console.log('📱 MyTasks - 我的包裹:', myPackages.length);
+      console.log('📱 MyTasks - 包裹详情:', myPackages);
+      
+      // 调试：显示所有快递员姓名
+      const allCouriers = [...new Set(allPackages.map(pkg => pkg.courier).filter(Boolean))];
+      console.log('📱 MyTasks - 所有快递员:', allCouriers);
       
       setPackages(myPackages);
       
