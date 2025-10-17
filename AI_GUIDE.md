@@ -15,7 +15,7 @@ MARKET LINK EXPRESS 是一个完整的快递管理系统，包含三个主要组
 │     ├── 实时跟踪管理                                        │
 │     ├── 快递员管理                                          │
 │     └── 包裹管理                                           │
-│     🌐 部署: Vercel (生产) + Netlify (备用)                │
+│     🌐 部署: Netlify (主要) + Vercel (备用)                │
 ├─────────────────────────────────────────────────────────────┤
 │  2. 客户端 APP (React Native + Expo)                       │
 │     ├── 客户下单                                            │
@@ -831,5 +831,199 @@ CREATE TABLE users (
 
 ---
 
-*最后更新：2024年1月*
-*版本：1.0.0*
+## 🏗️ 当前系统架构与连接方式 (2025年1月更新)
+
+### 📍 部署架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MARKET LINK EXPRESS                      │
+│                    当前生产环境架构                          │
+├─────────────────────────────────────────────────────────────┤
+│  🌐 Web 管理后台 (React + TypeScript)                      │
+│     ├── 主要部署: Netlify                                   │
+│     │   └── URL: https://market-link-express.netlify.app   │
+│     ├── 备用部署: Vercel                                    │
+│     │   └── URL: https://ml-express.vercel.app             │
+│     └── 代码仓库: GitHub (自动部署)                         │
+├─────────────────────────────────────────────────────────────┤
+│  📱 客户端 APP (React Native + Expo)                       │
+│     ├── 开发状态: 开发中                                    │
+│     ├── 部署方式: Expo EAS Build                           │
+│     └── 包名: com.marketlinkexpress.client                 │
+├─────────────────────────────────────────────────────────────┤
+│  🚚 员工 APP (React Native + Expo)                         │
+│     ├── 开发状态: 开发中                                    │
+│     ├── 部署方式: Expo EAS Build                           │
+│     └── 包名: com.marketlinkexpress.staff                  │
+├─────────────────────────────────────────────────────────────┤
+│  🗄️ 数据库 (Supabase PostgreSQL)                          │
+│     ├── 项目: ML Express Production                        │
+│     ├── URL: https://uopkyuluxnrewvlmutam.supabase.co     │
+│     ├── 主要表: packages, couriers, users, admin_accounts  │
+│     └── 实时同步: Web ↔ Mobile Apps                        │
+├─────────────────────────────────────────────────────────────┤
+│  🗺️ 地图服务 (Google Maps API)                            │
+│     ├── API Key: AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c  │
+│     ├── 服务: Maps JavaScript API, Places API, Geocoding   │
+│     └── 限制: HTTP referer (Netlify/Vercel domains)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 🔗 系统连接方式
+
+#### 1. Web ↔ 数据库连接
+```typescript
+// src/services/supabase.ts
+const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+```
+
+#### 2. Mobile Apps ↔ 数据库连接
+```typescript
+// ml-express-mobile-app/services/supabase.ts
+// 使用相同的 Supabase 配置
+```
+
+#### 3. Web ↔ Google Maps 集成
+```typescript
+// src/pages/HomePage.tsx
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c';
+
+// 地图坐标保存逻辑 (已修复)
+const finalCoords = selectedLocation 
+  ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
+  : mapClickPosition;
+
+if (finalCoords) {
+  if (mapSelectionType === 'sender') {
+    setSelectedSenderLocation(finalCoords);
+  } else if (mapSelectionType === 'receiver') {
+    setSelectedReceiverLocation(finalCoords);
+  }
+}
+```
+
+#### 4. Mobile Apps ↔ Google Maps 集成
+```typescript
+// ml-express-mobile-app/screens/MapScreen.tsx
+// 使用相同的 API Key，通过环境变量配置
+```
+
+### 🚀 部署流程
+
+#### Web 应用部署 (Netlify)
+1. **自动部署**：
+   ```bash
+   git push origin main
+   # Netlify 自动检测 GitHub 推送，触发构建
+   ```
+
+2. **手动部署**：
+   ```bash
+   npm run build
+   # 将 build/ 目录上传到 Netlify
+   ```
+
+3. **环境变量配置**：
+   ```toml
+   # netlify.toml
+   [context.production.environment]
+   REACT_APP_GOOGLE_MAPS_API_KEY = "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+   REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
+   REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   ```
+
+#### Mobile Apps 部署 (Expo EAS Build)
+1. **Android 部署**：
+   ```bash
+   cd ml-express-mobile-app
+   eas build --platform android --profile production
+   ```
+
+2. **iOS 部署**：
+   ```bash
+   cd ml-express-mobile-app
+   eas build --platform ios --profile production
+   ```
+
+### 🔧 关键修复记录
+
+#### 1. 地图坐标保存修复 (2025-01-18)
+**问题**：Web 端下单时，地图选择的坐标没有正确保存到数据库
+**修复**：
+- 修复 `HomePage.tsx` 中地图确认按钮的坐标获取逻辑
+- 优先使用 `selectedLocation` (POI点击) 的坐标
+- 确保 `receiver_latitude/longitude` 正确保存到 Supabase
+
+#### 2. 骑手 App 导航一致性修复 (2025-01-18)
+**问题**：骑手 App 导航目的地与客户下单位置不一致
+**修复**：
+- 优化 `MapScreen.tsx` 中的 `handleNavigate` 函数
+- 直接使用数据库提供的精确坐标
+- 如果坐标缺失，提示管理员补全而非使用 fallback geocoding
+
+#### 3. 包裹分配功能修复 (2025-01-17)
+**问题**：Web 端分配包裹后，骑手 App 中不显示
+**修复**：
+- 修复 `LoginScreen.tsx` 中的用户身份存储逻辑
+- 统一使用 `couriers.name` 而非 `admin_accounts.employee_name`
+- 修复 Supabase RLS 策略，允许 `anon` 角色更新包裹状态
+
+### 📊 数据流架构
+
+```
+客户下单流程:
+Web HomePage → Google Maps API → 坐标选择 → Supabase packages 表
+                ↓
+实时跟踪页面 → 包裹分配 → 通知系统 → 骑手 App 接收
+
+骑手配送流程:
+骑手 App → 登录验证 → 任务列表 → 地图导航 → 状态更新 → Web 管理后台
+```
+
+### 🔐 安全配置
+
+#### Google Maps API Key 限制
+- **HTTP referer 限制**：
+  - `https://market-link-express.netlify.app/*`
+  - `https://ml-express.vercel.app/*`
+  - `https://*.netlify.app/*` (预览环境)
+
+#### Supabase RLS 策略
+- **packages 表**：允许 `anon` 角色进行所有操作
+- **couriers 表**：限制访问权限
+- **admin_accounts 表**：管理员专用
+
+### 📱 移动端配置
+
+#### 环境变量
+```bash
+# ml-express-mobile-app/.env
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c
+EXPO_PUBLIC_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+#### 权限配置
+```json
+// ml-express-mobile-app/app.json
+{
+  "expo": {
+    "permissions": [
+      "ACCESS_FINE_LOCATION",
+      "ACCESS_COARSE_LOCATION",
+      "CAMERA",
+      "MEDIA_LIBRARY"
+    ]
+  }
+}
+```
+
+---
+
+*最后更新：2025年1月18日*
+*版本：2.0.0*
+*状态：生产环境运行中*
