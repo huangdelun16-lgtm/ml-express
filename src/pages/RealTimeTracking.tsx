@@ -46,6 +46,7 @@ const RealTimeTracking: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCity, setSelectedCity] = useState('yangon');
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   // 缅甸主要城市数据
@@ -104,21 +105,34 @@ const RealTimeTracking: React.FC = () => {
   }, []);
 
   const loadPackages = async () => {
-    const data = await packageService.getAllPackages();
-    console.log('📦 加载的所有包裹:', data);
-    
-    // 分离不同状态的包裹
-    const pendingPackages = data.filter(p => p.status === '待取件');
-    const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
-    
-    console.log('📦 待分配包裹:', pendingPackages);
-    console.log('📦 已分配包裹:', assignedPackages);
-    
-    // 显示所有活跃包裹（待分配 + 已分配）
-    const activePackages = [...pendingPackages, ...assignedPackages];
-    console.log('📦 总活跃包裹:', activePackages);
-    
-    setPackages(activePackages);
+    try {
+      console.log('🔄 开始加载包裹数据...');
+      const data = await packageService.getAllPackages();
+      console.log('📦 加载的所有包裹:', data);
+      
+      // 分离不同状态的包裹
+      const pendingPackages = data.filter(p => p.status === '待取件');
+      const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
+      
+      console.log('📦 待分配包裹:', pendingPackages.length, '个');
+      console.log('📦 已分配包裹:', assignedPackages.length, '个');
+      
+      // 显示所有活跃包裹（待分配 + 已分配）
+      const activePackages = [...pendingPackages, ...assignedPackages];
+      console.log('📦 总活跃包裹:', activePackages.length, '个');
+      
+      setPackages(activePackages);
+      
+      // 强制触发重新渲染
+      setTimeout(() => {
+        console.log('🔄 强制重新渲染包裹列表');
+        setPackages([...activePackages]);
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ 加载包裹数据失败:', error);
+      setPackages([]);
+    }
   };
 
   const loadCouriers = async () => {
@@ -243,6 +257,7 @@ const RealTimeTracking: React.FC = () => {
 
   // 手动分配包裹
   const assignPackageToCourier = async (packageData: Package, courier: Courier) => {
+    setIsAssigning(true);
     try {
       console.log('📦 开始分配包裹:', packageData.id, '给快递员:', courier.name);
       
@@ -260,7 +275,7 @@ const RealTimeTracking: React.FC = () => {
       if (success) {
         console.log('🔔 开始发送通知...');
         // 🔔 发送通知给快递员
-        await notificationService.sendPackageAssignedNotification(
+        const notificationSuccess = await notificationService.sendPackageAssignedNotification(
           courier.id,
           courier.name,
           packageData.id,
@@ -272,8 +287,12 @@ const RealTimeTracking: React.FC = () => {
           }
         );
 
-        console.log('✅ 分配成功，显示成功消息');
-        alert(`包裹 ${packageData.id} 已成功分配给快递员 ${courier.name}\n📲 通知已发送`);
+        console.log('🔔 通知发送结果:', notificationSuccess);
+
+        // 显示明确的成功消息
+        const successMessage = `✅ 分配成功！\n\n📦 包裹：${packageData.id}\n🚚 骑手：${courier.name}\n📲 通知：${notificationSuccess ? '已发送' : '发送失败'}\n\n包裹已从待分配列表移除`;
+        alert(successMessage);
+        
         setShowAssignModal(false);
         setSelectedPackage(null);
         
@@ -300,11 +319,13 @@ const RealTimeTracking: React.FC = () => {
         ));
       } else {
         console.log('❌ 包裹状态更新失败');
-        alert('分配失败，请重试');
+        alert('❌ 分配失败！\n\n包裹状态更新失败，请重试');
       }
     } catch (error) {
       console.error('分配包裹失败:', error);
-      alert('分配失败，请重试');
+      alert('❌ 分配失败！\n\n发生错误：' + error.message);
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -729,19 +750,23 @@ const RealTimeTracking: React.FC = () => {
                   }}>
                     <button
                       onClick={() => autoAssignPackage(pkg)}
+                      disabled={isAssigning}
                       style={{
                         flex: 1,
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: isAssigning 
+                          ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
+                          : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         color: 'white',
                         border: 'none',
                         padding: '0.6rem',
                         borderRadius: '8px',
-                        cursor: 'pointer',
+                        cursor: isAssigning ? 'not-allowed' : 'pointer',
                         fontWeight: 'bold',
-                        fontSize: '0.9rem'
+                        fontSize: '0.9rem',
+                        opacity: isAssigning ? 0.7 : 1
                       }}
                     >
-                      🤖 自动分配
+                      {isAssigning ? '⏳ 分配中...' : '🤖 自动分配'}
                     </button>
                     <button
                       onClick={() => {
