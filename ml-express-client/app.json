@@ -26,7 +26,8 @@
         "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save QR codes and package images."
       },
       "config": {
-        "usesNonExemptEncryption": false
+        "usesNonExemptEncryption": false,
+        "googleMapsApiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
       }
     },
     "android": {
@@ -42,7 +43,12 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

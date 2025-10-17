@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>移动应用部署指南</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .step ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .step li {
+            margin: 8px 0;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+        }
+        .code {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 移动应用部署指南</h1>
+        
+        <div class="status success">
+            <strong>✅ API Key 已更新!</strong> 所有移动应用的 Google Maps API Key 已更新为最新版本
+        </div>
+        
+        <div class="status info">
+            <h3>📋 已更新的应用</h3>
+            <ul>
+                <li>✅ <strong>客户端应用 (ml-express-client)</strong> - iOS & Android</li>
+                <li>✅ <strong>Staff 应用 (ml-express-mobile-app)</strong> - iOS & Android</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h4>🔧 客户端应用部署 (ml-express-client)</h4>
+            <p><strong>用于客户下单和跟踪包裹</strong></p>
+            
+            <ol>
+                <li><strong>进入客户端应用目录</strong>
+                    <div class="code">cd ml-express-client</div>
+                </li>
+                
+                <li><strong>安装依赖</strong>
+                    <div class="code">npm install</div>
+                </li>
+                
+                <li><strong>构建应用</strong>
+                    <div class="code">npx expo build:android</div>
+                    <div class="code">npx expo build:ios</div>
+                </li>
+                
+                <li><strong>或者使用 EAS Build (推荐)</strong>
+                    <div class="code">npx eas build --platform android</div>
+                    <div class="code">npx eas build --platform ios</div>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <h4>🔧 Staff 应用部署 (ml-express-mobile-app)</h4>
+            <p><strong>用于骑手接单和配送</strong></p>
+            
+            <ol>
+                <li><strong>进入 Staff 应用目录</strong>
+                    <div class="code">cd ml-express-mobile-app</div>
+                </li>
+                
+                <li><strong>安装依赖</strong>
+                    <div class="code">npm install</div>
+                </li>
+                
+                <li><strong>构建应用</strong>
+                    <div class="code">npx expo build:android</div>
+                    <div class="code">npx expo build:ios</div>
+                </li>
+                
+                <li><strong>或者使用 EAS Build (推荐)</strong>
+                    <div class="code">npx eas build --platform android</div>
+                    <div class="code">npx eas build --platform ios</div>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="highlight">
+            <h4>⏰ 重要提醒</h4>
+            <p><strong>Google Cloud Console 配置：</strong></p>
+            <ul>
+                <li>确保 API Key 已启用以下服务：
+                    <ul>
+                        <li>Maps SDK for Android</li>
+                        <li>Maps SDK for iOS</li>
+                        <li>Maps JavaScript API</li>
+                    </ul>
+                </li>
+                <li>确保域名限制包含：
+                    <ul>
+                        <li>Android Package: com.mlexpress.client</li>
+                        <li>iOS Bundle ID: com.mlexpress.client</li>
+                        <li>Android Package: com.marketlinkexpress.staff</li>
+                        <li>iOS Bundle ID: com.marketlinkexpress.staff</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h4>🧪 测试步骤</h4>
+            <p>部署完成后，请测试：</p>
+            
+            <ol>
+                <li><strong>客户端应用测试</strong>
+                    <ul>
+                        <li>打开应用，检查地图是否正常显示</li>
+                        <li>测试下单功能，选择地址时地图是否正常</li>
+                        <li>测试包裹跟踪功能</li>
+                    </ul>
+                </li>
+                
+                <li><strong>Staff 应用测试</strong>
+                    <ul>
+                        <li>打开应用，检查地图是否正常显示</li>
+                        <li>测试接单功能，地图标记是否正常</li>
+                        <li>测试导航功能</li>
+                        <li>测试拍照上传功能</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="status success">
+            <h3>🎯 预期结果</h3>
+            <p>部署完成后，您应该能够：</p>
+            <ul>
+                <li>✅ 客户端应用正常显示地图</li>
+                <li>✅ 客户可以正常下单和跟踪包裹</li>
+                <li>✅ Staff 应用正常显示地图和标记</li>
+                <li>✅ 骑手可以正常接单和导航</li>
+                <li>✅ 所有地图功能正常工作</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h4>📞 完成后请告诉我</h4>
+            <p>部署完成后，请告诉我：</p>
+            <ul>
+                <li>客户端应用部署是否成功</li>
+                <li>Staff 应用部署是否成功</li>
+                <li>地图功能是否正常工作</li>
+                <li>是否有任何错误或问题</li>
+            </ul>
+        </div>
+        
+        <div class="status warning">
+            <h3>🎉 即将完成!</h3>
+            <p>这是移动应用的最终部署，完成后整个系统的 Google Maps 集成就完全成功了！</p>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时的提示
+        window.addEventListener('load', function() {
+            console.log('移动应用部署指南已加载');
+        });
+    </script>
+</body>
+</html>
