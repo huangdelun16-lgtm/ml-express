@@ -208,23 +208,35 @@ const RealTimeTracking: React.FC = () => {
 
   // 自动分配包裹
   const autoAssignPackage = async (packageData: Package) => {
+    console.log('🤖 开始自动分配包裹:', packageData.id);
+    console.log('📊 当前快递员列表:', couriers);
+    
     // 找到在线且当前包裹最少的快递员
     const availableCouriers = couriers
-      .filter(c => c.status === 'online')
+      .filter(c => {
+        console.log(`快递员 ${c.name} 状态: ${c.status}, 当前包裹数: ${c.currentPackages || 0}`);
+        return c.status === 'online' || c.status === 'active';
+      })
       .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
+    console.log('✅ 可用快递员:', availableCouriers);
+
     if (availableCouriers.length === 0) {
+      console.log('❌ 没有可用的快递员');
       alert('当前没有在线的快递员，请稍后再试');
       return;
     }
 
     const bestCourier = availableCouriers[0];
+    console.log('🎯 选择最佳快递员:', bestCourier);
     await assignPackageToCourier(packageData, bestCourier);
   };
 
   // 手动分配包裹
   const assignPackageToCourier = async (packageData: Package, courier: Courier) => {
     try {
+      console.log('📦 开始分配包裹:', packageData.id, '给快递员:', courier.name);
+      
       // 更新包裹状态
       const success = await packageService.updatePackageStatus(
         packageData.id,
@@ -234,7 +246,10 @@ const RealTimeTracking: React.FC = () => {
         courier.name
       );
 
+      console.log('📦 包裹状态更新结果:', success);
+
       if (success) {
+        console.log('🔔 开始发送通知...');
         // 🔔 发送通知给快递员
         await notificationService.sendPackageAssignedNotification(
           courier.id,
@@ -248,6 +263,7 @@ const RealTimeTracking: React.FC = () => {
           }
         );
 
+        console.log('✅ 分配成功，显示成功消息');
         alert(`包裹 ${packageData.id} 已成功分配给快递员 ${courier.name}\n📲 通知已发送`);
         setShowAssignModal(false);
         setSelectedPackage(null);
@@ -260,6 +276,7 @@ const RealTimeTracking: React.FC = () => {
             : c
         ));
       } else {
+        console.log('❌ 包裹状态更新失败');
         alert('分配失败，请重试');
       }
     } catch (error) {

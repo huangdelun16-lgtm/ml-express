@@ -257,6 +257,8 @@ export const packageService = {
     transferCode?: string,
     storeInfo?: { storeId: string, storeName: string, receiveCode: string }
   ): Promise<boolean> {
+    console.log('📦 更新包裹状态:', { id, status, pickupTime, deliveryTime, courierName });
+    
     const updateData: any = { status };
     
     if (pickupTime) updateData.pickup_time = pickupTime;
@@ -271,16 +273,25 @@ export const packageService = {
       updateData.store_receive_code = storeInfo.receiveCode;
     }
     
+    console.log('📦 更新数据:', updateData);
+    
     const { error } = await supabase
       .from('packages')
       .update(updateData)
       .eq('id', id);
     
     if (error) {
-      console.error('更新包裹状态失败:', error);
+      console.error('❌ 更新包裹状态失败:', error);
+      console.error('错误详情:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return false;
     }
     
+    console.log('✅ 包裹状态更新成功');
     return true;
   },
 
