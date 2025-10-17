@@ -323,7 +323,8 @@ const RealTimeTracking: React.FC = () => {
       }
     } catch (error) {
       console.error('分配包裹失败:', error);
-      alert('❌ 分配失败！\n\n发生错误：' + error.message);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      alert('❌ 分配失败！\n\n发生错误：' + errorMessage);
     } finally {
       setIsAssigning(false);
     }

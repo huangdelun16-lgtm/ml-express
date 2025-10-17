@@ -181,7 +181,7 @@ export const getCourierLocations = async (courierIds?: string[]): Promise<{
     if (error) {
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : '未知错误'
       };
     }
 
@@ -230,7 +230,7 @@ export const getCourierTrackingHistory = async (
     if (error) {
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : '未知错误'
       };
     }
 

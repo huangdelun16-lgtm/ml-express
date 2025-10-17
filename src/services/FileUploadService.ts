@@ -259,10 +259,10 @@ export class FileUploadService {
         fileSizeLimit: this.config.maxFileSize
       });
 
-      if (error && !error.message.includes('already exists')) {
+      if (error && !(error instanceof Error && error.message.includes('already exists'))) {
         return {
           success: false,
-          error: `创建存储桶失败: ${error.message}`
+          error: `创建存储桶失败: ${error instanceof Error ? error.message : '未知错误'}`
         };
       }
 

@@ -1,4 +1,6 @@
 -- 启用通知功能的系统设置
+-- 请在 Supabase SQL Editor 中运行此脚本
+
 INSERT INTO system_settings (settings_key, settings_value, description, category) 
 VALUES 
   ('notification.sms_enabled', 'true', '启用短信通知', 'notification'),
@@ -8,3 +10,6 @@ ON CONFLICT (settings_key)
 DO UPDATE SET 
   settings_value = EXCLUDED.settings_value,
   updated_at = NOW();
+
+-- 验证设置是否生效
+SELECT * FROM system_settings WHERE category = 'notification';
