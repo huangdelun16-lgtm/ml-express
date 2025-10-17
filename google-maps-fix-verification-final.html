@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps 修复验证</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #218838; }
+        #map { 
+            height: 300px; 
+            width: 100%; 
+            margin: 20px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Google Maps 修复验证</h1>
+        
+        <div class="status success">
+            <strong>✅ 语法错误已修复!</strong> RealTimeTracking.tsx 的语法错误已修复
+        </div>
+        
+        <div class="status info">
+            <strong>🔧 修复内容:</strong>
+            <ul>
+                <li>修复了 SyntaxError: Unexpected token, expected "}"</li>
+                <li>移除了多余的 "): null}" 代码</li>
+                <li>更新了所有文件使用新 API Key: AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c</li>
+                <li>修复了 netlify.toml 环境变量配置</li>
+            </ul>
+        </div>
+        
+        <div>
+            <button onclick="testApiKey()">🧪 测试 API Key</button>
+            <button onclick="testMap()">🗺️ 测试地图</button>
+            <button onclick="testRealTimeTracking()">📍 测试实时跟踪</button>
+        </div>
+        
+        <div id="status"></div>
+        <div id="map"></div>
+        
+        <div class="status warning">
+            <h3>⏰ 等待部署完成</h3>
+            <p>Netlify 正在重新部署修复后的代码，请等待 2-3 分钟后再测试。</p>
+        </div>
+        
+        <div class="status info">
+            <h3>🎯 测试步骤</h3>
+            <ol>
+                <li><strong>等待部署完成</strong> - 查看 Netlify 控制台确认部署成功</li>
+                <li><strong>测试 API Key</strong> - 点击"测试 API Key"按钮</li>
+                <li><strong>测试地图</strong> - 点击"测试地图"按钮</li>
+                <li><strong>测试实时跟踪</strong> - 点击"测试实时跟踪"按钮</li>
+            </ol>
+        </div>
+        
+        <div class="status success">
+            <h3>🎉 预期结果</h3>
+            <p>修复后您应该看到：</p>
+            <ul>
+                <li>✅ API Key 测试成功</li>
+                <li>✅ 地图正常渲染</li>
+                <li>✅ 实时跟踪页面地图正常工作</li>
+                <li>✅ 控制台无 InvalidKey 错误</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c';
+        let mapLoaded = false;
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function testApiKey() {
+            updateStatus('正在测试 API Key...', 'warning');
+            
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=onApiKeyTest`;
+            script.onerror = function() {
+                updateStatus('❌ API Key 测试失败', 'error');
+            };
+            
+            window.onApiKeyTest = function() {
+                mapLoaded = true;
+                updateStatus('✅ API Key 测试成功！', 'success');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function testMap() {
+            if (!mapLoaded) {
+                updateStatus('请先测试 API Key', 'warning');
+                return;
+            }
+            
+            updateStatus('正在测试地图渲染...', 'warning');
+            
+            try {
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                    zoom: 13
+                });
+                
+                new google.maps.Marker({
+                    position: { lat: 16.8661, lng: 96.1951 },
+                    map: map,
+                    title: '仰光测试点'
+                });
+                
+                updateStatus('✅ 地图渲染成功！', 'success');
+                
+            } catch (error) {
+                updateStatus(`❌ 地图渲染失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function testRealTimeTracking() {
+            updateStatus('正在打开实时跟踪页面...', 'info');
+            window.open('/admin/tracking', '_blank');
+            updateStatus('✅ 已打开实时跟踪页面，请检查地图是否正常显示', 'success');
+        }
+        
+        // 页面加载时自动测试
+        window.addEventListener('load', function() {
+            updateStatus('准备测试修复后的 Google Maps', 'info');
+            
+            // 自动开始测试
+            setTimeout(() => {
+                testApiKey();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
