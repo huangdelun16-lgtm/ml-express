@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Cloud 计费账号检查工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { 
+            background-color: #6c757d; 
+            cursor: not-allowed; 
+        }
+        .step {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .checklist {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .checklist ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .checklist li {
+            margin: 8px 0;
+        }
+        .api-test {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .billing-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .billing-info h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 Google Cloud 计费账号检查工具</h1>
+        
+        <div class="billing-info">
+            <h4>⚠️ 重要提示</h4>
+            <p>Google Maps API 需要有效的计费账号才能正常工作。即使有免费配额，也必须关联计费账号。</p>
+        </div>
+        
+        <div>
+            <label for="apiKey">请输入您的 Google Maps API Key:</label>
+            <input type="text" id="apiKey" placeholder="AIza..." style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+            <button onclick="checkBillingStatus()">检查计费账号状态</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div id="results"></div>
+        
+        <div class="step">
+            <h3>🔍 手动检查步骤</h3>
+            <p>如果自动检查无法确定状态，请按以下步骤手动检查：</p>
+            
+            <div class="checklist">
+                <h4>步骤 1: 访问 Google Cloud Console</h4>
+                <ul>
+                    <li>打开 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                    <li>选择您的项目</li>
+                    <li>确认项目名称和 ID</li>
+                </ul>
+            </div>
+            
+            <div class="checklist">
+                <h4>步骤 2: 检查计费设置</h4>
+                <ul>
+                    <li>在左侧菜单中找到 "Billing" (计费)</li>
+                    <li>点击进入计费页面</li>
+                    <li>查看是否有关联的计费账号</li>
+                </ul>
+            </div>
+            
+            <div class="checklist">
+                <h4>步骤 3: 检查计费账号状态</h4>
+                <ul>
+                    <li>计费账号状态应为 "Active" (活跃)</li>
+                    <li>检查付款方式是否有效</li>
+                    <li>确认没有欠费或限制</li>
+                </ul>
+            </div>
+            
+            <div class="checklist">
+                <h4>步骤 4: 检查 API 配额</h4>
+                <ul>
+                    <li>进入 "APIs & Services" → "Quotas"</li>
+                    <li>查看 Maps JavaScript API 的配额状态</li>
+                    <li>确认配额没有超出限制</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>🛠️ 常见计费问题解决方案</h3>
+            
+            <div class="checklist">
+                <h4>问题 1: 没有计费账号</h4>
+                <ul>
+                    <li>点击 "Link a billing account" (关联计费账号)</li>
+                    <li>创建新的计费账号</li>
+                    <li>添加有效的付款方式 (信用卡)</li>
+                </ul>
+            </div>
+            
+            <div class="checklist">
+                <h4>问题 2: 计费账号被暂停</h4>
+                <ul>
+                    <li>检查付款方式是否过期</li>
+                    <li>更新信用卡信息</li>
+                    <li>联系 Google Cloud 支持</li>
+                </ul>
+            </div>
+            
+            <div class="checklist">
+                <h4>问题 3: 配额超出限制</h4>
+                <ul>
+                    <li>检查 API 使用量</li>
+                    <li>增加配额限制</li>
+                    <li>优化 API 调用频率</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>📊 Google Maps API 计费信息</h3>
+            <div class="billing-info">
+                <h4>免费配额</h4>
+                <ul>
+                    <li>Maps JavaScript API: 每月 28,000 次加载</li>
+                    <li>Places API: 每月 1,000 次请求</li>
+                    <li>Geocoding API: 每月 40,000 次请求</li>
+                </ul>
+                <p><strong>注意:</strong> 即使使用免费配额，也必须关联计费账号。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentApiKey = '';
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function addResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `step`;
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <div class="status ${type}">${content}</div>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function checkBillingStatus() {
+            currentApiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!currentApiKey) {
+                updateStatus('请输入 API Key', 'error');
+                return;
+            }
+            
+            if (!currentApiKey.startsWith('AIza')) {
+                updateStatus('API Key 格式错误：应该以 "AIza" 开头', 'error');
+                return;
+            }
+            
+            // 清空之前的结果
+            document.getElementById('results').innerHTML = '';
+            updateStatus('正在检查计费账号状态...', 'warning');
+            
+            // 执行计费状态检查
+            checkApiKeyBilling();
+            checkQuotaStatus();
+            checkApiAccess();
+        }
+        
+        function checkApiKeyBilling() {
+            // 通过 API 调用测试计费状态
+            fetch(`https://maps.googleapis.com/maps/api/js?key=${currentApiKey}`, { 
+                method: 'HEAD',
+                mode: 'no-cors'
+            })
+            .then(response => {
+                if (response.status === 0) {
+                    // no-cors 模式下无法获取状态码，尝试其他方法
+                    testBillingWithGeocoding();
+                } else {
+                    analyzeResponse(response);
+                }
+            })
+            .catch(error => {
+                // 尝试通过 Geocoding API 测试
+                testBillingWithGeocoding();
+            });
+        }
+        
+        function testBillingWithGeocoding() {
+            // 使用 Geocoding API 测试计费状态
+            fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=test&key=${currentApiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error_message) {
+                    analyzeBillingError(data.error_message);
+                } else {
+                    addResult('✅ 计费账号检查', '计费账号状态正常，API 可以正常访问', 'success');
+                }
+            })
+            .catch(error => {
+                addResult('❌ 计费账号检查', '无法确定计费账号状态，请手动检查', 'error');
+            });
+        }
+        
+        function analyzeBillingError(errorMessage) {
+            if (errorMessage.includes('billing') || errorMessage.includes('BillingNotEnabled')) {
+                addResult('❌ 计费账号问题', '检测到计费账号问题：' + errorMessage, 'error');
+                addResult('🔧 解决方案', '请在 Google Cloud Console 中设置计费账号', 'warning');
+            } else if (errorMessage.includes('quota') || errorMessage.includes('QuotaExceeded')) {
+                addResult('⚠️ 配额问题', '检测到配额问题：' + errorMessage, 'warning');
+                addResult('🔧 解决方案', '请检查 API 配额使用情况或增加配额限制', 'warning');
+            } else if (errorMessage.includes('key') || errorMessage.includes('InvalidKey')) {
+                addResult('❌ API Key 问题', '检测到 API Key 问题：' + errorMessage, 'error');
+                addResult('🔧 解决方案', '请检查 API Key 是否正确或重新生成', 'warning');
+            } else {
+                addResult('❓ 未知错误', '检测到错误：' + errorMessage, 'warning');
+            }
+        }
+        
+        function checkQuotaStatus() {
+            // 尝试多次调用 API 来测试配额
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < 3; i++) {
+                fetch(`https://maps.googleapis.com/maps/api/js?key=${currentApiKey}`, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                })
+                .catch(error => {
+                    errorCount++;
+                });
+            }
+            
+            setTimeout(() => {
+                if (errorCount === 0) {
+                    addResult('✅ 配额检查', 'API 配额充足，可以正常使用', 'success');
+                } else if (successCount > 0) {
+                    addResult('⚠️ 配额检查', '部分 API 调用成功，配额可能接近限制', 'warning');
+                } else {
+                    addResult('❌ 配额检查', 'API 调用失败，可能是配额问题', 'error');
+                }
+            }, 2000);
+        }
+        
+        function checkApiAccess() {
+            // 检查不同 API 的访问权限
+            const apis = [
+                { name: 'Maps JavaScript API', url: 'https://maps.googleapis.com/maps/api/js' },
+                { name: 'Geocoding API', url: 'https://maps.googleapis.com/maps/api/geocode' },
+                { name: 'Places API', url: 'https://maps.googleapis.com/maps/api/place' }
+            ];
+            
+            apis.forEach(api => {
+                fetch(`${api.url}?key=${currentApiKey}`, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        addResult(`✅ ${api.name}`, 'API 访问正常', 'success');
+                    } else {
+                        addResult(`❌ ${api.name}`, `API 访问失败: ${response.status}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    addResult(`❓ ${api.name}`, `网络错误: ${error.message}`, 'warning');
+                });
+            });
+        }
+        
+        // 页面加载时的提示
+        window.addEventListener('load', function() {
+            updateStatus('请输入您的 Google Maps API Key 检查计费账号状态', 'info');
+        });
+    </script>
+</body>
+</html>
