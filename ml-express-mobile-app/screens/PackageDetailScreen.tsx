@@ -291,7 +291,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         setCurrentPackage({ ...currentPackage, status: '已送达' });
 
         // 生成详细的成功消息
-        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackage.id}\n👤 骑手：${userName}\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
+        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackage.id}\n👤 骑手：${userName}\n📍 位置：${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
         
         if (photoSaved) {
           successMessage += `\n✅ 配送照片已上传到服务器`;
@@ -316,7 +316,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       } else {
         Alert.alert(
           '⚠️ 部分成功', 
-          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
+          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
           [
             {
               text: '确定',

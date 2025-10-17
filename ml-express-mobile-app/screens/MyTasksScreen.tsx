@@ -345,7 +345,7 @@ const MyTasksScreen: React.FC = () => {
         if (success) {
           Alert.alert(
             '配送完成！',
-            `包裹已成功送达\n\n📦 包裹编号：${selectedPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
+            `包裹已成功送达\n\n📦 包裹编号：${selectedPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
             [
               {
                 text: '确定',
@@ -361,7 +361,7 @@ const MyTasksScreen: React.FC = () => {
         } else {
           Alert.alert(
             '照片上传成功',
-            `配送证明已记录\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`,
+            `配送证明已记录\n位置: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`,
             [
               {
                 text: '确定',

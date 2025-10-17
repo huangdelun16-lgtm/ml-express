@@ -141,7 +141,7 @@ export default function DashboardScreen({ navigation }: any) {
           .insert([locationData]);
       }
 
-      console.log(`✅ 位置已更新: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      console.log(`✅ 位置已更新: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}`);
     } catch (error) {
       console.error('更新位置失败:', error);
     }

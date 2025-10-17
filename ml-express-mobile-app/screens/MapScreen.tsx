@@ -410,7 +410,7 @@ export default function MapScreen({ navigation }: any) {
         console.log('配送证明记录:', deliveryProof);
 
         // 生成详细的成功消息
-        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackageForDelivery.id}\n👤 骑手：${userName}\n📍 位置：${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
+        let successMessage = `包裹已成功送达\n\n📦 包裹编号：${currentPackageForDelivery.id}\n👤 骑手：${userName}\n📍 位置：${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n`;
         
         if (photoSaved) {
           successMessage += `\n✅ 配送照片已上传到服务器`;
@@ -438,7 +438,7 @@ export default function MapScreen({ navigation }: any) {
       } else {
         Alert.alert(
           '⚠️ 部分成功', 
-          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
+          `配送照片${photoSaved ? '已上传' : '已保存到本地'}\n位置: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n⚠️ 但包裹状态更新失败，请稍后重试`,
           [
             {
               text: '确定',
@@ -800,7 +800,7 @@ export default function MapScreen({ navigation }: any) {
   const renderPackageItem = ({ item, index }: { item: Package, index: number }) => {
     // 显示距离信息（如果有且有效）
     const itemDistance = (item as any).distance;
-    const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999
+    const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999 && typeof itemDistance === 'number'
       ? `📏 ${itemDistance.toFixed(1)}km` 
       : '';
     
@@ -921,7 +921,7 @@ export default function MapScreen({ navigation }: any) {
                   {language === 'zh' ? '我的位置' : 'My Location'}
                 </Text>
                 <Text style={styles.locationCoords}>
-                  {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                  {location?.latitude?.toFixed(4) || 'N/A'}, {location?.longitude?.toFixed(4) || 'N/A'}
                 </Text>
               </>
             )}
@@ -1077,7 +1077,7 @@ export default function MapScreen({ navigation }: any) {
                 <View style={styles.routeInfo}>
                   <Text style={styles.routeName}>{pkg.receiver_name}</Text>
                   <Text style={styles.routeDistance}>
-                    {pkg.distance !== null && pkg.distance !== 999
+                    {pkg.distance !== null && pkg.distance !== 999 && typeof pkg.distance === 'number'
                       ? `📏 ${pkg.distance.toFixed(1)}km`
                       : '📍 地址待确认'}
                   </Text>

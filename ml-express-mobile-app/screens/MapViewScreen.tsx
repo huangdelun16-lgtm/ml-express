@@ -209,8 +209,8 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
                 </View>
                 <Text style={styles.locationAddress}>{currentLocation.address}</Text>
                 <Text style={styles.locationCoords}>
-                  纬度: {currentLocation.latitude.toFixed(6)} | 
-                  经度: {currentLocation.longitude.toFixed(6)}
+                  纬度: {currentLocation?.latitude?.toFixed(6) || 'N/A'} | 
+                  经度: {currentLocation?.longitude?.toFixed(6) || 'N/A'}
                 </Text>
                 <TouchableOpacity
                   style={styles.openMapButton}
@@ -266,7 +266,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
                           📍 {courier.location.address}
                         </Text>
                         <Text style={styles.courierCoords}>
-                          {courier.location.latitude.toFixed(4)}, {courier.location.longitude.toFixed(4)}
+                          {courier.location?.latitude?.toFixed(4) || 'N/A'}, {courier.location?.longitude?.toFixed(4) || 'N/A'}
                         </Text>
                       </>
                     )}
@@ -359,7 +359,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
                       <Text style={styles.infoTitle}>位置信息</Text>
                       <Text style={styles.infoText}>📍 {selectedCourier.location.address}</Text>
                       <Text style={styles.infoText}>
-                        坐标: {selectedCourier.location.latitude.toFixed(6)}, {selectedCourier.location.longitude.toFixed(6)}
+                        坐标: {selectedCourier.location?.latitude?.toFixed(6) || 'N/A'}, {selectedCourier.location?.longitude?.toFixed(6) || 'N/A'}
                       </Text>
                       <TouchableOpacity
                         style={styles.fullWidthMapButton}

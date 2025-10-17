@@ -295,7 +295,7 @@ class GeofenceService {
       destination_longitude: destinationLon,
       distance_from_destination: distance,
       title: `🚨 ${severity === 'critical' ? '紧急' : '距离违规'}警报`,
-      description: `骑手 ${courierName} 在距离收件地址 ${distance.toFixed(0)} 米处尝试标记包裹 ${packageId} 为已送达（超出允许范围 ${this.DELIVERY_RADIUS_METERS} 米）。\n\n骑手位置: ${geofenceResult.courierLocation.latitude.toFixed(6)}, ${geofenceResult.courierLocation.longitude.toFixed(6)}\n收件地址: ${destinationLat.toFixed(6)}, ${destinationLon.toFixed(6)}\n定位精度: ${geofenceResult.courierLocation.accuracy?.toFixed(0) || '未知'} 米`,
+      description: `骑手 ${courierName} 在距离收件地址 ${distance?.toFixed(0) || 'N/A'} 米处尝试标记包裹 ${packageId} 为已送达（超出允许范围 ${this.DELIVERY_RADIUS_METERS} 米）。\n\n骑手位置: ${geofenceResult.courierLocation?.latitude?.toFixed(6) || 'N/A'}, ${geofenceResult.courierLocation?.longitude?.toFixed(6) || 'N/A'}\n收件地址: ${destinationLat?.toFixed(6) || 'N/A'}, ${destinationLon?.toFixed(6) || 'N/A'}\n定位精度: ${geofenceResult.courierLocation?.accuracy?.toFixed(0) || '未知'} 米`,
       action_attempted: 'mark_delivered',
       metadata: {
         courier_location: geofenceResult.courierLocation,
@@ -310,7 +310,7 @@ class GeofenceService {
       allowed: false,
       result: geofenceResult,
       alertCreated: true,
-      message: `❌ 您距离收件地址还有 ${distance.toFixed(0)} 米\n必须在 ${this.DELIVERY_RADIUS_METERS} 米范围内才能标记已送达\n\n⚠️ 此异常操作已记录并通知管理员`,
+      message: `❌ 您距离收件地址还有 ${distance?.toFixed(0) || 'N/A'} 米\n必须在 ${this.DELIVERY_RADIUS_METERS} 米范围内才能标记已送达\n\n⚠️ 此异常操作已记录并通知管理员`,
     };
   }
 
