@@ -599,7 +599,7 @@ const RealTimeTracking: React.FC = () => {
                     </InfoWindow>
                   )}
                 </GoogleMap>
-              ) : null}
+              )}
             </div>
           </div>
         </div>
