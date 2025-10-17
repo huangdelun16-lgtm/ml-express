@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, trackingService } from '../services/supabase';
 
 // Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const TrackingPage: React.FC = () => {
