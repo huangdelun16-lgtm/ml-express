@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 
+                           (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || 
+                           "";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
@@ -46,6 +48,7 @@ const RealTimeTracking: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCity, setSelectedCity] = useState('yangon');
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -62,10 +65,31 @@ const RealTimeTracking: React.FC = () => {
   };
 
   // 加载 Google Maps
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
+  const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: GOOGLE_MAPS_LIBRARIES
   });
+
+  // 调试信息
+  useEffect(() => {
+    console.log('=== Google Maps 调试信息 ===');
+    console.log('Google Maps API Key:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+    console.log('API Key length:', GOOGLE_MAPS_API_KEY?.length || 0);
+    console.log('API Key starts with AIza:', GOOGLE_MAPS_API_KEY?.startsWith('AIza') || false);
+    console.log('Map loaded:', isMapLoaded);
+    console.log('Load error:', loadError);
+    console.log('========================');
+    
+    if (loadError) {
+      console.error('Google Maps load error:', loadError);
+    }
+    
+    // 如果API密钥缺失，显示警告
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error('❌ Google Maps API密钥未设置！');
+      console.log('请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+    }
+  }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
   // 加载包裹数据
   useEffect(() => {
@@ -275,8 +299,8 @@ const RealTimeTracking: React.FC = () => {
 
   return (
     <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      minHeight: '100vh', 
+      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
       padding: '2rem'
     }}>
       {/* 顶部导航 */}
@@ -390,158 +414,195 @@ const RealTimeTracking: React.FC = () => {
             border: '2px solid #e5e7eb',
             position: 'relative'
           }}>
-            {/* 城市选择器 */}
-            <div style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              zIndex: 1000,
-              background: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: '8px',
-              padding: '8px',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <select
-                value={selectedCity}
-                onChange={(e) => handleCityChange(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '2px solid #e5e7eb',
-                  background: 'white',
-                  color: '#1f2937',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  minWidth: '150px',
-                  outline: 'none'
-                }}
-              >
-                {Object.entries(myanmarCities).map(([key, city]) => (
-                  <option key={key} value={key}>
-                    📍 {city.name} ({city.nameEn})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {!isMapLoaded ? (
+            <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
+              {/* 城市选择器 */}
               <div style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#f3f4f6',
-                color: '#6b7280'
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '8px',
+                padding: '8px',
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                backdropFilter: 'blur(10px)'
               }}>
-                <div>🌍 地图加载中...</div>
-              </div>
-            ) : (
-              <GoogleMap
-                key={selectedCity}
-                mapContainerStyle={{ width: '100%', height: '100%' }}
-                center={mapCenter}
-                zoom={13}
-                options={{
-                  fullscreenControl: true,
-                  fullscreenControlOptions: {
-                    position: window.google.maps.ControlPosition.TOP_RIGHT
-                  },
-                  styles: [
-                    {
-                      featureType: 'poi',
-                      elementType: 'labels',
-                      stylers: [{ visibility: 'off' }]
-                    }
-                  ]
-                }}
-              >
-                {/* 显示快递员位置 */}
-                {couriers
-                  .filter(courier => courier.latitude != null && courier.longitude != null)
-                  .map(courier => (
-                    <Marker
-                      key={courier.id}
-                      position={{ lat: courier.latitude!, lng: courier.longitude! }}
-                      icon={{
-                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="20" cy="20" r="18" fill="${getCourierStatusColor(courier.status)}" stroke="white" stroke-width="3"/>
-                            <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏍️</text>
-                          </svg>
-                        `)}`,
-                        scaledSize: new window.google.maps.Size(40, 40),
-                        anchor: new window.google.maps.Point(20, 20)
-                      }}
-                      onClick={() => setSelectedCourier(courier)}
-                    />
+                <select
+                  value={selectedCity}
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '2px solid #e5e7eb',
+                    background: 'white',
+                    color: '#1f2937',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    minWidth: '150px',
+                    outline: 'none'
+                  }}
+                >
+                  {Object.entries(myanmarCities).map(([key, city]) => (
+                    <option key={key} value={key}>
+                      📍 {city.name} ({city.nameEn})
+                    </option>
                   ))}
+                </select>
+              </div>
 
-                {/* 信息窗口 */}
-                {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
-                  <InfoWindow
-                    position={{ lat: selectedCourier.latitude, lng: selectedCourier.longitude }}
-                    onCloseClick={() => setSelectedCourier(null)}
-                  >
-                    <div style={{ padding: '0.5rem', minWidth: '250px' }}>
-                      <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
-                        {selectedCourier.name}
-                      </h3>
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                          <strong>📱 电话:</strong> {selectedCourier.phone}
-                        </p>
-                        {selectedCourier.email && (
-                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                            <strong>📧 邮箱:</strong> {selectedCourier.email}
-                          </p>
-                        )}
-                        {selectedCourier.vehicle_type && (
-                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                            <strong>🏍️ 车辆:</strong> {selectedCourier.vehicle_type}
-                          </p>
-                        )}
-                        {selectedCourier.license_number && (
-                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                            <strong>🪪 车牌:</strong> {selectedCourier.license_number}
-                          </p>
-                        )}
-                      </div>
-                      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
-                          <strong>📦 当前包裹:</strong> <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{selectedCourier.currentPackages || 0}</span>
-                        </p>
-                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
-                          <strong>✅ 总完成:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>{selectedCourier.todayDeliveries || 0}</span>
-                        </p>
-                        {selectedCourier.rating !== undefined && (
-                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
-                            <strong>⭐ 评分:</strong> <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{selectedCourier.rating.toFixed(1)}</span>
-                          </p>
-                        )}
-                        <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
-                          <strong>🔋 电量:</strong> <span style={{ color: selectedCourier.batteryLevel && selectedCourier.batteryLevel < 30 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{selectedCourier.batteryLevel || 0}%</span>
-                        </p>
+              {!isMapLoaded ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  textAlign: 'center',
+                  padding: '2rem'
+                }}>
+                  {!GOOGLE_MAPS_API_KEY ? (
+                    <>
+                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🚫</div>
+                      <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem', color: '#ef4444', fontWeight: 'bold' }}>
+                        Google Maps API 密钥缺失
                       </div>
                       <div style={{ 
-                        marginTop: '0.5rem',
-                        padding: '0.4rem 0.8rem',
-                        borderRadius: '6px',
-                        background: getCourierStatusColor(selectedCourier.status),
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        fontSize: '0.9rem'
+                        marginTop: '1rem', 
+                        padding: '1rem', 
+                        background: '#fff', 
+                        borderRadius: '8px',
+                        border: '1px solid #ddd',
+                        fontSize: '0.9rem',
+                        textAlign: 'left',
+                        maxWidth: '400px'
                       }}>
-                        {getCourierStatusText(selectedCourier.status)}
+                        <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>🔧 解决方法</h4>
+                        <p style={{ margin: 0, lineHeight: 1.6 }}>
+                          请在您的网站托管平台（如 Netlify 或 Vercel）的环境变量设置中，添加一个名为 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code> 的变量，并填入您有效的 Google Maps API 密钥。
+                        </p>
                       </div>
-                    </div>
-                  </InfoWindow>
-                )}
-              </GoogleMap>
-            )}
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
+                      <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
+                      {loadError && (
+                        <div style={{ color: '#ef4444', marginTop: '0.5rem', background: '#fffbe B', padding: '0.5rem', borderRadius: '4px' }}>
+                          加载错误: {loadError.message}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : mapContainerRef.current ? (
+                <GoogleMap
+                  key={selectedCity}
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={mapCenter}
+                  zoom={13}
+                  options={{
+                    fullscreenControl: true,
+                    fullscreenControlOptions: {
+                      position: window.google.maps.ControlPosition.TOP_RIGHT
+                    },
+                    styles: [
+                      {
+                        featureType: 'poi',
+                        elementType: 'labels',
+                        stylers: [{ visibility: 'off' }]
+                      }
+                    ]
+                  }}
+                >
+                  {/* 显示快递员位置 */}
+                  {couriers
+                    .filter(courier => courier.latitude != null && courier.longitude != null)
+                    .map(courier => (
+                      <Marker
+                        key={courier.id}
+                        position={{ lat: courier.latitude!, lng: courier.longitude! }}
+                        icon={{
+                          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="20" cy="20" r="18" fill="${getCourierStatusColor(courier.status)}" stroke="white" stroke-width="3"/>
+                              <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏍️</text>
+                            </svg>
+                          `)}`,
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 20)
+                        }}
+                        onClick={() => setSelectedCourier(courier)}
+                      />
+                    ))}
+
+                  {/* 信息窗口 */}
+                  {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
+                    <InfoWindow
+                      position={{ lat: selectedCourier.latitude, lng: selectedCourier.longitude }}
+                      onCloseClick={() => setSelectedCourier(null)}
+                    >
+                      <div style={{ padding: '0.5rem', minWidth: '250px' }}>
+                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
+                          {selectedCourier.name}
+                        </h3>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>📱 电话:</strong> {selectedCourier.phone}
+                          </p>
+                          {selectedCourier.email && (
+                            <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                              <strong>📧 邮箱:</strong> {selectedCourier.email}
+                            </p>
+                          )}
+                          {selectedCourier.vehicle_type && (
+                            <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                              <strong>🏍️ 车辆:</strong> {selectedCourier.vehicle_type}
+                            </p>
+                          )}
+                          {selectedCourier.license_number && (
+                            <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                              <strong>🪪 车牌:</strong> {selectedCourier.license_number}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                            <strong>📦 当前包裹:</strong> <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{selectedCourier.currentPackages || 0}</span>
+                          </p>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                            <strong>✅ 总完成:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>{selectedCourier.todayDeliveries || 0}</span>
+                          </p>
+                          {selectedCourier.rating !== undefined && (
+                            <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                              <strong>⭐ 评分:</strong> <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{selectedCourier.rating.toFixed(1)}</span>
+                            </p>
+                          )}
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                            <strong>🔋 电量:</strong> <span style={{ color: selectedCourier.batteryLevel && selectedCourier.batteryLevel < 30 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{selectedCourier.batteryLevel || 0}%</span>
+                          </p>
+                        </div>
+                        <div style={{ 
+                          marginTop: '0.5rem',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          background: getCourierStatusColor(selectedCourier.status),
+                          color: 'white',
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          fontSize: '0.9rem'
+                        }}>
+                          {getCourierStatusText(selectedCourier.status)}
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
+                </GoogleMap>
+              ) : null}
+            </div>
           </div>
         </div>
 

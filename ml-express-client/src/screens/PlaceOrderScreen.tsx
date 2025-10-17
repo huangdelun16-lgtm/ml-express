@@ -488,16 +488,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
   // 提交订单
   const handleSubmitOrder = async () => {
-    // 强制检查用户ID是否存在
-    if (!userId) {
-      Alert.alert('错误', '无法获取您的用户身份，请尝试重新登录后再下单。');
-      console.error('【下单失败】关键错误：提交时 userId 为空或未定义。');
-      return;
-    }
-
-    // 添加明确的日志，用于调试
-    console.log(`【下单流程】准备为用户 ${userId} 创建订单...`);
-
     // 验证必填字段
     if (!senderName || !senderPhone || !senderAddress ||
         !receiverName || !receiverPhone || !receiverAddress ||
@@ -548,8 +538,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         receiver_address: receiverAddress,
         package_type: packageType,
         weight: weight,
-        // 核心修正：确保 description 字段包含客户ID标记
-        description: `${description || ''} [客户ID: ${userId}]`.trim(),
+        description: description || '',
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: distance,

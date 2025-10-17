@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API Key 诊断工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        #map { height: 400px; width: 100%; margin: 20px 0; }
+        .log { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Google Maps API Key 诊断工具</h1>
+        
+        <div id="status"></div>
+        
+        <div>
+            <h3>1. 环境变量检查</h3>
+            <button onclick="checkEnvironmentVariables()">检查环境变量</button>
+            <div id="env-check" class="log"></div>
+        </div>
+        
+        <div>
+            <h3>2. API Key 格式验证</h3>
+            <button onclick="validateApiKey()">验证 API Key 格式</button>
+            <div id="api-key-check" class="log"></div>
+        </div>
+        
+        <div>
+            <h3>3. Google Maps 加载测试</h3>
+            <button onclick="testGoogleMaps()">测试 Google Maps 加载</button>
+            <div id="map-test" class="log"></div>
+            <div id="map"></div>
+        </div>
+        
+        <div>
+            <h3>4. 网络请求诊断</h3>
+            <button onclick="diagnoseNetworkRequests()">诊断网络请求</button>
+            <div id="network-check" class="log"></div>
+        </div>
+        
+        <div>
+            <h3>5. 控制台错误检查</h3>
+            <button onclick="checkConsoleErrors()">检查控制台错误</button>
+            <div id="console-check" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let apiKey = '';
+        let mapLoaded = false;
+        
+        // 从多个可能的来源获取 API Key
+        function getApiKey() {
+            // 1. 尝试从环境变量获取（如果页面有全局变量）
+            if (window.REACT_APP_GOOGLE_MAPS_API_KEY) {
+                return window.REACT_APP_GOOGLE_MAPS_API_KEY;
+            }
+            
+            // 2. 尝试从 process.env 获取（如果存在）
+            if (window.process && window.process.env && window.process.env.REACT_APP_GOOGLE_MAPS_API_KEY) {
+                return window.process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+            }
+            
+            // 3. 尝试从 import.meta.env 获取（Vite 环境）
+            if (window.import && window.import.meta && window.import.meta.env && window.import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+                return window.import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            }
+            
+            // 4. 尝试从 URL 参数获取（用于测试）
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlApiKey = urlParams.get('api_key');
+            if (urlApiKey) {
+                return urlApiKey;
+            }
+            
+            return '';
+        }
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}\n`;
+            element.textContent += logMessage;
+            element.scrollTop = element.scrollHeight;
+            
+            // 更新状态
+            updateStatus(message, type);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function checkEnvironmentVariables() {
+            log('env-check', '开始检查环境变量...');
+            
+            apiKey = getApiKey();
+            
+            if (!apiKey) {
+                log('env-check', '❌ 未找到 Google Maps API Key', 'error');
+                log('env-check', '请检查以下位置:', 'warning');
+                log('env-check', '1. .env 文件中的 REACT_APP_GOOGLE_MAPS_API_KEY');
+                log('env-check', '2. Netlify 环境变量设置');
+                log('env-check', '3. 构建时的环境变量注入');
+                return;
+            }
+            
+            log('env-check', `✅ 找到 API Key: ${apiKey.substring(0, 10)}...`, 'success');
+            log('env-check', `API Key 长度: ${apiKey.length} 字符`);
+            log('env-check', `API Key 格式: ${apiKey.startsWith('AIza') ? '正确 (AIza开头)' : '可能不正确'}`);
+        }
+        
+        function validateApiKey() {
+            if (!apiKey) {
+                log('api-key-check', '❌ 请先检查环境变量', 'error');
+                return;
+            }
+            
+            log('api-key-check', '开始验证 API Key 格式...');
+            
+            // 基本格式检查
+            if (!apiKey.startsWith('AIza')) {
+                log('api-key-check', '❌ API Key 格式错误：应该以 "AIza" 开头', 'error');
+                return;
+            }
+            
+            if (apiKey.length < 35) {
+                log('api-key-check', '❌ API Key 长度不足：应该至少 35 个字符', 'error');
+                return;
+            }
+            
+            log('api-key-check', '✅ API Key 格式验证通过', 'success');
+            
+            // 测试 API Key 是否有效
+            testApiKeyValidity();
+        }
+        
+        function testApiKeyValidity() {
+            log('api-key-check', '正在测试 API Key 有效性...');
+            
+            // 使用 Google Maps JavaScript API 测试
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=onGoogleMapsLoaded`;
+            script.onerror = function() {
+                log('api-key-check', '❌ Google Maps API 加载失败', 'error');
+                log('api-key-check', '可能的原因:', 'warning');
+                log('api-key-check', '1. API Key 无效或已过期');
+                log('api-key-check', '2. API Key 权限不足');
+                log('api-key-check', '3. 域名限制设置错误');
+                log('api-key-check', '4. 计费账户问题');
+            };
+            
+            window.onGoogleMapsLoaded = function() {
+                log('api-key-check', '✅ Google Maps API 加载成功', 'success');
+                mapLoaded = true;
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function testGoogleMaps() {
+            if (!mapLoaded) {
+                log('map-test', '❌ Google Maps API 尚未加载，请先验证 API Key', 'error');
+                return;
+            }
+            
+            log('map-test', '开始测试地图渲染...');
+            
+            try {
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                    zoom: 13
+                });
+                
+                log('map-test', '✅ 地图渲染成功', 'success');
+                
+                // 添加标记测试
+                new google.maps.Marker({
+                    position: { lat: 16.8661, lng: 96.1951 },
+                    map: map,
+                    title: '测试标记'
+                });
+                
+                log('map-test', '✅ 标记添加成功', 'success');
+                
+            } catch (error) {
+                log('map-test', `❌ 地图渲染失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function diagnoseNetworkRequests() {
+            log('network-check', '开始诊断网络请求...');
+            
+            // 检查当前页面的域名
+            const currentDomain = window.location.hostname;
+            log('network-check', `当前域名: ${currentDomain}`);
+            
+            // 检查是否在允许的域名列表中
+            const allowedDomains = [
+                'market-link-express.com',
+                'www.market-link-express.com',
+                'market-link-express.netlify.app',
+                'localhost',
+                '127.0.0.1'
+            ];
+            
+            const isAllowed = allowedDomains.some(domain => 
+                currentDomain === domain || currentDomain.endsWith('.' + domain)
+            );
+            
+            if (isAllowed) {
+                log('network-check', '✅ 当前域名在允许列表中', 'success');
+            } else {
+                log('network-check', '❌ 当前域名可能不在 Google Cloud 允许列表中', 'error');
+                log('network-check', '请在 Google Cloud Console 中添加以下域名:', 'warning');
+                log('network-check', `- https://${currentDomain}/*`);
+                log('network-check', `- https://*.${currentDomain}/*`);
+            }
+            
+            // 测试网络连接
+            fetch('https://maps.googleapis.com/maps/api/js', {
+                method: 'HEAD',
+                mode: 'no-cors'
+            }).then(() => {
+                log('network-check', '✅ 可以访问 Google Maps API 服务器', 'success');
+            }).catch(error => {
+                log('network-check', `❌ 无法访问 Google Maps API 服务器: ${error.message}`, 'error');
+            });
+        }
+        
+        function checkConsoleErrors() {
+            log('console-check', '检查控制台错误...');
+            
+            // 重写 console.error 来捕获错误
+            const originalError = console.error;
+            const errors = [];
+            
+            console.error = function(...args) {
+                errors.push(args.join(' '));
+                originalError.apply(console, args);
+            };
+            
+            setTimeout(() => {
+                if (errors.length === 0) {
+                    log('console-check', '✅ 未发现控制台错误', 'success');
+                } else {
+                    log('console-check', `发现 ${errors.length} 个错误:`, 'warning');
+                    errors.forEach(error => {
+                        log('console-check', `❌ ${error}`, 'error');
+                    });
+                }
+                
+                // 恢复原始 console.error
+                console.error = originalError;
+            }, 2000);
+        }
+        
+        // 页面加载时自动检查
+        window.addEventListener('load', function() {
+            updateStatus('诊断工具已加载，请点击按钮开始检查', 'info');
+        });
+    </script>
+</body>
+</html>
