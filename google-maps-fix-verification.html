@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps 修复验证测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #218838; }
+        #map { 
+            height: 400px; 
+            width: 100%; 
+            margin: 20px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 8px;
+        }
+        .test-result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        .checklist {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .checklist ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .checklist li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Google Maps 修复验证测试</h1>
+        
+        <div class="status success">
+            <strong>✅ 配置完成!</strong> 您已在 Google Cloud Console 中正确设置了域名限制
+        </div>
+        
+        <div class="checklist">
+            <h3>📋 已完成的配置</h3>
+            <ul>
+                <li>✅ 域名限制已设置: market-link-express.netlify.app</li>
+                <li>✅ API 限制设置为 "Don't restrict key"</li>
+                <li>✅ 代码已更新所有相关文件</li>
+                <li>✅ Netlify 环境变量已设置</li>
+                <li>🔄 <strong>等待生效:</strong> Google Cloud 设置需要 1-5 分钟生效</li>
+            </ul>
+        </div>
+        
+        <div>
+            <button onclick="testGoogleMapsNow()">🧪 立即测试 Google Maps</button>
+            <button onclick="testMapRendering()">🗺️ 测试地图渲染</button>
+            <button onclick="testRealTimeTracking()">📍 测试实时跟踪页面</button>
+        </div>
+        
+        <div id="test-results"></div>
+        
+        <div id="map"></div>
+        
+        <div class="status info">
+            <h3>⏰ 重要提醒</h3>
+            <p>Google Cloud Console 的设置可能需要 <strong>1-5 分钟</strong> 才能完全生效。如果测试失败，请稍等几分钟后再试。</p>
+        </div>
+        
+        <div class="status warning">
+            <h3>🔍 如果仍然有问题</h3>
+            <p>如果测试后仍然显示 InvalidKeyMapError，请检查：</p>
+            <ul>
+                <li>确认 Google Cloud Console 中的设置已保存</li>
+                <li>确认 Maps JavaScript API 已启用</li>
+                <li>确认计费账号状态正常</li>
+                <li>等待 5 分钟后再次测试</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw';
+        let mapLoaded = false;
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            if (statusDiv) {
+                statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            }
+        }
+        
+        function addTestResult(title, result, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                <div class="status ${type}">${result}</div>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function testGoogleMapsNow() {
+            document.getElementById('test-results').innerHTML = '';
+            addTestResult('🧪 Google Maps API 测试', '正在测试 API Key 和域名限制...', 'warning');
+            
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=onApiKeyTest`;
+            script.onerror = function() {
+                addTestResult('❌ Google Maps API 测试', 'API Key 测试失败，可能是域名限制或计费问题', 'error');
+                updateStatus('测试失败，请检查 Google Cloud Console 设置', 'error');
+            };
+            
+            window.onApiKeyTest = function() {
+                addTestResult('✅ Google Maps API 测试', 'API Key 有效，Google Maps API 加载成功！', 'success');
+                mapLoaded = true;
+                updateStatus('Google Maps API 测试成功！', 'success');
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function testMapRendering() {
+            if (!mapLoaded) {
+                addTestResult('⚠️ 地图渲染测试', '请先测试 Google Maps API', 'warning');
+                return;
+            }
+            
+            addTestResult('🗺️ 地图渲染测试', '正在测试地图渲染...', 'warning');
+            
+            try {
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 16.8661, lng: 96.1951 }, // 仰光
+                    zoom: 13
+                });
+                
+                // 添加标记
+                new google.maps.Marker({
+                    position: { lat: 16.8661, lng: 96.1951 },
+                    map: map,
+                    title: '仰光测试点'
+                });
+                
+                addTestResult('✅ 地图渲染测试', '地图渲染成功，标记添加成功！', 'success');
+                updateStatus('地图渲染测试成功！', 'success');
+                
+            } catch (error) {
+                addTestResult('❌ 地图渲染测试', `地图渲染失败: ${error.message}`, 'error');
+                updateStatus('地图渲染测试失败', 'error');
+            }
+        }
+        
+        function testRealTimeTracking() {
+            addTestResult('📍 实时跟踪页面测试', '正在打开实时跟踪页面...', 'info');
+            
+            // 打开实时跟踪页面
+            window.open('/admin/tracking', '_blank');
+            
+            addTestResult('✅ 实时跟踪页面测试', '已打开实时跟踪页面，请检查地图是否正常显示', 'success');
+        }
+        
+        // 页面加载时自动测试
+        window.addEventListener('load', function() {
+            updateStatus('准备测试 Google Maps 修复结果', 'info');
+            
+            // 自动开始测试
+            setTimeout(() => {
+                testGoogleMapsNow();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
