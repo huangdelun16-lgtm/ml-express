@@ -46,7 +46,7 @@ export default function LoginScreen({ navigation }: any) {
             // 通过员工姓名查找对应的快递员记录
             const { data: courierData } = await supabase
               .from('couriers')
-              .select('id')
+              .select('id, name')
               .eq('name', account.employee_name)
               .single();
             
@@ -60,8 +60,10 @@ export default function LoginScreen({ navigation }: any) {
                 })
                 .eq('id', courierData.id);
               
-              // 保存快递员ID，方便后续使用
+              // 保存快递员ID和姓名，方便后续使用
               await AsyncStorage.setItem('currentCourierId', courierData.id);
+              // 重要：使用快递员的 name 而不是 employee_name
+              await AsyncStorage.setItem('currentUserName', courierData.name);
               
               // 立即上传一次位置
               try {

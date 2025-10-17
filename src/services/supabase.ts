@@ -797,7 +797,8 @@ export const notificationService = {
 
       if (!notificationEnabled) {
         console.log('通知功能未启用，跳过发送');
-        return true; // 不算失败
+        // 即使通知功能未启用，也创建通知记录供移动端读取
+        console.log('📝 创建通知记录供移动端读取...');
       }
 
       // 构建通知标题和内容
@@ -2025,4 +2026,5 @@ export const courierSalaryService = {
       return false;
     }
   }
+};
 };

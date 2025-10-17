@@ -107,14 +107,16 @@ const RealTimeTracking: React.FC = () => {
     const data = await packageService.getAllPackages();
     console.log('📦 加载的所有包裹:', data);
     
-    // 只显示待分配和配送中的包裹
-    const activePackages = data.filter(p => 
-      p.status === '待取件' || p.status === '已取件' || p.status === '配送中'
-    );
+    // 分离不同状态的包裹
+    const pendingPackages = data.filter(p => p.status === '待取件');
+    const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
     
-    console.log('📦 过滤后的活跃包裹:', activePackages);
-    console.log('📦 待取件包裹:', data.filter(p => p.status === '待取件'));
-    console.log('📦 已取件包裹:', data.filter(p => p.status === '已取件'));
+    console.log('📦 待分配包裹:', pendingPackages);
+    console.log('📦 已分配包裹:', assignedPackages);
+    
+    // 显示所有活跃包裹（待分配 + 已分配）
+    const activePackages = [...pendingPackages, ...assignedPackages];
+    console.log('📦 总活跃包裹:', activePackages);
     
     setPackages(activePackages);
   };
@@ -282,6 +284,13 @@ const RealTimeTracking: React.FC = () => {
         // 验证包裹状态是否已更新
         const updatedPackage = await packageService.getPackageById(packageData.id);
         console.log('🔍 验证包裹状态更新:', updatedPackage);
+        
+        // 强制刷新页面数据
+        console.log('🔄 强制刷新页面数据...');
+        setTimeout(async () => {
+          await loadPackages();
+          await loadCouriers();
+        }, 1000);
         
         // 更新快递员的包裹数（实际应该从后端更新）
         setCouriers(prev => prev.map(c => 
@@ -635,7 +644,7 @@ const RealTimeTracking: React.FC = () => {
           </div>
         </div>
 
-        {/* 右侧：待分配包裹列表 */}
+        {/* 右侧：包裹管理 */}
         <div style={{
           background: 'white',
           borderRadius: '15px',
@@ -644,7 +653,13 @@ const RealTimeTracking: React.FC = () => {
           maxHeight: '700px',
           overflow: 'auto'
         }}>
-          <h2 style={{ marginTop: 0, color: '#1f2937' }}>📦 待分配包裹</h2>
+          <h2 style={{ marginTop: 0, color: '#1f2937' }}>📦 包裹管理</h2>
+          
+          {/* 待分配包裹 */}
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
+              ⏳ 待分配包裹 ({packages.filter(p => p.status === '待取件').length})
+            </h3>
 
           {packages.filter(p => p.status === '待取件').length === 0 ? (
             <div style={{
@@ -751,6 +766,78 @@ const RealTimeTracking: React.FC = () => {
                 </div>
               ))
           )}
+          </div>
+          
+          {/* 已分配包裹 */}
+          <div>
+            <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
+              ✅ 已分配包裹 ({packages.filter(p => p.status === '已取件' || p.status === '配送中').length})
+            </h3>
+            
+            {packages.filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
+                color: '#9ca3af'
+              }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+                <p>暂无已分配包裹</p>
+              </div>
+            ) : (
+              packages
+                .filter(p => p.status === '已取件' || p.status === '配送中')
+                .map(pkg => (
+                  <div
+                    key={pkg.id}
+                    style={{
+                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      marginBottom: '1rem',
+                      border: '2px solid #bbf7d0'
+                    }}
+                  >
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <strong style={{ color: '#166534' }}>{pkg.id}</strong>
+                      <span style={{
+                        background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
+                        color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {pkg.status}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📤 寄件人:</strong> {pkg.sender_name} ({pkg.sender_phone})
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📥 收件人:</strong> {pkg.receiver_name} ({pkg.receiver_phone})
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📍 地址:</strong> {pkg.receiver_address}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>🚚 骑手:</strong> <span style={{ color: '#059669', fontWeight: 'bold' }}>{pkg.courier || '未分配'}</span>
+                      </p>
+                      {pkg.pickup_time && (
+                        <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                          <strong>⏰ 取件时间:</strong> {pkg.pickup_time}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
         </div>
       </div>
 
