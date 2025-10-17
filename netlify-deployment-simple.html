@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netlify 部署问题诊断</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Netlify 部署问题诊断</h1>
+        
+        <div class="status error">
+            <strong>问题确认:</strong> 检查工具显示空白，说明 Netlify 部署确实有问题
+        </div>
+        
+        <div class="step">
+            <h4>🔍 立即检查步骤</h4>
+            <p><strong>请按以下步骤检查 Netlify 部署失败的原因：</strong></p>
+            
+            <ol>
+                <li><strong>访问 Netlify 控制台</strong>
+                    <br>打开 <a href="https://app.netlify.com/" target="_blank">https://app.netlify.com/</a>
+                </li>
+                
+                <li><strong>选择您的项目</strong>
+                    <br>找到 "market-link-express" 项目
+                </li>
+                
+                <li><strong>查看部署状态</strong>
+                    <br>点击 "Deploys" 标签，查看最新部署
+                </li>
+                
+                <li><strong>检查部署日志</strong>
+                    <br>点击失败的部署，查看 "Deploy log"
+                </li>
+                
+                <li><strong>截图错误信息</strong>
+                    <br>将红色错误信息截图发送给我
+                </li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <h4>🛠️ 常见部署失败原因</h4>
+            
+            <p><strong>最可能的原因：</strong></p>
+            <ul>
+                <li><strong>构建错误</strong> - TypeScript 编译失败</li>
+                <li><strong>依赖问题</strong> - npm install 失败</li>
+                <li><strong>环境变量</strong> - 环境变量配置错误</li>
+                <li><strong>构建超时</strong> - 构建时间过长</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h4>🔧 快速解决方案</h4>
+            
+            <p><strong>方案 1: 更新环境变量</strong></p>
+            <ol>
+                <li>进入 "Site settings" → "Environment variables"</li>
+                <li>更新 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code></li>
+                <li>设置为: <code>AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c</code></li>
+                <li>保存并重新部署</li>
+            </ol>
+            
+            <p><strong>方案 2: 手动触发部署</strong></p>
+            <ol>
+                <li>在 Netlify 控制台点击 "Trigger deploy"</li>
+                <li>选择 "Deploy site"</li>
+                <li>等待部署完成</li>
+            </ol>
+            
+            <p><strong>方案 3: 检查构建设置</strong></p>
+            <ol>
+                <li>进入 "Site settings" → "Build & deploy"</li>
+                <li>确认 "Build command" 为: <code>npm run build</code></li>
+                <li>确认 "Publish directory" 为: <code>build</code></li>
+            </ol>
+        </div>
+        
+        <div class="status info">
+            <h3>📋 当前状态</h3>
+            <ul>
+                <li>✅ 新 API Key 已更新到所有代码文件</li>
+                <li>✅ 代码已提交到 GitHub</li>
+                <li>❌ Netlify 部署失败</li>
+                <li>❌ 检查工具显示空白</li>
+                <li>🔄 <strong>需要:</strong> 检查部署日志并修复错误</li>
+            </ul>
+        </div>
+        
+        <div class="status warning">
+            <h3>💡 紧急行动</h3>
+            <p><strong>请立即执行：</strong></p>
+            <ol>
+                <li>访问 Netlify 控制台</li>
+                <li>查看部署日志中的错误信息</li>
+                <li>更新环境变量为新 API Key</li>
+                <li>手动触发重新部署</li>
+                <li>将错误信息发送给我</li>
+            </ol>
+        </div>
+        
+        <div class="status success">
+            <h3>🎯 预期结果</h3>
+            <p>修复部署问题后，您应该能够：</p>
+            <ul>
+                <li>正常访问所有页面</li>
+                <li>使用检查工具</li>
+                <li>看到 Google Maps 正常工作</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 简单的页面加载确认
+        window.addEventListener('load', function() {
+            console.log('Netlify 部署问题诊断页面已加载');
+            
+            // 检查页面是否正常加载
+            const container = document.querySelector('.container');
+            if (container) {
+                console.log('页面内容正常显示');
+            } else {
+                console.error('页面内容加载失败');
+            }
+        });
+    </script>
+</body>
+</html>
