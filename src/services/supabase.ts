@@ -2027,4 +2027,3 @@ export const courierSalaryService = {
     }
   }
 };
-};
