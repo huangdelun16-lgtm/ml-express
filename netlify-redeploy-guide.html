@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netlify 重新部署指南</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            border-left: 5px solid;
+        }
+        .success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .step ol, .step ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .step li {
+            margin: 8px 0;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Netlify 重新部署指南</h1>
+        
+        <div class="status success">
+            <strong>🎉 好消息!</strong> 本地测试成功，Google Maps 可以正常打开！
+        </div>
+        
+        <div class="status warning">
+            <strong>⚠️ 需要重新部署:</strong> Netlify 需要重新部署才能使用新的 API Key
+        </div>
+        
+        <div class="step">
+            <h4>🔧 立即执行重新部署</h4>
+            <p><strong>请按以下步骤完成 Netlify 重新部署：</strong></p>
+            
+            <ol>
+                <li><strong>访问 Netlify 控制台</strong>
+                    <br>打开 <a href="https://app.netlify.com/" target="_blank">https://app.netlify.com/</a>
+                </li>
+                
+                <li><strong>选择您的项目</strong>
+                    <br>找到 "market-link-express" 项目并点击
+                </li>
+                
+                <li><strong>手动触发部署</strong>
+                    <br>点击 "Deploys" 标签 → 点击 "Trigger deploy" → 选择 "Deploy site"
+                </li>
+                
+                <li><strong>等待部署完成</strong>
+                    <br>等待 2-3 分钟，直到状态显示 "Published"
+                </li>
+                
+                <li><strong>测试网站</strong>
+                    <br>访问 <code>https://market-link-express.netlify.app/admin/tracking</code>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="step">
+            <h4>🔄 自动部署检查</h4>
+            <p>如果手动触发部署不起作用，请检查：</p>
+            
+            <div class="highlight">
+                <h4>检查自动部署设置</h4>
+                <ol>
+                    <li>进入 "Site settings" → "Build & deploy"</li>
+                    <li>确认 "Build hooks" 部分有正确的 GitHub 连接</li>
+                    <li>确认 "Deploy settings" 中的 "Branch to deploy" 设置为 <code>main</code></li>
+                    <li>如果连接断开，重新连接 GitHub 仓库</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h4>🛠️ 如果部署仍然失败</h4>
+            <p>如果重新部署后仍然有问题，请检查：</p>
+            
+            <ul>
+                <li><strong>环境变量</strong> - 确认 Netlify 中的 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code> 已更新为新值</li>
+                <li><strong>构建日志</strong> - 查看部署日志中是否有新的错误</li>
+                <li><strong>缓存问题</strong> - 尝试清除浏览器缓存</li>
+                <li><strong>API Key 配置</strong> - 确认 Google Cloud Console 中的域名限制正确</li>
+            </ul>
+        </div>
+        
+        <div class="status info">
+            <h3>📋 当前状态</h3>
+            <ul>
+                <li>✅ 语法错误已修复</li>
+                <li>✅ 新 API Key 已更新到所有文件</li>
+                <li>✅ 本地测试成功（Google Maps 可以打开）</li>
+                <li>🔄 <strong>需要:</strong> Netlify 重新部署</li>
+                <li>🔄 <strong>需要:</strong> 更新 Netlify 环境变量</li>
+            </ul>
+        </div>
+        
+        <div class="status warning">
+            <h3>💡 重要提醒</h3>
+            <p><strong>请确保在 Netlify 控制台中更新环境变量：</strong></p>
+            <ul>
+                <li>变量名: <code>REACT_APP_GOOGLE_MAPS_API_KEY</code></li>
+                <li>变量值: <code>AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c</code></li>
+            </ul>
+        </div>
+        
+        <div class="status success">
+            <h3>🎯 预期结果</h3>
+            <p>重新部署完成后，您应该能够：</p>
+            <ul>
+                <li>✅ 正常访问所有页面</li>
+                <li>✅ 在实时跟踪页面看到 Google Maps</li>
+                <li>✅ 地图正常加载和交互</li>
+                <li>✅ 控制台无 InvalidKey 错误</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h4>📞 完成后请告诉我</h4>
+            <p>重新部署完成后，请告诉我：</p>
+            <ul>
+                <li>部署是否成功</li>
+                <li>Google Maps 是否正常显示</li>
+                <li>是否还有其他问题</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时的提示
+        window.addEventListener('load', function() {
+            console.log('Netlify 重新部署指南页面已加载');
+        });
+    </script>
+</body>
+</html>
