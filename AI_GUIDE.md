@@ -595,9 +595,31 @@ console.log('我的包裹:', myPackages);
 
 #### 关键文件
 - `screens/LoginScreen.tsx` - 登录页面
-- `screens/MapScreen.tsx` - 地图页面
+- `screens/MapScreen.tsx` - 地图页面（包含智能路线优化）
 - `screens/MyTasksScreen.tsx` - 任务页面
 - `services/supabase.ts` - 数据库服务
+
+#### 🎯 智能配送路线优化功能 (2025-01-18 新增)
+
+**核心算法**：
+- **取货点坐标解析** - 优先使用`sender_latitude`和`sender_longitude`
+- **送货点坐标解析** - 优先使用`receiver_latitude`和`receiver_longitude`
+- **完整路径计算** - 计算从当前位置到取货点，再到送货点的总距离
+- **智能优先级排序** - 基于总距离和紧急程度进行优化排序
+
+**地图显示增强**：
+- **取货点标记** - 橙色📦标记显示所有取货点位置
+- **送货点标记** - 蓝色数字标记显示所有送货点位置
+- **分段路线显示** - 三种颜色的路线：
+  - 🟢 **绿色粗线** - 从当前位置到第一个取货点
+  - 🟠 **橙色中线** - 从取货点到送货点
+  - 🔵 **蓝色细线** - 从送货点到下一个取货点
+
+**包裹卡片优化**：
+- **分离式信息展示** - 取货点和送货点分别用不同颜色背景显示
+- **经纬度独立显示** - 经纬度单独一行，带有标签说明
+- **地址独立显示** - 地址信息单独显示，便于阅读
+- **距离信息详细** - 分别显示取货距离、送货距离和总距离
 
 ---
 
@@ -618,9 +640,13 @@ console.log('我的包裹:', myPackages);
 │  📦 packages (包裹表)                                       │
 │     ├── id (主键)                                           │
 │     ├── sender_*, receiver_* (发件人/收件人信息)            │
+│     ├── sender_latitude, sender_longitude (发件人坐标)      │
+│     ├── receiver_latitude, receiver_longitude (收件人坐标)   │
 │     ├── description (包含 [客户ID: xxx] 标记)              │
 │     ├── courier (关联 couriers.name)                        │
 │     ├── status (待取件→已取件→配送中→已送达)                │
+│     ├── delivery_speed (配送速度: 急送达/定时达)            │
+│     ├── scheduled_delivery_time (定时配送时间)              │
 │     └── pickup_time, delivery_time                         │
 │                                                             │
 │  🚚 couriers (快递员表)                                     │
@@ -652,14 +678,18 @@ CREATE TABLE packages (
   sender_name TEXT NOT NULL,
   sender_phone TEXT NOT NULL,
   sender_address TEXT NOT NULL,
+  sender_latitude DECIMAL(10,8), -- 发件人纬度
+  sender_longitude DECIMAL(11,8), -- 发件人经度
   receiver_name TEXT NOT NULL,
   receiver_phone TEXT NOT NULL,
   receiver_address TEXT NOT NULL,
+  receiver_latitude DECIMAL(10,8), -- 收件人纬度
+  receiver_longitude DECIMAL(11,8), -- 收件人经度
   package_type TEXT NOT NULL,
   weight DECIMAL(5,2),
   description TEXT, -- 包含 [客户ID: xxx] 标记
-  delivery_speed TEXT NOT NULL,
-  scheduled_delivery_time TEXT,
+  delivery_speed TEXT NOT NULL, -- 配送速度: 急送达/定时达
+  scheduled_delivery_time TEXT, -- 定时配送时间
   status TEXT NOT NULL DEFAULT '待取件', -- 待取件→已取件→配送中→已送达
   courier TEXT, -- 关联 couriers.name
   pickup_time TEXT,
@@ -965,12 +995,23 @@ if (finalCoords) {
 - 直接使用数据库提供的精确坐标
 - 如果坐标缺失，提示管理员补全而非使用 fallback geocoding
 
-#### 3. 包裹分配功能修复 (2025-01-17)
-**问题**：Web 端分配包裹后，骑手 App 中不显示
-**修复**：
-- 修复 `LoginScreen.tsx` 中的用户身份存储逻辑
-- 统一使用 `couriers.name` 而非 `admin_accounts.employee_name`
-- 修复 Supabase RLS 策略，允许 `anon` 角色更新包裹状态
+#### 4. 骑手App智能路线优化 (2025-01-18)
+**功能**：优化骑手app配送路线算法，确保取货点和送货点都按最近路程规划
+**实现**：
+- 新增`getPickupCoordinates`和`getDeliveryCoordinates`函数
+- 实现完整路径计算（当前位置→取货点→送货点）
+- 优化地图显示：取货点橙色📦标记，送货点蓝色数字标记
+- 分段路线显示：绿色（到取货点）、橙色（取货到送货）、蓝色（送货到下一取货点）
+- 包裹卡片优化：分离式信息展示，经纬度独立显示
+
+#### 5. 包裹卡片显示优化 (2025-01-18)
+**功能**：优化骑手app地图页面包裹卡片显示，将经纬度和地址分开显示
+**实现**：
+- 取货点区域：黄色背景 + 橙色左边框
+- 送货点区域：蓝色背景 + 蓝色左边框
+- 经纬度容器：半透明白色背景，突出显示坐标
+- 距离信息：分别显示取货距离、送货距离和总距离
+- 提高操作便利性：经纬度独立显示，便于复制和使用
 
 ### 📊 数据流架构
 
@@ -1025,5 +1066,6 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ---
 
 *最后更新：2025年1月18日*
-*版本：2.0.0*
+*版本：2.1.0*
 *状态：生产环境运行中*
+*新增功能：骑手App智能路线优化 + 包裹卡片显示优化*
