@@ -65,6 +65,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
     longitude: 96.0891,
   });
   
+  // 坐标状态 - 用于保存寄件人和收件人的精确坐标
+  const [senderCoordinates, setSenderCoordinates] = useState<{lat: number, lng: number} | null>(null);
+  const [receiverCoordinates, setReceiverCoordinates] = useState<{lat: number, lng: number} | null>(null);
+  
   // 包裹类型说明
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
@@ -410,7 +414,18 @@ export default function PlaceOrderScreen({ navigation }: any) {
       if (address && address[0]) {
         const addr = address[0];
         const fullAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
-        setSenderAddress(fullAddress || `${location.coords.latitude}, ${location.coords.longitude}`);
+        const finalAddress = fullAddress || `${location.coords.latitude}, ${location.coords.longitude}`;
+        
+        // 保存地址和坐标
+        setSenderAddress(finalAddress);
+        setSenderCoordinates({
+          lat: location.coords.latitude,
+          lng: location.coords.longitude
+        });
+        console.log('✅ 当前位置坐标已保存:', {
+          lat: location.coords.latitude,
+          lng: location.coords.longitude
+        });
       }
       
       hideLoading();
@@ -458,10 +473,20 @@ export default function PlaceOrderScreen({ navigation }: any) {
         const fullAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
         const finalAddress = fullAddress || `${selectedLocation.latitude}, ${selectedLocation.longitude}`;
         
+        // 保存坐标和地址
+        const coords = {
+          lat: selectedLocation.latitude,
+          lng: selectedLocation.longitude
+        };
+        
         if (mapType === 'sender') {
           setSenderAddress(finalAddress);
+          setSenderCoordinates(coords);
+          console.log('✅ 寄件地址坐标已保存:', coords);
         } else {
           setReceiverAddress(finalAddress);
+          setReceiverCoordinates(coords);
+          console.log('✅ 收件地址坐标已保存:', coords);
         }
       }
       
@@ -533,9 +558,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
         sender_name: senderName,
         sender_phone: senderPhone,
         sender_address: senderAddress,
+        sender_latitude: senderCoordinates?.lat || null,
+        sender_longitude: senderCoordinates?.lng || null,
         receiver_name: receiverName,
         receiver_phone: receiverPhone,
         receiver_address: receiverAddress,
+        receiver_latitude: receiverCoordinates?.lat || null,
+        receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
         description: description || '',
