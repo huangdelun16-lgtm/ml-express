@@ -21,6 +21,7 @@ import FinanceManagementScreen from './screens/FinanceManagementScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import MyTasksScreen from './screens/MyTasksScreen';
 import MyStatisticsScreen from './screens/MyStatisticsScreen';
+import PerformanceAnalyticsScreen from './screens/PerformanceAnalyticsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -205,6 +206,7 @@ export default function App() {
         <Stack.Screen name="FinanceManagement" component={FinanceManagementScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
+        <Stack.Screen name="PerformanceAnalytics" component={PerformanceAnalyticsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   </AppProvider>

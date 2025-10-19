@@ -36,6 +36,9 @@ export interface Package {
   receiver_longitude?: number; // 收件人经度
   sender_latitude?: number; // 发件人纬度
   sender_longitude?: number; // 发件人经度
+  // 新增配送相关字段
+  delivery_speed?: string; // 配送速度
+  scheduled_delivery_time?: string; // 定时配送时间
 }
 
 export interface AdminAccount {
@@ -293,10 +296,13 @@ export const courierService = {
 
   async updateCourierStatus(courierId: string, status: string): Promise<boolean> {
     try {
+      // 确保状态值符合数据库约束
+      const validStatus = ['active', 'inactive', 'busy'].includes(status) ? status : 'active';
+      
       const { error } = await supabase
         .from('couriers')
         .update({ 
-          status,
+          status: validStatus,
           last_active: new Date().toLocaleString('zh-CN')
         })
         .eq('id', courierId);
@@ -742,11 +748,16 @@ export const deliveryPhotoService = {
     locationName?: string;
   }): Promise<boolean> {
     try {
+      // 生成照片URL（使用data URL格式）
+      const photoUrl = photoData.photoBase64 
+        ? `data:image/jpeg;base64,${photoData.photoBase64}`
+        : photoData.photoUrl;
+
       const { error } = await supabase
         .from('delivery_photos')
         .insert([{
           package_id: photoData.packageId,
-          photo_url: photoData.photoUrl,
+          photo_url: photoUrl,
           photo_base64: photoData.photoBase64,
           courier_name: photoData.courierName,
           courier_id: photoData.courierId,
@@ -761,6 +772,7 @@ export const deliveryPhotoService = {
         return false;
       }
 
+      console.log('✅ 配送照片保存成功，URL已生成');
       return true;
     } catch (err) {
       console.error('保存配送照片异常:', err);

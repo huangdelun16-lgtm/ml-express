@@ -187,6 +187,11 @@ export default function PackageManagementScreen({ navigation }: any) {
           { label: '已送达', value: '已送达', color: '#27ae60', icon: '✅' },
           { label: '配送失败', value: '配送失败', color: '#e67e22', icon: '⚠️' },
         ];
+      case '已分配':
+        return [
+          { label: '已取件', value: '已取件', color: '#3498db', icon: '📦' },
+          { label: '已取消', value: '已取消', color: '#e74c3c', icon: '❌' },
+        ];
       default:
         return [];
     }
@@ -297,7 +302,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       
       // 只对待分配的包裹进行智能分配
       const unassignedPackages = selectedPackageList.filter(pkg => 
-        pkg.status === '待取件' || pkg.courier === '未分配' || !pkg.courier
+        pkg.status === '待取件' || pkg.courier === '未分配' || !pkg.courier || pkg.courier === '待分配'
       );
 
       if (unassignedPackages.length === 0) {
@@ -305,6 +310,8 @@ export default function PackageManagementScreen({ navigation }: any) {
         setAssignmentLoading(false);
         return;
       }
+
+      console.log(`🧠 开始智能分配 ${unassignedPackages.length} 个包裹...`);
 
       // 执行智能分配算法
       const optimizations = await routeService.assignOptimalCourier(unassignedPackages);
@@ -315,6 +322,7 @@ export default function PackageManagementScreen({ navigation }: any) {
         return;
       }
 
+      console.log(`✅ 智能分配完成，生成 ${optimizations.length} 个分配方案`);
       setRouteOptimizations(optimizations);
       setShowAssignModal(true);
     } catch (error) {
@@ -383,8 +391,11 @@ export default function PackageManagementScreen({ navigation }: any) {
   const statusFilters = [
     { label: '全部', value: 'all' },
     { label: '待取件', value: '待取件' },
+    { label: '已取件', value: '已取件' },
     { label: '配送中', value: '配送中' },
     { label: '已送达', value: '已送达' },
+    { label: '已取消', value: '已取消' },
+    { label: '配送失败', value: '配送失败' },
   ];
 
   const getStatusColor = (status: string) => {

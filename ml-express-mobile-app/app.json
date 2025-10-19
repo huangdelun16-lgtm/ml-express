@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ML Express Staff",
-    "slug": "MLExpressStaffApp",
+    "slug": "MarketLinkStaffApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,10 +22,12 @@
         ],
         "NSLocationWhenInUseUsageDescription": "需要获取您的位置来显示配送路线和导航",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "需要获取您的位置来提供实时配送服务",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+        "googleMapsApiKey": "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"
       }
     },
     "android": {
@@ -34,12 +36,15 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.marketlinkexpress.staff",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+          "apiKey": "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"
         }
       }
     },
@@ -48,8 +53,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "ml-express-app"
+        "projectId": "9831d961-9124-46ed-8581-bf406616439f"
       }
-    }
+    },
+    "owner": "amt349"
   }
 }

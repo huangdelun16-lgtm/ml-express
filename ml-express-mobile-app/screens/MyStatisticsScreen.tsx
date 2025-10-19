@@ -111,6 +111,16 @@ export default function MyStatisticsScreen({ navigation }: any) {
           </View>
           <Text style={styles.userName}>{currentUserName}</Text>
           <Text style={styles.userRole}>{language === 'zh' ? '快递员' : 'Courier'}</Text>
+          
+          {/* 详细分析按钮 */}
+          <TouchableOpacity 
+            style={styles.analyticsButton}
+            onPress={() => navigation.navigate('PerformanceAnalytics')}
+          >
+            <Text style={styles.analyticsButtonText}>
+              📈 {language === 'zh' ? '详细业绩分析' : 'Detailed Analytics'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* 今日统计 */}
@@ -351,6 +361,24 @@ const styles = StyleSheet.create({
   userRole: {
     fontSize: 14,
     color: '#666',
+  },
+  analyticsButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  analyticsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   statsSection: {
     padding: 16,
