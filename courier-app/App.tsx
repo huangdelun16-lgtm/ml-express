@@ -1,235 +1,408 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, StatusBar } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
-import Constants from 'expo-constants';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  SafeAreaView,
+  StatusBar,
+  TextInput,
+  Modal,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './services/supabase';
 
-interface LocationData {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-}
+export default function StaffApp() {
+  const [currentScreen, setCurrentScreen] = useState('dashboard');
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    role: '',
+    username: ''
+  });
+  const [packages, setPackages] = useState<any[]>([]);
+  const [couriers, setCouriers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-interface Package {
-  id: string;
-  sender_name: string;
-  receiver_name: string;
-  receiver_address: string;
-  status: string;
-  latitude: number;
-  longitude: number;
-}
+  useEffect(() => {
+    loadUserInfo();
+    loadData();
+  }, []);
 
-export default function App() {
-  const [location, setLocation] = useState<LocationData | null>(null);
-  const [packages, setPackages] = useState<Package[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const loadUserInfo = async () => {
+    const name = await AsyncStorage.getItem('currentUserName') || 'Staff User';
+    const role = await AsyncStorage.getItem('currentUserRole') || 'operator';
+    const username = await AsyncStorage.getItem('currentUser') || 'staff';
+    
+    setUserInfo({ name, role, username });
+  };
 
-  // 获取当前位置
-  const getCurrentLocation = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      setIsLoading(true);
+      // 加载包裹数据
+      const { data: packagesData } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
       
-      // 请求位置权限
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('权限被拒绝', '需要位置权限来获取当前位置');
-        return;
-      }
+      setPackages(packagesData || []);
 
-      // 获取当前位置
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      const locationData: LocationData = {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        accuracy: currentLocation.coords.accuracy,
-      };
-
-      setLocation(locationData);
+      // 加载骑手数据
+      const { data: couriersData } = await supabase
+        .from('couriers')
+        .select('*')
+        .order('name');
       
-      Alert.alert(
-        '位置获取成功！',
-        `纬度: ${locationData.latitude.toFixed(6)}\n经度: ${locationData.longitude.toFixed(6)}\n精度: ${locationData.accuracy?.toFixed(0)}米`,
-        [{ text: '确定' }]
-      );
-
+      setCouriers(couriersData || []);
     } catch (error) {
-      console.error('获取位置失败:', error);
-      Alert.alert('获取位置失败', '请检查GPS设置和网络连接');
+      console.error('加载数据失败:', error);
+      Alert.alert('错误', '加载数据失败');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // 模拟获取包裹数据
-  const loadPackages = () => {
-    const mockPackages: Package[] = [
-      {
-        id: 'PKG001',
-        sender_name: '张三',
-        receiver_name: '李四',
-        receiver_address: '曼德勒市中心商业区',
-        status: '待配送',
-        latitude: 21.9588,
-        longitude: 96.0891,
-      },
-      {
-        id: 'PKG002',
-        sender_name: '王五',
-        receiver_name: '赵六',
-        receiver_address: '曼德勒大学附近',
-        status: '配送中',
-        latitude: 21.9688,
-        longitude: 96.0991,
-      },
-      {
-        id: 'PKG003',
-        sender_name: '孙七',
-        receiver_name: '周八',
-        receiver_address: '茵雅湖畔',
-        status: '待取件',
-        latitude: 21.9488,
-        longitude: 96.0791,
-      },
-    ];
-    setPackages(mockPackages);
-  };
-
-  // 更新包裹状态
-  const updatePackageStatus = (packageId: string, newStatus: string) => {
-    setPackages(prev => 
-      prev.map(pkg => 
-        pkg.id === packageId ? { ...pkg, status: newStatus } : pkg
-      )
+  const handleLogout = async () => {
+    Alert.alert(
+      '确认退出',
+      '确定要退出登录吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '退出',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.clear();
+            // 这里应该导航到登录页面
+            Alert.alert('已退出', '请重新登录');
+          }
+        }
+      ]
     );
-    Alert.alert('状态更新', `包裹 ${packageId} 状态已更新为: ${newStatus}`);
   };
 
-  useEffect(() => {
-    loadPackages();
-  }, []);
-
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a365d" />
-      
-      {/* 头部 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🚴 骑手工作台</Text>
-        <Text style={styles.headerSubtitle}>MARKET LINK EXPRESS</Text>
+  const renderDashboard = () => (
+    <ScrollView style={styles.screenContent}>
+      <View style={styles.welcomeCard}>
+        <Text style={styles.welcomeTitle}>欢迎回来，{userInfo.name}！</Text>
+        <Text style={styles.welcomeSubtitle}>角色: {userInfo.role}</Text>
       </View>
 
-      {/* 地图区域 */}
-      <View style={styles.mapContainer}>
-        <MapView
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
-          initialRegion={{
-            latitude: 21.9588,
-            longitude: 96.0891,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
-          showsCompass={true}
-          showsScale={true}
-        >
-          {/* 当前位置标记 */}
-          {location && (
-            <Marker
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              title="我的位置"
-              description={`精度: ${location.accuracy?.toFixed(0)}米`}
-              pinColor="blue"
-            />
-          )}
-
-          {/* 包裹位置标记 */}
-          {packages.map((pkg) => (
-            <Marker
-              key={pkg.id}
-              coordinate={{
-                latitude: pkg.latitude,
-                longitude: pkg.longitude,
-              }}
-              title={`包裹 ${pkg.id}`}
-              description={`${pkg.sender_name} → ${pkg.receiver_name}`}
-              pinColor={pkg.status === '配送中' ? 'red' : pkg.status === '待配送' ? 'orange' : 'green'}
-              onPress={() => setSelectedPackage(pkg)}
-            />
-          ))}
-        </MapView>
-
-        {/* 当前位置按钮 */}
-        <TouchableOpacity
-          style={styles.locationButton}
-          onPress={getCurrentLocation}
-          disabled={isLoading}
-        >
-          <Text style={styles.locationButtonText}>
-            {isLoading ? '📍' : '📍'}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{packages.length}</Text>
+          <Text style={styles.statLabel}>总包裹数</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{couriers.length}</Text>
+          <Text style={styles.statLabel}>骑手数量</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>
+            {packages.filter(p => p.status === '已送达').length}
           </Text>
+          <Text style={styles.statLabel}>已完成</Text>
+        </View>
+      </View>
+
+      <View style={styles.quickActions}>
+        <Text style={styles.sectionTitle}>快速操作</Text>
+        <View style={styles.actionGrid}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => setCurrentScreen('packages')}
+          >
+            <Ionicons name="cube" size={24} color="#2c5282" />
+            <Text style={styles.actionText}>包裹管理</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => setCurrentScreen('couriers')}
+          >
+            <Ionicons name="people" size={24} color="#2c5282" />
+            <Text style={styles.actionText}>骑手管理</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => setCurrentScreen('scanner')}
+          >
+            <Ionicons name="qr-code" size={24} color="#2c5282" />
+            <Text style={styles.actionText}>扫码管理</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => setCurrentScreen('map')}
+          >
+            <Ionicons name="map" size={24} color="#2c5282" />
+            <Text style={styles.actionText}>地图监控</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  const renderPackages = () => (
+    <ScrollView style={styles.screenContent}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setCurrentScreen('dashboard')}>
+          <Ionicons name="arrow-back" size={24} color="#2c5282" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>包裹管理</Text>
+        <TouchableOpacity onPress={loadData}>
+          <Ionicons name="refresh" size={24} color="#2c5282" />
         </TouchableOpacity>
       </View>
 
-      {/* 包裹列表 */}
-      <View style={styles.packageList}>
-        <Text style={styles.sectionTitle}>📦 我的包裹 ({packages.length})</Text>
-        {packages.map((pkg) => (
-          <View key={pkg.id} style={styles.packageItem}>
-            <View style={styles.packageInfo}>
-              <Text style={styles.packageId}>#{pkg.id}</Text>
-              <Text style={styles.packageRoute}>
-                {pkg.sender_name} → {pkg.receiver_name}
-              </Text>
-              <Text style={styles.packageAddress}>{pkg.receiver_address}</Text>
-              <Text style={[
-                styles.packageStatus,
-                { color: pkg.status === '配送中' ? '#e74c3c' : pkg.status === '待配送' ? '#f39c12' : '#27ae60' }
-              ]}>
-                状态: {pkg.status}
-              </Text>
-            </View>
-            <View style={styles.packageActions}>
-              {pkg.status === '待取件' && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.pickupButton]}
-                  onPress={() => updatePackageStatus(pkg.id, '配送中')}
-                >
-                  <Text style={styles.actionButtonText}>取件</Text>
-                </TouchableOpacity>
-              )}
-              {pkg.status === '配送中' && (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deliverButton]}
-                  onPress={() => updatePackageStatus(pkg.id, '已送达')}
-                >
-                  <Text style={styles.actionButtonText}>送达</Text>
-                </TouchableOpacity>
-              )}
+      {packages.map((pkg, index) => (
+        <View key={pkg.id || index} style={styles.packageCard}>
+          <View style={styles.packageHeader}>
+            <Text style={styles.packageId}>#{pkg.id}</Text>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(pkg.status) }
+            ]}>
+              <Text style={styles.statusText}>{pkg.status}</Text>
             </View>
           </View>
-        ))}
+          
+          <Text style={styles.packageInfo}>
+            {pkg.sender_name} → {pkg.receiver_name}
+          </Text>
+          <Text style={styles.packageAddress}>{pkg.receiver_address}</Text>
+          
+          <View style={styles.packageActions}>
+            <TouchableOpacity style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>查看详情</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>编辑</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  const renderCouriers = () => (
+    <ScrollView style={styles.screenContent}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setCurrentScreen('dashboard')}>
+          <Ionicons name="arrow-back" size={24} color="#2c5282" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>骑手管理</Text>
+        <TouchableOpacity onPress={loadData}>
+          <Ionicons name="refresh" size={24} color="#2c5282" />
+        </TouchableOpacity>
       </View>
 
-      {/* 底部操作栏 */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.refreshButton} onPress={loadPackages}>
-          <Text style={styles.refreshButtonText}>🔄 刷新包裹</Text>
+      {couriers.map((courier, index) => (
+        <View key={courier.id || index} style={styles.courierCard}>
+          <View style={styles.courierHeader}>
+            <Text style={styles.courierName}>{courier.name}</Text>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: courier.status === 'active' ? '#27ae60' : '#95a5a6' }
+            ]}>
+              <Text style={styles.statusText}>
+                {courier.status === 'active' ? '在线' : '离线'}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.courierInfo}>
+            车辆: {courier.vehicle_type} | 电话: {courier.phone}
+          </Text>
+          
+          <View style={styles.packageActions}>
+            <TouchableOpacity style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>查看详情</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>分配任务</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  const renderScanner = () => (
+    <View style={styles.screenContent}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setCurrentScreen('dashboard')}>
+          <Ionicons name="arrow-back" size={24} color="#2c5282" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
-          <Text style={styles.refreshButtonText}>📍 获取位置</Text>
+        <Text style={styles.headerTitle}>扫码管理</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.scannerContainer}>
+        <Ionicons name="qr-code" size={80} color="#2c5282" />
+        <Text style={styles.scannerTitle}>扫码功能</Text>
+        <Text style={styles.scannerSubtitle}>
+          扫描包裹二维码或中转码
+        </Text>
+        
+        <TouchableOpacity style={styles.scanButton}>
+          <Text style={styles.scanButtonText}>开始扫描</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.manualButton}>
+          <Text style={styles.manualButtonText}>手动输入</Text>
         </TouchableOpacity>
       </View>
     </View>
+  );
+
+  const renderMap = () => (
+    <View style={styles.screenContent}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setCurrentScreen('dashboard')}>
+          <Ionicons name="arrow-back" size={24} color="#2c5282" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>地图监控</Text>
+        <TouchableOpacity onPress={loadData}>
+          <Ionicons name="refresh" size={24} color="#2c5282" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.mapContainer}>
+        <Ionicons name="map" size={80} color="#2c5282" />
+        <Text style={styles.mapTitle}>地图功能</Text>
+        <Text style={styles.mapSubtitle}>
+          实时监控骑手位置和配送路线
+        </Text>
+        
+        <TouchableOpacity style={styles.mapButton}>
+          <Text style={styles.mapButtonText}>打开地图</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.routeButton}>
+          <Text style={styles.routeButtonText}>规划路线</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '已送达': return '#27ae60';
+      case '配送中': return '#f39c12';
+      case '待取件': return '#3498db';
+      default: return '#95a5a6';
+    }
+  };
+
+  const renderCurrentScreen = () => {
+    switch (currentScreen) {
+      case 'packages': return renderPackages();
+      case 'couriers': return renderCouriers();
+      case 'scanner': return renderScanner();
+      case 'map': return renderMap();
+      default: return renderDashboard();
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#2c5282" />
+      
+      {/* 顶部导航栏 */}
+      <View style={styles.topBar}>
+        <Text style={styles.appTitle}>ML Express Staff</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 主内容区域 */}
+      {renderCurrentScreen()}
+
+      {/* 底部导航栏 */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity 
+          style={[styles.navItem, currentScreen === 'dashboard' && styles.navItemActive]}
+          onPress={() => setCurrentScreen('dashboard')}
+        >
+          <Ionicons 
+            name={currentScreen === 'dashboard' ? 'home' : 'home-outline'} 
+            size={24} 
+            color={currentScreen === 'dashboard' ? '#2c5282' : '#666'} 
+          />
+          <Text style={[
+            styles.navText, 
+            currentScreen === 'dashboard' && styles.navTextActive
+          ]}>工作台</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.navItem, currentScreen === 'packages' && styles.navItemActive]}
+          onPress={() => setCurrentScreen('packages')}
+        >
+          <Ionicons 
+            name={currentScreen === 'packages' ? 'cube' : 'cube-outline'} 
+            size={24} 
+            color={currentScreen === 'packages' ? '#2c5282' : '#666'} 
+          />
+          <Text style={[
+            styles.navText, 
+            currentScreen === 'packages' && styles.navTextActive
+          ]}>包裹</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.navItem, currentScreen === 'couriers' && styles.navItemActive]}
+          onPress={() => setCurrentScreen('couriers')}
+        >
+          <Ionicons 
+            name={currentScreen === 'couriers' ? 'people' : 'people-outline'} 
+            size={24} 
+            color={currentScreen === 'couriers' ? '#2c5282' : '#666'} 
+          />
+          <Text style={[
+            styles.navText, 
+            currentScreen === 'couriers' && styles.navTextActive
+          ]}>骑手</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.navItem, currentScreen === 'scanner' && styles.navItemActive]}
+          onPress={() => setCurrentScreen('scanner')}
+        >
+          <Ionicons 
+            name={currentScreen === 'scanner' ? 'qr-code' : 'qr-code-outline'} 
+            size={24} 
+            color={currentScreen === 'scanner' ? '#2c5282' : '#666'} 
+          />
+          <Text style={[
+            styles.navText, 
+            currentScreen === 'scanner' && styles.navTextActive
+          ]}>扫码</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.navItem, currentScreen === 'map' && styles.navItemActive]}
+          onPress={() => setCurrentScreen('map')}
+        >
+          <Ionicons 
+            name={currentScreen === 'map' ? 'map' : 'map-outline'} 
+            size={24} 
+            color={currentScreen === 'map' ? '#2c5282' : '#666'} 
+          />
+          <Text style={[
+            styles.navText, 
+            currentScreen === 'map' && styles.navTextActive
+          ]}>地图</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -238,130 +411,311 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: '#1a365d',
-    paddingTop: Constants.statusBarHeight + 10,
-    paddingBottom: 15,
+  topBar: {
+    backgroundColor: '#2c5282',
+    paddingVertical: 15,
     paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  appTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  screenContent: {
+    flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#2c3e50',
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  mapContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-  },
-  locationButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: '#38a169',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+  welcomeCard: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  locationButtonText: {
-    fontSize: 20,
-    color: 'white',
+  welcomeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 5,
   },
-  packageList: {
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: '#7f8c8d',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statCard: {
     backgroundColor: 'white',
-    padding: 15,
-    maxHeight: 200,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c5282',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#7f8c8d',
+  },
+  quickActions: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#2c3e50',
+    marginBottom: 12,
   },
-  packageItem: {
+  actionGrid: {
     flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3498db',
-  },
-  packageInfo: {
-    flex: 1,
-  },
-  packageId: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  packageRoute: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginTop: 2,
-  },
-  packageAddress: {
-    fontSize: 11,
-    color: '#95a5a6',
-    marginTop: 2,
-  },
-  packageStatus: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  packageActions: {
-    justifyContent: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    marginLeft: 8,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  pickupButton: {
-    backgroundColor: '#f39c12',
+  actionText: {
+    fontSize: 12,
+    color: '#2c3e50',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  deliverButton: {
-    backgroundColor: '#27ae60',
+  packageCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  actionButtonText: {
+  packageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  packageId: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  packageInfo: {
+    fontSize: 14,
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  packageAddress: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginBottom: 12,
+  },
+  packageActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionBtn: {
+    backgroundColor: '#2c5282',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  actionBtnText: {
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  bottomBar: {
-    flexDirection: 'row',
+  courierCard: {
     backgroundColor: 'white',
-    padding: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#ecf0f1',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  refreshButton: {
-    flex: 1,
-    backgroundColor: '#3498db',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginHorizontal: 5,
+  courierHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  refreshButtonText: {
+  courierName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  courierInfo: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 12,
+  },
+  scannerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  scannerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  scannerSubtitle: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  scanButton: {
+    backgroundColor: '#2c5282',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  scanButtonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  manualButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  manualButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  mapContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  mapTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  mapSubtitle: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  mapButton: {
+    backgroundColor: '#2c5282',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  mapButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  routeButton: {
+    backgroundColor: '#e67e22',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  routeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bottomNav: {
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  navItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  navItemActive: {
+    backgroundColor: '#f7fafc',
+    borderRadius: 8,
+  },
+  navText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  navTextActive: {
+    color: '#2c5282',
     fontWeight: 'bold',
   },
 });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { deliveryAlertService } from '../services/deliveryAlertService';
 
 interface DeliveryAlert {
   id: string;
@@ -21,9 +22,45 @@ interface DeliveryAlert {
   resolved_at?: string;
   resolved_by?: string;
   resolution_notes?: string;
+  violation_type?: string; // 新增：违规类型
+  penalty_points?: number; // 新增：扣分
+  warning_level?: string; // 新增：警告级别
+  admin_action?: string; // 新增：管理员处理动作
   metadata?: any;
   created_at: string;
   updated_at: string;
+}
+
+interface ViolationRecord {
+  id: string;
+  courier_id: string;
+  courier_name: string;
+  violation_type: string;
+  severity: string;
+  penalty_points: number;
+  warning_level: string;
+  description: string;
+  evidence_photos?: string[];
+  admin_action: string;
+  admin_notes: string;
+  created_at: string;
+  created_by: string;
+}
+
+interface AdminAuditLog {
+  id: string;
+  admin_id: string;
+  admin_name: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  target_name?: string;
+  action_description: string;
+  old_values?: any;
+  new_values?: any;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
 }
 
 export default function DeliveryAlerts() {
@@ -46,9 +83,23 @@ export default function DeliveryAlerts() {
     pendingAlerts: 0,
     resolvedToday: 0
   });
+  
+  // 违规记录管理状态
+  const [violationRecords, setViolationRecords] = useState<ViolationRecord[]>([]);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const [selectedCourierViolations, setSelectedCourierViolations] = useState<ViolationRecord[]>([]);
+  const [violationForm, setViolationForm] = useState({
+    violation_type: '',
+    severity: 'medium',
+    penalty_points: 0,
+    warning_level: 'warning',
+    admin_action: '',
+    admin_notes: ''
+  });
 
   useEffect(() => {
     loadAlerts();
+    loadViolationRecords();
     updateRealTimeStats();
     
     // 设置实时订阅
@@ -86,31 +137,223 @@ export default function DeliveryAlerts() {
   const loadAlerts = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('delivery_alerts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      
+      // 使用新的配送警报服务
+      const allAlerts = await deliveryAlertService.getAllAlerts();
+      
+      // 应用过滤器
+      let filteredAlerts = allAlerts;
+      
       if (filter !== 'all') {
-        query = query.eq('status', filter);
+        filteredAlerts = filteredAlerts.filter(alert => alert.status === filter);
       }
-
+      
       if (severityFilter !== 'all') {
-        query = query.eq('severity', severityFilter);
+        filteredAlerts = filteredAlerts.filter(alert => alert.severity === severityFilter);
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('加载警报失败:', error);
-        return;
-      }
-
-      setAlerts(data || []);
+      
+      setAlerts(filteredAlerts);
+      
+      // 更新实时统计
+      const totalAlerts = allAlerts.length;
+      const criticalAlerts = allAlerts.filter(alert => alert.severity === 'critical').length;
+      const pendingAlerts = allAlerts.filter(alert => alert.status === 'pending').length;
+      const resolvedToday = allAlerts.filter(alert => {
+        if (alert.resolved_at) {
+          const resolvedDate = new Date(alert.resolved_at);
+          const today = new Date();
+          return resolvedDate.toDateString() === today.toDateString();
+        }
+        return false;
+      }).length;
+      
+      setRealTimeStats({
+        totalAlerts,
+        criticalAlerts,
+        pendingAlerts,
+        resolvedToday
+      });
+      
     } catch (error) {
       console.error('加载警报异常:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 📋 加载违规记录
+  const loadViolationRecords = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courier_violations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('加载违规记录失败:', error);
+        return;
+      }
+
+      setViolationRecords(data || []);
+    } catch (error) {
+      console.error('加载违规记录异常:', error);
+    }
+  };
+
+  // ⚠️ 创建违规记录
+  const createViolationRecord = async (alert: DeliveryAlert) => {
+    try {
+      const violationData = {
+        courier_id: alert.courier_id,
+        courier_name: alert.courier_name,
+        violation_type: violationForm.violation_type || alert.alert_type,
+        severity: violationForm.severity,
+        penalty_points: violationForm.penalty_points,
+        warning_level: violationForm.warning_level,
+        description: `${alert.title}: ${alert.description}`,
+        evidence_photos: packagePhotos,
+        admin_action: violationForm.admin_action,
+        admin_notes: violationForm.admin_notes,
+        created_by: 'admin' // 可以从用户上下文获取
+      };
+
+      const { error } = await supabase
+        .from('courier_violations')
+        .insert([violationData]);
+
+      if (error) {
+        console.error('创建违规记录失败:', error);
+        window.alert('创建违规记录失败，请重试');
+        return false;
+      }
+
+      console.log('✅ 违规记录创建成功');
+      return true;
+    } catch (error) {
+      console.error('创建违规记录异常:', error);
+      window.alert('创建违规记录失败，请重试');
+      return false;
+    }
+  };
+
+  // 📊 获取骑手违规统计
+  const getCourierViolationStats = (courierId: string) => {
+    const violations = violationRecords.filter(v => v.courier_id === courierId);
+    const totalPoints = violations.reduce((sum, v) => sum + v.penalty_points, 0);
+    const criticalCount = violations.filter(v => v.severity === 'critical').length;
+    
+    return {
+      totalViolations: violations.length,
+      totalPenaltyPoints: totalPoints,
+      criticalViolations: criticalCount,
+      lastViolation: violations[0]?.created_at
+    };
+  };
+
+  // ⚠️ 处理创建违规记录
+  const handleCreateViolation = (alert: DeliveryAlert) => {
+    setSelectedAlert(alert);
+    setShowViolationModal(true);
+    setViolationForm({
+      violation_type: alert.alert_type,
+      severity: alert.severity,
+      penalty_points: getSeverityPoints(alert.severity),
+      warning_level: getSeverityWarning(alert.severity),
+      admin_action: '',
+      admin_notes: ''
+    });
+  };
+
+  // 📋 处理查看骑手违规历史
+  const handleViewCourierViolations = (courierId: string) => {
+    const violations = violationRecords.filter(v => v.courier_id === courierId);
+    setSelectedCourierViolations(violations);
+    setShowViolationModal(true);
+  };
+
+  // 📊 获取严重程度对应的扣分
+  const getSeverityPoints = (severity: string) => {
+    switch (severity) {
+      case 'low': return 1;
+      case 'medium': return 3;
+      case 'high': return 5;
+      case 'critical': return 10;
+      default: return 1;
+    }
+  };
+
+  // ⚠️ 获取严重程度对应的警告级别
+  const getSeverityWarning = (severity: string) => {
+    switch (severity) {
+      case 'low': return 'warning';
+      case 'medium': return 'warning';
+      case 'high': return 'serious_warning';
+      case 'critical': return 'final_warning';
+      default: return 'warning';
+    }
+  };
+
+  // 💾 保存违规记录
+  const handleSaveViolation = async () => {
+    if (!selectedAlert) return;
+
+    setProcessing(true);
+    try {
+      const success = await createViolationRecord(selectedAlert);
+      if (success) {
+        // 记录操作日志
+        await logAdminAction({
+          action_type: 'create_violation',
+          target_type: 'courier',
+          target_id: selectedAlert.courier_id,
+          target_name: selectedAlert.courier_name,
+          action_description: `为骑手 ${selectedAlert.courier_name} 创建违规记录：${violationForm.violation_type}`,
+          new_values: violationForm
+        });
+
+        // 更新警报状态
+        await handleUpdateStatus(selectedAlert.id, 'resolved');
+        setShowViolationModal(false);
+        loadViolationRecords();
+        window.alert('违规记录创建成功！');
+      }
+    } catch (error) {
+      console.error('保存违规记录失败:', error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // 📝 记录管理员操作日志
+  const logAdminAction = async (actionData: {
+    action_type: string;
+    target_type: string;
+    target_id: string;
+    target_name?: string;
+    action_description: string;
+    old_values?: any;
+    new_values?: any;
+  }) => {
+    try {
+      const logData = {
+        admin_id: 'admin', // 可以从用户上下文获取
+        admin_name: '管理员', // 可以从用户上下文获取
+        ...actionData,
+        ip_address: null, // 前端无法直接获取
+        user_agent: navigator.userAgent
+      };
+
+      const { error } = await supabase
+        .from('admin_audit_logs')
+        .insert([logData]);
+
+      if (error) {
+        console.error('记录操作日志失败:', error);
+      } else {
+        console.log('✅ 操作日志记录成功');
+      }
+    } catch (error) {
+      console.error('记录操作日志异常:', error);
     }
   };
 
@@ -277,26 +520,38 @@ export default function DeliveryAlerts() {
   ) => {
     try {
       setProcessing(true);
-      const { error } = await supabase
-        .from('delivery_alerts')
-        .update({
-          status: newStatus,
-          resolved_at: new Date().toISOString(),
-          resolved_by: 'admin', // 需要从认证系统获取当前管理员
-          resolution_notes: resolutionNotes
-        })
-        .eq('id', alertId);
+      
+      // 获取当前警报信息用于日志记录
+      const currentAlert = alerts.find(alert => alert.id === alertId);
+      
+      // 使用新的配送警报服务更新状态
+      const success = await deliveryAlertService.updateAlertStatus(
+        alertId,
+        newStatus,
+        resolutionNotes,
+        'admin' // 需要从认证系统获取当前管理员
+      );
 
-      if (error) {
-        console.error('更新警报状态失败:', error);
+      if (!success) {
         window.alert('更新失败，请重试');
         return;
       }
 
+      // 记录操作日志
+      await logAdminAction({
+        action_type: 'update_alert_status',
+        target_type: 'alert',
+        target_id: alertId,
+        target_name: currentAlert?.title,
+        action_description: `将警报状态从 ${currentAlert?.status} 更新为 ${newStatus}`,
+        old_values: { status: currentAlert?.status },
+        new_values: { status: newStatus, resolution_notes: resolutionNotes }
+      });
+
       setShowDetailModal(false);
       setResolutionNotes('');
       loadAlerts();
-      window.alert('警报状态已更新');
+      window.alert(`警报状态已更新为: ${newStatus}`);
     } catch (error) {
       console.error('更新警报状态异常:', error);
       window.alert('更新失败，请重试');
@@ -332,6 +587,38 @@ export default function DeliveryAlerts() {
         return 'ℹ️ 低';
       default:
         return severity;
+    }
+  };
+
+  // 获取违规类型文本
+  const getViolationTypeText = (alertType: string) => {
+    switch (alertType) {
+      case 'location_violation':
+        return '📍 位置违规';
+      case 'photo_violation':
+        return '📸 照片违规';
+      case 'time_violation':
+        return '⏰ 时间违规';
+      case 'route_violation':
+        return '🛣️ 路线违规';
+      default:
+        return '⚠️ 其他违规';
+    }
+  };
+
+  // 获取违规类型颜色
+  const getViolationTypeColor = (alertType: string) => {
+    switch (alertType) {
+      case 'location_violation':
+        return '#e53e3e'; // 红色 - 位置违规最严重
+      case 'photo_violation':
+        return '#d69e2e'; // 黄色 - 照片违规中等
+      case 'time_violation':
+        return '#3182ce'; // 蓝色 - 时间违规
+      case 'route_violation':
+        return '#805ad5'; // 紫色 - 路线违规
+      default:
+        return '#718096'; // 灰色 - 其他
     }
   };
 
@@ -615,13 +902,14 @@ export default function DeliveryAlerts() {
                           {getSeverityText(alert.severity)}
                         </span>
                         <span style={{
-                          background: '#e2e8f0',
-                          color: '#4a5568',
+                          background: getViolationTypeColor(alert.alert_type),
+                          color: 'white',
                           padding: '4px 12px',
                           borderRadius: '6px',
-                          fontSize: '0.875rem'
+                          fontSize: '0.875rem',
+                          fontWeight: 600
                         }}>
-                          {getAlertTypeText(alert.alert_type)}
+                          {getViolationTypeText(alert.alert_type)}
                         </span>
                         <span style={{
                           background: alert.status === 'pending' ? '#fef3c7' : '#e2e8f0',
@@ -646,6 +934,24 @@ export default function DeliveryAlerts() {
                       </div>
                       <div style={{ marginTop: '8px', fontSize: '0.875rem', color: '#4a5568' }}>
                         <strong>骑手:</strong> {alert.courier_name}
+                        {(() => {
+                          const stats = getCourierViolationStats(alert.courier_id);
+                          if (stats.totalViolations > 0) {
+                            return (
+                              <span style={{ 
+                                marginLeft: '8px', 
+                                padding: '2px 6px', 
+                                backgroundColor: stats.criticalViolations > 0 ? '#e53e3e' : '#d69e2e',
+                                color: 'white',
+                                borderRadius: '4px',
+                                fontSize: '10px'
+                              }}>
+                                ⚠️ {stats.totalViolations}次违规 ({stats.totalPenaltyPoints}分)
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '0.875rem', color: '#4a5568' }}>
                         <strong>包裹:</strong> {alert.package_id}
@@ -974,6 +1280,47 @@ export default function DeliveryAlerts() {
                 <span>📸</span>
                 <span>骑手拍照记录</span>
               </button>
+              
+              <button
+                onClick={() => handleCreateViolation(selectedAlert)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#e53e3e',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>⚠️</span>
+                <span>创建违规记录</span>
+              </button>
+              
+              <button
+                onClick={() => handleViewCourierViolations(selectedAlert.courier_id)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#d69e2e',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>📋</span>
+                <span>违规历史</span>
+              </button>
+              
               {selectedAlert.status === 'pending' && (
                 <>
                   <button

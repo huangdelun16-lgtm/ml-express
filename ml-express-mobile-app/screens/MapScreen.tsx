@@ -137,6 +137,8 @@ export default function MapScreen({ navigation }: any) {
   // 拍照相关状态
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showSingleMapModal, setShowSingleMapModal] = useState(false);
+  const [selectedPackageForMap, setSelectedPackageForMap] = useState<PackageWithExtras | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [currentPackageForDelivery, setCurrentPackageForDelivery] = useState<PackageWithExtras | null>(null);
@@ -212,7 +214,7 @@ export default function MapScreen({ navigation }: any) {
       const packagePromises = allPackages
         .filter(pkg =>
           pkg.courier === currentUser &&
-          !['已送达', '已取消'].includes(pkg.status)
+          !['已送达', '已取消'].includes(pkg.status)  // 排除已送达和已取消的包裹
         )
         .map(async pkg => {
           try {
@@ -891,50 +893,40 @@ export default function MapScreen({ navigation }: any) {
     // 添加触觉反馈
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    const coords = pkg.coords || coordinatesCache.current[pkg.id];
-
-    if (!coords || !coords.lat || !coords.lng) {
-      Alert.alert('提示', '订单缺少坐标信息，请联系管理员补全地址坐标');
-      return;
-    }
-
     try {
-      let origin = '';
-      if (location) {
-        origin = `${location.latitude},${location.longitude}`;
-      } else {
-        const currentLocation = await Location.getCurrentPositionAsync({});
-        origin = `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
-        setLocation({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        });
+      // 解析包裹的取货点和送货点坐标
+      const pickupCoords = await getPickupCoordinates(pkg);
+      const deliveryCoords = await getDeliveryCoordinates(pkg);
+      
+      if (!pickupCoords || !deliveryCoords) {
+        Alert.alert('提示', '包裹缺少坐标信息，请联系管理员补全地址坐标');
+        return;
       }
 
-      const destination = `${coords.lat},${coords.lng}`;
+      // 计算距离
+      const pickupDistance = location ? 
+        calculateDistance(location.latitude, location.longitude, pickupCoords.lat, pickupCoords.lng) / 1000 : null;
+      const deliveryDistance = 
+        calculateDistance(pickupCoords.lat, pickupCoords.lng, deliveryCoords.lat, deliveryCoords.lng) / 1000;
+      const totalDistance = (pickupDistance ?? 0) + deliveryDistance;
 
-      const candidateUrls = [
-        `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`,
-        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
-      ];
+      // 设置单个包裹地图数据
+      const packageWithCoords = {
+        ...pkg,
+        pickupCoords,
+        deliveryCoords,
+        pickupDistance,
+        deliveryDistance,
+        totalDistance,
+        locationSource: deliveryCoords.source || pickupCoords.source || 'fallback'
+      };
 
-      for (const url of candidateUrls) {
-        if (await Linking.canOpenURL(url)) {
-          await Linking.openURL(url);
-          console.log('🧭 启动导航:', {
-            packageId: pkg.id,
-            destination,
-            coordSource: coords.source,
-          });
-          return;
-        }
-      }
-
-      const fallbackUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
-      await Linking.openURL(fallbackUrl);
+      setSelectedPackageForMap(packageWithCoords);
+      setShowSingleMapModal(true);
+      
     } catch (error) {
-      console.error('打开导航失败:', error);
-      Alert.alert('错误', '无法打开导航应用，请确保已安装Google Maps或Apple Maps');
+      console.error('解析包裹坐标失败:', error);
+      Alert.alert('错误', '无法解析包裹坐标，请重试');
     }
   };
 
@@ -1143,8 +1135,8 @@ export default function MapScreen({ navigation }: any) {
           
           return {
             ...pkg,
-            pickupCoords,
-            deliveryCoords,
+            pickupCoords: pickupCoords || undefined,
+            deliveryCoords: deliveryCoords || undefined,
             pickupDistance,
             deliveryDistance,
             totalDistance,
@@ -1287,10 +1279,14 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
-  // 导航到所有包裹地址（智能优化路线 + 地图预览）
+  // 导航到所有包裹地址（完整版路线规划）
   const handleNavigateAll = async () => {
-    // 添加触觉反馈
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      // 添加触觉反馈
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      console.warn('触觉反馈失败:', error);
+    }
     
     if (packages.length === 0) {
       Alert.alert('提示', '暂无待配送包裹');
@@ -1302,21 +1298,60 @@ export default function MapScreen({ navigation }: any) {
       return;
     }
 
-    // 显示加载提示
-    Alert.alert('🔄 路线规划中...', '正在为您优化最佳配送路线，请稍候');
-
     try {
-      // 1. 智能优化路线
-      const optimizedPackages = await enhancedRouteOptimization(packages);
+      console.log('🧭 开始规划路线...');
       
-      // 2. 更新包裹列表显示（按优化后的顺序）
-      setPackages(optimizedPackages);
+      // 1. 计算优化后的配送顺序
+      const optimizedPackages = await optimizeDeliveryRoute(packages);
+      
+      // 2. 为每个包裹解析坐标并计算距离（供“配送顺序”列表与路线渲染使用）
+      const packagesWithCoords = await Promise.all(
+        optimizedPackages.map(async (pkg: Package) => {
+          const pickupCoords = await getPickupCoordinates(pkg);
+          const deliveryCoords = await getDeliveryCoordinates(pkg);
 
-      // 3. 保存带坐标的优化包裹数据
-      setOptimizedPackagesWithCoords(optimizedPackages);
+          // 计算公里数（如无坐标则为null）
+          const pickupDistance = pickupCoords
+            ? calculateDistance(location.latitude, location.longitude, pickupCoords.lat, pickupCoords.lng) / 1000
+            : null;
+          const deliveryDistance = pickupCoords && deliveryCoords
+            ? calculateDistance(pickupCoords.lat, pickupCoords.lng, deliveryCoords.lat, deliveryCoords.lng) / 1000
+            : null;
+          const totalDistance = (pickupDistance ?? 0) + (deliveryDistance ?? 0);
 
-      // 4. 显示地图预览（带数字标记 1,2,3,4）
+          return {
+            ...pkg,
+            // 供外部Google Maps多点导航用
+            coords: deliveryCoords || undefined,
+            displayCoords: deliveryCoords ? `${deliveryCoords.lat.toFixed(6)}, ${deliveryCoords.lng.toFixed(6)}` : '坐标缺失',
+            // 供“配送路线预览”地图与列表用
+            pickupCoords: pickupCoords || undefined,
+            deliveryCoords: deliveryCoords || undefined,
+            pickupDistance,
+            deliveryDistance,
+            totalDistance,
+            locationSource: (deliveryCoords?.source ?? pickupCoords?.source ?? 'fallback') as any,
+          } as any;
+        })
+      );
+
+      // 3. 过滤掉没有送货坐标的包裹（至少需要送货点）
+      const validPackages = packagesWithCoords.filter((pkg: any) => pkg.deliveryCoords || pkg.coords);
+      
+      if (validPackages.length === 0) {
+        Alert.alert('提示', '所有包裹都缺少收件地址坐标，无法规划路线');
+        return;
+      }
+
+      // 4. 保存优化后的包裹列表
+      setOptimizedPackagesWithCoords(validPackages);
+      
+      // 5. 显示地图预览
       setShowMapPreview(true);
+      
+      console.log(`✅ 路线规划完成: ${validPackages.length}个有效包裹`);
+      console.log('📋 配送顺序:', validPackages.map((pkg: any, index: number) => `${index + 1}. ${pkg.receiver_name}`));
+      
     } catch (error) {
       console.error('路线规划失败:', error);
       Alert.alert('错误', '路线规划失败，请重试');
@@ -1427,17 +1462,18 @@ export default function MapScreen({ navigation }: any) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '待取件': return '#f39c12';
-      case '已取件': return '#3498db';
-      case '配送中': return '#9b59b6';
-      default: return '#95a5a6';
+      case '待取件': return '#f39c12';  // 橙色
+      case '已取件': return '#3498db';  // 蓝色
+      case '配送中': return '#9b59b6';  // 紫色
+      case '已送达': return '#27ae60';  // 绿色
+      default: return '#95a5a6';        // 灰色
     }
   };
 
   const renderPackageItem = ({ item, index }: { item: PackageWithExtras; index: number }) => {
     // 显示距离信息（如果有且有效）
     const itemDistance = (item as any).distance;
-    const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999 && typeof itemDistance === 'number'
+    const distanceText = itemDistance !== null && itemDistance !== undefined && itemDistance !== 999 && typeof itemDistance === 'number'                             
       ? `📏 ${itemDistance.toFixed(1)}km` 
       : '';
     
@@ -1447,6 +1483,14 @@ export default function MapScreen({ navigation }: any) {
     
     // 判断是否为当前配送的包裹
     const isCurrentDelivering = currentDeliveringPackageId === item.id;
+    
+    // 计算包裹编号：基于创建时间排序，确保编号稳定
+    const sortedPackages = [...packages].sort((a, b) => {
+      const timeA = new Date(a.created_at || a.create_time || 0).getTime();
+      const timeB = new Date(b.created_at || b.create_time || 0).getTime();
+      return timeA - timeB;
+    });
+    const packageNumber = sortedPackages.findIndex(pkg => pkg.id === item.id) + 1;
     
     return (
       <TouchableOpacity
@@ -1524,12 +1568,12 @@ export default function MapScreen({ navigation }: any) {
           {/* 操作按钮区域 */}
           <View style={styles.actionRow}>
             {/* 数字标记 */}
-            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>
-              <Text style={styles.numberText}>{index + 1}</Text>
+            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>                                                                    
+              <Text style={styles.numberText}>{packageNumber}</Text>
             </View>
             
             {/* 配送按钮 */}
-            {item.status === '已取件' || item.status === '配送中' ? (
+            {item.status === '已取件' ? (
               !isCurrentDelivering ? (
                 <TouchableOpacity 
                   style={styles.startDeliveryButton}
@@ -1555,10 +1599,34 @@ export default function MapScreen({ navigation }: any) {
                   </Text>
                 </TouchableOpacity>
               )
+            ) : item.status === '配送中' ? (
+              <TouchableOpacity 
+                style={styles.finishDeliveryButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  finishDelivering(item.id);
+                }}
+              >
+                <Text style={styles.finishDeliveryText}>
+                  🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete Delivery' : 'ပို့ဆောင်မှုပြီးမြောက်'}
+                </Text>
+              </TouchableOpacity>
+            ) : item.status === '待取件' ? (
+              <View style={styles.placeholderButton}>
+                <Text style={styles.placeholderText}>
+                  {language === 'zh' ? '请先扫码取件' : language === 'en' ? 'Please scan to pickup' : 'အမှာစာရယူရန်စကင်န်ပါ'}
+                </Text>
+              </View>
+            ) : item.status === '已送达' ? (
+              <View style={styles.completedButton}>
+                <Text style={styles.completedText}>
+                  ✅ {language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပို့ဆောင်ပြီးပါပြီ'}
+                </Text>
+              </View>
             ) : (
               <View style={styles.placeholderButton}>
                 <Text style={styles.placeholderText}>
-                  {language === 'zh' ? '等待取件' : language === 'en' ? 'Waiting for Pickup' : 'အမှာစာရယူရန်စောင့်ဆိုင်း'}
+                  {language === 'zh' ? '状态异常' : language === 'en' ? 'Status Error' : 'အခြေအနေမမှန်ပါ'}
                 </Text>
               </View>
             )}
@@ -1741,7 +1809,7 @@ export default function MapScreen({ navigation }: any) {
                 </View>
               </Marker>
 
-              {/* 取货点标记（橙色圆点） */}
+              {/* 取货点标记（P-1, P-2, P-3...） */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.pickupCoords) return null;
                 return (
@@ -1751,17 +1819,17 @@ export default function MapScreen({ navigation }: any) {
                       latitude: pkg.pickupCoords.lat,
                       longitude: pkg.pickupCoords.lng,
                     }}
-                    title={`📦 ${index + 1}. 取货点: ${pkg.sender_name}`}
+                    title={`P-${index + 1}. 取货点: ${pkg.sender_name}`}
                     description={pkg.sender_address}
                   >
                     <View style={styles.pickupMarker}>
-                      <Text style={styles.pickupMarkerText}>📦</Text>
+                      <Text style={styles.pickupMarkerText}>P-{index + 1}</Text>
                     </View>
                   </Marker>
                 );
               })}
 
-              {/* 送货点标记（蓝色数字） */}
+              {/* 送货点标记（D-1A, D-2A, D-3A...） */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.deliveryCoords) return null;
                 return (
@@ -1771,11 +1839,11 @@ export default function MapScreen({ navigation }: any) {
                       latitude: pkg.deliveryCoords.lat,
                       longitude: pkg.deliveryCoords.lng,
                     }}
-                    title={`🚚 ${index + 1}. 送货点: ${pkg.receiver_name}`}
+                    title={`D-${index + 1}A. 送货点: ${pkg.receiver_name}`}
                     description={pkg.receiver_address}
                   >
                     <View style={styles.packageMarker}>
-                      <Text style={styles.packageMarkerNumber}>{index + 1}</Text>
+                      <Text style={styles.packageMarkerNumber}>D-{index + 1}A</Text>
                     </View>
                   </Marker>
                 );
@@ -1870,53 +1938,63 @@ export default function MapScreen({ navigation }: any) {
             <Text style={styles.routeListTitle}>
               {language === 'zh' ? '配送顺序：' : language === 'en' ? 'Delivery Order:' : 'ပို့ဆောင်မည့်အစဉ်:'}
             </Text>
-            {optimizedPackagesWithCoords.map((pkg: any, index: number) => (
-              <View key={pkg.id} style={styles.routeListItem}>
-                <View style={styles.routeNumber}>
-                  <Text style={styles.routeNumberText}>{index + 1}</Text>
-                </View>
-                <View style={styles.routeInfo}>
-                  <Text style={styles.routeName}>{pkg.receiver_name}</Text>
-                  
-                  {/* 取货点信息 */}
-                  <View style={styles.pickupInfo}>
-                    <Text style={styles.pickupLabel}>📦 取货点: {pkg.sender_name}</Text>
-                    <Text style={styles.pickupAddress}>{pkg.sender_address}</Text>
-                    {pkg.pickupDistance !== null && (
-                      <Text style={styles.pickupDistance}>距离: {pkg.pickupDistance.toFixed(1)}km</Text>
-                    )}
-                    {pkg.pickupCoords && (
-                      <Text style={styles.pickupCoords}>🧭 {pkg.pickupCoords.lat.toFixed(6)}, {pkg.pickupCoords.lng.toFixed(6)}</Text>
-                    )}
+            {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
+              // 计算包裹编号：基于创建时间排序，确保编号稳定
+              const sortedPackages = [...packages].sort((a, b) => {
+                const timeA = new Date(a.created_at || a.create_time || 0).getTime();
+                const timeB = new Date(b.created_at || b.create_time || 0).getTime();
+                return timeA - timeB;
+              });
+              const packageNumber = sortedPackages.findIndex(p => p.id === pkg.id) + 1;
+              
+              return (
+                <View key={pkg.id} style={styles.routeListItem}>
+                  <View style={styles.routeNumber}>
+                    <Text style={styles.routeNumberText}>{packageNumber}</Text>
                   </View>
-                  
-                  {/* 送货点信息 */}
-                  <View style={styles.deliveryInfo}>
-                    <Text style={styles.deliveryLabel}>🚚 送货点: {pkg.receiver_name}</Text>
-                    <Text style={styles.deliveryAddress}>{pkg.receiver_address}</Text>
-                    {pkg.deliveryDistance !== null && (
-                      <Text style={styles.deliveryDistance}>距离: {pkg.deliveryDistance.toFixed(1)}km</Text>
+                  <View style={styles.routeInfo}>
+                    <Text style={styles.routeName}>包裹 {packageNumber}: {pkg.receiver_name}</Text>
+                    
+                    {/* 取货点信息 */}
+                    <View style={styles.pickupInfo}>
+                      <Text style={styles.pickupLabel}>P-{packageNumber} 取货点: {pkg.sender_name}</Text>
+                      <Text style={styles.pickupAddress}>{pkg.sender_address}</Text>
+                      {pkg.pickupDistance !== null && (
+                        <Text style={styles.pickupDistance}>距离: {pkg.pickupDistance.toFixed(1)}km</Text>
+                      )}
+                      {pkg.pickupCoords && (
+                        <Text style={styles.pickupCoords}>🧭 {pkg.pickupCoords.lat.toFixed(6)}, {pkg.pickupCoords.lng.toFixed(6)}</Text>
+                      )}
+                    </View>
+                    
+                    {/* 送货点信息 */}
+                    <View style={styles.deliveryInfo}>
+                      <Text style={styles.deliveryLabel}>D-{packageNumber}A 送货点: {pkg.receiver_name}</Text>
+                      <Text style={styles.deliveryAddress}>{pkg.receiver_address}</Text>
+                      {pkg.deliveryDistance !== null && (
+                        <Text style={styles.deliveryDistance}>距离: {pkg.deliveryDistance.toFixed(1)}km</Text>
+                      )}
+                      {pkg.deliveryCoords && (
+                        <Text style={styles.deliveryCoords}>🧭 {pkg.deliveryCoords.lat.toFixed(6)}, {pkg.deliveryCoords.lng.toFixed(6)}</Text>
+                      )}
+                    </View>
+                    
+                    {/* 总距离 */}
+                    {pkg.totalDistance !== null && (
+                      <Text style={styles.totalDistance}>
+                        📏 总距离: {pkg.totalDistance.toFixed(1)}km
+                      </Text>
                     )}
-                    {pkg.deliveryCoords && (
-                      <Text style={styles.deliveryCoords}>🧭 {pkg.deliveryCoords.lat.toFixed(6)}, {pkg.deliveryCoords.lng.toFixed(6)}</Text>
-                    )}
-                  </View>
-                  
-                  {/* 总距离 */}
-                  {pkg.totalDistance !== null && (
-                    <Text style={styles.totalDistance}>
-                      📏 总距离: {pkg.totalDistance.toFixed(1)}km
+                    
+                    {/* 优先级信息 */}
+                    <Text style={styles.routeSource}>
+                      {`📡 ${getLocationSourceLabel(pkg.locationSource || 'fallback')}`}
+                      {pkg.delivery_speed && ` · ${pkg.delivery_speed}`}
                     </Text>
-                  )}
-                  
-                  {/* 优先级信息 */}
-                  <Text style={styles.routeSource}>
-                    {`📡 ${getLocationSourceLabel(pkg.locationSource || 'fallback')}`}
-                    {pkg.delivery_speed && ` · ${pkg.delivery_speed}`}
-                  </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
       </Modal>
@@ -2018,6 +2096,201 @@ export default function MapScreen({ navigation }: any) {
               </View>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* 🗺️ 单个包裹地图Modal */}
+      <Modal
+        visible={showSingleMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowSingleMapModal(false)}
+      >
+        <View style={styles.mapModalContainer}>
+          {/* 地图标题栏 */}
+          <View style={styles.mapModalHeader}>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowSingleMapModal(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.mapModalTitle}>📍 包裹配送路线</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* 地图视图 */}
+          {location && selectedPackageForMap && (
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              initialRegion={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              }}
+            >
+              {/* 骑手当前位置标记（绿色圆点） */}
+              <Marker
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                title="我的位置"
+                description="骑手当前位置"
+              >
+                <View style={styles.courierMarker}>
+                  <Text style={styles.courierMarkerText}>🏍️</Text>
+                </View>
+              </Marker>
+
+              {/* 取货点标记（P-1） */}
+              {selectedPackageForMap.pickupCoords && (
+                <Marker
+                  coordinate={{
+                    latitude: selectedPackageForMap.pickupCoords.lat,
+                    longitude: selectedPackageForMap.pickupCoords.lng,
+                  }}
+                  title={`P-1. 取货点: ${selectedPackageForMap.sender_name}`}
+                  description={selectedPackageForMap.sender_address}
+                >
+                  <View style={styles.pickupMarker}>
+                    <Text style={styles.pickupMarkerText}>P-1</Text>
+                  </View>
+                </Marker>
+              )}
+
+              {/* 送货点标记（D-1A） */}
+              {selectedPackageForMap.deliveryCoords && (
+                <Marker
+                  coordinate={{
+                    latitude: selectedPackageForMap.deliveryCoords.lat,
+                    longitude: selectedPackageForMap.deliveryCoords.lng,
+                  }}
+                  title={`D-1A. 送货点: ${selectedPackageForMap.receiver_name}`}
+                  description={selectedPackageForMap.receiver_address}
+                >
+                  <View style={styles.packageMarker}>
+                    <Text style={styles.packageMarkerNumber}>D-1A</Text>
+                  </View>
+                </Marker>
+              )}
+
+              {/* 配送路线连线 */}
+              {selectedPackageForMap.pickupCoords && selectedPackageForMap.deliveryCoords && (
+                <>
+                  {/* 从当前位置到取货点的路线（绿色） */}
+                  <Polyline
+                    coordinates={[
+                      { latitude: location.latitude, longitude: location.longitude },
+                      { 
+                        latitude: selectedPackageForMap.pickupCoords.lat, 
+                        longitude: selectedPackageForMap.pickupCoords.lng 
+                      }
+                    ]}
+                    strokeColor="#10b981"
+                    strokeWidth={4}
+                    lineDashPattern={[8, 4]}
+                  />
+                  
+                  {/* 从取货点到送货点的路线（橙色） */}
+                  <Polyline
+                    coordinates={[
+                      { 
+                        latitude: selectedPackageForMap.pickupCoords.lat, 
+                        longitude: selectedPackageForMap.pickupCoords.lng 
+                      },
+                      { 
+                        latitude: selectedPackageForMap.deliveryCoords.lat, 
+                        longitude: selectedPackageForMap.deliveryCoords.lng 
+                      }
+                    ]}
+                    strokeColor="#f59e0b"
+                    strokeWidth={4}
+                    lineDashPattern={[6, 3]}
+                  />
+                </>
+              )}
+            </MapView>
+          )}
+
+          {/* 底部操作按钮 */}
+          <View style={styles.mapModalFooter}>
+            <TouchableOpacity 
+              style={styles.startNavigationButton}
+              onPress={async () => {
+                if (!selectedPackageForMap || !location) return;
+                
+                try {
+                  const origin = `${location.latitude},${location.longitude}`;
+                  const destination = `${selectedPackageForMap.deliveryCoords?.lat},${selectedPackageForMap.deliveryCoords?.lng}`;
+                  
+                  const candidateUrls = [
+                    `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`,
+                    `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+                  ];
+
+                  let opened = false;
+                  for (const url of candidateUrls) {
+                    if (await Linking.canOpenURL(url)) {
+                      await Linking.openURL(url);
+                      opened = true;
+                      break;
+                    }
+                  }
+
+                  if (!opened) {
+                    const fallbackUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
+                    await Linking.openURL(fallbackUrl);
+                  }
+                  
+                  setShowSingleMapModal(false);
+                } catch (error) {
+                  console.error('打开导航失败:', error);
+                  Alert.alert('错误', '无法打开导航应用');
+                }
+              }}
+            >
+              <Text style={styles.startNavigationText}>
+                🚀 {language === 'zh' ? '开始导航' : language === 'en' ? 'Start Navigation' : 'လမ်းညွှန်စတင်ရန်'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 包裹信息 */}
+          {selectedPackageForMap && (
+            <View style={styles.singlePackageInfo}>
+              <Text style={styles.singlePackageTitle}>
+                📦 {selectedPackageForMap.id} - {selectedPackageForMap.receiver_name}
+              </Text>
+              
+              {/* 取货点信息 */}
+              <View style={styles.singlePackageSection}>
+                <Text style={styles.singlePackageLabel}>A. 取货点: {selectedPackageForMap.sender_name}</Text>
+                <Text style={styles.singlePackageAddress}>{selectedPackageForMap.sender_address}</Text>
+                {selectedPackageForMap.pickupDistance !== null && selectedPackageForMap.pickupDistance !== undefined && (
+                  <Text style={styles.singlePackageDistance}>距离: {selectedPackageForMap.pickupDistance.toFixed(1)}km</Text>
+                )}
+              </View>
+              
+              {/* 送货点信息 */}
+              <View style={styles.singlePackageSection}>
+                <Text style={styles.singlePackageLabel}>1. 送货点: {selectedPackageForMap.receiver_name}</Text>
+                <Text style={styles.singlePackageAddress}>{selectedPackageForMap.receiver_address}</Text>
+                {selectedPackageForMap.deliveryDistance !== null && selectedPackageForMap.deliveryDistance !== undefined && (
+                  <Text style={styles.singlePackageDistance}>距离: {selectedPackageForMap.deliveryDistance.toFixed(1)}km</Text>
+                )}
+              </View>
+              
+              {/* 总距离 */}
+              {selectedPackageForMap.totalDistance !== null && selectedPackageForMap.totalDistance !== undefined && (
+                <Text style={styles.singlePackageTotalDistance}>
+                  📏 总距离: {selectedPackageForMap.totalDistance.toFixed(1)}km
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -2241,6 +2514,22 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontWeight: '500',
   },
+  completedButton: {
+    flex: 1,
+    backgroundColor: '#d1fae5',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completedText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+  },
   startDeliveryButton: {
     backgroundColor: '#10b981',
     paddingHorizontal: 10,
@@ -2422,9 +2711,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   packageMarker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#3182ce',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2438,14 +2727,14 @@ const styles = StyleSheet.create({
   },
   packageMarkerNumber: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   // 取货点标记样式
   pickupMarker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f59e0b',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2458,7 +2747,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   pickupMarkerText: {
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   mapModalFooter: {
@@ -2839,5 +3129,56 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginVertical: 4,
     textAlign: 'center',
+  },
+  
+  // 单个包裹地图样式
+  singlePackageInfo: {
+    backgroundColor: '#fff',
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  singlePackageTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+  },
+  singlePackageSection: {
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  singlePackageLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  singlePackageAddress: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  singlePackageDistance: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  singlePackageTotalDistance: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
   },
 });

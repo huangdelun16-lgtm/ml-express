@@ -5,8 +5,8 @@ const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
 // 初始化 Supabase 客户端
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // 生成6位随机验证码
@@ -245,7 +245,9 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({
           success: true,
-          message: '验证码已发送（开发模式）',
+          message: language === 'zh' ? '验证码已发送（开发模式）' :
+                   language === 'en' ? 'Code sent (Dev Mode)' :
+                   'ကုဒ်ပို့ပြီးပါပြီ (Dev Mode)',
           code: devCode, // 仅开发模式返回
           isDevelopmentMode: true
         })
@@ -257,29 +259,43 @@ exports.handler = async (event, context) => {
 
     // 存储验证码到 Supabase（5分钟有效期）
     if (supabase) {
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-      
-      // 删除该邮箱的旧验证码
-      await supabase
-        .from('verification_codes')
-        .delete()
-        .eq('email', email);
-      
-      // 插入新验证码
-      const { error: insertError } = await supabase
-        .from('verification_codes')
-        .insert({
-          email: email,
-          code: code,
-          expires_at: expiresAt,
-          used: false
-        });
-      
-      if (insertError) {
-        console.error('❌ 存储验证码失败:', insertError);
-        // 继续发送邮件，即使存储失败
-      } else {
-        console.log(`✅ 验证码已存储: ${email} -> ${code}`);
+      try {
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        
+        console.log(`📝 准备存储验证码: ${email} -> ${code}, 过期时间: ${expiresAt}`);
+        
+        // 删除该邮箱的旧验证码
+        const { error: deleteError } = await supabase
+          .from('verification_codes')
+          .delete()
+          .eq('email', email);
+        
+        if (deleteError) {
+          console.error('❌ 删除旧验证码失败:', deleteError);
+        } else {
+          console.log(`✅ 已删除 ${email} 的旧验证码`);
+        }
+        
+        // 插入新验证码
+        const { error: insertError } = await supabase
+          .from('verification_codes')
+          .insert({
+            email: email,
+            code: code,
+            expires_at: expiresAt,
+            used: false
+          });
+        
+        if (insertError) {
+          console.error('❌ 存储验证码失败:', insertError);
+          console.error('❌ 错误详情:', JSON.stringify(insertError, null, 2));
+          // 继续发送邮件，即使存储失败
+        } else {
+          console.log(`✅ 验证码已存储: ${email} -> ${code}`);
+        }
+      } catch (error) {
+        console.error('❌ Supabase操作异常:', error);
+        console.error('❌ 异常详情:', JSON.stringify(error, null, 2));
       }
     } else {
       console.warn('⚠️ Supabase 未配置，验证码无法持久化存储');
@@ -306,6 +322,30 @@ exports.handler = async (event, context) => {
 
     console.log(`📧 正在发送验证码到: ${email}`);
 
+    // 验证Gmail连接
+    try {
+      await transporter.verify();
+      console.log('✅ Gmail连接验证成功');
+    } catch (verifyError) {
+      console.error('❌ Gmail连接验证失败:', verifyError.message);
+      
+      // Gmail连接失败，回退到开发模式
+      const devCode = '123456';
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: language === 'zh' ? '验证码已发送（开发模式 - Gmail配置问题）' :
+                   language === 'en' ? 'Code sent (Dev Mode - Gmail config issue)' :
+                   'ကုဒ်ပို့ပြီးပါပြီ (Dev Mode - Gmail ပြင်ဆင်မှုပြဿနာ)',
+          code: devCode,
+          isDevelopmentMode: true,
+          error: 'Gmail connection failed, using dev mode'
+        })
+      };
+    }
+
     // 发送邮件
     const info = await transporter.sendMail(mailOptions);
 
@@ -325,7 +365,16 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error('❌ 发送邮件失败:', error);
-
+    
+    // 获取语言参数，如果解析失败则默认为中文
+    let language = 'zh';
+    try {
+      const body = JSON.parse(event.body || '{}');
+      language = body.language || 'zh';
+    } catch (e) {
+      // 解析失败，使用默认语言
+    }
+    
     return {
       statusCode: 500,
       headers,

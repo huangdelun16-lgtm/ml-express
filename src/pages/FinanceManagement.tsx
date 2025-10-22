@@ -232,8 +232,8 @@ const FinanceManagement: React.FC = () => {
     pendingPayments: 0,
     packageIncome: 0, // 添加包裹收入
     packageCount: 0, // 添加包裹数量
-    courierKmCost: 0, // 快递员公里费用
-    totalKm: 0 // 总配送公里数
+    courierKmCost: 0, // 快递员公里费用（仅送货距离）
+    totalKm: 0 // 总送货公里数
   });
 
   useEffect(() => {
@@ -255,9 +255,10 @@ const FinanceManagement: React.FC = () => {
       }, 0);
       const packageCount = deliveredPackages.length;
       
-      // 计算快递员公里费用（只统计已送达的包裹）
+      // 计算快递员公里费用（只统计已送达包裹的送货距离，不包含取件距离）
       const COURIER_KM_RATE = 500; // 每公里500 MMK
       const totalKm = deliveredPackages.reduce((sum, pkg) => {
+        // 只计算送货距离，不包含取件距离
         return sum + (pkg.delivery_distance || 0);
       }, 0);
       const courierKmCost = totalKm * COURIER_KM_RATE;
@@ -330,12 +331,12 @@ const FinanceManagement: React.FC = () => {
         const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
         const relatedPackageIds = pkgs.map(p => p.id); // <-- 新增：收集包裹ID
         
-        // 计算各项费用
-        const COURIER_KM_RATE = 500; // MMK/KM
+        // 计算各项费用（仅计算送货距离费用，不包含取件距离）
+        const COURIER_KM_RATE = 500; // MMK/KM（仅送货距离）
         const DELIVERY_BONUS_RATE = 1000; // MMK/单
         const BASE_SALARY = 200000; // 基本工资 MMK
         
-        const kmFee = totalKm * COURIER_KM_RATE;
+        const kmFee = totalKm * COURIER_KM_RATE; // 仅送货距离费用
         const deliveryBonus = totalDeliveries * DELIVERY_BONUS_RATE;
         const baseSalary = BASE_SALARY;
         
@@ -746,7 +747,7 @@ const FinanceManagement: React.FC = () => {
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
             {renderSummaryCard('包裹收入', summary.packageIncome, `已送达包裹总收入 (${summary.packageCount}个)`, '#6c5ce7')}
-            {renderSummaryCard('骑手公里费用', summary.courierKmCost, `总配送距离 ${summary.totalKm.toFixed(2)} KM (500 MMK/KM)`, '#fd79a8')}
+            {renderSummaryCard('骑手送货费用', summary.courierKmCost, `总送货距离 ${summary.totalKm.toFixed(2)} KM (500 MMK/KM)`, '#fd79a8')}
           </div>
         )}
 
@@ -2293,9 +2294,9 @@ const FinanceManagement: React.FC = () => {
             >
               <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>📊 骑手数据统计</h3>
             
-            {/* 骑手公里费用统计 */}
+            {/* 骑手送货费用统计 */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📍 骑手公里费用统计</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📍 骑手送货费用统计</h4>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -2336,7 +2337,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {summary.courierKmCost.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>公里费用总额</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>送货费用总额</div>
                 </div>
                 <div style={{
                   background: 'rgba(253, 121, 168, 0.2)',
@@ -2425,9 +2426,9 @@ const FinanceManagement: React.FC = () => {
               </div>
             </div>
 
-            {/* 骑手公里费用明细表 */}
+            {/* 骑手送货费用明细表 */}
             <div style={{ marginTop: '24px', marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📋 骑手公里费用明细 (按骑手统计)</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📋 骑手送货费用明细 (按骑手统计)</h4>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
@@ -2439,8 +2440,8 @@ const FinanceManagement: React.FC = () => {
                     <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手ID</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达包裹数</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>总配送距离</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>公里费用</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>总送货距离</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送货费用</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>平均每单距离</th>
                     </tr>
                   </thead>
@@ -2658,7 +2659,7 @@ const FinanceManagement: React.FC = () => {
                         <span style={{ color: 'white', fontWeight: '600' }}>{selectedSalary.base_salary.toLocaleString()} MMK</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>公里费</span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>送货费</span>
                         <span style={{ color: '#74b9ff', fontWeight: '600' }}>+{selectedSalary.km_fee.toLocaleString()} MMK</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>

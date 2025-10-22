@@ -26,7 +26,7 @@ export async function sendEmailVerificationCode(
     console.log(`📧 正在发送验证码到: ${email}`);
 
     // 调用 Netlify Function
-    const response = await fetch('/.netlify/functions/send-email-code', {
+    const response = await fetch('https://market-link-express.com/.netlify/functions/send-email-code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -79,7 +79,7 @@ export async function verifyEmailCode(
     console.log(`🔍 正在验证验证码: ${email} - ${code}`);
 
     // 调用 Netlify Function
-    const response = await fetch('/.netlify/functions/verify-email-code', {
+    const response = await fetch('https://market-link-express.com/.netlify/functions/verify-email-code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

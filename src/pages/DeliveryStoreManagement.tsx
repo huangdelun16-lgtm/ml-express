@@ -162,28 +162,30 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 打开地图选择
   const openMapSelection = () => {
+    console.log('🗺️ 打开地图选择，API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? '已设置' : '未设置');
     setMapError(null);
     setMapLoading(true);
     setShowMapModal(true);
     
-    // 设置超时机制，30秒后如果还没加载完成就显示错误
+    // 设置超时机制，15秒后如果还没加载完成就显示错误
     setTimeout(() => {
       if (mapLoading) {
         setMapLoading(false);
         setMapError('地图加载超时，可能是网络问题或API配置问题。请尝试手动输入坐标或联系管理员。');
       }
-    }, 30000);
+    }, 15000);
   };
 
   // 地图加载成功回调
   const onMapLoad = useCallback(() => {
+    console.log('✅ Google Maps 加载成功');
     setMapLoading(false);
     setMapError(null);
   }, []);
 
   // 地图加载失败回调
   const onMapError = useCallback((error: any) => {
-    console.error('Google Maps 加载失败:', error);
+    console.error('❌ Google Maps 加载失败:', error);
     setMapLoading(false);
     
     // 根据错误类型提供不同的提示
@@ -1171,7 +1173,7 @@ const DeliveryStoreManagement: React.FC = () => {
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
           <ErrorBoundary>
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"}>
+            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"}>
               <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
                 center={mapCenter}
@@ -2032,7 +2034,7 @@ const DeliveryStoreManagement: React.FC = () => {
               ) : (
                 <ErrorBoundary>
                   <LoadScript 
-                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"}
+                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"}
                     onLoad={onMapLoad}
                     onError={onMapError}
                   >

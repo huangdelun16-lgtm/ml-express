@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 快递员数据接口（扩展数据库接口）
@@ -260,14 +260,18 @@ const RealTimeTracking: React.FC = () => {
     setIsAssigning(true);
     try {
       console.log('📦 开始分配包裹:', packageData.id, '给快递员:', courier.name);
+      console.log('📍 包裹经纬度信息:', {
+        sender: { lat: packageData.sender_latitude, lng: packageData.sender_longitude },
+        receiver: { lat: packageData.receiver_latitude, lng: packageData.receiver_longitude }
+      });
       
-      // 更新包裹状态
+      // 更新包裹状态为"待取件"并分配骑手
       const success = await packageService.updatePackageStatus(
         packageData.id,
-        '已取件',
-        new Date().toLocaleString('zh-CN'),
-        undefined,
-        courier.name
+        '待取件',  // 分配后状态为待取件，骑手扫码后才变为已取件
+        undefined, // pickupTime - 取件时间由骑手扫码时设置
+        undefined, // deliveryTime
+        courier.name  // courierName
       );
 
       console.log('📦 包裹状态更新结果:', success);
@@ -699,11 +703,16 @@ const RealTimeTracking: React.FC = () => {
                 <div
                   key={pkg.id}
                   style={{
-                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    background: pkg.courier && pkg.courier !== '未分配'
+                      ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
+                      : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
                     padding: '1rem',
                     borderRadius: '10px',
                     marginBottom: '1rem',
-                    border: '2px solid #bae6fd'
+                    border: pkg.courier && pkg.courier !== '未分配'
+                      ? '2px solid #22c55e'
+                      : '2px solid #bae6fd',
+                    opacity: pkg.courier && pkg.courier !== '未分配' ? 0.9 : 1
                   }}
                 >
                   <div style={{ 
@@ -713,8 +722,12 @@ const RealTimeTracking: React.FC = () => {
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
                     <span style={{
-                      background: '#fef3c7',
-                      color: '#92400e',
+                      background: pkg.courier && pkg.courier !== '未分配'
+                        ? '#dcfce7'
+                        : '#fef3c7',
+                      color: pkg.courier && pkg.courier !== '未分配'
+                        ? '#166534'
+                        : '#92400e',
                       padding: '0.2rem 0.6rem',
                       borderRadius: '5px',
                       fontSize: '0.8rem',
@@ -724,12 +737,22 @@ const RealTimeTracking: React.FC = () => {
                     </span>
                   </div>
                   
-                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
+                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 从: {pkg.sender_address}
+                      {pkg.sender_latitude && pkg.sender_longitude && (
+                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
+                        </span>
+                      )}
                     </p>
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 到: {pkg.receiver_address}
+                      {pkg.receiver_latitude && pkg.receiver_longitude && (
+                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
+                        </span>
+                      )}
                     </p>
                     <p style={{ margin: '0.3rem 0' }}>
                       📦 类型: {pkg.package_type} ({pkg.weight})
@@ -749,45 +772,67 @@ const RealTimeTracking: React.FC = () => {
                     gap: '0.5rem',
                     marginTop: '1rem'
                   }}>
-                    <button
-                      onClick={() => autoAssignPackage(pkg)}
-                      disabled={isAssigning}
-                      style={{
+                    {/* 如果包裹已分配给骑手（有courier且不为'未分配'），显示状态信息而不是分配按钮 */}
+                    {pkg.courier && pkg.courier !== '未分配' ? (
+                      <div style={{
                         flex: 1,
-                        background: isAssigning 
-                          ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
-                          : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        border: 'none',
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        color: '#92400e',
+                        border: '2px solid #f59e0b',
                         padding: '0.6rem',
                         borderRadius: '8px',
-                        cursor: isAssigning ? 'not-allowed' : 'pointer',
                         fontWeight: 'bold',
                         fontSize: '0.9rem',
-                        opacity: isAssigning ? 0.7 : 1
-                      }}
-                    >
-                      {isAssigning ? '⏳ 分配中...' : '🤖 自动分配'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedPackage(pkg);
-                        setShowAssignModal(true);
-                      }}
-                      style={{
-                        flex: 1,
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.6rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem'
-                      }}
-                    >
-                      👤 手动分配
-                    </button>
+                        textAlign: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        ✅ 已分配给: {pkg.courier}
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => autoAssignPackage(pkg)}
+                          disabled={isAssigning}
+                          style={{
+                            flex: 1,
+                            background: isAssigning 
+                              ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
+                              : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.6rem',
+                            borderRadius: '8px',
+                            cursor: isAssigning ? 'not-allowed' : 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '0.9rem',
+                            opacity: isAssigning ? 0.7 : 1
+                          }}
+                        >
+                          {isAssigning ? '⏳ 分配中...' : '🤖 自动分配'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedPackage(pkg);
+                            setShowAssignModal(true);
+                          }}
+                          style={{
+                            flex: 1,
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.6rem',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          👤 手动分配
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))

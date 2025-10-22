@@ -18,11 +18,14 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
+          "maps",
+          "comgooglemaps",
           "maps"
         ],
         "NSLocationWhenInUseUsageDescription": "需要获取您的位置来显示配送路线和导航",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "需要获取您的位置来提供实时配送服务",
         "UIBackgroundModes": [
+          "location",
           "location"
         ]
       },
@@ -38,6 +41,8 @@
       "package": "com.marketlinkexpress.staff",
       "permissions": [
         "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
@@ -48,14 +53,18 @@
         }
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    
     "extra": {
       "eas": {
         "projectId": "9831d961-9124-46ed-8581-bf406616439f"
       }
     },
-    "owner": "amt349"
+    "owner": "amt349",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9831d961-9124-46ed-8581-bf406616439f"
+    }
   }
 }

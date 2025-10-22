@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,9 @@ export default function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const t = {
@@ -56,6 +59,15 @@ export default function RegisterScreen({ navigation }: any) {
       registerSuccessMsg: '注册成功！请登录',
       registerFailed: '注册失败',
       registering: '正在注册...',
+      verificationCode: '验证码',
+      verificationCodePlaceholder: '请输入6位验证码',
+      sendCode: '发送验证码',
+      resendCode: '重新发送',
+      codeSent: '验证码已发送',
+      codeSentMsg: '验证码已发送到您的邮箱',
+      invalidCode: '验证码错误',
+      codeRequired: '请输入验证码',
+      sendCodeFirst: '请先发送验证码',
     },
     en: {
       register: 'Register',
@@ -84,6 +96,15 @@ export default function RegisterScreen({ navigation }: any) {
       registerSuccessMsg: 'Registration successful! Please login',
       registerFailed: 'Registration Failed',
       registering: 'Registering...',
+      verificationCode: 'Verification Code',
+      verificationCodePlaceholder: 'Enter 6-digit code',
+      sendCode: 'Send Code',
+      resendCode: 'Resend',
+      codeSent: 'Code Sent',
+      codeSentMsg: 'Verification code sent to your email',
+      invalidCode: 'Invalid code',
+      codeRequired: 'Please enter verification code',
+      sendCodeFirst: 'Please send verification code first',
     },
     my: {
       register: 'စာရင်းသွင်း',
@@ -112,10 +133,75 @@ export default function RegisterScreen({ navigation }: any) {
       registerSuccessMsg: 'စာရင်းသွင်းပြီးပါပြီ! ဝင်ရောက်ပါ',
       registerFailed: 'စာရင်းသွင်းမှုမအောင်မြင်',
       registering: 'စာရင်းသွင်းနေသည်...',
+      verificationCode: 'အတည်ပြုကုဒ်',
+      verificationCodePlaceholder: '6 လုံးကုဒ်ထည့်ပါ',
+      sendCode: 'ကုဒ်ပို့ရန်',
+      resendCode: 'ပြန်ပို့ရန်',
+      codeSent: 'ကုဒ်ပို့ပြီးပါပြီ',
+      codeSentMsg: 'အတည်ပြုကုဒ်ကို သင့်အီးမေးလ်သို့ ပို့ပြီးပါပြီ',
+      invalidCode: 'ကုဒ်မှားနေပါသည်',
+      codeRequired: 'အတည်ပြုကုဒ်ထည့်ပါ',
+      sendCodeFirst: 'ဦးစွာ အတည်ပြုကုဒ်ပို့ပါ',
     },
   };
 
   const currentT = t[language];
+
+  // 倒计时效果
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [countdown]);
+
+  // 发送验证码
+  const handleSendVerificationCode = async () => {
+    if (!email) {
+      Alert.alert('', currentT.invalidEmail);
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('', currentT.invalidEmail);
+      return;
+    }
+
+    try {
+      showLoading('发送验证码中...');
+      
+      // 调用邮箱验证服务
+      const response = await fetch('https://market-link-express.com/.netlify/functions/send-email-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          language: language
+        })
+      });
+
+      const result = await response.json();
+      hideLoading();
+
+      if (result.success) {
+        setCodeSent(true);
+        setCountdown(60);
+        Alert.alert(currentT.codeSent, currentT.codeSentMsg);
+      } else {
+        Alert.alert('发送失败', result.message || '验证码发送失败');
+      }
+    } catch (error) {
+      hideLoading();
+      Alert.alert('发送失败', '网络错误，请重试');
+    }
+  };
 
   // 验证邮箱格式
   const validateEmail = (email: string) => {
@@ -160,10 +246,43 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
 
+    // 验证验证码
+    if (!verificationCode) {
+      Alert.alert('', currentT.codeRequired);
+      return;
+    }
+
+    if (!codeSent) {
+      Alert.alert('', currentT.sendCodeFirst);
+      return;
+    }
+
     setLoading(true);
     showLoading(currentT.registering);
 
     try {
+      // 先验证验证码
+      const verifyResponse = await fetch('https://market-link-express.com/.netlify/functions/verify-email-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          code: verificationCode,
+          language: language
+        })
+      });
+
+      const verifyResult = await verifyResponse.json();
+      
+      if (!verifyResult.success) {
+        hideLoading();
+        Alert.alert(currentT.invalidCode, verifyResult.message || currentT.invalidCode);
+        return;
+      }
+
+      // 验证码验证成功，继续注册
       const result = await customerService.register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -242,19 +361,6 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>{currentT.email} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={currentT.emailPlaceholder}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
               <Text style={styles.label}>{currentT.phone} *</Text>
               <TextInput
                 style={styles.input}
@@ -286,6 +392,47 @@ export default function RegisterScreen({ navigation }: any) {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{currentT.email} *</Text>
+              <View style={styles.emailRow}>
+                <TextInput
+                  style={[styles.input, styles.emailInput]}
+                  placeholder={currentT.emailPlaceholder}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholderTextColor="#9ca3af"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.sendCodeButton,
+                    countdown > 0 && styles.sendCodeButtonDisabled
+                  ]}
+                  onPress={handleSendVerificationCode}
+                  disabled={countdown > 0}
+                >
+                  <Text style={styles.sendCodeButtonText}>
+                    {countdown > 0 ? `${countdown}s` : currentT.sendCode}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 验证码输入 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{currentT.verificationCode} *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={currentT.verificationCodePlaceholder}
+                value={verificationCode}
+                onChangeText={setVerificationCode}
+                keyboardType="numeric"
+                maxLength={6}
                 placeholderTextColor="#9ca3af"
               />
             </View>
@@ -383,6 +530,30 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 20,
+  },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  emailInput: {
+    flex: 1,
+  },
+  sendCodeButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  sendCodeButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  sendCodeButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   label: {
     fontSize: 15,

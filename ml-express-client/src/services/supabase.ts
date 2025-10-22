@@ -52,6 +52,9 @@ export interface Package {
   pickup_time?: string;
   delivery_time?: string;
   delivery_distance?: number;
+  customer_rating?: number;
+  customer_comment?: string;
+  rating_time?: string;
 }
 
 // 客户服务（使用users表）
@@ -615,7 +618,7 @@ export const packageService = {
       // 1. 检查订单状态和所有者
       const { data: order, error: checkError } = await supabase
         .from('packages')
-        .select('status, customer_id')
+        .select('status, description')
         .eq('id', orderId)
         .single();
 
@@ -625,7 +628,10 @@ export const packageService = {
         return { success: false, message: '订单不存在' };
       }
 
-      if (order.customer_id !== customerId) {
+      // 2. 从description中提取客户ID（因为packages表没有customer_id字段）
+      const customerIdFromDescription = order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
+      
+      if (customerIdFromDescription !== customerId) {
         return { success: false, message: '无权操作此订单' };
       }
 
@@ -633,7 +639,7 @@ export const packageService = {
         return { success: false, message: '只有待取件状态的订单可以取消' };
       }
 
-      // 2. 更新状态
+      // 3. 更新状态
       const { error } = await supabase
         .from('packages')
         .update({ 
@@ -656,7 +662,7 @@ export const packageService = {
       // 1. 检查订单状态和所有者
       const { data: order, error: checkError } = await supabase
         .from('packages')
-        .select('status, customer_id, customer_rating')
+        .select('status, description, customer_rating')
         .eq('id', orderId)
         .single();
 
@@ -666,7 +672,10 @@ export const packageService = {
         return { success: false, message: '订单不存在' };
       }
 
-      if (order.customer_id !== customerId) {
+      // 2. 从description中提取客户ID（因为packages表没有customer_id字段）
+      const customerIdFromDescription = order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
+      
+      if (customerIdFromDescription !== customerId) {
         return { success: false, message: '无权操作此订单' };
       }
 
@@ -678,12 +687,13 @@ export const packageService = {
         return { success: false, message: '该订单已评价过' };
       }
 
-      // 2. 添加评价
+      // 3. 添加评价
       const { error } = await supabase
         .from('packages')
         .update({ 
           customer_rating: rating,
           customer_comment: comment || '',
+          rating_time: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);

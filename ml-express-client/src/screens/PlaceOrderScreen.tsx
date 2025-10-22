@@ -56,6 +56,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 价格
   const [price, setPrice] = useState('0');
   const [distance, setDistance] = useState(0);
+  const [isCalculated, setIsCalculated] = useState(false);
+  const [calculatedPrice, setCalculatedPrice] = useState('0');
+  const [calculatedDistance, setCalculatedDistance] = useState(0);
   
   // 地图相关
   const [showMapModal, setShowMapModal] = useState(false);
@@ -122,6 +125,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
       distancePrice: '里程费',
       speedPrice: '时效费',
       totalPrice: '总计',
+      calculateButton: '计算',
+      calculating: '计算中...',
+      calculateSuccess: '计算完成',
+      calculateFailed: '计算失败',
       submitOrder: '提交订单',
       fillRequired: '请填写所有必填项',
       orderSuccess: '订单创建成功',
@@ -142,6 +149,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         description: '如：衣服、食品等',
         scheduledTime: '如：今天18:00',
       },
+      coordinates: '坐标',
       packageTypes: {
         document: '文件',
         standard: '标准件',
@@ -186,6 +194,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
       distancePrice: 'Distance Fee',
       speedPrice: 'Speed Fee',
       totalPrice: 'Total',
+      calculateButton: 'Calculate',
+      calculating: 'Calculating...',
+      calculateSuccess: 'Calculation Complete',
+      calculateFailed: 'Calculation Failed',
       submitOrder: 'Submit Order',
       fillRequired: 'Please fill all required fields',
       orderSuccess: 'Order created successfully',
@@ -206,6 +218,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         description: 'e.g.: Clothes, Food, etc.',
         scheduledTime: 'e.g.: Today 18:00',
       },
+      coordinates: 'Coordinates',
       packageTypes: {
         document: 'Document',
         standard: 'Standard Package',
@@ -250,6 +263,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
       distancePrice: 'အကွာအဝေးအခကြေး',
       speedPrice: 'မြန်နှုန်းအခကြေး',
       totalPrice: 'စုစုပေါင်း',
+      calculateButton: 'တွက်ချက်မည်',
+      calculating: 'တွက်ချက်နေသည်...',
+      calculateSuccess: 'တွက်ချက်ပြီးပြီ',
+      calculateFailed: 'တွက်ချက်မအောင်မြင်',
       submitOrder: 'အမှာစာတင်သွင်းမည်',
       fillRequired: 'လိုအပ်သောအကွက်များဖြည့်ပါ',
       orderSuccess: 'အမှာစာအောင်မြင်စွာဖန်တီးပြီး',
@@ -270,6 +287,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         description: 'ဥပမာ: အဝတ်အစား, အစားအစာ',
         scheduledTime: 'ဥပမာ: ယနေ့ ၁၈:၀၀',
       },
+      coordinates: 'ကိုဩဒိနိတ်',
       packageTypes: {
         document: 'စာရွက်စာတမ်း',
         standard: 'စံပါဆယ်',
@@ -352,47 +370,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
   }, [useMyInfo]);
 
   // 计算价格
-  useEffect(() => {
-    calculatePrice();
-  }, [weight, deliverySpeed, distance, packageType, pricingSettings]);
-
-  const calculatePrice = () => {
-    // 基础价格（起步价）
-    let totalPrice = pricingSettings.base_fee;
-    
-    // 1. 距离费用（超过免费公里数部分）
-    const chargeableDistance = Math.max(0, distance - pricingSettings.free_km_threshold);
-    totalPrice += chargeableDistance * pricingSettings.per_km_fee;
-    
-    // 2. 重量附加费（超重件：重量超过5KG的部分）
-    if (packageType === '超重件（5KG）以上') {
-      const weightValue = parseFloat(weight || '0');
-      const excessWeight = Math.max(0, weightValue - 5);
-      totalPrice += excessWeight * pricingSettings.weight_surcharge;
-    }
-    
-    // 3. 配送速度附加费
-    if (deliverySpeed === '急送达') {
-      totalPrice += pricingSettings.urgent_surcharge;
-    } else if (deliverySpeed === '定时达') {
-      totalPrice += pricingSettings.scheduled_surcharge;
-    }
-    
-    // 4. 包裹类型附加费
-    if (packageType === '超规件（45x60x15cm）以上') {
-      // 超规件：按距离计算附加费
-      totalPrice += distance * pricingSettings.oversize_surcharge;
-    } else if (packageType === '易碎品') {
-      // 易碎品：固定附加费
-      totalPrice += pricingSettings.fragile_surcharge;
-    } else if (packageType === '食品和饮料') {
-      // 食品和饮料：按距离计算附加费
-      totalPrice += distance * pricingSettings.food_beverage_surcharge;
-    }
-    
-    setPrice(Math.round(totalPrice).toString());
-  };
-
   // 使用当前位置
   const useCurrentLocation = async () => {
     try {
@@ -416,16 +393,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
         const fullAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
         const finalAddress = fullAddress || `${location.coords.latitude}, ${location.coords.longitude}`;
         
-        // 保存地址和坐标
-        setSenderAddress(finalAddress);
-        setSenderCoordinates({
+        // 将地址和坐标一起添加到输入框
+        const coords = {
           lat: location.coords.latitude,
           lng: location.coords.longitude
-        });
-        console.log('✅ 当前位置坐标已保存:', {
-          lat: location.coords.latitude,
-          lng: location.coords.longitude
-        });
+        };
+        const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+        setSenderAddress(addressWithCoords);
+        setSenderCoordinates(coords);
+        console.log('✅ 当前位置坐标已保存:', coords);
       }
       
       hideLoading();
@@ -480,11 +456,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
         };
         
         if (mapType === 'sender') {
-          setSenderAddress(finalAddress);
+          // 将地址和坐标一起添加到输入框
+          const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+          setSenderAddress(addressWithCoords);
           setSenderCoordinates(coords);
           console.log('✅ 寄件地址坐标已保存:', coords);
         } else {
-          setReceiverAddress(finalAddress);
+          // 将地址和坐标一起添加到输入框
+          const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+          setReceiverAddress(addressWithCoords);
           setReceiverCoordinates(coords);
           console.log('✅ 收件地址坐标已保存:', coords);
         }
@@ -499,6 +479,86 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
+  // 使用Haversine公式计算两点之间的距离（公里）
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // 地球半径（公里）
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // 精准计算费用
+  const calculatePrice = async () => {
+    try {
+      showLoading(currentT.calculating, 'package');
+      
+      // 检查是否有坐标信息
+      if (!senderCoordinates || !receiverCoordinates) {
+        Alert.alert('提示', '请先选择寄件和收件地址的精确位置');
+        hideLoading();
+        return;
+      }
+
+      // 计算精确距离
+      const exactDistance = calculateDistance(
+        senderCoordinates.lat,
+        senderCoordinates.lng,
+        receiverCoordinates.lat,
+        receiverCoordinates.lng
+      );
+
+      // 按照要求：6.1km = 7km（向上取整）
+      const roundedDistance = Math.ceil(exactDistance);
+      setCalculatedDistance(roundedDistance);
+
+      // 计算各项费用
+      let totalPrice = pricingSettings.base_fee; // 基础费用
+
+      // 距离费用（超过免费公里数后收费）
+      const distanceFee = Math.max(0, roundedDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee;
+      totalPrice += distanceFee;
+
+      // 重量附加费
+      const weightNum = parseFloat(weight || '0');
+      if (packageType === '超重件（5KG）以上' && weightNum > 5) {
+        totalPrice += Math.max(0, weightNum - 5) * pricingSettings.weight_surcharge;
+      }
+
+      // 速度附加费
+      if (deliverySpeed !== '准时达') {
+        const speedExtra = deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0;
+        totalPrice += speedExtra;
+      }
+
+      // 包裹类型附加费
+      if (packageType === '超规件（45x60x15cm）以上') {
+        totalPrice += roundedDistance * pricingSettings.oversize_surcharge;
+      }
+      if (packageType === '易碎品') {
+        totalPrice += pricingSettings.fragile_surcharge;
+      }
+      if (packageType === '食品和饮料') {
+        totalPrice += roundedDistance * pricingSettings.food_beverage_surcharge;
+      }
+
+      // 更新计算结果
+      setCalculatedPrice(Math.round(totalPrice).toString());
+      setIsCalculated(true);
+      
+      hideLoading();
+      Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistance}km\n总费用: ${Math.round(totalPrice)} MMK`);
+      
+    } catch (error) {
+      hideLoading();
+      console.error('计算费用失败:', error);
+      Alert.alert(currentT.calculateFailed, '计算失败，请重试');
+    }
+  };
+
   // 估算距离（简化版，实际应该使用地图API）
   const estimateDistance = () => {
     // 这里简化为随机距离，实际应该根据地址计算
@@ -510,6 +570,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
   useEffect(() => {
     estimateDistance();
   }, [senderAddress, receiverAddress]);
+
+  // 从地址文本中提取纯地址（移除坐标信息）
+  const extractAddress = (addressText: string) => {
+    const lines = addressText.split('\n');
+    return lines.filter(line => !line.includes('📍')).join('\n').trim();
+  };
 
   // 提交订单
   const handleSubmitOrder = async () => {
@@ -557,12 +623,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
         customer_id: userId,
         sender_name: senderName,
         sender_phone: senderPhone,
-        sender_address: senderAddress,
+        sender_address: extractAddress(senderAddress),
         sender_latitude: senderCoordinates?.lat || null,
         sender_longitude: senderCoordinates?.lng || null,
         receiver_name: receiverName,
         receiver_phone: receiverPhone,
-        receiver_address: receiverAddress,
+        receiver_address: extractAddress(receiverAddress),
         receiver_latitude: receiverCoordinates?.lat || null,
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
@@ -570,13 +636,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
         description: description || '',
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
-        delivery_distance: distance,
+        delivery_distance: isCalculated ? calculatedDistance : distance,
         status: '待取件',
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',
         courier: '待分配',
-        price: price,
+        price: isCalculated ? calculatedPrice : price,
       };
 
       // 调用API创建订单
@@ -587,8 +653,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
       if (result) { // 假设成功时 result 不为 null
         // 显示QR码模态框
         setQrOrderId(orderId);
-        setQrOrderPrice(price);
+        setQrOrderPrice(isCalculated ? calculatedPrice : price);
         setShowQRCodeModal(true);
+        // 重置表单
+        resetForm();
       } else {
         // 由于没有统一的错误对象，我们直接在服务层打印错误
         // 这里只给用户通用提示
@@ -618,6 +686,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
     setDeliverySpeed('准时达');
     setScheduledTime('');
     setSenderAddress('');
+    setReceiverCoordinates(null);
+    setSenderCoordinates(null);
+    setIsCalculated(false);
+    setCalculatedPrice('0');
+    setCalculatedDistance(0);
+    setPrice('0');
+    setDistance(0);
   };
 
   // 处理包裹类型点击
@@ -697,7 +772,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
             <TextInput
               style={[styles.input, styles.textArea]}
               value={senderAddress}
-              onChangeText={setSenderAddress}
+              onChangeText={(text) => {
+                // 如果用户手动编辑地址，移除坐标信息
+                const lines = text.split('\n');
+                const addressLines = lines.filter(line => !line.includes('📍'));
+                setSenderAddress(addressLines.join('\n'));
+              }}
               placeholder={currentT.placeholders.address}
               placeholderTextColor="#9ca3af"
               multiline
@@ -743,7 +823,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
             <TextInput
               style={[styles.input, styles.textArea]}
               value={receiverAddress}
-              onChangeText={setReceiverAddress}
+              onChangeText={(text) => {
+                // 如果用户手动编辑地址，移除坐标信息
+                const lines = text.split('\n');
+                const addressLines = lines.filter(line => !line.includes('📍'));
+                setReceiverAddress(addressLines.join('\n'));
+              }}
               placeholder={currentT.placeholders.address}
               placeholderTextColor="#9ca3af"
               multiline
@@ -856,66 +941,95 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
         {/* 价格估算 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 {currentT.priceEstimate}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>💰 {currentT.priceEstimate}</Text>
+            <TouchableOpacity
+              style={styles.calculateButton}
+              onPress={calculatePrice}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.calculateButtonGradient}
+              >
+                <Text style={styles.calculateButtonText}>🧮 {currentT.calculateButton}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.priceCard}>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{currentT.distance}:</Text>
-              <Text style={styles.priceValue}>~{distance} {currentT.kmUnit}</Text>
-            </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
-              <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
-            </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
-              <Text style={styles.priceValue}>
-                {Math.round(Math.max(0, distance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee)} MMK
-              </Text>
-            </View>
-            {packageType === '超重件（5KG）以上' && parseFloat(weight || '0') > 5 && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>超重附加费:</Text>
-                <Text style={styles.priceValue}>
-                  {Math.round(Math.max(0, parseFloat(weight) - 5) * pricingSettings.weight_surcharge)} MMK
+            {!isCalculated ? (
+              <View style={styles.pricePlaceholder}>
+                <Text style={styles.pricePlaceholderText}>
+                  📊 点击"计算"按钮获取精准费用
+                </Text>
+                <Text style={styles.pricePlaceholderSubtext}>
+                  需要先选择寄件和收件地址的精确位置
                 </Text>
               </View>
+            ) : (
+              <>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>{currentT.distance}:</Text>
+                  <Text style={styles.priceValue}>{calculatedDistance} {currentT.kmUnit}</Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
+                  <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
+                  <Text style={styles.priceValue}>
+                    {Math.round(Math.max(0, calculatedDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee)} MMK
+                  </Text>
+                </View>
+                {packageType === '超重件（5KG）以上' && parseFloat(weight || '0') > 5 && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>超重附加费:</Text>
+                    <Text style={styles.priceValue}>
+                      {Math.round(Math.max(0, parseFloat(weight) - 5) * pricingSettings.weight_surcharge)} MMK
+                    </Text>
+                  </View>
+                )}
+                {deliverySpeed !== '准时达' && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
+                    <Text style={styles.priceValue}>
+                      {deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0} MMK
+                    </Text>
+                  </View>
+                )}
+                {packageType === '超规件（45x60x15cm）以上' && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>超规附加费:</Text>
+                    <Text style={styles.priceValue}>
+                      {Math.round(calculatedDistance * pricingSettings.oversize_surcharge)} MMK
+                    </Text>
+                  </View>
+                )}
+                {packageType === '易碎品' && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>易碎品附加费:</Text>
+                    <Text style={styles.priceValue}>{pricingSettings.fragile_surcharge} MMK</Text>
+                  </View>
+                )}
+                {packageType === '食品和饮料' && (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>食品附加费:</Text>
+                    <Text style={styles.priceValue}>
+                      {Math.round(calculatedDistance * pricingSettings.food_beverage_surcharge)} MMK
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.priceDivider} />
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>
+                  <Text style={styles.priceTotal}>{calculatedPrice} MMK</Text>
+                </View>
+              </>
             )}
-            {deliverySpeed !== '准时达' && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
-                <Text style={styles.priceValue}>
-                  {deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0} MMK
-                </Text>
-              </View>
-            )}
-            {packageType === '超规件（45x60x15cm）以上' && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>超规附加费:</Text>
-                <Text style={styles.priceValue}>
-                  {Math.round(distance * pricingSettings.oversize_surcharge)} MMK
-                </Text>
-              </View>
-            )}
-            {packageType === '易碎品' && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>易碎品附加费:</Text>
-                <Text style={styles.priceValue}>{pricingSettings.fragile_surcharge} MMK</Text>
-              </View>
-            )}
-            {packageType === '食品和饮料' && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>食品附加费:</Text>
-                <Text style={styles.priceValue}>
-                  {Math.round(distance * pricingSettings.food_beverage_surcharge)} MMK
-                </Text>
-              </View>
-            )}
-            <View style={styles.priceDivider} />
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>
-              <Text style={styles.priceTotal}>{price} MMK</Text>
-            </View>
           </View>
         </View>
 
@@ -932,7 +1046,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
             style={styles.submitGradient}
           >
             <Text style={styles.submitText}>{currentT.submitOrder}</Text>
-            <Text style={styles.submitPrice}>{price} MMK</Text>
+            <Text style={styles.submitPrice}>
+              {isCalculated ? calculatedPrice : '0'} MMK
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -1192,6 +1308,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  calculateButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  calculateButtonGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  calculateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pricePlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  pricePlaceholderText: {
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  pricePlaceholderSubtext: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -1239,6 +1384,20 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  coordinateInfo: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6',
+  },
+  coordinateText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '500',
   },
   chipContainer: {
     flexDirection: 'row',

@@ -63,12 +63,12 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleLogout = () => {
     Alert.alert(
-      language === 'zh' ? '确认退出' : 'Confirm Logout',
-      language === 'zh' ? '确定要退出登录吗？' : 'Are you sure you want to logout?',
+      language === 'zh' ? '确认退出' : language === 'my' ? 'အကောင့်မှထွက်ရန်အတည်ပြုပါ' : 'Confirm Logout',
+      language === 'zh' ? '确定要退出登录吗？' : language === 'my' ? 'အကောင့်မှထွက်ရန်သေချာပါသလား?' : 'Are you sure you want to logout?',
       [
-        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+        { text: language === 'zh' ? '取消' : language === 'my' ? 'ပယ်ဖျက်ပါ' : 'Cancel', style: 'cancel' },
         {
-          text: language === 'zh' ? '退出' : 'Logout',
+          text: language === 'zh' ? '退出' : language === 'my' ? 'ထွက်ရန်' : 'Logout',
           style: 'destructive',
           onPress: async () => {
             // 如果是骑手，更新快递员状态为离线
@@ -105,22 +105,47 @@ export default function ProfileScreen({ navigation }: any) {
 
   const getRoleName = (role: string) => {
     const map: Record<string, string> = {
-      'admin': language === 'zh' ? '管理员' : 'Admin',
-      'manager': language === 'zh' ? '经理' : 'Manager',
-      'operator': language === 'zh' ? '操作员' : 'Operator',
-      'finance': language === 'zh' ? '财务' : 'Finance'
+      'admin': language === 'zh' ? '管理员' : language === 'my' ? 'အက်မင်' : 'Admin',
+      'manager': language === 'zh' ? '经理' : language === 'my' ? 'မန်နေဂျာ' : 'Manager',
+      'operator': language === 'zh' ? '操作员' : language === 'my' ? 'အော်ပရေတာ' : 'Operator',
+      'finance': language === 'zh' ? '财务' : language === 'my' ? 'ဘဏ္ဍာရေး' : 'Finance'
     };
     return map[role] || role;
   };
 
   const menuItems = [
-    { icon: '📦', title: language === 'zh' ? '配送历史' : 'Delivery History', subtitle: language === 'zh' ? '查看所有配送记录' : 'View all delivery records', screen: 'DeliveryHistory' },
-    { icon: '📊', title: language === 'zh' ? '我的统计' : 'My Statistics', subtitle: language === 'zh' ? '查看配送数据分析' : 'View delivery data analysis', screen: 'MyStatistics' },
-    { icon: '⚙️', title: language === 'zh' ? '应用设置' : 'App Settings', subtitle: language === 'zh' ? '通知、定位等设置' : 'Notifications, location settings', screen: 'Settings' },
-    { icon: '📖', title: language === 'zh' ? '使用帮助' : 'User Guide', subtitle: language === 'zh' ? '功能使用指南' : 'Feature usage guide', screen: 'Help' },
-    { icon: '🌐', title: language === 'zh' ? '访问网站' : 'Visit Website', subtitle: 'market-link-express.com', action: () => {
-      Linking.openURL('https://market-link-express.com');
-    }},
+    { 
+      icon: '📦', 
+      title: language === 'zh' ? '配送历史' : language === 'my' ? 'ပို့ဆောင်မှုမှတ်တမ်း' : 'Delivery History', 
+      subtitle: language === 'zh' ? '查看所有配送记录' : language === 'my' ? 'ပို့ဆောင်မှုမှတ်တမ်းအားလုံးကိုကြည့်ရန်' : 'View all delivery records', 
+      screen: 'DeliveryHistory' 
+    },
+    { 
+      icon: '📊', 
+      title: language === 'zh' ? '我的统计' : language === 'my' ? 'ကျွန်ုပ်၏စာရင်းဇယား' : 'My Statistics', 
+      subtitle: language === 'zh' ? '查看配送数据分析' : language === 'my' ? 'ပို့ဆောင်မှုဒေတာခွဲခြမ်းစိတ်ဖြာမှုကိုကြည့်ရန်' : 'View delivery data analysis', 
+      screen: 'MyStatistics' 
+    },
+    { 
+      icon: '⚙️', 
+      title: language === 'zh' ? '应用设置' : language === 'my' ? 'အက်ပ်ဆက်တင်များ' : 'App Settings', 
+      subtitle: language === 'zh' ? '通知、定位等设置' : language === 'my' ? 'အကြောင်းကြားချက်များ၊ တည်နေရာဆက်တင်များ' : 'Notifications, location settings', 
+      screen: 'Settings' 
+    },
+    { 
+      icon: '📖', 
+      title: language === 'zh' ? '使用帮助' : language === 'my' ? 'အသုံးပြုမှုအကူအညီ' : 'User Guide', 
+      subtitle: language === 'zh' ? '功能使用指南' : language === 'my' ? 'လုပ်ဆောင်ချက်အသုံးပြုမှုလမ်းညွှန်' : 'Feature usage guide', 
+      screen: 'Help' 
+    },
+    { 
+      icon: '🌐', 
+      title: language === 'zh' ? '访问网站' : language === 'my' ? 'ဝဘ်ဆိုက်ကိုလည်ပတ်ရန်' : 'Visit Website', 
+      subtitle: 'market-link-express.com', 
+      action: () => {
+        Linking.openURL('https://market-link-express.com');
+      }
+    },
   ];
 
   return (
@@ -134,22 +159,22 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
         <Text style={styles.userName}>{currentUserName}</Text>
         <Text style={styles.userRole}>{getRoleName(currentUserRole)}</Text>
-        <Text style={styles.userId}>{language === 'zh' ? '账号' : 'Account'}: {currentUser}</Text>
+        <Text style={styles.userId}>{language === 'zh' ? '账号' : language === 'my' ? 'အကောင့်' : 'Account'}: {currentUser}</Text>
       </View>
 
       {/* 统计卡片 */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.todayDelivered}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '今日完成' : 'Today'}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '今日完成' : language === 'my' ? 'ယနေ့ပြီးမြောက်' : 'Today'}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.inProgress}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'In Progress'}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : language === 'my' ? 'ပို့ဆောင်နေဆဲ' : 'In Progress'}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.totalDelivered}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '累计完成' : 'Total'}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '累计完成' : language === 'my' ? 'စုစုပေါင်းပြီးမြောက်' : 'Total'}</Text>
         </View>
       </View>
 
@@ -165,7 +190,10 @@ export default function ProfileScreen({ navigation }: any) {
               } else if (item.screen) {
                 navigation.navigate(item.screen);
               } else {
-                Alert.alert(language === 'zh' ? '提示' : 'Notice', language === 'zh' ? '功能开发中，敬请期待！' : 'Feature under development, stay tuned!');
+                Alert.alert(
+                  language === 'zh' ? '提示' : language === 'my' ? 'အကြောင်းကြားချက်' : 'Notice', 
+                  language === 'zh' ? '功能开发中，敬请期待！' : language === 'my' ? 'လုပ်ဆောင်ချက်များဖွံ့ဖြိုးတိုးတက်နေဆဲ၊ စောင့်ဆိုင်းပါ!' : 'Feature under development, stay tuned!'
+                );
               }
             }}
           >
@@ -183,7 +211,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       {/* 退出登录按钮 */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>{language === 'zh' ? '退出登录' : 'Logout'}</Text>
+        <Text style={styles.logoutText}>{language === 'zh' ? '退出登录' : language === 'my' ? 'အကောင့်မှထွက်ရန်' : 'Logout'}</Text>
       </TouchableOpacity>
 
       {/* 版本信息 */}

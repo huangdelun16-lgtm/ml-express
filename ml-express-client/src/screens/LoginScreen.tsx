@@ -34,7 +34,6 @@ export default function LoginScreen({ navigation }: any) {
       email: '邮箱/手机号',
       password: '密码',
       loginButton: '登录',
-      guestMode: '访客模式',
       noAccount: '还没有账号？',
       register: '立即注册',
       emailPlaceholder: '请输入邮箱或手机号',
@@ -42,7 +41,6 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: '登录成功',
       loginFailed: '登录失败',
       fillAllFields: '请填写邮箱/手机号和密码',
-      guestModeDesc: '以访客身份浏览',
       loggingIn: '正在登录...',
       language: '语言',
       languageChinese: '中文',
@@ -56,7 +54,6 @@ export default function LoginScreen({ navigation }: any) {
       email: 'Email/Phone',
       password: 'Password',
       loginButton: 'Login',
-      guestMode: 'Guest Mode',
       noAccount: "Don't have an account?",
       register: 'Register Now',
       emailPlaceholder: 'Enter email or phone number',
@@ -64,7 +61,6 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: 'Login successful',
       loginFailed: 'Login failed',
       fillAllFields: 'Please fill email/phone and password',
-      guestModeDesc: 'Browse as guest',
       loggingIn: 'Logging in...',
       language: 'Language',
       languageChinese: '中文',
@@ -78,7 +74,6 @@ export default function LoginScreen({ navigation }: any) {
       email: 'အီးမေးလ်/ဖုန်း',
       password: 'စကားဝှက်',
       loginButton: 'ဝင်ရောက်',
-      guestMode: 'ဧည့်သည်မုဒ်',
       noAccount: 'အကောင့်မရှိသေးဘူးလား?',
       register: 'စာရင်းသွင်း',
       emailPlaceholder: 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ',
@@ -86,7 +81,6 @@ export default function LoginScreen({ navigation }: any) {
       loginSuccess: 'အောင်မြင်စွာဝင်ရောက်ပြီး',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
       fillAllFields: 'အီးမေးလ်/ဖုန်းနှင့်စကားဝှက်ဖြည့်ပါ',
-      guestModeDesc: 'ဧည့်သည်အနေဖြင့်ကြည့်ရှုရန်',
       loggingIn: 'ဝင်ရောက်နေသည်...',
       language: 'ဘာသာစကား',
       languageChinese: '中文',
@@ -130,25 +124,6 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert(currentT.loginFailed, error.message || currentT.loginFailed);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGuestMode = async () => {
-    try {
-      // 保存访客信息
-      const guestUser = {
-        id: 'guest',
-        name: '访客用户',
-        email: '',
-        phone: '',
-        user_type: 'guest',
-      };
-      await AsyncStorage.setItem('currentUser', JSON.stringify(guestUser));
-      await AsyncStorage.setItem('userId', 'guest');
-      await AsyncStorage.setItem('isGuest', 'true');
-      navigation.replace('Main');
-    } catch (error) {
-      console.error('访客模式错误:', error);
     }
   };
 
@@ -230,19 +205,6 @@ export default function LoginScreen({ navigation }: any) {
                   <Text style={styles.loginButtonText}>{currentT.loginButton}</Text>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Guest Mode Button */}
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={handleGuestMode}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.guestIcon}>👤</Text>
-              <View>
-                <Text style={styles.guestButtonText}>{currentT.guestMode}</Text>
-                <Text style={styles.guestButtonDesc}>{currentT.guestModeDesc}</Text>
-              </View>
             </TouchableOpacity>
 
             {/* Register Prompt */}
@@ -360,31 +322,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  guestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-  },
-  guestIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  guestButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  guestButtonDesc: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
   },
   registerPrompt: {
     flexDirection: 'row',

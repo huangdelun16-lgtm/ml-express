@@ -133,6 +133,22 @@ export default function ScanScreen({ navigation }: any) {
     );
   }
 
+  // 如果相机有错误，显示错误信息
+  if (cameraError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Text style={styles.permissionText}>❌</Text>
+          <Text style={styles.permissionTitle}>相机错误</Text>
+          <Text style={styles.permissionDesc}>{cameraError}</Text>
+          <TouchableOpacity style={styles.permissionButton} onPress={() => setCameraError(null)}>
+            <Text style={styles.permissionButtonText}>重试</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   const handleBarCodeScanned = async ({ data }: any) => {
     const currentTime = Date.now();
     
@@ -189,19 +205,11 @@ export default function ScanScreen({ navigation }: any) {
       const foundPackage = packages.find(p => p.id === packageId);
 
       if (foundPackage) {
-        // 检查包裹状态
-        if (foundPackage.status === '已取件') {
-          Alert.alert(
-            '包裹已取件',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-        } else if (foundPackage.status === '待取件') {
+        // 检查包裹状态 - 只有"待取件"状态的包裹才能扫码取件
+        if (foundPackage.status === '待取件') {
           Alert.alert(
             '确认取件',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n是否确认取件？`,
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n扫码确认取件，状态将更新为"已取件"`,
             [
               { text: '取消', onPress: resetScanState },
               {
@@ -212,10 +220,34 @@ export default function ScanScreen({ navigation }: any) {
               }
             ]
           );
+        } else if (foundPackage.status === '已取件') {
+          Alert.alert(
+            '包裹已取件',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n请点击"开始配送"按钮开始配送`,
+            [
+              { text: '确定', onPress: resetScanState }
+            ]
+          );
+        } else if (foundPackage.status === '配送中') {
+          Alert.alert(
+            '包裹配送中',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n包裹正在配送中，请继续配送流程`,
+            [
+              { text: '确定', onPress: resetScanState }
+            ]
+          );
+        } else if (foundPackage.status === '已送达') {
+          Alert.alert(
+            '包裹已送达',
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n包裹已完成配送`,
+            [
+              { text: '确定', onPress: resetScanState }
+            ]
+          );
         } else {
           Alert.alert(
             '包裹状态异常',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}`,
+            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n只有"待取件"状态的包裹才能扫码取件`,
             [
               { text: '确定', onPress: resetScanState }
             ]

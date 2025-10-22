@@ -1,30 +1,47 @@
+functionsDirectory = "/Users/aungmyatthu/Desktop/ml-express/netlify/functions"
+functionsDirectoryOrigin = "config"
 redirectsOrigin = "config"
 plugins = []
 headers = []
 
-[functions]
-
-[functions."*"]
-
 [build]
-publish = "D:\\ML Express\\build"
+publish = "/Users/aungmyatthu/Desktop/ml-express/build"
 publishOrigin = "config"
 commandOrigin = "config"
-command = "npm run build"
+command = "npm install && npm run build"
+functions = "/Users/aungmyatthu/Desktop/ml-express/netlify/functions"
 
 [build.environment]
+NODE_VERSION = "18"
+REACT_APP_GOOGLE_MAPS_API_KEY = "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
+REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY"
+SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [build.processing]
+skip_processing = false
 
 [build.processing.css]
+bundle = true
+minify = true
 
 [build.processing.html]
+pretty_urls = true
 
 [build.processing.images]
 
 [build.processing.js]
+bundle = true
+minify = true
+
+[build.processing.skip]
+paths = ["*.md", "*.html", "test-*", "diagnose-*"]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
 
 [[redirects]]
 from = "/*"

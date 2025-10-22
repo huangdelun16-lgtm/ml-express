@@ -5,7 +5,7 @@ import { packageService, testConnection, userService, systemSettingsService, sup
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 错误边界组件
@@ -76,8 +76,10 @@ const HomePage: React.FC = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
-  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);                                                       
   const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [senderAddressText, setSenderAddressText] = useState('');
+  const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
@@ -93,6 +95,9 @@ const HomePage: React.FC = () => {
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   const [paymentQRCode, setPaymentQRCode] = useState<string>('');
+  const [isCalculated, setIsCalculated] = useState(false);
+  const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
+  const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   // const [orderData, setOrderData] = useState<any>(null);
   
   // 用户认证相关状态
@@ -421,6 +426,8 @@ const HomePage: React.FC = () => {
         const { sendEmailVerificationCode } = await import('../services/emailService');
         const result = await sendEmailVerificationCode(registerForm.email, language as 'zh' | 'en' | 'my');
         
+        console.log('📧 邮箱服务返回结果:', result);
+        
         if (result.success) {
           setCodeSent(true);
           setCountdown(60); // 60秒倒计时
@@ -430,6 +437,7 @@ const HomePage: React.FC = () => {
           }
           alert(result.message);
         } else {
+          console.error('❌ 邮箱服务返回失败:', result);
           alert(result.message);
         }
         
@@ -474,6 +482,7 @@ const HomePage: React.FC = () => {
       }
     } catch (error) {
       console.error('发送验证码失败:', error);
+      console.error('错误详情:', JSON.stringify(error, null, 2));
       alert(language === 'zh' ? '发送失败，请重试' : 
             language === 'en' ? 'Failed to send, please try again' : 
             'ပို့ဆောင်မှု မအောင်မြင်ပါ');
@@ -772,9 +781,9 @@ const HomePage: React.FC = () => {
         secureReliable: '安全可靠',
         smartService: '智能服务',
         transparentPricing: '透明定价',
-        prepaidPickupFee: '预付取货费',
+        prepaidDeliveryFee: '预付配送费',
         scanQrPay: '请扫描二维码支付',
-        pickupFee: '取货费',
+        deliveryFee: '配送费',
         paymentQrCode: '支付二维码',
         confirmPayment: '支付完成',
         cancelPayment: '取消',
@@ -893,9 +902,9 @@ const HomePage: React.FC = () => {
         secureReliable: 'Secure & Reliable',
         smartService: 'Smart Service',
         transparentPricing: 'Transparent Pricing',
-        prepaidPickupFee: 'Prepaid Pickup Fee',
+        prepaidDeliveryFee: 'Prepaid Delivery Fee',
         scanQrPay: 'Please scan QR code to pay',
-        pickupFee: 'pickup fee',
+        deliveryFee: 'Delivery Fee',
         paymentQrCode: 'Payment QR Code',
         confirmPayment: 'Payment Complete',
         cancelPayment: 'Cancel',
@@ -1014,9 +1023,9 @@ const HomePage: React.FC = () => {
         secureReliable: 'လုံခြုံ ယုံကြည်စိတ်ချရသော',
         smartService: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
         transparentPricing: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
-        prepaidPickupFee: 'ကြိုတင်ပေးချေသော လာယူခြင်း ကုန်ကျစရိတ်',
+        prepaidDeliveryFee: 'ကြိုတင်ပေးချေသော ပို့ဆောင်ခြင်း ကုန်ကျစရိတ်',
         scanQrPay: 'QR Code ကို စကင်န်ဖတ်ပြီး ပေးချေပါ',
-        pickupFee: 'လာယူခြင်း ကုန်ကျစရိတ်',
+        deliveryFee: 'ပို့ဆောင်ခြင်း ကုန်ကျစရိတ်',
         paymentQrCode: 'ပေးချေမှု QR Code',
         confirmPayment: 'ပေးချေမှုကို အတည်ပြုပါ',
         cancelPayment: 'ပေးချေမှုကို ပယ်ဖျက်ပါ',
@@ -1203,6 +1212,83 @@ const HomePage: React.FC = () => {
     return Math.ceil(totalPrice / 100) * 100;
   };
 
+  // 重置表单和计算状态
+  const resetOrderForm = () => {
+    setIsCalculated(false);
+    setCalculatedPriceDetail(0);
+    setCalculatedDistanceDetail(0);
+    setSelectedSenderLocation(null);
+    setSelectedReceiverLocation(null);
+    setScheduledDeliveryTime('');
+    setSelectedDeliverySpeed('');
+  };
+
+  // 预估费用计算函数（类似客户端App）
+  const calculatePriceEstimate = async () => {
+    try {
+      // 获取表单数据
+      const form = document.querySelector('form') as HTMLFormElement;
+      if (!form) return;
+      
+      const formData = new FormData(form);
+      const orderInfo = {
+        senderName: formData.get('senderName') as string,
+        senderPhone: formData.get('senderPhone') as string,
+        senderAddress: formData.get('senderAddress') as string,
+        receiverName: formData.get('receiverName') as string,
+        receiverPhone: formData.get('receiverPhone') as string,
+        receiverAddress: formData.get('receiverAddress') as string,
+        packageType: formData.get('packageType') as string,
+        weight: formData.get('weight') as string,
+        deliverySpeed: formData.get('deliverySpeed') as string,
+        description: formData.get('description') as string
+      };
+
+      // 检查必填字段
+      if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
+        alert(language === 'zh' ? '请先填写寄件和收件地址' : 
+              language === 'en' ? 'Please fill in sender and receiver addresses first' : 
+              'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ဦးစွာ ဖြည့်စွက်ပါ');
+        return;
+      }
+
+      // 计算距离
+      const distance = await calculateDistance(
+        orderInfo.senderAddress,
+        orderInfo.receiverAddress
+      );
+      
+      // 按照要求：6.1km = 7km（向上取整）
+      const roundedDistance = Math.ceil(distance);
+      setCalculatedDistanceDetail(roundedDistance);
+
+      // 计算价格
+      const price = calculatePrice(
+        orderInfo.packageType,
+        orderInfo.weight,
+        orderInfo.deliverySpeed,
+        roundedDistance
+      );
+      
+      setCalculatedPriceDetail(price);
+      setIsCalculated(true);
+      
+      // 显示计算结果
+      alert(language === 'zh' ? 
+        `计算完成！\n配送距离: ${roundedDistance}km\n总费用: ${price} MMK` :
+        language === 'en' ? 
+        `Calculation Complete!\nDelivery Distance: ${roundedDistance}km\nTotal Cost: ${price} MMK` :
+        `တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ${roundedDistance}km\nစုစုပေါင်းကုန်ကျစရိတ်: ${price} MMK`
+      );
+      
+    } catch (error) {
+      console.error('计算费用失败:', error);
+      alert(language === 'zh' ? '计算失败，请重试' : 
+            language === 'en' ? 'Calculation failed, please try again' : 
+            'တွက်ချက်မှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ');
+    }
+  };
+
   // 生成收款二维码
   const generatePaymentQRCode = async (amount: number, orderId: string) => {
     try {
@@ -1234,13 +1320,20 @@ const HomePage: React.FC = () => {
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
+    
+    // 从地址文本中提取纯地址（移除坐标信息）
+    const extractAddress = (addressText: string) => {
+      const lines = addressText.split('\n');
+      return lines.filter(line => !line.includes('📍 坐标:')).join('\n').trim();
+    };
+    
     const orderInfo = {
       senderName: formData.get('senderName') as string,
       senderPhone: formData.get('senderPhone') as string,
-      senderAddress: formData.get('senderAddress') as string,
+      senderAddress: extractAddress(senderAddressText),
       receiverName: formData.get('receiverName') as string,
       receiverPhone: formData.get('receiverPhone') as string,
-      receiverAddress: formData.get('receiverAddress') as string,
+      receiverAddress: extractAddress(receiverAddressText),
       packageType: formData.get('packageType') as string,
       weight: formData.get('weight') as string,
       deliverySpeed: formData.get('deliverySpeed') as string,
@@ -1286,7 +1379,7 @@ const HomePage: React.FC = () => {
       
       // 3. 计算价格
       console.log('计算配送价格...');
-      const price = calculatePrice(
+      const price = isCalculated ? calculatedPriceDetail : calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
@@ -1999,6 +2092,7 @@ const HomePage: React.FC = () => {
                     name="senderAddress"
                     placeholder={t.order.senderAddress}
                     required
+                    value={senderAddressText}
                     style={{
                       width: '100%',
                       padding: '0.8rem',
@@ -2012,6 +2106,13 @@ const HomePage: React.FC = () => {
                     }}
                     onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                     onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // 如果用户手动编辑地址，移除坐标信息
+                      const lines = value.split('\n');
+                      const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
+                      setSenderAddressText(addressLines.join('\n'));
+                    }}
                   />
                   <button
                     type="button"
@@ -2086,6 +2187,7 @@ const HomePage: React.FC = () => {
                     name="receiverAddress"
                     placeholder={t.order.receiverAddress}
                     required
+                    value={receiverAddressText}
                     style={{
                       width: '100%',
                       padding: '0.8rem',
@@ -2099,6 +2201,13 @@ const HomePage: React.FC = () => {
                     }}
                     onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                     onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // 如果用户手动编辑地址，移除坐标信息
+                      const lines = value.split('\n');
+                      const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
+                      setReceiverAddressText(addressLines.join('\n'));
+                    }}
                   />
                   <button
                     type="button"
@@ -2265,6 +2374,103 @@ const HomePage: React.FC = () => {
                 </div>
               </div>
 
+              {/* 💰 价格估算部分 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}</span>
+                  <button
+                    type="button"
+                    onClick={calculatePriceEstimate}
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)';
+                    }}
+                  >
+                    🧮 {language === 'zh' ? '计算' : language === 'en' ? 'Calculate' : 'တွက်ချက်ရန်'}
+                  </button>
+                </h3>
+                
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  {!isCalculated ? (
+                    <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.8)' }}>
+                      <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                        📊 {language === 'zh' ? '点击"计算"按钮获取精准费用' : 
+                            language === 'en' ? 'Click "Calculate" button to get accurate pricing' : 
+                            'တိကျသော စျေးနှုန်းရရှိရန် "တွက်ချက်ရန်" ခလုတ်ကို နှိပ်ပါ'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+                        {language === 'zh' ? '需要先填写寄件和收件地址' : 
+                         language === 'en' ? 'Please fill in sender and receiver addresses first' : 
+                         'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ဦးစွာ ဖြည့်စွက်ပါ'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '配送距离' : language === 'en' ? 'Delivery Distance' : 'ပို့ဆောင်အကွာအဝေး'}:
+                        </span>
+                        <span style={{ color: '#10b981', fontWeight: '600' }}>
+                          {calculatedDistanceDetail} {language === 'zh' ? '公里' : language === 'en' ? 'km' : 'ကီလိုမီတာ'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '基础费用' : language === 'en' ? 'Base Fee' : 'အခြေခံအခကြေး'}:
+                        </span>
+                        <span style={{ color: '#3b82f6', fontWeight: '600' }}>
+                          {pricingSettings.baseFee} MMK
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '距离费用' : language === 'en' ? 'Distance Fee' : 'အကွာအဝေးအခ'}:
+                        </span>
+                        <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
+                          {Math.max(0, calculatedDistanceDetail - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee} MMK
+                        </span>
+                      </div>
+                      <div style={{ 
+                        borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
+                        paddingTop: '0.5rem', 
+                        marginTop: '0.5rem',
+                        display: 'flex', 
+                        justifyContent: 'space-between' 
+                      }}>
+                        <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          {language === 'zh' ? '总费用' : language === 'en' ? 'Total Cost' : 'စုစုပေါင်းကုန်ကျစရိတ်'}:
+                        </span>
+                        <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                          {calculatedPriceDetail} MMK
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div style={{ 
                 display: 'flex', 
                 gap: '1rem', 
@@ -2313,7 +2519,14 @@ const HomePage: React.FC = () => {
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.3)';
                   }}
                 >
-                  {t.order.submit}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <span>{t.order.submit}</span>
+                    {isCalculated && (
+                      <span style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.2rem' }}>
+                        {calculatedPriceDetail} MMK
+                      </span>
+                    )}
+                  </div>
                 </button>
               </div>
             </form>
@@ -2582,7 +2795,10 @@ const HomePage: React.FC = () => {
                 🎉 订单创建成功！
               </h2>
               <button
-                onClick={() => setShowOrderSuccessModal(false)}
+                onClick={() => {
+                  setShowOrderSuccessModal(false);
+                  resetOrderForm();
+                }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.1)',
                   border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -2764,7 +2980,10 @@ const HomePage: React.FC = () => {
                 )}
               </button>
               <button
-                onClick={() => setShowOrderSuccessModal(false)}
+                onClick={() => {
+                  setShowOrderSuccessModal(false);
+                  resetOrderForm();
+                }}
                 style={{
                   background: '#e2e8f0',
                   color: '#4a5568',
@@ -3249,37 +3468,32 @@ const HomePage: React.FC = () => {
                     // 获取完整地址（包含用户补充的详细信息）
                     const completeAddress = addressInput.value.trim();
                     
-                    // 将地址填入对应的表单字段
-                    const targetField = mapSelectionType === 'sender' ? 
-                      document.querySelector('textarea[name="senderAddress"]') as HTMLTextAreaElement :
-                      document.querySelector('textarea[name="receiverAddress"]') as HTMLTextAreaElement;
-                    
-                    if (targetField) {
-                      targetField.value = completeAddress;
-                      targetField.style.borderColor = '#38a169';
-                      targetField.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                    // 优先使用 selectedLocation (POI点击) 的坐标，其次使用 mapClickPosition (右键点击)
+                    const finalCoords = selectedLocation 
+                      ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
+                      : mapClickPosition;
 
-                      setTimeout(() => {
-                        targetField.style.borderColor = '#e2e8f0';
-                        targetField.style.boxShadow = 'none';
-                      }, 2000);
-
-                      // 优先使用 selectedLocation (POI点击) 的坐标，其次使用 mapClickPosition (右键点击)
-                      const finalCoords = selectedLocation 
-                        ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
-                        : mapClickPosition;
-
-                      if (finalCoords) {
-                        if (mapSelectionType === 'sender') {
-                          setSelectedSenderLocation(finalCoords);
-                          console.log('✅ 寄件地址坐标已保存:', finalCoords);
-                        } else if (mapSelectionType === 'receiver') {
-                          setSelectedReceiverLocation(finalCoords);
-                          console.log('✅ 收件地址坐标已保存:', finalCoords);
-                        }
-                      } else {
-                        console.warn('⚠️ 未能获取坐标信息');
+                    if (finalCoords) {
+                      // 将地址和坐标一起添加到输入框
+                      const addressWithCoords = `${completeAddress}\n📍 坐标: ${finalCoords.lat.toFixed(6)}, ${finalCoords.lng.toFixed(6)}`;
+                      
+                      if (mapSelectionType === 'sender') {
+                        setSenderAddressText(addressWithCoords);
+                        setSelectedSenderLocation(finalCoords);
+                        console.log('✅ 寄件地址坐标已保存:', finalCoords);
+                      } else if (mapSelectionType === 'receiver') {
+                        setReceiverAddressText(addressWithCoords);
+                        setSelectedReceiverLocation(finalCoords);
+                        console.log('✅ 收件地址坐标已保存:', finalCoords);
                       }
+                    } else {
+                      // 如果没有坐标，只添加地址
+                      if (mapSelectionType === 'sender') {
+                        setSenderAddressText(completeAddress);
+                      } else if (mapSelectionType === 'receiver') {
+                        setReceiverAddressText(completeAddress);
+                      }
+                      console.warn('⚠️ 未能获取坐标信息');
                     }
 
                     alert(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
