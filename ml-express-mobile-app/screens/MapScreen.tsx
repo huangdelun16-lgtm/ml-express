@@ -218,37 +218,26 @@ export default function MapScreen({ navigation }: any) {
         )
         .map(async pkg => {
           try {
-            const cached = coordinatesCache.current[pkg.id];
-            if (cached) {
-              return {
-                ...pkg,
-                coords: { ...cached },
-                resolvedAddress: cached.resolvedAddress || pkg.receiver_address,
-                locationSource: cached.source,
-              };
-            }
-
-            const resolved = await resolvePackageLocation(pkg);
-            if (resolved) {
-              coordinatesCache.current[pkg.id] = resolved;
-              return {
-                ...pkg,
-                coords: resolved,
-                resolvedAddress: resolved.resolvedAddress || pkg.receiver_address,
-                locationSource: resolved.source,
-              };
-            }
-
+            // 解析取货点坐标
+            const pickupCoords = await getPickupCoordinates(pkg);
+            // 解析送货点坐标
+            const deliveryCoords = await getDeliveryCoordinates(pkg);
+            
             return {
               ...pkg,
-              coords: undefined,
-              resolvedAddress: pkg.receiver_address,
-              locationSource: 'fallback' as const,
+              pickupCoords: pickupCoords || undefined,
+              deliveryCoords: deliveryCoords || undefined,
+              // 保持向后兼容
+              coords: deliveryCoords || undefined,
+              resolvedAddress: deliveryCoords?.resolvedAddress || pkg.receiver_address,
+              locationSource: deliveryCoords?.source || 'fallback',
             };
           } catch (error) {
             console.warn(`包裹 ${pkg.id} 解析失败:`, error);
             return {
               ...pkg,
+              pickupCoords: undefined,
+              deliveryCoords: undefined,
               coords: undefined,
               resolvedAddress: pkg.receiver_address,
               locationSource: 'fallback' as const,
