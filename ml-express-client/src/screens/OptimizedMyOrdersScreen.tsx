@@ -357,9 +357,12 @@ export default function OptimizedMyOrdersScreen({ navigation }: any) {
             {item.sender_address}
           </Text>
           {item.sender_latitude && item.sender_longitude && (
-            <Text style={styles.coordsText}>
-              ({item.sender_latitude.toFixed(6)}, {item.sender_longitude.toFixed(6)})
-            </Text>
+            <View style={styles.coordsContainer}>
+              <Text style={styles.coordsLabel}>经纬度：</Text>
+              <Text style={styles.coordsText}>
+                {item.sender_latitude.toFixed(6)}, {item.sender_longitude.toFixed(6)}
+              </Text>
+            </View>
           )}
         </View>
         <View style={styles.orderInfo}>
@@ -372,9 +375,12 @@ export default function OptimizedMyOrdersScreen({ navigation }: any) {
             {item.receiver_address}
           </Text>
           {item.receiver_latitude && item.receiver_longitude && (
-            <Text style={styles.coordsText}>
-              ({item.receiver_latitude.toFixed(6)}, {item.receiver_longitude.toFixed(6)})
-            </Text>
+            <View style={styles.coordsContainer}>
+              <Text style={styles.coordsLabel}>经纬度：</Text>
+              <Text style={styles.coordsText}>
+                {item.receiver_latitude.toFixed(6)}, {item.receiver_longitude.toFixed(6)}
+              </Text>
+            </View>
           )}
         </View>
         <View style={styles.orderInfo}>
@@ -641,16 +647,26 @@ const styles = StyleSheet.create({
     color: '#374151',
     flex: 1,
   },
-  coordsText: {
-    fontSize: 11,
-    color: '#059669',
-    fontWeight: '500',
+  coordsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
     backgroundColor: '#f0fdf4',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     alignSelf: 'flex-start',
+  },
+  coordsLabel: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  coordsText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
   },
   orderFooter: {
     flexDirection: 'row',

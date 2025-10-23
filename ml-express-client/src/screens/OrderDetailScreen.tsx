@@ -488,9 +488,12 @@ export default function OrderDetailScreen({ route, navigation }: any) {
             </View>
             <Text style={styles.addressText}>📍 {order.sender_address}</Text>
             {order.sender_latitude && order.sender_longitude && (
-              <Text style={styles.coordsText}>
-                ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
-              </Text>
+              <View style={styles.coordsContainer}>
+                <Text style={styles.coordsLabel}>经纬度：</Text>
+                <Text style={styles.coordsText}>
+                  {order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)}
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -511,9 +514,12 @@ export default function OrderDetailScreen({ route, navigation }: any) {
             </View>
             <Text style={styles.addressText}>📍 {order.receiver_address}</Text>
             {order.receiver_latitude && order.receiver_longitude && (
-              <Text style={styles.coordsText}>
-                ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
-              </Text>
+              <View style={styles.coordsContainer}>
+                <Text style={styles.coordsLabel}>经纬度：</Text>
+                <Text style={styles.coordsText}>
+                  {order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)}
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -949,16 +955,26 @@ const styles = StyleSheet.create({
     color: '#64748b',
     lineHeight: 20,
   },
-  coordsText: {
-    fontSize: 12,
-    color: '#059669',
-    fontWeight: '500',
+  coordsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 8,
     backgroundColor: '#f0fdf4',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     alignSelf: 'flex-start',
+  },
+  coordsLabel: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  coordsText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
   },
   priceRow: {
     flexDirection: 'row',

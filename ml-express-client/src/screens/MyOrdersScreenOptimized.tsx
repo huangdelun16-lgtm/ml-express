@@ -321,9 +321,12 @@ export default function MyOrdersScreen({ navigation }: any) {
             {order.sender_address}
           </Text>
           {order.sender_latitude && order.sender_longitude && (
-            <Text style={styles.coordsText}>
-              ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
-            </Text>
+            <View style={styles.coordsContainer}>
+              <Text style={styles.coordsLabel}>经纬度：</Text>
+              <Text style={styles.coordsText}>
+                {order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)}
+              </Text>
+            </View>
           )}
         </View>
         <View style={styles.orderInfo}>
@@ -336,9 +339,12 @@ export default function MyOrdersScreen({ navigation }: any) {
             {order.receiver_address}
           </Text>
           {order.receiver_latitude && order.receiver_longitude && (
-            <Text style={styles.coordsText}>
-              ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
-            </Text>
+            <View style={styles.coordsContainer}>
+              <Text style={styles.coordsLabel}>经纬度：</Text>
+              <Text style={styles.coordsText}>
+                {order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)}
+              </Text>
+            </View>
           )}
         </View>
         <View style={styles.orderInfo}>
@@ -600,16 +606,26 @@ const styles = StyleSheet.create({
     color: '#374151',
     flex: 1,
   },
-  coordsText: {
-    fontSize: 11,
-    color: '#059669',
-    fontWeight: '500',
+  coordsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
     backgroundColor: '#f0fdf4',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     alignSelf: 'flex-start',
+  },
+  coordsLabel: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  coordsText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
   },
   orderFooter: {
     flexDirection: 'row',

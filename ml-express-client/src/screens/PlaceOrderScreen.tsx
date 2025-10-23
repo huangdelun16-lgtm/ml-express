@@ -783,6 +783,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
               multiline
               numberOfLines={3}
             />
+            {senderCoordinates && (
+              <View style={styles.coordsContainer}>
+                <Text style={styles.coordsLabel}>经纬度：</Text>
+                <Text style={styles.coordsText}>
+                  {senderCoordinates.lat.toFixed(6)}, {senderCoordinates.lng.toFixed(6)}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -834,6 +842,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
               multiline
               numberOfLines={3}
             />
+            {receiverCoordinates && (
+              <View style={styles.coordsContainer}>
+                <Text style={styles.coordsLabel}>经纬度：</Text>
+                <Text style={styles.coordsText}>
+                  {receiverCoordinates.lat.toFixed(6)}, {receiverCoordinates.lng.toFixed(6)}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -1384,6 +1400,28 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  coordsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#059669',
+  },
+  coordsLabel: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  coordsText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
   },
   coordinateInfo: {
     marginTop: 8,
