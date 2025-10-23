@@ -24,9 +24,13 @@ interface Order {
   sender_name: string;
   sender_phone: string;
   sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
   package_type: string;
   weight: string;
   description?: string;
@@ -68,6 +72,7 @@ export default function MyOrdersScreen({ navigation }: any) {
       cancelled: '已取消',
       noOrders: '暂无订单',
       noOrdersDesc: '快来下单吧！',
+      sender: '寄件人',
       receiver: '收件人',
       status: '状态',
       price: '价格',
@@ -90,6 +95,7 @@ export default function MyOrdersScreen({ navigation }: any) {
       cancelled: 'Cancelled',
       noOrders: 'No Orders',
       noOrdersDesc: 'Place your first order now!',
+      sender: 'Sender',
       receiver: 'Receiver',
       status: 'Status',
       price: 'Price',
@@ -112,6 +118,7 @@ export default function MyOrdersScreen({ navigation }: any) {
       cancelled: 'ပယ်ဖျက်ပြီး',
       noOrders: 'အော်ဒါမရှိပါ',
       noOrdersDesc: 'အော်ဒါတင်ပါ!',
+      sender: 'ပို့သူ',
       receiver: 'လက်ခံသူ',
       status: 'အခြေအနေ',
       price: 'စျေးနှုန်း',
@@ -384,6 +391,27 @@ export default function MyOrdersScreen({ navigation }: any) {
                 </View>
               </View>
 
+              {/* 寄件人信息 */}
+              <View style={styles.orderInfo}>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>📤</Text>
+                  <Text style={styles.orderInfoLabel}>{t.sender}:</Text>
+                  <Text style={styles.orderInfoValue}>{order.sender_name}</Text>
+                  <Text style={styles.orderInfoPhone}>{order.sender_phone}</Text>
+                </View>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>📍</Text>
+                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
+                    {order.sender_address}
+                  </Text>
+                  {order.sender_latitude && order.sender_longitude && (
+                    <Text style={styles.orderInfoCoords}>
+                      ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
+                    </Text>
+                  )}
+                </View>
+              </View>
+
               {/* 收件人信息 */}
               <View style={styles.orderInfo}>
                 <View style={styles.orderInfoRow}>
@@ -397,6 +425,11 @@ export default function MyOrdersScreen({ navigation }: any) {
                   <Text style={styles.orderInfoAddress} numberOfLines={1}>
                     {order.receiver_address}
                   </Text>
+                  {order.receiver_latitude && order.receiver_longitude && (
+                    <Text style={styles.orderInfoCoords}>
+                      ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -646,6 +679,16 @@ const styles = StyleSheet.create({
     color: '#64748b',
     flex: 1,
     marginLeft: 4,
+  },
+  orderInfoCoords: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
+    marginLeft: 8,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   orderCourier: {
     flexDirection: 'row',
