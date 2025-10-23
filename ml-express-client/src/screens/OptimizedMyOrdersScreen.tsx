@@ -24,9 +24,13 @@ interface Order {
   sender_name: string;
   sender_phone: string;
   sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
   package_type: string;
   weight: string;
   description?: string;
@@ -344,17 +348,37 @@ export default function OptimizedMyOrdersScreen({ navigation }: any) {
       
       <View style={styles.orderBody}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderLabel}>收件人:</Text>
-          <Text style={styles.orderValue}>{item.receiver_name}</Text>
+          <Text style={styles.orderLabel}>📤 寄件人:</Text>
+          <Text style={styles.orderValue}>{item.sender_name} {item.sender_phone}</Text>
         </View>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderLabel}>地址:</Text>
+          <Text style={styles.orderLabel}>📍 寄件地址:</Text>
           <Text style={styles.orderValue} numberOfLines={2}>
-            📍 {item.receiver_address}
+            {item.sender_address}
           </Text>
+          {item.sender_latitude && item.sender_longitude && (
+            <Text style={styles.coordsText}>
+              ({item.sender_latitude.toFixed(6)}, {item.sender_longitude.toFixed(6)})
+            </Text>
+          )}
         </View>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderLabel}>包裹:</Text>
+          <Text style={styles.orderLabel}>👤 收件人:</Text>
+          <Text style={styles.orderValue}>{item.receiver_name} {item.receiver_phone}</Text>
+        </View>
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderLabel}>📍 收件地址:</Text>
+          <Text style={styles.orderValue} numberOfLines={2}>
+            {item.receiver_address}
+          </Text>
+          {item.receiver_latitude && item.receiver_longitude && (
+            <Text style={styles.coordsText}>
+              ({item.receiver_latitude.toFixed(6)}, {item.receiver_longitude.toFixed(6)})
+            </Text>
+          )}
+        </View>
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderLabel}>📦 包裹:</Text>
           <Text style={styles.orderValue}>{item.package_type} ({item.weight}kg)</Text>
         </View>
       </View>
@@ -616,6 +640,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     flex: 1,
+  },
+  coordsText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
+    marginTop: 2,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
   },
   orderFooter: {
     flexDirection: 'row',

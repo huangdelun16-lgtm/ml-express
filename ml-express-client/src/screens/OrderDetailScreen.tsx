@@ -27,9 +27,13 @@ interface Order {
   sender_name: string;
   sender_phone: string;
   sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
   package_type: string;
   weight: string;
   description?: string;
@@ -483,6 +487,11 @@ export default function OrderDetailScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </View>
             <Text style={styles.addressText}>📍 {order.sender_address}</Text>
+            {order.sender_latitude && order.sender_longitude && (
+              <Text style={styles.coordsText}>
+                ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
+              </Text>
+            )}
           </View>
         </View>
 
@@ -501,6 +510,11 @@ export default function OrderDetailScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </View>
             <Text style={styles.addressText}>📍 {order.receiver_address}</Text>
+            {order.receiver_latitude && order.receiver_longitude && (
+              <Text style={styles.coordsText}>
+                ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
+              </Text>
+            )}
           </View>
         </View>
 
@@ -934,6 +948,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     lineHeight: 20,
+  },
+  coordsText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+    marginTop: 8,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
   },
   priceRow: {
     flexDirection: 'row',
