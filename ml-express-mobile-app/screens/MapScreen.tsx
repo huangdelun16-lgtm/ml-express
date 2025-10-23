@@ -1563,6 +1563,19 @@ export default function MapScreen({ navigation }: any) {
             <Text style={styles.locationSourceTag}>
               {`📡 ${getLocationSourceLabel(item.locationSource || 'fallback')}`}
             </Text>
+            
+            {/* 分配状态显示 */}
+            <View style={styles.assignmentStatus}>
+              {item.courier && item.courier !== '未分配' ? (
+                <Text style={styles.assignedText}>
+                  ✅ {language === 'zh' ? '已分配给' : language === 'en' ? 'Assigned to' : 'ပေးအပ်ပြီး'}: {item.courier}
+                </Text>
+              ) : (
+                <Text style={styles.unassignedText}>
+                  ⏳ {language === 'zh' ? '待分配' : language === 'en' ? 'Pending Assignment' : 'ပေးအပ်ရန်စောင့်ဆိုင်း'}
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* 操作按钮区域 */}
@@ -3180,5 +3193,28 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
+  },
+  
+  // 分配状态样式
+  assignmentStatus: {
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  assignedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+    textAlign: 'center',
+  },
+  unassignedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#dc2626',
+    textAlign: 'center',
   },
 });
