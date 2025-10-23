@@ -894,7 +894,20 @@ const RealTimeTracking: React.FC = () => {
                         <strong>📥 收件人:</strong> {pkg.receiver_name} ({pkg.receiver_phone})
                       </p>
                       <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📍 地址:</strong> {pkg.receiver_address}
+                        <strong>📍 从:</strong> {pkg.sender_address}
+                        {pkg.sender_latitude && pkg.sender_longitude && (
+                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                            ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
+                          </span>
+                        )}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📍 到:</strong> {pkg.receiver_address}
+                        {pkg.receiver_latitude && pkg.receiver_longitude && (
+                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                            ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
+                          </span>
+                        )}
                       </p>
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>🚚 骑手:</strong> <span style={{ color: '#059669', fontWeight: 'bold' }}>{pkg.courier || '未分配'}</span>
