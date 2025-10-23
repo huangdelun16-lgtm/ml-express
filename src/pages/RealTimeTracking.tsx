@@ -703,16 +703,16 @@ const RealTimeTracking: React.FC = () => {
                 <div
                   key={pkg.id}
                   style={{
-                    background: pkg.courier && pkg.courier !== '未分配'
+                    background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                       ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
                       : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
                     padding: '1rem',
                     borderRadius: '10px',
                     marginBottom: '1rem',
-                    border: pkg.courier && pkg.courier !== '未分配'
+                    border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                       ? '2px solid #22c55e'
                       : '2px solid #bae6fd',
-                    opacity: pkg.courier && pkg.courier !== '未分配' ? 0.9 : 1
+                    opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1
                   }}
                 >
                   <div style={{ 
@@ -722,10 +722,10 @@ const RealTimeTracking: React.FC = () => {
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
                     <span style={{
-                      background: pkg.courier && pkg.courier !== '未分配'
+                      background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                         ? '#dcfce7'
                         : '#fef3c7',
-                      color: pkg.courier && pkg.courier !== '未分配'
+                      color: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                         ? '#166534'
                         : '#92400e',
                       padding: '0.2rem 0.6rem',
@@ -772,8 +772,8 @@ const RealTimeTracking: React.FC = () => {
                     gap: '0.5rem',
                     marginTop: '1rem'
                   }}>
-                    {/* 如果包裹已分配给骑手（有courier且不为'未分配'），显示状态信息而不是分配按钮 */}
-                    {pkg.courier && pkg.courier !== '未分配' ? (
+                    {/* 如果包裹已分配给骑手（有courier且不为'未分配'和'待分配'），显示状态信息而不是分配按钮 */}
+                    {pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? (
                       <div style={{
                         flex: 1,
                         background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
