@@ -36,9 +36,13 @@ export interface Package {
   sender_name: string;
   sender_phone: string;
   sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
   package_type: string;
   weight: string;
   description?: string;
@@ -433,9 +437,13 @@ export const packageService = {
         sender_name: packageData.sender_name,
         sender_phone: packageData.sender_phone,
         sender_address: packageData.sender_address,
+        sender_latitude: packageData.sender_latitude,
+        sender_longitude: packageData.sender_longitude,
         receiver_name: packageData.receiver_name,
         receiver_phone: packageData.receiver_phone,
         receiver_address: packageData.receiver_address,
+        receiver_latitude: packageData.receiver_latitude,
+        receiver_longitude: packageData.receiver_longitude,
         package_type: packageData.package_type,
         weight: packageData.weight,
         description: fullDescription, // 将客户ID包含在描述中
