@@ -1337,7 +1337,101 @@ coordsText: {
 
 ---
 
-*最后更新：2025年10月23日*
-*版本：3.2.0*
+## 🔧 最新功能更新 (2025年10月24日)
+
+### 📱 客户端App修复和优化
+
+#### ✅ 已修复的问题
+
+1. **🔍 追踪功能修复**
+   - **问题**: 追踪页面查询订单号时显示"未找到订单"
+   - **原因**: `trackOrder`方法尝试查询不存在的`sender_code`和`transfer_code`字段
+   - **解决**: 修改为只查询`id`字段，使用`eq('id', trackingCode.trim())`
+   - **测试**: 成功查询订单`MDY20251022211208`，返回完整订单信息
+
+2. **📋 订单号复制功能修复**
+   - **问题**: `@react-native-clipboard/clipboard`在Expo Go中不被支持
+   - **解决**: 替换为`expo-clipboard`，使用`Clipboard.setStringAsync()`方法
+   - **功能**: 在订单详情页面点击📋图标复制订单号到剪贴板
+
+3. **🔧 依赖冲突问题解决**
+   - **问题**: npm依赖版本冲突导致启动失败
+   - **解决**: 使用`--legacy-peer-deps`安装依赖
+   - **状态**: 客户端App现在可以正常启动
+
+4. **🔔 通知服务优化**
+   - **问题**: 通知服务在应用启动时导致错误
+   - **解决**: 暂时注释掉通知服务的初始化和导入
+   - **原因**: `expo-notifications`在Expo Go中功能受限
+
+#### 🎯 当前功能状态
+
+- ✅ **追踪页面**: 查询订单号正常工作
+- ✅ **订单详情**: 复制订单号功能正常
+- ✅ **依赖管理**: 版本冲突已解决
+- ✅ **应用启动**: 客户端App成功启动
+- ⚠️ **通知功能**: 暂时禁用（Expo Go限制）
+
+#### 🔧 技术实现细节
+
+**trackOrder方法优化**:
+```typescript
+// 修复前（有问题）
+.or(`id.eq.${trackingCode},sender_code.eq.${trackingCode},transfer_code.eq.${trackingCode}`)
+
+// 修复后（正常工作）
+.eq('id', trackingCode.trim())
+```
+
+**剪贴板功能实现**:
+```typescript
+// 使用expo-clipboard
+import * as Clipboard from 'expo-clipboard';
+
+const copyOrderNumber = async () => {
+  try {
+    await Clipboard.setStringAsync(order?.id || '');
+    showToast(t.copied, 'success');
+  } catch (error) {
+    console.error('复制订单号失败:', error);
+    showToast('复制失败', 'error');
+  }
+};
+```
+
+#### 📊 测试结果
+
+**追踪功能测试**:
+- 查询订单号: `MDY20251022211208`
+- 返回状态: 已送达
+- 寄件人: 黄德伦 (09259369349)
+- 收件人: hdl (0955546862)
+- 价格: 2950 MMK
+- 重量: 8 KG
+- 配送员: AUNG AUNG
+
+### 🚀 iOS Store上架准备
+
+#### 📋 上架前检查清单
+
+1. **✅ 应用功能完整性**
+   - 客户端App核心功能正常
+   - 追踪功能正常工作
+   - 订单管理功能完整
+
+2. **⚠️ 需要完善的功能**
+   - 通知服务需要开发构建版本
+   - 推送通知功能需要完整实现
+   - 应用图标和启动画面优化
+
+3. **🔧 技术准备**
+   - EAS Build配置已就绪
+   - 依赖管理已优化
+   - 代码质量良好
+
+---
+
+*最后更新：2025年10月24日*
+*版本：3.3.0*
 *状态：生产环境运行中*
-*新增功能：全系统经纬度显示优化 + 订单详情页面修复 + 统一坐标显示格式*
+*新增功能：追踪功能修复 + 订单号复制功能 + 依赖问题解决 + iOS上架准备*
