@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -256,6 +257,17 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     setToastVisible(true);
   };
 
+  // 复制订单号
+  const copyOrderNumber = async () => {
+    try {
+      await Clipboard.setString(order?.id || '');
+      showToast(t.copied, 'success');
+    } catch (error) {
+      console.error('复制订单号失败:', error);
+      showToast('复制失败', 'error');
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [orderId]);
@@ -436,7 +448,16 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         </TouchableOpacity>
         <View style={styles.statusInfo}>
           <Text style={styles.statusTitle}>{order.status}</Text>
-          <Text style={styles.statusSubtitle}>{t.orderNumber}: {order.id}</Text>
+          <View style={styles.orderNumberContainer}>
+            <Text style={styles.statusSubtitle}>{t.orderNumber}: {order.id}</Text>
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={copyOrderNumber}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.copyButtonText}>📋</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -876,9 +897,28 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 4,
   },
+  orderNumberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   statusSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
+    flex: 1,
+  },
+  copyButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  copyButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
   },
   scrollView: {
     flex: 1,
