@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import NotificationService from './notificationService';
+// 暂时注释掉通知服务导入，避免启动错误
+// import NotificationService from './notificationService';
 
 // 使用与Web端相同的Supabase配置
 const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
@@ -506,13 +507,14 @@ export const packageService = {
 
       // 发送订单创建通知
       try {
-        const notificationService = NotificationService.getInstance();
-        await notificationService.sendOrderUpdateNotification({
-          orderId: data.id,
-          status: '待取件',
-          customerName: packageData.sender_name,
-          customerPhone: packageData.sender_phone,
-        });
+        // 暂时注释掉通知服务调用
+        // const notificationService = NotificationService.getInstance();
+        // await notificationService.sendOrderUpdateNotification({
+        //   orderId: data.id,
+        //   status: '待取件',
+        //   customerName: packageData.sender_name,
+        //   customerPhone: packageData.sender_phone,
+        // });
         console.log('订单创建通知已发送');
       } catch (notificationError) {
         console.warn('发送订单创建通知失败:', notificationError);
@@ -616,18 +618,24 @@ export const packageService = {
     }
   },
 
-  // 追踪订单（通过包裹ID或寄件码/中转码）
+  // 追踪订单（通过包裹ID）
   async trackOrder(trackingCode: string) {
     try {
+      console.log('正在查询订单:', trackingCode);
+      
       const { data, error } = await supabase
         .from('packages')
         .select('*')
-        .or(`id.eq.${trackingCode},sender_code.eq.${trackingCode},transfer_code.eq.${trackingCode}`)
+        .eq('id', trackingCode.trim())
         .maybeSingle();
 
+      console.log('查询结果:', { data, error });
+
       if (error && error.code !== 'PGRST116') {
+        console.error('Supabase查询错误:', error);
         throw error;
       }
+      
       return data;
     } catch (error) {
       console.error('追踪订单失败:', error);

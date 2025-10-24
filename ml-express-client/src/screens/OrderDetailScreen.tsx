@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Clipboard from '@react-native-clipboard/clipboard';
+import * as Clipboard from 'expo-clipboard';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -260,7 +260,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   // 复制订单号
   const copyOrderNumber = async () => {
     try {
-      await Clipboard.setString(order?.id || '');
+      await Clipboard.setStringAsync(order?.id || '');
       showToast(t.copied, 'success');
     } catch (error) {
       console.error('复制订单号失败:', error);

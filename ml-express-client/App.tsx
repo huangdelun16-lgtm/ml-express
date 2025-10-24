@@ -8,7 +8,8 @@ import { AppProvider, useApp } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
-import NotificationService from './src/services/notificationService';
+// 暂时注释掉通知服务导入，避免启动错误
+// import NotificationService from './src/services/notificationService';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -145,15 +146,17 @@ export default function App() {
 
   useEffect(() => {
     checkLoginStatus();
-    initializeNotificationService();
+    // 暂时注释掉通知服务初始化，避免启动错误
+    // initializeNotificationService();
   }, []);
 
   // 初始化通知服务
   const initializeNotificationService = async () => {
     try {
-      const notificationService = NotificationService.getInstance();
-      await notificationService.loadSettings();
-      notificationService.setupNotificationHandlers();
+      // 暂时注释掉通知服务初始化
+      // const notificationService = NotificationService.getInstance();
+      // await notificationService.loadSettings();
+      // notificationService.setupNotificationHandlers();
       console.log('通知服务初始化成功');
     } catch (error) {
       console.error('通知服务初始化失败:', error);
