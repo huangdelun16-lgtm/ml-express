@@ -21,6 +21,8 @@ import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { packageService, systemSettingsService } from '../services/supabase';
+import { FadeInView, ScaleInView } from '../components/Animations';
+import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -163,6 +165,18 @@ export default function PlaceOrderScreen({ navigation }: any) {
         overweight: '超重件（5KG）以上',
         oversized: '超规件（45x60x15cm）以上',
       },
+      packageTypeInfo: {
+        title: '包裹类型说明',
+        sizeLimit: '尺寸限制',
+        weightLimit: '重量限制',
+        weightRequirement: '重量要求',
+        sizeRequirement: '尺寸要求',
+        description: '说明',
+        standardDescription: '适用于常规大小的包裹，如衣物、文件、小型物品等。',
+        overweightDescription: '适用于重量超过5公斤的包裹。重物品需要额外运费，请确保包装牢固。',
+        oversizedDescription: '适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。',
+        understood: '我知道了',
+      },
     },
     en: {
       title: 'Place Order',
@@ -232,6 +246,18 @@ export default function PlaceOrderScreen({ navigation }: any) {
         overweight: 'Overweight (over 5KG)',
         oversized: 'Oversized (over 45x60x15cm)',
       },
+      packageTypeInfo: {
+        title: 'Package Type Description',
+        sizeLimit: 'Size Limit',
+        weightLimit: 'Weight Limit',
+        weightRequirement: 'Weight Requirement',
+        sizeRequirement: 'Size Requirement',
+        description: 'Description',
+        standardDescription: 'Suitable for regular-sized packages such as clothing, documents, small items, etc.',
+        overweightDescription: 'Suitable for packages weighing over 5KG. Heavy items require additional shipping fees. Please ensure secure packaging.',
+        oversizedDescription: 'Suitable for large packages exceeding standard dimensions. Large items require additional shipping fees. Please contact in advance to confirm transportability.',
+        understood: 'I Understand',
+      },
     },
     my: {
       title: 'အမှာစာတင်',
@@ -290,16 +316,28 @@ export default function PlaceOrderScreen({ navigation }: any) {
       coordinates: 'ကိုဩဒိနိတ်',
       packageTypes: {
         document: 'စာရွက်စာတမ်း',
-        standard: 'စံပါဆယ်',
+        standard: 'ပုံမှန်ပါဆယ်',
         overweight: 'အလေးချိန်ပိုပါဆယ်',
         oversized: 'အရွယ်အစားကြီးပါဆယ်',
         fragile: 'ကျိုးပဲ့လွယ်သောပစ္စည်း',
         foodDrinks: 'အစားအသောက်',
       },
       packageTypeDetails: {
-        standard: 'စံပါဆယ် (45x60x15cm) နှင့် (5KG) အောက်',
+        standard: 'ပုံမှန်ပါဆယ် (45x60x15cm) နှင့် (5KG) အောက်',
         overweight: 'အလေးချိန်ပိုပါဆယ် (5KG အထက်)',
         oversized: 'အရွယ်အစားကြီးပါဆယ် (45x60x15cm အထက်)',
+      },
+      packageTypeInfo: {
+        title: 'ပါဆယ်အမျိုးအစားရှင်းလင်းချက်',
+        sizeLimit: 'အရွယ်အစားကန့်သတ်ချက်',
+        weightLimit: 'အလေးချိန်ကန့်သတ်ချက်',
+        weightRequirement: 'အလေးချိန်လိုအပ်ချက်',
+        sizeRequirement: 'အရွယ်အစားလိုအပ်ချက်',
+        description: 'ရှင်းလင်းချက်',
+        standardDescription: 'ပုံမှန်အရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ဥပမာ: အဝတ်အစား၊ စာရွက်စာတမ်း၊ သေးငယ်သောပစ္စည်းများ။',
+        overweightDescription: '၅ကီလိုဂရမ်ထက်ပိုလေးသောပါဆယ်များအတွက်သင့်လျော်သည်။ လေးသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ထုပ်ပိုးမှုခိုင်မာစွာပြုလုပ်ပါ။',
+        oversizedDescription: 'စံချိန်ထက်ကြီးသောအရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ကြီးမားသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ပို့ဆောင်နိုင်မနိုင်ကို ကြိုတင်ဆက်သွယ်ပါ။',
+        understood: 'နားလည်ပါပြီ',
       },
     },
   };
@@ -751,19 +789,23 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* 寄件人信息 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📦 {currentT.senderInfo}</Text>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
-              <Switch
-                value={useMyInfo}
-                onValueChange={setUseMyInfo}
-                trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-                thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
-              />
+        <FadeInView delay={100}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <PackageIcon size={20} color="#1e293b" />
+                <Text style={styles.sectionTitle}> {currentT.senderInfo}</Text>
+              </View>
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
+                <Switch
+                  value={useMyInfo}
+                  onValueChange={setUseMyInfo}
+                  trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+                  thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
+                />
+              </View>
             </View>
-          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{currentT.senderName} *</Text>
@@ -819,10 +861,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
             )}
           </View>
         </View>
+        </FadeInView>
 
         {/* 收件人信息 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📮 {currentT.receiverInfo}</Text>
+        <FadeInView delay={200}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleContainer}>
+              <LocationIcon size={20} color="#1e293b" />
+              <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
+            </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{currentT.receiverName} *</Text>
@@ -878,10 +925,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
             )}
           </View>
         </View>
+        </FadeInView>
 
         {/* 包裹信息 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📋 {currentT.packageInfo}</Text>
+        <FadeInView delay={300}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleContainer}>
+              <PackageIcon size={20} color="#1e293b" />
+              <Text style={styles.sectionTitle}> {currentT.packageInfo}</Text>
+            </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{currentT.packageType} *</Text>
@@ -932,10 +984,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
             />
           </View>
         </View>
+        </FadeInView>
 
         {/* 配送选项 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🚚 {currentT.deliveryOptions}</Text>
+        <FadeInView delay={400}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleContainer}>
+              <DeliveryIcon size={20} color="#1e293b" />
+              <Text style={styles.sectionTitle}> {currentT.deliveryOptions}</Text>
+            </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>{currentT.deliverySpeed} *</Text>
@@ -980,11 +1037,16 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
           )}
         </View>
+        </FadeInView>
 
         {/* 价格估算 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>💰 {currentT.priceEstimate}</Text>
+        <ScaleInView delay={500}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <MoneyIcon size={20} color="#1e293b" />
+              <Text style={styles.sectionTitle}> {currentT.priceEstimate}</Text>
+            </View>
             <TouchableOpacity
               style={styles.calculateButton}
               onPress={calculatePrice}
@@ -1074,25 +1136,28 @@ export default function PlaceOrderScreen({ navigation }: any) {
             )}
           </View>
         </View>
+        </ScaleInView>
 
         {/* 提交按钮 */}
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleSubmitOrder}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={['#3b82f6', '#2563eb']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.submitGradient}
+        <ScaleInView delay={600}>
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmitOrder}
+            activeOpacity={0.8}
           >
-            <Text style={styles.submitText}>{currentT.submitOrder}</Text>
-            <Text style={styles.submitPrice}>
-              {isCalculated ? calculatedPrice : '0'} MMK
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.submitGradient}
+            >
+              <Text style={styles.submitText}>{currentT.submitOrder}</Text>
+              <Text style={styles.submitPrice}>
+                {isCalculated ? calculatedPrice : '0'} MMK
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </ScaleInView>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -1162,7 +1227,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           <View style={styles.infoModalContent}>
             <View style={styles.infoModalCard}>
               <View style={styles.infoModalHeader}>
-                <Text style={styles.infoModalTitle}>📦 包裹类型说明</Text>
+                <Text style={styles.infoModalTitle}>📦 {currentT.packageTypeInfo.title}</Text>
                 <TouchableOpacity onPress={() => setShowPackageTypeInfo(false)}>
                   <Text style={styles.infoModalClose}>✕</Text>
                 </TouchableOpacity>
@@ -1172,17 +1237,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' && (
                   <>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>📏 尺寸限制：</Text>
+                      <Text style={styles.infoLabel}>📏 {currentT.packageTypeInfo.sizeLimit}：</Text>
                       <Text style={styles.infoValue}>45 × 60 × 15 cm 以内</Text>
                     </View>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>⚖️ 重量限制：</Text>
+                      <Text style={styles.infoLabel}>⚖️ {currentT.packageTypeInfo.weightLimit}：</Text>
                       <Text style={styles.infoValue}>5 KG 以内</Text>
                     </View>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
                       <Text style={styles.infoDescription}>
-                        适用于常规大小的包裹，如衣物、文件、小型物品等。
+                        {currentT.packageTypeInfo.standardDescription}
                       </Text>
                     </View>
                   </>
@@ -1191,13 +1256,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 {selectedPackageTypeInfo === '超重件（5KG）以上' && (
                   <>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>⚖️ 重量要求：</Text>
+                      <Text style={styles.infoLabel}>⚖️ {currentT.packageTypeInfo.weightRequirement}：</Text>
                       <Text style={styles.infoValue}>5 KG 以上</Text>
                     </View>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
                       <Text style={styles.infoDescription}>
-                        适用于重量超过5公斤的包裹。重物品需要额外运费，请确保包装牢固。
+                        {currentT.packageTypeInfo.overweightDescription}
                       </Text>
                     </View>
                   </>
@@ -1206,13 +1271,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 {selectedPackageTypeInfo === '超规件（45x60x15cm）以上' && (
                   <>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>📏 尺寸要求：</Text>
+                      <Text style={styles.infoLabel}>📏 {currentT.packageTypeInfo.sizeRequirement}：</Text>
                       <Text style={styles.infoValue}>45 × 60 × 15 cm 以上</Text>
                     </View>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 说明：</Text>
+                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
                       <Text style={styles.infoDescription}>
-                        适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。
+                        {currentT.packageTypeInfo.oversizedDescription}
                       </Text>
                     </View>
                   </>
@@ -1230,7 +1295,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
                   end={{ x: 1, y: 0 }}
                   style={styles.infoModalButtonGradient}
                 >
-                  <Text style={styles.infoModalButtonText}>我知道了</Text>
+                  <Text style={styles.infoModalButtonText}>{currentT.packageTypeInfo.understood}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1340,14 +1405,14 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     marginTop: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1384,11 +1449,15 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 16,
   },
   switchContainer: {
     flexDirection: 'row',

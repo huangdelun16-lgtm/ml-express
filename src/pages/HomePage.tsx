@@ -2452,6 +2452,65 @@ const HomePage: React.FC = () => {
                           {Math.max(0, calculatedDistanceDetail - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee} MMK
                         </span>
                       </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '重量费用' : language === 'en' ? 'Weight Fee' : 'အလေးချိန်အခ'}:
+                        </span>
+                        <span style={{ color: '#ef4444', fontWeight: '600' }}>
+                          {(() => {
+                            const form = document.querySelector('form') as HTMLFormElement;
+                            if (!form) return 0;
+                            const formData = new FormData(form);
+                            const weight = formData.get('weight') as string;
+                            const weightNum = parseFloat(weight) || 1;
+                            const weightThreshold = 5;
+                            const weightFee = weightNum > weightThreshold ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
+                            return weightFee;
+                          })()} MMK
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '包裹类型费用' : language === 'en' ? 'Package Type Fee' : 'ပစ္စည်းအမျိုးအစားအခ'}:
+                        </span>
+                        <span style={{ color: '#f97316', fontWeight: '600' }}>
+                          {(() => {
+                            const form = document.querySelector('form') as HTMLFormElement;
+                            if (!form) return 0;
+                            const formData = new FormData(form);
+                            const packageType = formData.get('packageType') as string;
+                            let packageTypeFee = 0;
+                            if (packageType === t.ui.oversizedPackage || packageType === '超规件') {
+                              packageTypeFee = calculatedDistanceDetail * pricingSettings.oversizeSurcharge;
+                            } else if (packageType === t.ui.fragile || packageType === '易碎品') {
+                              packageTypeFee = pricingSettings.fragileSurcharge;
+                            } else if (packageType === t.ui.foodDrinks || packageType === '食品和饮料') {
+                              packageTypeFee = calculatedDistanceDetail * pricingSettings.foodBeverageSurcharge;
+                            }
+                            return packageTypeFee;
+                          })()} MMK
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '配送速度费用' : language === 'en' ? 'Delivery Speed Fee' : 'ပို့ဆောင်မြန်နှုန်းအခ'}:
+                        </span>
+                        <span style={{ color: '#06b6d4', fontWeight: '600' }}>
+                          {(() => {
+                            const form = document.querySelector('form') as HTMLFormElement;
+                            if (!form) return 0;
+                            const formData = new FormData(form);
+                            const deliverySpeed = formData.get('deliverySpeed') as string;
+                            let speedFee = 0;
+                            if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '加急配送') {
+                              speedFee = pricingSettings.urgentSurcharge;
+                            } else if (deliverySpeed === t.ui.onTimeDelivery || deliverySpeed === '准时达') {
+                              speedFee = pricingSettings.scheduledSurcharge;
+                            }
+                            return speedFee;
+                          })()} MMK
+                        </span>
+                      </div>
                       <div style={{ 
                         borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
                         paddingTop: '0.5rem', 
