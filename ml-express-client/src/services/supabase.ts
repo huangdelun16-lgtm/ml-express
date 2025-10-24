@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import NotificationService from './notificationService';
 
 // 使用与Web端相同的Supabase配置
 const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
@@ -501,6 +502,20 @@ export const packageService = {
           console.warn('更新用户统计失败（不影响订单创建）:', updateError);
           // 不抛出错误，因为订单已经创建成功
         }
+      }
+
+      // 发送订单创建通知
+      try {
+        const notificationService = NotificationService.getInstance();
+        await notificationService.sendOrderUpdateNotification({
+          orderId: data.id,
+          status: '待取件',
+          customerName: packageData.sender_name,
+          customerPhone: packageData.sender_phone,
+        });
+        console.log('订单创建通知已发送');
+      } catch (notificationError) {
+        console.warn('发送订单创建通知失败:', notificationError);
       }
 
       return { success: true, data };

@@ -8,6 +8,7 @@ import { AppProvider, useApp } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
+import NotificationService from './src/services/notificationService';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -19,6 +20,7 @@ import TrackOrderScreen from './src/screens/TrackOrderScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import NotificationWorkflowScreen from './src/screens/NotificationWorkflowScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -143,7 +145,20 @@ export default function App() {
 
   useEffect(() => {
     checkLoginStatus();
+    initializeNotificationService();
   }, []);
+
+  // 初始化通知服务
+  const initializeNotificationService = async () => {
+    try {
+      const notificationService = NotificationService.getInstance();
+      await notificationService.loadSettings();
+      notificationService.setupNotificationHandlers();
+      console.log('通知服务初始化成功');
+    } catch (error) {
+      console.error('通知服务初始化失败:', error);
+    }
+  };
 
   const checkLoginStatus = async () => {
     try {
@@ -207,6 +222,13 @@ export default function App() {
             <Stack.Screen 
               name="NotificationSettings" 
               component={NotificationSettingsScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="NotificationWorkflow" 
+              component={NotificationWorkflowScreen}
               options={{
                 animation: 'slide_from_right',
               }}

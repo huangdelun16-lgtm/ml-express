@@ -352,6 +352,9 @@ export default function ProfileScreen({ navigation }: any) {
       case 'help':
         showToast(t.comingSoon, 'info');
         break;
+      case 'notificationTest':
+        navigation.navigate('NotificationWorkflow');
+        break;
       default:
         break;
     }
@@ -476,6 +479,7 @@ export default function ProfileScreen({ navigation }: any) {
           { label: t.addressManagement, icon: '📍', action: 'address', color: '#f59e0b' },
           { label: t.myCoupons, icon: '🎟️', action: 'coupons', color: '#ec4899' },
           { label: t.helpCenter, icon: '❓', action: 'help', color: '#10b981' },
+          { label: '通知测试', icon: '🔔', action: 'notificationTest', color: '#8b5cf6' },
         ].map((action, index) => (
           <TouchableOpacity
             key={index}
