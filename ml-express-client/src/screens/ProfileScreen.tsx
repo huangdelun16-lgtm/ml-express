@@ -48,6 +48,17 @@ export default function ProfileScreen({ navigation }: any) {
     address: '',
   });
 
+  // 通知设置状态
+  const [notificationSettings, setNotificationSettings] = useState({
+    orderUpdates: true,        // 订单状态更新通知
+    deliveryReminders: true,   // 配送提醒通知
+    promotionalMessages: false, // 促销消息通知
+    systemAnnouncements: true, // 系统公告通知
+    pushNotifications: true,   // 推送通知总开关
+    emailNotifications: false, // 邮件通知
+    smsNotifications: false,   // 短信通知
+  });
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
@@ -88,6 +99,19 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: '资料更新失败',
       pleaseLogin: '请先登录',
       comingSoon: '功能开发中，敬请期待',
+      // 通知设置相关翻译
+      notificationSettings: '通知设置',
+      orderUpdates: '订单状态更新',
+      deliveryReminders: '配送提醒',
+      promotionalMessages: '促销消息',
+      systemAnnouncements: '系统公告',
+      pushNotifications: '推送通知',
+      emailNotifications: '邮件通知',
+      smsNotifications: '短信通知',
+      notificationDesc: '管理您希望接收的通知类型',
+      saveSettings: '保存设置',
+      settingsSaved: '设置已保存',
+      settingsSaveFailed: '设置保存失败',
     },
     en: {
       title: 'Profile',
@@ -121,6 +145,19 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: 'Failed to update profile',
       pleaseLogin: 'Please login first',
       comingSoon: 'Coming Soon',
+      // Notification settings translations
+      notificationSettings: 'Notification Settings',
+      orderUpdates: 'Order Updates',
+      deliveryReminders: 'Delivery Reminders',
+      promotionalMessages: 'Promotional Messages',
+      systemAnnouncements: 'System Announcements',
+      pushNotifications: 'Push Notifications',
+      emailNotifications: 'Email Notifications',
+      smsNotifications: 'SMS Notifications',
+      notificationDesc: 'Manage the types of notifications you want to receive',
+      saveSettings: 'Save Settings',
+      settingsSaved: 'Settings saved',
+      settingsSaveFailed: 'Failed to save settings',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -154,6 +191,19 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: 'အချက်အလက်ပြင်ဆင်မှုမအောင်မြင်ပါ',
       pleaseLogin: 'ကျေးဇူးပြု၍အရင်လော့ဂ်အင်ဝင်ပါ',
       comingSoon: 'မကြာမီလာမည်',
+      // အသိပေးချက်ဆက်တင်များ
+      notificationSettings: 'အသိပေးချက်ဆက်တင်များ',
+      orderUpdates: 'အော်ဒါအခြေအနေအသိပေးချက်',
+      deliveryReminders: 'ပို့ဆောင်မှုသတိပေးချက်',
+      promotionalMessages: 'ကြော်ငြာမက်ဆေ့ဂျ်',
+      systemAnnouncements: 'စနစ်ကြေညာချက်',
+      pushNotifications: 'Push အသိပေးချက်',
+      emailNotifications: 'အီးမေးလ်အသိပေးချက်',
+      smsNotifications: 'SMS အသိပေးချက်',
+      notificationDesc: 'သင်လက်ခံလိုသောအသိပေးချက်အမျိုးအစားများကိုစီမံခန့်ခွဲပါ',
+      saveSettings: 'ဆက်တင်များသိမ်းရန်',
+      settingsSaved: 'ဆက်တင်များသိမ်းပြီးပါပြီ',
+      settingsSaveFailed: 'ဆက်တင်များသိမ်းမှုမအောင်မြင်ပါ',
     },
   };
 
@@ -161,6 +211,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   useEffect(() => {
     loadUserData();
+    loadNotificationSettings();
   }, []);
 
   const loadUserData = async () => {
@@ -311,6 +362,48 @@ export default function ProfileScreen({ navigation }: any) {
     showToast(`${translations[lang].language}: ${lang === 'zh' ? '中文' : lang === 'en' ? 'English' : 'မြန်မာ'}`, 'success');
   };
 
+  // 加载通知设置
+  const loadNotificationSettings = async () => {
+    try {
+      const settings = await AsyncStorage.getItem('notificationSettings');
+      if (settings) {
+        setNotificationSettings(JSON.parse(settings));
+      }
+    } catch (error) {
+      console.error('加载通知设置失败:', error);
+    }
+  };
+
+  // 保存通知设置
+  const saveNotificationSettings = async (newSettings: typeof notificationSettings) => {
+    try {
+      await AsyncStorage.setItem('notificationSettings', JSON.stringify(newSettings));
+      setNotificationSettings(newSettings);
+      showToast(t.settingsSaved, 'success');
+    } catch (error) {
+      console.error('保存通知设置失败:', error);
+      showToast(t.settingsSaveFailed, 'error');
+    }
+  };
+
+  // 处理通知设置变更
+  const handleNotificationSettingChange = (key: keyof typeof notificationSettings, value: boolean) => {
+    const newSettings = { ...notificationSettings, [key]: value };
+    saveNotificationSettings(newSettings);
+  };
+
+  // 打开通知设置页面
+  const openNotificationSettings = () => {
+    if (isGuest) {
+      showToast(t.pleaseLogin, 'warning');
+      return;
+    }
+    navigation.navigate('NotificationSettings', {
+      settings: notificationSettings,
+      onSave: saveNotificationSettings,
+    });
+  };
+
   const renderUserCard = () => (
     <LinearGradient
       colors={['#2E86AB', '#1c6a8f', '#4CA1CF']}
@@ -435,13 +528,23 @@ export default function ProfileScreen({ navigation }: any) {
 
         <TouchableOpacity 
           style={styles.settingItem}
-          onPress={() => showToast(t.comingSoon, 'info')}
+          onPress={openNotificationSettings}
         >
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>🔔</Text>
             <Text style={styles.settingLabel}>{t.notifications}</Text>
           </View>
-          <Text style={styles.settingArrow}>›</Text>
+          <View style={styles.settingRight}>
+            <View style={[
+              styles.notificationToggle,
+              { backgroundColor: notificationSettings.pushNotifications ? '#10b981' : '#d1d5db' }
+            ]}>
+              <Text style={styles.notificationToggleText}>
+                {notificationSettings.pushNotifications ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -763,6 +866,23 @@ const styles = StyleSheet.create({
   settingArrow: {
     fontSize: 24,
     color: '#9ca3af',
+  },
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notificationToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  notificationToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   languageButtons: {
     flexDirection: 'row',

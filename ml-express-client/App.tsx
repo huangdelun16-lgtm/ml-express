@@ -18,6 +18,7 @@ import MyOrdersScreen from './src/screens/MyOrdersScreen';
 import TrackOrderScreen from './src/screens/TrackOrderScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
+import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -199,6 +200,13 @@ export default function App() {
             <Stack.Screen 
               name="OrderDetail" 
               component={OrderDetailScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="NotificationSettings" 
+              component={NotificationSettingsScreen}
               options={{
                 animation: 'slide_from_right',
               }}
