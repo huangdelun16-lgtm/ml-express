@@ -370,7 +370,33 @@ export default function PlaceOrderScreen({ navigation }: any) {
   }, [useMyInfo]);
 
   // 计算价格
-  // 使用当前位置
+  // 使用当前位置（在地图Modal中）
+  const useCurrentLocationInMap = async () => {
+    try {
+      showLoading('获取位置中...');
+      
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        hideLoading();
+        Alert.alert('提示', '需要位置权限才能使用此功能');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setSelectedLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      
+      hideLoading();
+    } catch (error) {
+      hideLoading();
+      console.error('获取位置失败:', error);
+      Alert.alert('错误', '获取位置失败');
+    }
+  };
+
+  // 使用当前位置（在表单中）
   const useCurrentLocation = async () => {
     try {
       showLoading('获取位置中...');
@@ -765,8 +791,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>{currentT.senderAddress} *</Text>
-              <TouchableOpacity onPress={useCurrentLocation}>
-                <Text style={styles.linkButton}>📍 {currentT.useCurrentLocation}</Text>
+              <TouchableOpacity onPress={() => openMapSelector('sender')}>
+                <Text style={styles.linkButton}>🗺️ {currentT.openMap}</Text>
               </TouchableOpacity>
             </View>
             <TextInput
@@ -1085,9 +1111,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
             <Text style={styles.mapTitle}>
               {mapType === 'sender' ? currentT.senderAddress : currentT.receiverAddress}
             </Text>
-            <TouchableOpacity onPress={confirmMapLocation}>
-              <Text style={styles.mapConfirmButton}>✓</Text>
-            </TouchableOpacity>
+            <View style={styles.mapHeaderButtons}>
+              <TouchableOpacity onPress={useCurrentLocationInMap} style={styles.mapCurrentLocationButton}>
+                <Text style={styles.mapCurrentLocationText}>📍 {currentT.useCurrentLocation}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmMapLocation}>
+                <Text style={styles.mapConfirmButton}>✓</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <MapView
@@ -1601,6 +1632,24 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     flex: 1,
     textAlign: 'center',
+  },
+  mapHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mapCurrentLocationButton: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+  },
+  mapCurrentLocationText: {
+    fontSize: 14,
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   mapConfirmButton: {
     fontSize: 28,
