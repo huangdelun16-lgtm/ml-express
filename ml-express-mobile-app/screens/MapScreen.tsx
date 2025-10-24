@@ -1355,12 +1355,23 @@ export default function MapScreen({ navigation }: any) {
       const origin = `${location.latitude},${location.longitude}`;
       
       if (optimizedPackagesWithCoords.length === 1) {
-        // 单个包裹导航
+        // 单个包裹导航 - 优先使用取货点坐标
         const pkg = optimizedPackagesWithCoords[0];
-        const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
-        const destination = coords
-          ? `${coords.lat},${coords.lng}`
-          : encodeURIComponent(pkg.receiver_address);
+        let destination: string;
+        
+        // 优先使用pickupCoords（取货点）
+        if (pkg.pickupCoords) {
+          destination = `${pkg.pickupCoords.lat},${pkg.pickupCoords.lng}`;
+        } else if (pkg.deliveryCoords) {
+          // 如果没有取货点坐标，使用送货点坐标
+          destination = `${pkg.deliveryCoords.lat},${pkg.deliveryCoords.lng}`;
+        } else {
+          // 最后使用备用方法
+          const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
+          destination = coords
+            ? `${coords.lat},${coords.lng}`
+            : encodeURIComponent(pkg.receiver_address);
+        }
         
         // 尝试多种URL方案，确保iOS和Android都能正常工作
         const urls = [
@@ -1385,12 +1396,23 @@ export default function MapScreen({ navigation }: any) {
           await Linking.openURL(appleMapsUrl);
         }
       } else {
-        // 多个包裹导航 - 使用坐标而不是地址
+        // 多个包裹导航 - 使用完整的取货点和送货点坐标
         const allCoords: string[] = [];
         for (const pkg of optimizedPackagesWithCoords) {
-          const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
-          if (coords) {
-            allCoords.push(`${coords.lat},${coords.lng}`);
+          // 优先使用pickupCoords和deliveryCoords（更准确）
+          if (pkg.pickupCoords) {
+            allCoords.push(`${pkg.pickupCoords.lat},${pkg.pickupCoords.lng}`);
+          }
+          if (pkg.deliveryCoords) {
+            allCoords.push(`${pkg.deliveryCoords.lat},${pkg.deliveryCoords.lng}`);
+          }
+          
+          // 如果没有pickupCoords/deliveryCoords，则使用备用方法
+          if (!pkg.pickupCoords && !pkg.deliveryCoords) {
+            const coords = pkg.coords || (await getCoordinatesForPackage(pkg));
+            if (coords) {
+              allCoords.push(`${coords.lat},${coords.lng}`);
+            }
           }
         }
         
