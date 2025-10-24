@@ -1836,6 +1836,15 @@ export default function MapScreen({ navigation }: any) {
               {/* 取货点标记（P-1, P-2, P-3...） */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.pickupCoords) return null;
+                
+                // 计算包裹编号：基于创建时间排序，确保编号稳定（与包裹列表一致）
+                const sortedPackages = [...packages].sort((a, b) => {
+                  const timeA = new Date(a.created_at || a.create_time || 0).getTime();
+                  const timeB = new Date(b.created_at || b.create_time || 0).getTime();
+                  return timeA - timeB;
+                });
+                const packageNumber = sortedPackages.findIndex(p => p.id === pkg.id) + 1;
+                
                 return (
                   <Marker
                     key={`pickup-${pkg.id}`}
@@ -1843,11 +1852,11 @@ export default function MapScreen({ navigation }: any) {
                       latitude: pkg.pickupCoords.lat,
                       longitude: pkg.pickupCoords.lng,
                     }}
-                    title={`P-${index + 1}. 取货点: ${pkg.sender_name}`}
+                    title={`P-${packageNumber}. 取货点: ${pkg.sender_name}`}
                     description={pkg.sender_address}
                   >
                     <View style={styles.pickupMarker}>
-                      <Text style={styles.pickupMarkerText}>P-{index + 1}</Text>
+                      <Text style={styles.pickupMarkerText}>P-{packageNumber}</Text>
                     </View>
                   </Marker>
                 );
@@ -1856,6 +1865,15 @@ export default function MapScreen({ navigation }: any) {
               {/* 送货点标记（D-1A, D-2A, D-3A...） */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.deliveryCoords) return null;
+                
+                // 计算包裹编号：基于创建时间排序，确保编号稳定（与包裹列表一致）
+                const sortedPackages = [...packages].sort((a, b) => {
+                  const timeA = new Date(a.created_at || a.create_time || 0).getTime();
+                  const timeB = new Date(b.created_at || b.create_time || 0).getTime();
+                  return timeA - timeB;
+                });
+                const packageNumber = sortedPackages.findIndex(p => p.id === pkg.id) + 1;
+                
                 return (
                   <Marker
                     key={`delivery-${pkg.id}`}
@@ -1863,11 +1881,11 @@ export default function MapScreen({ navigation }: any) {
                       latitude: pkg.deliveryCoords.lat,
                       longitude: pkg.deliveryCoords.lng,
                     }}
-                    title={`D-${index + 1}A. 送货点: ${pkg.receiver_name}`}
+                    title={`D-${packageNumber}A. 送货点: ${pkg.receiver_name}`}
                     description={pkg.receiver_address}
                   >
                     <View style={styles.packageMarker}>
-                      <Text style={styles.packageMarkerNumber}>D-{index + 1}A</Text>
+                      <Text style={styles.packageMarkerNumber}>D-{packageNumber}A</Text>
                     </View>
                   </Marker>
                 );
