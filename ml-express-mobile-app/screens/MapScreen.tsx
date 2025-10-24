@@ -1833,9 +1833,12 @@ export default function MapScreen({ navigation }: any) {
                 </View>
               </Marker>
 
-              {/* 取货点标记（P-1, P-2, P-3...） */}
+              {/* 取货点标记（P-1, P-2, P-3...） - 只显示待取件的包裹 */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.pickupCoords) return null;
+                
+                // 只显示待取件状态的包裹取货点
+                if (pkg.status !== '待取件') return null;
                 
                 // 计算包裹编号：基于创建时间排序，确保编号稳定（与包裹列表一致）
                 const sortedPackages = [...packages].sort((a, b) => {
@@ -1862,9 +1865,12 @@ export default function MapScreen({ navigation }: any) {
                 );
               })}
 
-              {/* 送货点标记（D-1A, D-2A, D-3A...） */}
+              {/* 送货点标记（D-1A, D-2A, D-3A...） - 只显示已取件和配送中的包裹 */}
               {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                 if (!pkg.deliveryCoords) return null;
+                
+                // 只显示已取件和配送中状态的包裹送货点
+                if (!['已取件', '配送中'].includes(pkg.status)) return null;
                 
                 // 计算包裹编号：基于创建时间排序，确保编号稳定（与包裹列表一致）
                 const sortedPackages = [...packages].sort((a, b) => {
@@ -1894,25 +1900,37 @@ export default function MapScreen({ navigation }: any) {
               {/* 完整配送路线连线 */}
               {location && optimizedPackagesWithCoords.length > 0 && (
                 <>
-                  {/* 从当前位置到第一个取货点的路线（绿色） */}
-                  {optimizedPackagesWithCoords[0]?.pickupCoords && (
-                    <Polyline
-                      coordinates={[
-                        { latitude: location.latitude, longitude: location.longitude },
-                        { 
-                          latitude: optimizedPackagesWithCoords[0].pickupCoords.lat, 
-                          longitude: optimizedPackagesWithCoords[0].pickupCoords.lng 
-                        }
-                      ]}
-                      strokeColor="#10b981"
-                      strokeWidth={4}
-                      lineDashPattern={[8, 4]}
-                    />
-                  )}
+                  {/* 从当前位置到第一个待取件包裹的取货点路线（绿色） */}
+                  {(() => {
+                    const firstPendingPickup = optimizedPackagesWithCoords.find(pkg => 
+                      pkg.status === '待取件' && pkg.pickupCoords
+                    );
+                    if (firstPendingPickup?.pickupCoords) {
+                      return (
+                        <Polyline
+                          coordinates={[
+                            { latitude: location.latitude, longitude: location.longitude },
+                            { 
+                              latitude: firstPendingPickup.pickupCoords.lat, 
+                              longitude: firstPendingPickup.pickupCoords.lng 
+                            }
+                          ]}
+                          strokeColor="#10b981"
+                          strokeWidth={4}
+                          lineDashPattern={[8, 4]}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
                   
-                  {/* 取货点到送货点的路线（橙色） */}
+                  {/* 取货点到送货点的路线（橙色） - 只连接已取件和配送中的包裹 */}
                   {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
                     if (!pkg.pickupCoords || !pkg.deliveryCoords) return null;
+                    
+                    // 只连接已取件和配送中状态的包裹
+                    if (!['已取件', '配送中'].includes(pkg.status)) return null;
+                    
                     return (
                       <Polyline
                         key={`pickup-delivery-${pkg.id}`}
@@ -1933,30 +1951,39 @@ export default function MapScreen({ navigation }: any) {
                     );
                   })}
                   
-                  {/* 送货点到下一个取货点的路线（蓝色） */}
+                  {/* 送货点到下一个待取件包裹的取货点路线（蓝色） */}
                   {optimizedPackagesWithCoords.map((pkg: any, index: number) => {
-                    if (index === optimizedPackagesWithCoords.length - 1) return null;
-                    const nextPkg = optimizedPackagesWithCoords[index + 1];
-                    if (!pkg.deliveryCoords || !nextPkg.pickupCoords) return null;
+                    // 只处理已取件和配送中状态的包裹
+                    if (!['已取件', '配送中'].includes(pkg.status) || !pkg.deliveryCoords) return null;
                     
-                    return (
-                      <Polyline
-                        key={`delivery-pickup-${pkg.id}`}
-                        coordinates={[
-                          { 
-                            latitude: pkg.deliveryCoords.lat, 
-                            longitude: pkg.deliveryCoords.lng 
-                          },
-                          { 
-                            latitude: nextPkg.pickupCoords.lat, 
-                            longitude: nextPkg.pickupCoords.lng 
-                          }
-                        ]}
-                        strokeColor="#3b82f6"
-                        strokeWidth={2}
-                        lineDashPattern={[4, 2]}
-                      />
+                    // 找到下一个待取件的包裹
+                    const nextPendingPickup = optimizedPackagesWithCoords.find((nextPkg, nextIndex) => 
+                      nextIndex > index && 
+                      nextPkg.status === '待取件' && 
+                      nextPkg.pickupCoords
                     );
+                    
+                    if (nextPendingPickup?.pickupCoords) {
+                      return (
+                        <Polyline
+                          key={`delivery-pickup-${pkg.id}`}
+                          coordinates={[
+                            { 
+                              latitude: pkg.deliveryCoords.lat, 
+                              longitude: pkg.deliveryCoords.lng 
+                            },
+                            { 
+                              latitude: nextPendingPickup.pickupCoords.lat, 
+                              longitude: nextPendingPickup.pickupCoords.lng 
+                            }
+                          ]}
+                          strokeColor="#3b82f6"
+                          strokeWidth={2}
+                          lineDashPattern={[4, 2]}
+                        />
+                      );
+                    }
+                    return null;
                   })}
                 </>
               )}
