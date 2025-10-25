@@ -1034,31 +1034,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
         </FadeInView>
 
-        {/* 配送选项 */}
-        <FadeInView delay={400}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleContainer}>
-              <DeliveryIcon size={20} color="#1e293b" />
-              <Text style={styles.sectionTitle}> {currentT.deliveryOptions}</Text>
-            </View>
-
-          {deliverySpeed === '定时达' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{currentT.scheduledTime} *</Text>
-              <TextInput
-                style={styles.input}
-                value={scheduledTime}
-                onChangeText={setScheduledTime}
-                placeholder={currentT.placeholders.scheduledTime}
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-          )}
-        </View>
-        </FadeInView>
-
         {/* 价格估算 */}
-        <ScaleInView delay={500}>
+        <ScaleInView delay={400}>
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
@@ -1157,7 +1134,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         </ScaleInView>
 
         {/* 提交按钮 */}
-        <ScaleInView delay={600}>
+        <ScaleInView delay={500}>
           <TouchableOpacity
             style={styles.submitButton}
             onPress={handleSubmitOrder}
