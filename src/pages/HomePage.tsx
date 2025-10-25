@@ -92,6 +92,7 @@ const HomePage: React.FC = () => {
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
+  const [showWeightInput, setShowWeightInput] = useState<boolean>(false);
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   const [paymentQRCode, setPaymentQRCode] = useState<string>('');
@@ -2244,10 +2245,17 @@ const HomePage: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '2rem' }}>
-                <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.package}</h3>
+                {/* 包裹类型部分 */}
+                <h3 style={{ color: 'white', marginBottom: '1rem' }}>包裹类型</h3>
                 <select
                   name="packageType"
                   required
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 根据包裹类型决定是否显示重量输入框
+                    const showWeight = value === t.ui.overweightPackage || value === t.ui.oversizedPackage;
+                    setShowWeightInput(showWeight);
+                  }}
                   style={{
                     width: '100%',
                     padding: '0.8rem',
@@ -2278,12 +2286,36 @@ const HomePage: React.FC = () => {
                   }}
                 >
                   <option value={t.ui.standardPackage}>{t.ui.standardPackage}</option>
-                  <option value={t.ui.overweightPackage}>{t.ui.overweightPackage}</option>
-                  <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
                   <option value={t.ui.document}>{t.ui.document}</option>
                   <option value={t.ui.fragile}>{t.ui.fragile}</option>
                   <option value={t.ui.foodDrinks}>{t.ui.foodDrinks}</option>
+                  <option value={t.ui.overweightPackage}>{t.ui.overweightPackage}</option>
+                  <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
                 </select>
+
+                {/* 重量输入框 - 只在选择超重件或超规件时显示 */}
+                {showWeightInput && (
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <input
+                      type="text"
+                      name="weight"
+                      placeholder={t.order.packageWeight}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.8rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        transition: 'border-color 0.3s ease'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    />
+                  </div>
+                )}
+
+                {/* 速度部分 */}
+                <h3 style={{ color: 'white', marginBottom: '1rem' }}>速度</h3>
                 <select
                   name="deliverySpeed"
                   required
@@ -2348,21 +2380,7 @@ const HomePage: React.FC = () => {
                     <span style={{ fontWeight: '500' }}>{t.ui.selectedTime}: {scheduledDeliveryTime}</span>
                   </div>
                 )}
-                <input
-                  type="text"
-                  name="weight"
-                  placeholder={t.order.packageWeight}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    transition: 'border-color 0.3s ease'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-                />
+                
                 <div style={{
                   fontSize: '0.8rem',
                   color: '#e74c3c',
