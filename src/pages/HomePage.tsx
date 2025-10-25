@@ -3637,81 +3637,217 @@ const HomePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(5px)',
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 3000
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '20px',
-            width: window.innerWidth < 768 ? '90%' : '400px',
+            width: window.innerWidth < 768 ? '90%' : '450px',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
+            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(15px)'
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🕐</div>
-              <h2 style={{ color: 'white', margin: 0 }}>
+            {/* 头部 */}
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ 
+                fontSize: '3.5rem', 
+                marginBottom: '0.5rem',
+                filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3))'
+              }}>🕐</div>
+              <h2 style={{ 
+                color: 'white', 
+                margin: 0, 
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+              }}>
                 {t.ui.selectDeliveryTime}
               </h2>
+              <p style={{ 
+                color: 'rgba(255, 255, 255, 0.8)', 
+                margin: '0.5rem 0 0 0',
+                fontSize: '0.9rem'
+              }}>
+                选择您希望的配送时间
+              </p>
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
+            {/* 快速选择时间 */}
+            <div style={{ marginBottom: '2rem' }}>
               <label style={{ 
                 color: 'white', 
                 display: 'block', 
-                marginBottom: '0.5rem',
-                fontWeight: 'bold'
+                marginBottom: '1rem',
+                fontWeight: 'bold',
+                fontSize: '1rem'
               }}>
-                {t.ui.selectDate}
+                ⚡ 快速选择
               </label>
-              <input
-                type="date"
-                id="delivery-date"
-                min={new Date().toISOString().split('T')[0]}
-                style={{
-                  width: '100%',
-                  padding: '0.8rem',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '10px',
-                  fontSize: '1rem',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  color: '#2c5282',
-                  fontWeight: '500'
-                }}
-              />
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, 1fr)', 
+                gap: '0.8rem',
+                marginBottom: '1rem'
+              }}>
+                {[
+                  { label: '今天下午', value: 'today-afternoon' },
+                  { label: '明天上午', value: 'tomorrow-morning' },
+                  { label: '明天下午', value: 'tomorrow-afternoon' },
+                  { label: '后天上午', value: 'day-after-morning' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      const now = new Date();
+                      let targetDate = new Date();
+                      let targetTime = '';
+
+                      switch (option.value) {
+                        case 'today-afternoon':
+                          targetTime = '14:00';
+                          break;
+                        case 'tomorrow-morning':
+                          targetDate.setDate(now.getDate() + 1);
+                          targetTime = '09:00';
+                          break;
+                        case 'tomorrow-afternoon':
+                          targetDate.setDate(now.getDate() + 1);
+                          targetTime = '14:00';
+                          break;
+                        case 'day-after-morning':
+                          targetDate.setDate(now.getDate() + 2);
+                          targetTime = '09:00';
+                          break;
+                      }
+
+                      const dateInput = document.getElementById('delivery-date') as HTMLInputElement;
+                      const timeInput = document.getElementById('delivery-time') as HTMLInputElement;
+                      
+                      if (dateInput && timeInput) {
+                        dateInput.value = targetDate.toISOString().split('T')[0];
+                        timeInput.value = targetTime;
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      fontSize: '0.9rem',
+                      transition: 'all 0.3s ease',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
+            {/* 自定义日期时间选择 */}
+            <div style={{ marginBottom: '2rem' }}>
               <label style={{ 
                 color: 'white', 
                 display: 'block', 
-                marginBottom: '0.5rem',
-                fontWeight: 'bold'
+                marginBottom: '1rem',
+                fontWeight: 'bold',
+                fontSize: '1rem'
               }}>
-                {t.ui.selectTime}
+                📅 自定义时间
               </label>
-              <input
-                type="time"
-                id="delivery-time"
-                style={{
-                  width: '100%',
-                  padding: '0.8rem',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '10px',
-                  fontSize: '1rem',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  color: '#2c5282',
-                  fontWeight: '500'
-                }}
-              />
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  {t.ui.selectDate}
+                </label>
+                <input
+                  type="date"
+                  id="delivery-date"
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                    e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.3)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontSize: '0.9rem'
+                }}>
+                  {t.ui.selectTime}
+                </label>
+                <input
+                  type="time"
+                  id="delivery-time"
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#2c5282',
+                    fontWeight: '500',
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                    e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.3)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
             </div>
 
+            {/* 按钮组 */}
             <div style={{ 
               display: 'flex', 
               gap: '1rem',
@@ -3734,18 +3870,25 @@ const HomePage: React.FC = () => {
                   background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '0.8rem 1.5rem',
-                  borderRadius: '10px',
+                  padding: '1rem 2rem',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   fontWeight: 'bold',
                   fontSize: '1rem',
                   transition: 'all 0.3s ease',
-                  flex: 1
+                  flex: 1,
+                  boxShadow: '0 4px 15px rgba(56, 161, 105, 0.3)'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(56, 161, 105, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(56, 161, 105, 0.3)';
+                }}
               >
-                {t.ui.confirmTime}
+                ✅ {t.ui.confirmTime}
               </button>
               
               <button
@@ -3754,25 +3897,28 @@ const HomePage: React.FC = () => {
                   setSelectedDeliverySpeed('');
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.15)',
                   color: 'white',
-                  border: '2px solid white',
-                  padding: '0.8rem 1.5rem',
-                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  padding: '1rem 2rem',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   fontWeight: 'bold',
                   fontSize: '1rem',
                   transition: 'all 0.3s ease',
-                  flex: 1
+                  flex: 1,
+                  backdropFilter: 'blur(10px)'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                {t.ui.cancel}
+                ❌ {t.ui.cancel}
               </button>
             </div>
           </div>
