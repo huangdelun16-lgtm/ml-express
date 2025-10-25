@@ -128,7 +128,7 @@ const settingDefinitions: SettingDefinition[] = [
     category: 'pricing',
     type: 'number',
     defaultValue: 400,
-    suffix: 'MMK'
+    suffix: 'MMK/公里'
   },
   {
     key: 'pricing.food_beverage_surcharge',
