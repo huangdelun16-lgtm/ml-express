@@ -79,6 +79,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
   
+  // 时间选择器
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
   const [qrOrderId, setQrOrderId] = useState('');
@@ -998,7 +1003,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
                     styles.radioOption,
                     deliverySpeed === speed.value && styles.radioOptionActive
                   ]}
-                  onPress={() => setDeliverySpeed(speed.value)}
+                  onPress={() => {
+                    setDeliverySpeed(speed.value);
+                    if (speed.value === '定时达') {
+                      setShowTimePicker(true);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={styles.radio}>
@@ -1296,6 +1306,143 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* 时间选择器模态框 */}
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContent}>
+            <LinearGradient
+              colors={['#b0d3e8', '#7895a3']}
+              style={styles.timePickerHeader}
+            >
+              <View style={styles.timePickerHeaderContent}>
+                <Text style={styles.timePickerTitle}>🕐 选择配送时间</Text>
+                <Text style={styles.timePickerSubtitle}>请选择您希望的配送时间</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowTimePicker(false)}
+                style={styles.timePickerCloseButton}
+              >
+                <Text style={styles.timePickerCloseText}>✕</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={styles.timePickerBody}>
+              {/* 快速选择时间 */}
+              <View style={styles.quickSelectSection}>
+                <Text style={styles.quickSelectTitle}>⚡ 快速选择</Text>
+                <View style={styles.quickSelectGrid}>
+                  {[
+                    { label: '今天下午', value: 'today-afternoon' },
+                    { label: '明天上午', value: 'tomorrow-morning' },
+                    { label: '明天下午', value: 'tomorrow-afternoon' },
+                    { label: '后天上午', value: 'day-after-morning' }
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => {
+                        const now = new Date();
+                        let targetDate = new Date();
+                        let targetTime = '';
+
+                        switch (option.value) {
+                          case 'today-afternoon':
+                            targetTime = '14:00';
+                            break;
+                          case 'tomorrow-morning':
+                            targetDate.setDate(now.getDate() + 1);
+                            targetTime = '09:00';
+                            break;
+                          case 'tomorrow-afternoon':
+                            targetDate.setDate(now.getDate() + 1);
+                            targetTime = '14:00';
+                            break;
+                          case 'day-after-morning':
+                            targetDate.setDate(now.getDate() + 2);
+                            targetTime = '09:00';
+                            break;
+                        }
+
+                        setSelectedDate(targetDate.toISOString().split('T')[0]);
+                        setSelectedTime(targetTime);
+                      }}
+                      style={styles.quickSelectButton}
+                    >
+                      <Text style={styles.quickSelectButtonText}>{option.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* 自定义时间选择 */}
+              <View style={styles.customTimeSection}>
+                <Text style={styles.customTimeTitle}>📅 自定义时间</Text>
+                
+                <View style={styles.dateTimeRow}>
+                  <View style={styles.dateTimeInput}>
+                    <Text style={styles.dateTimeLabel}>日期</Text>
+                    <TextInput
+                      style={styles.dateTimeTextInput}
+                      value={selectedDate}
+                      onChangeText={setSelectedDate}
+                      placeholder="选择日期"
+                      placeholderTextColor="#9ca3af"
+                    />
+                  </View>
+                  
+                  <View style={styles.dateTimeInput}>
+                    <Text style={styles.dateTimeLabel}>时间</Text>
+                    <TextInput
+                      style={styles.dateTimeTextInput}
+                      value={selectedTime}
+                      onChangeText={setSelectedTime}
+                      placeholder="选择时间"
+                      placeholderTextColor="#9ca3af"
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity
+                style={styles.timePickerCancelButton}
+                onPress={() => {
+                  setShowTimePicker(false);
+                  setDeliverySpeed('准时达');
+                }}
+              >
+                <Text style={styles.timePickerCancelText}>❌ 取消</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.timePickerConfirmButton}
+                onPress={() => {
+                  if (selectedDate && selectedTime) {
+                    const formattedDateTime = `${selectedDate} ${selectedTime}`;
+                    setScheduledTime(formattedDateTime);
+                    setShowTimePicker(false);
+                  } else {
+                    Alert.alert('提示', '请选择日期和时间');
+                  }
+                }}
+              >
+                <LinearGradient
+                  colors={['#38a169', '#48bb78']}
+                  style={styles.timePickerConfirmGradient}
+                >
+                  <Text style={styles.timePickerConfirmText}>✅ 确认时间</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* QR码模态框 */}
@@ -1910,6 +2057,158 @@ const styles = StyleSheet.create({
   },
   qrButtonText: {
     fontSize: 15,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  // 时间选择器样式
+  timePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  timePickerContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 400,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  timePickerHeader: {
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timePickerHeaderContent: {
+    flex: 1,
+  },
+  timePickerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  timePickerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  timePickerCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timePickerCloseText: {
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  timePickerBody: {
+    padding: 24,
+  },
+  quickSelectSection: {
+    marginBottom: 24,
+  },
+  quickSelectTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  quickSelectGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickSelectButton: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  quickSelectButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  customTimeSection: {
+    marginBottom: 24,
+  },
+  customTimeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateTimeInput: {
+    flex: 1,
+  },
+  dateTimeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 8,
+  },
+  dateTimeTextInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  timePickerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 24,
+    paddingTop: 0,
+  },
+  timePickerCancelButton: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  timePickerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  timePickerConfirmButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  timePickerConfirmGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  timePickerConfirmText: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
   },
