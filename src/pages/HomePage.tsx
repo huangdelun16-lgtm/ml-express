@@ -81,6 +81,7 @@ const HomePage: React.FC = () => {
   const [senderAddressText, setSenderAddressText] = useState('');
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
+  const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
   const [generatedOrderId, setGeneratedOrderId] = useState('');
@@ -3268,7 +3269,7 @@ const HomePage: React.FC = () => {
                             // 获取POI的详细信息
                             const service = new window.google.maps.places.PlacesService(map);
                             service.getDetails(
-                              { placeId: e.placeId, fields: ['name', 'formatted_address', 'geometry'] },
+                              { placeId: e.placeId, fields: ['name', 'formatted_address', 'geometry', 'types'] },
                               (place: any, status: any) => {
                                 if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
                                   const lat = place.geometry.location.lat();
@@ -3276,7 +3277,7 @@ const HomePage: React.FC = () => {
                                   const address = place.formatted_address || place.name;
                                   
                                   // 设置地图点击位置
-                  setMapClickPosition({ lat, lng });
+                                  setMapClickPosition({ lat, lng });
                                   setMapCenter({ lat, lng });
                                   
                                   // 自动填充到地址输入框
@@ -3289,6 +3290,12 @@ const HomePage: React.FC = () => {
                                   
                                   // 更新选中位置
                                   setSelectedLocation({ lat, lng, address });
+                                  
+                                  // 设置选中的POI信息
+                                  setSelectedPOI({ name: place.name, types: place.types || [] });
+                                  
+                                  // 显示选中POI的提示
+                                  console.log('✅ 已选择POI:', place.name, '类型:', place.types);
                                 }
                               }
                             );
@@ -3509,7 +3516,7 @@ const HomePage: React.FC = () => {
             {/* 地址输入框 */}
             <div style={{ marginBottom: '2rem' }}>
               <div style={{ marginBottom: '0.5rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                {t.order.mapTip}
+                📍 点击地图、右键选择位置或点击店铺图标选择位置
               </div>
               <input
                 type="text"
@@ -3529,6 +3536,33 @@ const HomePage: React.FC = () => {
                 onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)'}
                 onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
               />
+              
+              {/* 选中POI信息显示 */}
+              {selectedPOI && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  background: 'rgba(56, 161, 105, 0.1)',
+                  border: '1px solid rgba(56, 161, 105, 0.3)',
+                  borderRadius: '8px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <div style={{ 
+                    color: 'rgba(255, 255, 255, 0.9)', 
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    marginBottom: '0.5rem'
+                  }}>
+                    ✅ 已选择: {selectedPOI.name}
+                  </div>
+                  <div style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.8rem'
+                  }}>
+                    类型: {selectedPOI.types.slice(0, 3).join(', ')}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 按钮组 */}
@@ -3578,6 +3612,7 @@ const HomePage: React.FC = () => {
 
                     setMapClickPosition(null);
                     setSelectedLocation(null);
+                    setSelectedPOI(null);
                     setShowMapModal(false);
                     setMapSelectionType(null);
                   } else {
