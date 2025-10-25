@@ -85,7 +85,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [selectedTime, setSelectedTime] = useState('');
   
   // 地图POI相关
-  const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
   
   // QR码模态框
@@ -444,54 +443,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
-  // 获取附近的POI（兴趣点）
-  const fetchNearbyPlaces = async (latitude: number, longitude: number) => {
-    try {
-      // 这里可以使用Google Places API来获取附近的POI
-      // 为了演示，我们创建一些模拟的POI数据
-      const mockPlaces = [
-        {
-          id: '1',
-          name: 'Our Hour',
-          type: 'coffee',
-          coordinate: { latitude: latitude + 0.001, longitude: longitude + 0.001 },
-          address: 'Khattar St, Yangon'
-        },
-        {
-          id: '2',
-          name: 'Blace Coffee',
-          type: 'coffee',
-          coordinate: { latitude: latitude - 0.001, longitude: longitude - 0.001 },
-          address: 'Khattar St, Yangon'
-        },
-        {
-          id: '3',
-          name: 'Eternal 美容院',
-          type: 'beauty',
-          coordinate: { latitude: latitude + 0.002, longitude: longitude - 0.001 },
-          address: 'Khattar St, Yangon'
-        },
-        {
-          id: '4',
-          name: 'Happy GPS',
-          type: 'service',
-          coordinate: { latitude: latitude - 0.001, longitude: longitude + 0.002 },
-          address: 'Khattar St, Yangon'
-        }
-      ];
-      
-      setNearbyPlaces(mockPlaces);
-    } catch (error) {
-      console.error('获取附近POI失败:', error);
-    }
-  };
-
-  // 选择POI
-  const selectPlace = (place: any) => {
-    setSelectedPlace(place);
-    setSelectedLocation(place.coordinate);
-  };
-
   // 使用当前位置（在表单中）
   const useCurrentLocation = async () => {
     try {
@@ -551,9 +502,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
       setSelectedLocation(currentLocation);
       setMapType(type);
       setShowMapModal(true);
-      
-      // 获取附近的POI
-      await fetchNearbyPlaces(currentLocation.latitude, currentLocation.longitude);
     } catch (error) {
       console.error('打开地图失败:', error);
       Alert.alert('错误', '打开地图失败');
@@ -1260,6 +1208,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
               setSelectedLocation(e.nativeEvent.coordinate);
               setSelectedPlace(null); // 清除POI选择
             }}
+            onPoiClick={(e) => {
+              // 点击POI时自动选择该位置
+              setSelectedLocation(e.nativeEvent.coordinate);
+              setSelectedPlace({
+                name: e.nativeEvent.name || '选中位置',
+                address: e.nativeEvent.name || '未知地址'
+              });
+            }}
           >
             {/* 主标记 - 用户选择的位置 */}
             <Marker
@@ -1272,25 +1228,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
               title="选择的位置"
               description="拖动或点击地图调整位置"
             />
-            
-            {/* POI标记 - 附近的店铺 */}
-            {nearbyPlaces.map((place) => (
-              <Marker
-                key={place.id}
-                coordinate={place.coordinate}
-                onPress={() => selectPlace(place)}
-                title={place.name}
-                description={place.address}
-              >
-                <View style={styles.poiMarker}>
-                  <Text style={styles.poiMarkerText}>
-                    {place.type === 'coffee' ? '☕' : 
-                     place.type === 'beauty' ? '💄' : 
-                     place.type === 'service' ? '🔧' : '📍'}
-                  </Text>
-                </View>
-              </Marker>
-            ))}
           </MapView>
 
           <View style={styles.mapFooter}>
@@ -2301,25 +2238,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
-  },
-  // POI标记样式
-  poiMarker: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  poiMarkerText: {
-    fontSize: 18,
   },
   // 选中POI信息样式
   selectedPlaceInfo: {
