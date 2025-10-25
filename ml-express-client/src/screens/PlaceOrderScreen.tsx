@@ -988,9 +988,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* 速度部分 */}
+            {/* 配送选项部分 */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>速度 *</Text>
+              <Text style={styles.label}>🚚配送选项 *</Text>
               {deliverySpeeds.map((speed) => (
                 <TouchableOpacity
                   key={speed.value}
