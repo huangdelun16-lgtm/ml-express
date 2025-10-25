@@ -50,6 +50,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [packageType, setPackageType] = useState('文件');
   const [weight, setWeight] = useState('');
   const [description, setDescription] = useState('');
+  const [showWeightInput, setShowWeightInput] = useState(false);
   
   // 配送选项
   const [deliverySpeed, setDeliverySpeed] = useState('准时达');
@@ -646,8 +647,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
     // 验证必填字段
     if (!senderName || !senderPhone || !senderAddress ||
         !receiverName || !receiverPhone || !receiverAddress ||
-        !packageType || !weight) {
+        !packageType) {
       Alert.alert('提示', currentT.fillRequired);
+      return;
+    }
+
+    // 验证重量字段（只在需要时验证）
+    if (showWeightInput && !weight) {
+      Alert.alert('提示', '请填写包裹重量');
       return;
     }
 
@@ -762,6 +769,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 处理包裹类型点击
   const handlePackageTypeClick = (typeValue: string) => {
     setPackageType(typeValue);
+    
+    // 控制重量框的显示逻辑
+    // ✅超重件 ✅超规件 时 "重量"框框 需要显示
+    // ❌标准件 ❌文件 ❌易碎品 ❌食物和饮料 时 "重量"框框 不需要显示
+    const showWeight = typeValue === '超重件（5KG）以上' || typeValue === '超规件（45x60x15cm）以上';
+    setShowWeightInput(showWeight);
     
     // 如果是标准件、超重件或超规件，显示详细说明
     if (typeValue === '标准件（45x60x15cm）和（5KG）以内' ||
@@ -935,55 +948,90 @@ export default function PlaceOrderScreen({ navigation }: any) {
               <Text style={styles.sectionTitle}> {currentT.packageInfo}</Text>
             </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.packageType} *</Text>
-            <View style={styles.chipContainer}>
-              {packageTypes.map((type) => (
+            {/* 包裹类型部分 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>包裹类型 *</Text>
+              <View style={styles.chipContainer}>
+                {packageTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type.value}
+                    style={[
+                      styles.chip,
+                      packageType === type.value && styles.chipActive
+                    ]}
+                    onPress={() => handlePackageTypeClick(type.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      packageType === type.value && styles.chipTextActive
+                    ]}>
+                      {type.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* 重量输入框 - 只在选择超重件或超规件时显示 */}
+            {showWeightInput && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{currentT.weight} *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={weight}
+                  onChangeText={setWeight}
+                  placeholder={currentT.placeholders.weight}
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            )}
+
+            {/* 速度部分 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>速度 *</Text>
+              {deliverySpeeds.map((speed) => (
                 <TouchableOpacity
-                  key={type.value}
+                  key={speed.value}
                   style={[
-                    styles.chip,
-                    packageType === type.value && styles.chipActive
+                    styles.radioOption,
+                    deliverySpeed === speed.value && styles.radioOptionActive
                   ]}
-                  onPress={() => handlePackageTypeClick(type.value)}
+                  onPress={() => setDeliverySpeed(speed.value)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[
-                    styles.chipText,
-                    packageType === type.value && styles.chipTextActive
-                  ]}>
-                    {type.label}
-                  </Text>
+                  <View style={styles.radio}>
+                    {deliverySpeed === speed.value && <View style={styles.radioInner} />}
+                  </View>
+                    <View style={styles.radioContent}>
+                    <Text style={[
+                      styles.radioText,
+                      deliverySpeed === speed.value && styles.radioTextActive
+                    ]}>
+                      {speed.label}
+                    </Text>
+                    {speed.extra > 0 && (
+                      <Text style={styles.extraPrice}>+{speed.extra} MMK</Text>
+                    )}
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.weight} *</Text>
-            <TextInput
-              style={styles.input}
-              value={weight}
-              onChangeText={setWeight}
-              placeholder={currentT.placeholders.weight}
-              placeholderTextColor="#9ca3af"
-              keyboardType="decimal-pad"
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{currentT.description}</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder={currentT.placeholders.description}
+                placeholderTextColor="#9ca3af"
+                multiline
+                numberOfLines={2}
+              />
+            </View>
           </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.description}</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder={currentT.placeholders.description}
-              placeholderTextColor="#9ca3af"
-              multiline
-              numberOfLines={2}
-            />
-          </View>
-        </View>
         </FadeInView>
 
         {/* 配送选项 */}
@@ -993,36 +1041,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
               <DeliveryIcon size={20} color="#1e293b" />
               <Text style={styles.sectionTitle}> {currentT.deliveryOptions}</Text>
             </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.deliverySpeed} *</Text>
-            {deliverySpeeds.map((speed) => (
-              <TouchableOpacity
-                key={speed.value}
-                style={[
-                  styles.radioOption,
-                  deliverySpeed === speed.value && styles.radioOptionActive
-                ]}
-                onPress={() => setDeliverySpeed(speed.value)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.radio}>
-                  {deliverySpeed === speed.value && <View style={styles.radioInner} />}
-                </View>
-                  <View style={styles.radioContent}>
-                  <Text style={[
-                    styles.radioText,
-                    deliverySpeed === speed.value && styles.radioTextActive
-                  ]}>
-                    {speed.label}
-                  </Text>
-                  {speed.extra > 0 && (
-                    <Text style={styles.extraPrice}>+{speed.extra} MMK</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
 
           {deliverySpeed === '定时达' && (
             <View style={styles.inputGroup}>
