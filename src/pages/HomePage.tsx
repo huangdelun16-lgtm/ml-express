@@ -2472,7 +2472,7 @@ const HomePage: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                         <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                          {language === 'zh' ? '重量费用' : language === 'en' ? 'Weight Fee' : 'အလေးချိန်အခ'}:
+                          {language === 'zh' ? '超重费' : language === 'en' ? 'Overweight Fee' : 'အလေးချိန်ပိုအခ'}:
                         </span>
                         <span style={{ color: '#ef4444', fontWeight: '600' }}>
                           {(() => {
@@ -2489,7 +2489,7 @@ const HomePage: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                         <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                          {language === 'zh' ? '包裹类型费用' : language === 'en' ? 'Package Type Fee' : 'ပစ္စည်းအမျိုးအစားအခ'}:
+                          {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
                         </span>
                         <span style={{ color: '#f97316', fontWeight: '600' }}>
                           {(() => {
@@ -2501,7 +2501,7 @@ const HomePage: React.FC = () => {
                             if (packageType === t.ui.oversizedPackage || packageType === '超规件') {
                               packageTypeFee = calculatedDistanceDetail * pricingSettings.oversizeSurcharge;
                             } else if (packageType === t.ui.fragile || packageType === '易碎品') {
-                              packageTypeFee = pricingSettings.fragileSurcharge;
+                              packageTypeFee = calculatedDistanceDetail * pricingSettings.fragileSurcharge;
                             } else if (packageType === t.ui.foodDrinks || packageType === '食品和饮料') {
                               packageTypeFee = calculatedDistanceDetail * pricingSettings.foodBeverageSurcharge;
                             }
@@ -2522,9 +2522,10 @@ const HomePage: React.FC = () => {
                             let speedFee = 0;
                             if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '加急配送') {
                               speedFee = pricingSettings.urgentSurcharge;
-                            } else if (deliverySpeed === t.ui.onTimeDelivery || deliverySpeed === '准时达') {
+                            } else if (deliverySpeed === t.ui.scheduledDelivery || deliverySpeed === '定时达') {
                               speedFee = pricingSettings.scheduledSurcharge;
                             }
+                            // 准时达不加费，所以不需要处理 t.ui.onTimeDelivery
                             return speedFee;
                           })()} MMK
                         </span>
