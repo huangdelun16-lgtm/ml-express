@@ -15,6 +15,10 @@ const EmployeeSupervision: React.FC = () => {
   const [filterDate, setFilterDate] = useState<string>('all');
   const [searchText, setSearchText] = useState<string>('');
   
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 500;
+  
   useEffect(() => {
     loadData();
   }, []);
@@ -58,6 +62,17 @@ const EmployeeSupervision: React.FC = () => {
     
     return true;
   });
+  
+  // 分页计算
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentLogs = filteredLogs.slice(startIndex, endIndex);
+
+  // 当筛选条件改变时，重置到第一页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterUser, filterModule, filterAction, filterDate, searchText]);
 
   // 获取操作类型的中文名称
   const getActionTypeName = (type: string) => {
@@ -344,7 +359,7 @@ const EmployeeSupervision: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map((log) => (
+                {currentLogs.map((log) => (
                   <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     <td style={{ padding: '12px', fontSize: '0.85rem', opacity: 0.8, whiteSpace: 'nowrap' }}>
                       {log.action_time ? new Date(log.action_time).toLocaleString('zh-CN', {
