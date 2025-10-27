@@ -5,7 +5,7 @@ import { useResponsive } from '../hooks/useResponsive';
 
 const EmployeeSupervision: React.FC = () => {
   const navigate = useNavigate();
-const [logs, setLogs] = useState<Package[]>([]);
+const [logs, setLogs] = useState<AuditLog[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
