@@ -28,7 +28,7 @@ interface User {
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-const [activeTab, setActiveTab] = useState<Package[]>([]);
+const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
 ('list');
   const [users, setUsers] = useState<User[]>([]);

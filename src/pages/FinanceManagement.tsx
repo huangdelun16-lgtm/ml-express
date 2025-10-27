@@ -75,9 +75,8 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-const [activeTab, setActiveTab] = useState<Package[]>([]);
+const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-<TabKey>('overview');
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
