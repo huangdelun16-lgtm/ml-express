@@ -820,7 +820,7 @@ const HomePage: React.FC = () => {
         totalAmount: '应付金额',
         paymentQRCode: '收款二维码',
         scanToPay: '扫码支付',
-        paymentWarning: '⚠️ 请注意：付款之后不可退还 已确认下单再付款',n
+        paymentWarning: '⚠️ 请注意：付款之后不可退还 已确认下单再付款',
         priceBreakdown: '价格明细',
         basePrice: '基础费用',
         distanceFee: '距离费用',
@@ -942,7 +942,7 @@ const HomePage: React.FC = () => {
         paymentQRCode: 'Payment QR Code',
         scanToPay: 'Scan to Pay',
         priceBreakdown: 'Price Breakdown',
-        paymentWarning: '⚠️ Please note: Payment is non-refundable. Please confirm your order before payment.',n
+        paymentWarning: '⚠️ Please note: Payment is non-refundable. Please confirm your order before payment.',
         basePrice: 'Base Fee',
         distanceFee: 'Distance Fee',
         packageTypeFee: 'Package Type',
@@ -1063,7 +1063,7 @@ const HomePage: React.FC = () => {
         totalAmount: 'စုစုပေါင်းပမာဏ',
         paymentQRCode: 'ငွေပေးချေမှု QR ကုဒ်',
         scanToPay: 'စကင်န်ဖတ်၍ ငွေပေးပါ',
-        paymentWarning: '⚠️ မှတ်ချက် - ငွေပေးပြီးရင် ပြန်အမ်းမရပါ ။ မှာယူမှတ်တမ်းအား အတည်ပြုပြီးမှ ငွေပေးရန်',n
+        paymentWarning: '⚠️ မှတ်ချက် - ငွေပေးပြီးရင် ပြန်အမ်းမရပါ ။ မှာယူမှတ်တမ်းအား အတည်ပြုပြီးမှ ငွေပေးရန်',
         priceBreakdown: 'စျေးနှုန်းအသေးစိတ်',
         basePrice: 'အခြေခံအခကြေး',
         distanceFee: 'အကွာအဝေးအခ',
