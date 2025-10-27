@@ -70,3 +70,13 @@ option {
     transform: translateY(0);
   }
 }
+
+/* 骨架屏加载动画 */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
