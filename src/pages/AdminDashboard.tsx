@@ -14,9 +14,8 @@ const AdminDashboard: React.FC = () => {
   const currentUser = localStorage.getItem('currentUser') || '';
 
   // 用户编辑模态框状态
-const [showUserEditModal, setShowUserEditModal] = useState<Package[]>([]);
+const [showUserEditModal, setShowUserEditModal] = useState(false);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-(false);
   const [userEditFormData, setUserEditFormData] = useState({
     username: '',
     password: '',

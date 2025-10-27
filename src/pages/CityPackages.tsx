@@ -11,8 +11,6 @@ const CityPackages: React.FC = () => {
   const { language } = useLanguage();
 const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-('list');
-  const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
