@@ -12,6 +12,14 @@ interface ButtonProps {
   className?: string;
 }
 
+interface ColorScheme {
+  background: string;
+  hoverBackground: string;
+  color: string;
+  boxShadow: string;
+  border?: string;
+}
+
 export const Button: React.FC<ButtonProps> = ({
   children,
   onClick,
@@ -26,12 +34,13 @@ export const Button: React.FC<ButtonProps> = ({
   const isDisabled = disabled || loading;
 
   // 颜色方案
-  const colorSchemes = {
+  const colorSchemes: Record<string, ColorScheme> = {
     primary: {
       background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
       hoverBackground: 'linear-gradient(135deg, #2a5180 0%, #2f80cc 100%)',
       color: 'white',
       boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)',
+      border: 'none',
     },
     secondary: {
       background: 'rgba(255, 255, 255, 0.1)',
@@ -45,12 +54,14 @@ export const Button: React.FC<ButtonProps> = ({
       hoverBackground: 'linear-gradient(135deg, #36a067 0%, #46b976 100%)',
       color: 'white',
       boxShadow: '0 4px 15px rgba(56, 161, 105, 0.3)',
+      border: 'none',
     },
     danger: {
       background: 'linear-gradient(135deg, #e53e3e 0%, #fc8181 100%)',
       hoverBackground: 'linear-gradient(135deg, #e33c3c 0%, #fa7f7f 100%)',
       color: 'white',
       boxShadow: '0 4px 15px rgba(229, 62, 62, 0.3)',
+      border: 'none',
     },
     outline: {
       background: 'transparent',
@@ -63,6 +74,7 @@ export const Button: React.FC<ButtonProps> = ({
       background: 'rgba(255, 255, 255, 0.05)',
       hoverBackground: 'rgba(255, 255, 255, 0.1)',
       color: 'rgba(255, 255, 255, 0.9)',
+      border: 'none',
       boxShadow: 'none',
     },
   };
