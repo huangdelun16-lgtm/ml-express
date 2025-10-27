@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { adminAccountService } from '../services/supabase';
+import { useResponsive } from '../hooks/useResponsive';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -13,7 +14,9 @@ const AdminDashboard: React.FC = () => {
   const currentUser = localStorage.getItem('currentUser') || '';
 
   // 用户编辑模态框状态
-  const [showUserEditModal, setShowUserEditModal] = useState(false);
+  const [showUserEditModal, setShowUserEditModal] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+(false);
   const [userEditFormData, setUserEditFormData] = useState({
     username: '',
     password: '',
@@ -202,7 +205,7 @@ const AdminDashboard: React.FC = () => {
     <div style={{ 
       minHeight: '100vh', 
       background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '20px',
+      padding: isMobile ? '12px' : '20px',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -333,8 +336,8 @@ const AdminDashboard: React.FC = () => {
       {/* 卡片网格 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '20px',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: isMobile ? '12px' : '20px',
         maxWidth: '1200px',
         margin: '0 auto',
         position: 'relative',

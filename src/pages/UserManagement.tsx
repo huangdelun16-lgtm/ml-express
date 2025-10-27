@@ -3,6 +3,7 @@ import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 // 用户数据类型定义
 interface User {
@@ -27,7 +28,9 @@ interface User {
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState('list');
+  const [activeTab, setActiveTab] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+('list');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -274,7 +277,7 @@ const UserManagement: React.FC = () => {
     <div style={{ 
       minHeight: '100vh', 
       background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '20px',
+      padding: isMobile ? '12px' : '20px',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -311,7 +314,7 @@ const UserManagement: React.FC = () => {
         zIndex: 1
       }}>
         <div>
-          <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
             {language === 'zh' ? '用户管理' : language === 'en' ? 'User Management' : 'အသုံးပြုသူစီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
@@ -394,7 +397,7 @@ const UserManagement: React.FC = () => {
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
           borderRadius: '15px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
           position: 'relative',
@@ -403,7 +406,7 @@ const UserManagement: React.FC = () => {
           {/* 统计信息 */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: '15px',
             marginBottom: '20px'
           }}>
@@ -460,7 +463,7 @@ const UserManagement: React.FC = () => {
           {/* 搜索和过滤 */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '15px',
             marginBottom: '20px'
           }}>
@@ -532,7 +535,7 @@ const UserManagement: React.FC = () => {
                   <div key={user.id} style={{
                     background: 'rgba(255, 255, 255, 0.1)',
                     borderRadius: '10px',
-                    padding: '20px',
+                    padding: isMobile ? '12px' : '20px',
                     border: '1px solid rgba(255, 255, 255, 0.2)'
                   }}>
                     <div style={{
@@ -575,7 +578,7 @@ const UserManagement: React.FC = () => {
 
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                       gap: '15px',
                       marginBottom: '15px'
                     }}>
@@ -703,8 +706,8 @@ const UserManagement: React.FC = () => {
           <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '20px',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: isMobile ? '12px' : '20px',
               marginBottom: '30px'
             }}>
               {/* 基本信息 */}

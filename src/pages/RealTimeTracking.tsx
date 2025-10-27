@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
+import { useResponsive } from '../hooks/useResponsive';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
@@ -39,7 +40,9 @@ interface CourierWithLocation extends Courier {
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [packages, setPackages] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+<Package[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
@@ -530,7 +533,7 @@ const RealTimeTracking: React.FC = () => {
                 }}>
                   {!GOOGLE_MAPS_API_KEY ? (
                     <>
-                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🚫</div>
+                      <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', marginBottom: '1rem' }}>🚫</div>
                       <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem', color: '#ef4444', fontWeight: 'bold' }}>
                         Google Maps API 密钥缺失
                       </div>
@@ -552,7 +555,7 @@ const RealTimeTracking: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🌍</div>
+                      <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', marginBottom: '1rem' }}>🌍</div>
                       <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
                       {loadError && (
                         <div style={{ color: '#ef4444', marginTop: '0.5rem', background: '#fffbe B', padding: '0.5rem', borderRadius: '4px' }}>
@@ -851,7 +854,7 @@ const RealTimeTracking: React.FC = () => {
                 padding: '2rem',
                 color: '#9ca3af'
               }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', marginBottom: '0.5rem' }}>📦</div>
                 <p>暂无已分配包裹</p>
               </div>
             ) : (

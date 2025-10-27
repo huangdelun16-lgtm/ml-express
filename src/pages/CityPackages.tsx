@@ -4,11 +4,14 @@ import { packageService, Package, supabase, auditLogService, deliveryPhotoServic
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import { SkeletonCard } from '../components/SkeletonLoader';
+import { useResponsive } from '../hooks/useResponsive';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState('list');
+  const [activeTab, setActiveTab] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+('list');
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -328,7 +331,7 @@ const CityPackages: React.FC = () => {
     <div style={{ 
       minHeight: '100vh', 
       background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '20px',
+      padding: isMobile ? '12px' : '20px',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -344,7 +347,7 @@ const CityPackages: React.FC = () => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
             {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
@@ -610,7 +613,7 @@ const CityPackages: React.FC = () => {
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
           borderRadius: '15px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
           position: 'relative',
@@ -738,7 +741,7 @@ const CityPackages: React.FC = () => {
 
                 <div style={{
                   display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '10px',
                     marginBottom: '10px'
                 }}>
@@ -917,7 +920,7 @@ const CityPackages: React.FC = () => {
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000,
-          padding: '20px'
+          padding: isMobile ? '12px' : '20px'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
@@ -960,7 +963,7 @@ const CityPackages: React.FC = () => {
 
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
               borderRadius: '15px',
               marginBottom: '20px'
             }}>
@@ -1037,7 +1040,7 @@ const CityPackages: React.FC = () => {
                   }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{
-                        fontSize: '2rem',
+                        fontSize: isMobile ? '1.5rem' : '2rem',
                         marginBottom: '10px'
                       }}>⏳</div>
                       <p style={{ color: '#666', margin: 0, fontSize: '0.9rem' }}>生成中...</p>
@@ -1199,7 +1202,7 @@ const CityPackages: React.FC = () => {
 
             <div style={{
               background: 'rgba(255, 255, 255, 0.1)',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
               borderRadius: '15px',
               marginBottom: '20px'
             }}>
@@ -1975,7 +1978,7 @@ const CityPackages: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '20px' }}>
+              <div style={{ display: 'grid', gap: isMobile ? '12px' : '20px' }}>
                 {packagePhotos.map((photo) => (
                   <div key={photo.id} style={{
                     background: 'rgba(255, 255, 255, 0.1)',
@@ -2093,12 +2096,12 @@ const CityPackages: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gap: '20px' }}>
+            <div style={{ display: 'grid', gap: isMobile ? '12px' : '20px' }}>
               {/* 基本信息 */}
             <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
@@ -2141,7 +2144,7 @@ const CityPackages: React.FC = () => {
               <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
@@ -2167,7 +2170,7 @@ const CityPackages: React.FC = () => {
             <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
@@ -2193,7 +2196,7 @@ const CityPackages: React.FC = () => {
             <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>

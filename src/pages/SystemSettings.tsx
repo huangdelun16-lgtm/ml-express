@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SystemSetting, systemSettingsService } from '../services/supabase';
+import { useResponsive } from '../hooks/useResponsive';
 
 type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | 'tracking' | 'security';
 
@@ -316,7 +317,9 @@ const categories: Array<{ id: SettingCategory; name: string; description: string
 
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<SettingCategory>('general');
+  const [activeTab, setActiveTab] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+<SettingCategory>('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -599,7 +602,7 @@ const SystemSettings: React.FC = () => {
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: '20px',
+        padding: isMobile ? '12px' : '20px',
         fontFamily: 'Segoe UI, Arial, sans-serif'
       }}
     >
@@ -613,7 +616,7 @@ const SystemSettings: React.FC = () => {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>系统设置中心</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>系统设置中心</h1>
           <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>统一管理计费规则、通知策略、自动化流程与安全策略</p>
           {lastSavedAt && (
             <span style={{ marginTop: '8px', display: 'inline-block', fontSize: '0.9rem', opacity: 0.75 }}>
@@ -685,7 +688,7 @@ const SystemSettings: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: isMobile ? '12px' : '20px' }}>
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
@@ -826,7 +829,7 @@ const SystemSettings: React.FC = () => {
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: activeTab === 'pricing' ? 'repeat(2, 1fr)' : '1fr',
-              gap: '16px' 
+              gap: isMobile ? '12px' : '16px' 
             }}>
               {currentDefinitions.map(def => {
                 const metadata = settingsMetadata[def.key];

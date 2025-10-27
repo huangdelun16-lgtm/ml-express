@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auditLogService, AuditLog, adminAccountService, AdminAccount } from '../services/supabase';
+import { useResponsive } from '../hooks/useResponsive';
 
 const EmployeeSupervision: React.FC = () => {
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs, setLogs] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+<AuditLog[]>([]);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -131,7 +134,7 @@ const EmployeeSupervision: React.FC = () => {
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: '20px',
+        padding: isMobile ? '12px' : '20px',
         fontFamily: 'Segoe UI, Arial, sans-serif'
       }}
     >
@@ -146,7 +149,7 @@ const EmployeeSupervision: React.FC = () => {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>👁️ 员工监督中心</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>👁️ 员工监督中心</h1>
           <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>实时监控所有员工操作行为，追踪系统变更记录</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -182,50 +185,50 @@ const EmployeeSupervision: React.FC = () => {
       </div>
 
       {/* 统计卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: isMobile ? '12px' : '16px', marginBottom: '24px' }}>
         <div style={{
           background: 'rgba(255, 255, 255, 0.12)',
           borderRadius: '12px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(255,255,255,0.1)',
           color: 'white'
         }}>
           <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '8px' }}>总操作数</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{filteredLogs.length}</div>
+          <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold' }}>{filteredLogs.length}</div>
         </div>
         <div style={{
           background: 'rgba(72, 187, 120, 0.2)',
           borderRadius: '12px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(72, 187, 120, 0.3)',
           color: 'white'
         }}>
           <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '8px' }}>创建操作</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold' }}>
             {filteredLogs.filter(l => l.action_type === 'create').length}
           </div>
         </div>
         <div style={{
           background: 'rgba(66, 153, 225, 0.2)',
           borderRadius: '12px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(66, 153, 225, 0.3)',
           color: 'white'
         }}>
           <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '8px' }}>更新操作</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold' }}>
             {filteredLogs.filter(l => l.action_type === 'update').length}
           </div>
         </div>
         <div style={{
           background: 'rgba(245, 101, 101, 0.2)',
           borderRadius: '12px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(245, 101, 101, 0.3)',
           color: 'white'
         }}>
           <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '8px' }}>删除操作</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+          <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold' }}>
             {filteredLogs.filter(l => l.action_type === 'delete').length}
           </div>
         </div>
@@ -236,7 +239,7 @@ const EmployeeSupervision: React.FC = () => {
         style={{
           background: 'rgba(255, 255, 255, 0.12)',
           borderRadius: '14px',
-          padding: '20px',
+          padding: isMobile ? '12px' : '20px',
           border: '1px solid rgba(255,255,255,0.1)',
           marginBottom: '20px',
           color: 'white'

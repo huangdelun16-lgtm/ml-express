@@ -5,10 +5,13 @@ import { fileUploadService } from '../services/FileUploadService';
 import { imageCompressionService, CompressionResult } from '../services/ImageCompressionService';
 import { fileValidationService } from '../services/FileValidationService';
 import { BatchProgress, UploadProgress } from '../components/UploadProgress';
+import { useResponsive } from '../hooks/useResponsive';
 
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
+  const [accounts, setAccounts] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -462,7 +465,7 @@ const AccountManagement: React.FC = () => {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #2d3748 100%)',
-      padding: '20px',
+      padding: isMobile ? '12px' : '20px',
       color: 'white'
     }}>
       <div style={{
@@ -475,8 +478,8 @@ const AccountManagement: React.FC = () => {
         backdropFilter: 'blur(10px)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>账号管理</h1>
-          <div style={{ display: 'flex', gap: '16px' }}>
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', margin: 0 }}>账号管理</h1>
+          <div style={{ display: 'flex', gap: isMobile ? '12px' : '16px' }}>
             <button
               onClick={() => setShowForm(!showForm)}
               style={{
@@ -545,7 +548,7 @@ const AccountManagement: React.FC = () => {
           }}>
             <h2 style={{ marginBottom: '24px' }}>创建新账号</h2>
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: isMobile ? '12px' : '20px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
                     用户名 *
@@ -776,7 +779,7 @@ const AccountManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: '16px', justifyContent: 'center' }}>
+              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>
                 <button
                   type="submit"
                   style={{
@@ -1122,7 +1125,7 @@ const AccountManagement: React.FC = () => {
                 {/* 基本信息 */}
                 <div style={{ 
                   background: 'rgba(255,255,255,0.05)', 
-                  padding: '20px', 
+                  padding: isMobile ? '12px' : '20px', 
                   borderRadius: '12px',
                   border: '1px solid rgba(255,255,255,0.1)'
                 }}>
@@ -1150,7 +1153,7 @@ const AccountManagement: React.FC = () => {
                 {/* 职位信息 */}
                 <div style={{ 
                   background: 'rgba(255,255,255,0.05)', 
-                  padding: '20px', 
+                  padding: isMobile ? '12px' : '20px', 
                   borderRadius: '12px',
                   border: '1px solid rgba(255,255,255,0.1)'
                 }}>
@@ -1195,7 +1198,7 @@ const AccountManagement: React.FC = () => {
                 {/* 联系信息 */}
                 <div style={{ 
                   background: 'rgba(255,255,255,0.05)', 
-                  padding: '20px', 
+                  padding: isMobile ? '12px' : '20px', 
                   borderRadius: '12px',
                   border: '1px solid rgba(255,255,255,0.1)'
                 }}>
@@ -1221,7 +1224,7 @@ const AccountManagement: React.FC = () => {
                 {/* 薪资与紧急联系人 */}
                 <div style={{ 
                   background: 'rgba(255,255,255,0.05)', 
-                  padding: '20px', 
+                  padding: isMobile ? '12px' : '20px', 
                   borderRadius: '12px',
                   border: '1px solid rgba(255,255,255,0.1)'
                 }}>
@@ -1253,12 +1256,12 @@ const AccountManagement: React.FC = () => {
               <div style={{ 
                 marginTop: '24px',
                 background: 'rgba(255,255,255,0.05)', 
-                padding: '20px', 
+                padding: isMobile ? '12px' : '20px', 
                 borderRadius: '12px',
                 border: '1px solid rgba(255,255,255,0.1)'
               }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: '#8b5cf6' }}>账号状态与备注</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: isMobile ? '12px' : '16px', marginBottom: '16px' }}>
                   <div>
                     <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>账号状态：</span>
                     <span style={{ 
@@ -1306,7 +1309,7 @@ const AccountManagement: React.FC = () => {
                 )}
               </div>
 
-              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: '16px', justifyContent: 'center' }}>
+              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>
                 <button
                   onClick={() => {
                     setCvImages(viewingAccount.cv_images || []);
@@ -1465,7 +1468,7 @@ const AccountManagement: React.FC = () => {
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                    gap: '16px'
+                    gap: isMobile ? '12px' : '16px'
                   }}>
                     {cvImages.map((image, index) => (
                       <div key={index} style={{
@@ -1621,8 +1624,8 @@ const AccountManagement: React.FC = () => {
               {cvImages.length > 0 ? (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                  gap: '20px'
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+                  gap: isMobile ? '12px' : '20px'
                 }}>
                   {cvImages.map((image, index) => (
                     <div key={index} style={{

@@ -3,6 +3,7 @@ import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
 type FilterStatus = 'all' | FinanceRecord['status'];
@@ -74,7 +75,9 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [activeTab, setActiveTab] = useState
+  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+<TabKey>('overview');
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
@@ -577,7 +580,7 @@ const FinanceManagement: React.FC = () => {
         }}
       />
       <h3 style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1.1rem', marginBottom: '12px' }}>{title}</h3>
-      <div style={{ color, fontSize: '2rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>
+      <div style={{ color, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>
         {value.toLocaleString()} MMK
       </div>
       <p style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.9rem', margin: 0 }}>{description}</p>
@@ -607,7 +610,7 @@ const FinanceManagement: React.FC = () => {
             justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '32px',
-            gap: '16px'
+            gap: isMobile ? '12px' : '16px'
           }}
         >
           <div>
@@ -739,7 +742,7 @@ const FinanceManagement: React.FC = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
               gap: '18px'
             }}
           >
@@ -766,8 +769,8 @@ const FinanceManagement: React.FC = () => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: isMobile ? '12px' : '16px',
                 marginBottom: '24px'
               }}
             >
@@ -879,8 +882,8 @@ const FinanceManagement: React.FC = () => {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                      gap: '16px'
+                      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))',
+                      gap: isMobile ? '12px' : '16px'
                     }}
                   >
                     <div>
@@ -1109,7 +1112,7 @@ const FinanceManagement: React.FC = () => {
                       }}
                     />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? '12px' : '16px', marginTop: '24px' }}>
                     <button
                       type="submit"
                       disabled={isProcessing}
@@ -1273,11 +1276,11 @@ const FinanceManagement: React.FC = () => {
             <div style={{
               background: 'rgba(255, 255, 255, 0.12)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
               marginBottom: '24px',
               border: '1px solid rgba(255, 255, 255, 0.18)',
               display: 'flex',
-              gap: '16px',
+              gap: isMobile ? '12px' : '16px',
               alignItems: 'center',
               flexWrap: 'wrap'
             }}>
@@ -1324,7 +1327,7 @@ const FinanceManagement: React.FC = () => {
             {/* 关键指标卡片 */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
               gap: '18px',
               marginBottom: '24px'
             }}>
@@ -1374,7 +1377,7 @@ const FinanceManagement: React.FC = () => {
                           {incomeGrowth >= 0 ? '↗' : '↘'} {Math.abs(incomeGrowth).toFixed(1)}%
                         </div>
                       </div>
-                      <div style={{ color: '#2ecc71', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                      <div style={{ color: '#2ecc71', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '700', marginBottom: '8px' }}>
                         {recentIncome.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
@@ -1392,7 +1395,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
                         💸 {getPeriodLabel()}{t.recentExpense}
                       </div>
-                      <div style={{ color: '#ff6b6b', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                      <div style={{ color: '#ff6b6b', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '700', marginBottom: '8px' }}>
                         {recentExpense.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
@@ -1410,7 +1413,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500', marginBottom: '12px' }}>
                         📦 {getPeriodLabel()}{t.recentPackages}
                       </div>
-                      <div style={{ color: '#6c5ce7', fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>
+                      <div style={{ color: '#6c5ce7', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '700', marginBottom: '8px' }}>
                         {recentPackageCount} {language === 'zh' ? '个' : language === 'en' ? '' : 'ခု'}
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.85rem' }}>
@@ -1430,7 +1433,7 @@ const FinanceManagement: React.FC = () => {
                       </div>
                       <div style={{ 
                         color: recentIncome - recentExpense >= 0 ? '#00cec9' : '#ff6b6b', 
-                        fontSize: '2rem', 
+                        fontSize: isMobile ? '1.5rem' : '2rem', 
                         fontWeight: '700', 
                         marginBottom: '8px' 
                       }}>
@@ -1626,8 +1629,8 @@ const FinanceManagement: React.FC = () => {
             {/* 业务分析 */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-              gap: '20px'
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))',
+              gap: isMobile ? '12px' : '20px'
             }}>
               {/* 包裹类型分布 */}
               <div style={{
@@ -1758,8 +1761,8 @@ const FinanceManagement: React.FC = () => {
               <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>包裹收入统计</h4>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: isMobile ? '12px' : '16px',
                 marginBottom: '16px'
               }}>
                 <div style={{
@@ -1900,11 +1903,11 @@ const FinanceManagement: React.FC = () => {
             <div style={{
               background: 'rgba(255, 255, 255, 0.12)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: isMobile ? '12px' : '20px',
               marginBottom: '24px',
               border: '1px solid rgba(255, 255, 255, 0.18)',
               display: 'flex',
-              gap: '16px',
+              gap: isMobile ? '12px' : '16px',
               flexWrap: 'wrap',
               alignItems: 'center'
             }}>
@@ -2014,18 +2017,18 @@ const FinanceManagement: React.FC = () => {
             {/* 工资统计卡片 */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '16px',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: isMobile ? '12px' : '16px',
               marginBottom: '24px'
             }}>
               <div style={{
                 background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%)',
                 border: '1px solid rgba(251, 191, 36, 0.3)',
                 borderRadius: '16px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 textAlign: 'center'
               }}>
-                <div style={{ color: '#fbbf24', fontSize: '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div style={{ color: '#fbbf24', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                   {courierSalaries.filter(s => s.status === 'pending').length}
                 </div>
                 <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>待结算</div>
@@ -2035,10 +2038,10 @@ const FinanceManagement: React.FC = () => {
                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)',
                 border: '1px solid rgba(34, 197, 94, 0.3)',
                 borderRadius: '16px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 textAlign: 'center'
               }}>
-                <div style={{ color: '#22c55e', fontSize: '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div style={{ color: '#22c55e', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                   {courierSalaries.filter(s => s.status === 'approved').length}
                 </div>
                 <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已审核</div>
@@ -2048,10 +2051,10 @@ const FinanceManagement: React.FC = () => {
                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
                 border: '1px solid rgba(59, 130, 246, 0.3)',
                 borderRadius: '16px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 textAlign: 'center'
               }}>
-                <div style={{ color: '#3b82f6', fontSize: '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div style={{ color: '#3b82f6', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                   {courierSalaries.filter(s => s.status === 'paid').length}
                 </div>
                 <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已发放</div>
@@ -2061,7 +2064,7 @@ const FinanceManagement: React.FC = () => {
                 background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)',
                 border: '1px solid rgba(168, 85, 247, 0.3)',
                 borderRadius: '16px',
-                padding: '20px',
+                padding: isMobile ? '12px' : '20px',
                 textAlign: 'center'
               }}>
                 <div style={{ color: '#a855f7', fontSize: '1.6rem', fontWeight: 'bold', marginBottom: '8px' }}>
@@ -2300,8 +2303,8 @@ const FinanceManagement: React.FC = () => {
               <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📍 骑手送货费用统计</h4>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: isMobile ? '12px' : '16px',
                 marginBottom: '16px'
               }}>
                 <div style={{
@@ -2360,8 +2363,8 @@ const FinanceManagement: React.FC = () => {
               <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>💰 骑手佣金统计</h4>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: isMobile ? '12px' : '16px',
                 marginBottom: '16px'
               }}>
                 <div style={{
@@ -2396,8 +2399,8 @@ const FinanceManagement: React.FC = () => {
               <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>骑手支出统计</h4>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: isMobile ? '12px' : '16px',
                 marginBottom: '16px'
               }}>
                 <div style={{
@@ -2582,7 +2585,7 @@ const FinanceManagement: React.FC = () => {
                   justifyContent: 'center',
                   alignItems: 'center',
                   zIndex: 1000,
-                  padding: '20px'
+                  padding: isMobile ? '12px' : '20px'
                 }}
                 onClick={() => setShowSalaryDetail(false)}
               >
@@ -2621,11 +2624,11 @@ const FinanceManagement: React.FC = () => {
                   <div style={{
                     background: 'rgba(255, 255, 255, 0.1)',
                     borderRadius: '12px',
-                    padding: '20px',
+                    padding: isMobile ? '12px' : '20px',
                     marginBottom: '20px'
                   }}>
                     <h3 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '1.1rem' }}>基本信息</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '12px' }}>
                       <div>
                         <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginBottom: '4px' }}>骑手ID</div>
                         <div style={{ color: 'white', fontSize: '1rem', fontWeight: '600' }}>{selectedSalary.courier_id}</div>
@@ -2651,7 +2654,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{
                     background: 'rgba(255, 255, 255, 0.1)',
                     borderRadius: '12px',
-                    padding: '20px'
+                    padding: isMobile ? '12px' : '20px'
                   }}>
                     <h3 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '1.1rem' }}>工资组成</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2703,7 +2706,7 @@ const FinanceManagement: React.FC = () => {
                   justifyContent: 'center',
                   alignItems: 'center',
                   zIndex: 1000,
-                  padding: '20px'
+                  padding: isMobile ? '12px' : '20px'
                 }}
                 onClick={() => setShowPaymentModal(false)}
               >
