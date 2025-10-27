@@ -317,7 +317,7 @@ const categories: Array<{ id: SettingCategory; name: string; description: string
 
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
-const [activeTab, setActiveTab] = useState<'billing' | 'automation' | 'security'>('billing');
+const [activeTab, setActiveTab] = useState<SettingCategory>('general');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
 
   const [loading, setLoading] = useState(true);
