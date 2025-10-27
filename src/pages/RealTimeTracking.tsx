@@ -40,9 +40,8 @@ interface CourierWithLocation extends Courier {
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
-  const [packages, setPackages] = useState
+const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-<Package[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);

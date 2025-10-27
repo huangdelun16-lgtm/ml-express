@@ -9,7 +9,7 @@ import { useResponsive } from '../hooks/useResponsive';
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState
+const [activeTab, setActiveTab] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
 ('list');
   const [packages, setPackages] = useState<Package[]>([]);

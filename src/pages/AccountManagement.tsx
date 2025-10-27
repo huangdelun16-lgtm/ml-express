@@ -9,9 +9,8 @@ import { useResponsive } from '../hooks/useResponsive';
 
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState
+  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);

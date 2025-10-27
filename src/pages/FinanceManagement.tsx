@@ -75,7 +75,7 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState
+const [activeTab, setActiveTab] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
 <TabKey>('overview');
   const [records, setRecords] = useState<FinanceRecord[]>([]);

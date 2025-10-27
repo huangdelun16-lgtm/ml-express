@@ -26,9 +26,8 @@ interface Courier {
 const CourierManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [couriers, setCouriers] = useState
+const [couriers, setCouriers] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-<Courier[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [searchTerm, setSearchTerm] = useState('');
