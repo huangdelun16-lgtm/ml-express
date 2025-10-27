@@ -319,10 +319,8 @@ const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
 const [activeTab, setActiveTab] = useState<'billing' | 'automation' | 'security'>('billing');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-'general');
+
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
