@@ -1363,7 +1363,9 @@ const HomePage: React.FC = () => {
       return;
     }
     
-    if (!orderInfo.packageType || !orderInfo.weight || !orderInfo.deliverySpeed) {
+    // 根据包裹类型决定是否需要重量
+    const needWeight = orderInfo.packageType === '超重件' || orderInfo.packageType === '超规件';
+    if (!orderInfo.packageType || (needWeight && !orderInfo.weight) || !orderInfo.deliverySpeed) {
       alert('请填写完整的包裹信息');
       return;
     }
