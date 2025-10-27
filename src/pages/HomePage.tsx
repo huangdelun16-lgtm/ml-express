@@ -41,7 +41,7 @@ class ErrorBoundary extends React.Component<
           borderRadius: '10px',
           color: '#4a5568'
         }}>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -51,7 +51,7 @@ class ErrorBoundary extends React.Component<
             Google Maps API 配置问题<br/>
             请检查 API Key 设置
           </p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1477,7 +1477,7 @@ const HomePage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             MARKET LINK
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1489,17 +1489,17 @@ const HomePage: React.FC = () => {
             marginTop: '-0.2em'
           }}>
             EXPRESS
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
         </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1688,13 +1688,13 @@ const HomePage: React.FC = () => {
                     {option.label}
                   </button>
                 ))}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
             )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1743,7 +1743,7 @@ const HomePage: React.FC = () => {
               >
                 {language === 'zh' ? '退出' : language === 'en' ? 'Logout' : 'ထွက်'}
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1813,13 +1813,13 @@ const HomePage: React.FC = () => {
               >
                 {language === 'zh' ? '登录' : language === 'en' ? 'Login' : 'ဝင်ရန်'}
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
           )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1855,7 +1855,7 @@ const HomePage: React.FC = () => {
           borderRadius: '50%',
           filter: 'blur(50px)',
           animation: 'float 6s ease-in-out infinite'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1870,7 +1870,7 @@ const HomePage: React.FC = () => {
           borderRadius: '50%',
           filter: 'blur(40px)',
           animation: 'float 8s ease-in-out infinite reverse'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1886,7 +1886,7 @@ const HomePage: React.FC = () => {
           borderRadius: '50%',
           filter: 'blur(80px)',
           animation: 'pulse 10s ease-in-out infinite'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1904,7 +1904,7 @@ const HomePage: React.FC = () => {
             top: `${Math.random() * 100}%`,
             animation: `sparkle ${3 + Math.random() * 4}s ease-in-out infinite`,
             animationDelay: `${Math.random() * 2}s`
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -1933,7 +1933,7 @@ const HomePage: React.FC = () => {
           }}>
             {t.hero.title}
           </h1>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2011,7 +2011,7 @@ const HomePage: React.FC = () => {
             >
               📦 {t.ui.packageTracking}
             </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2049,18 +2049,18 @@ const HomePage: React.FC = () => {
               }}
             >
                 {tag}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
             ))}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2131,7 +2131,7 @@ const HomePage: React.FC = () => {
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <Logo size="medium" />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2233,12 +2233,12 @@ const HomePage: React.FC = () => {
                   >
                     📍 {t.order.selectOnMap}
                   </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2336,12 +2336,12 @@ const HomePage: React.FC = () => {
                   >
                     📍 {t.order.selectOnMap}
                   </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2414,7 +2414,7 @@ const HomePage: React.FC = () => {
                       onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
                       onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                     />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2485,7 +2485,7 @@ const HomePage: React.FC = () => {
                   }}>
                     <span style={{ fontSize: '1.2rem' }}>🕐</span>
                     <span style={{ fontWeight: '500' }}>{t.ui.selectedTime}: {scheduledDeliveryTime}</span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2500,12 +2500,12 @@ const HomePage: React.FC = () => {
                   fontStyle: 'italic'
                 }}>
                   ***{t.ui.packageInfoMismatch}***
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2556,7 +2556,7 @@ const HomePage: React.FC = () => {
                         📊 {language === 'zh' ? '点击"计算"按钮获取精准费用' : 
                             language === 'en' ? 'Click "Calculate" button to get accurate pricing' : 
                             'တိကျသော စျေးနှုန်းရရှိရန် "တွက်ချက်ရန်" ခလုတ်ကို နှိပ်ပါ'}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2565,12 +2565,12 @@ const HomePage: React.FC = () => {
                         {language === 'zh' ? '需要先填写寄件和收件地址' : 
                          language === 'en' ? 'Please fill in sender and receiver addresses first' : 
                          'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ဦးစွာ ဖြည့်စွက်ပါ'}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                       </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2584,7 +2584,7 @@ const HomePage: React.FC = () => {
                         <span style={{ color: '#10b981', fontWeight: '600' }}>
                           {calculatedDistanceDetail} {language === 'zh' ? '公里' : language === 'en' ? 'km' : 'ကီလိုမီတာ'}
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2596,7 +2596,7 @@ const HomePage: React.FC = () => {
                         <span style={{ color: '#3b82f6', fontWeight: '600' }}>
                           {pricingSettings.baseFee} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2608,7 +2608,7 @@ const HomePage: React.FC = () => {
                         <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
                           {Math.max(0, calculatedDistanceDetail - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2629,7 +2629,7 @@ const HomePage: React.FC = () => {
                             return weightFee;
                           })()} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2655,7 +2655,7 @@ const HomePage: React.FC = () => {
                             return packageTypeFee;
                           })()} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2680,7 +2680,7 @@ const HomePage: React.FC = () => {
                             return speedFee;
                           })()} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2698,23 +2698,23 @@ const HomePage: React.FC = () => {
                         <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '1.2rem' }}>
                           {calculatedPriceDetail} MMK
                         </span>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                       </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                     </div>
                   )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2775,24 +2775,24 @@ const HomePage: React.FC = () => {
                         {calculatedPriceDetail} MMK
                       </span>
                     )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                   </div>
                 </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
             </form>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2826,7 +2826,7 @@ const HomePage: React.FC = () => {
             overflow: 'auto'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2834,7 +2834,7 @@ const HomePage: React.FC = () => {
               <h2 style={{ color: '#2c5282', margin: 0 }}>
                 {t.ui.paymentQRCode}
             </h2>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2848,19 +2848,19 @@ const HomePage: React.FC = () => {
               marginBottom: '1rem',
               color: 'white'
             }}>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>📍 {t.ui.deliveryDistance}</div>
               <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginTop: '0.3rem' }}>
                 {deliveryDistance} km
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2874,19 +2874,19 @@ const HomePage: React.FC = () => {
               marginBottom: '1.5rem',
               color: 'white'
             }}>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               <div style={{ fontSize: '1rem', opacity: 0.9 }}>💰 {t.ui.totalAmount}</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
                 {calculatedPrice.toLocaleString()} MMK
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2901,7 +2901,7 @@ const HomePage: React.FC = () => {
             }}>
               <div style={{ fontSize: '1rem', color: '#2c5282', marginBottom: '1rem', fontWeight: 'bold' }}>
                 📱 {t.ui.scanToPay}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -2932,13 +2932,13 @@ const HomePage: React.FC = () => {
               color: '#666'
             }}>
                   {t.ui.calculating}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
               )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3055,17 +3055,17 @@ const HomePage: React.FC = () => {
               >
                 {t.ui.cancelPayment}
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3144,7 +3144,7 @@ const HomePage: React.FC = () => {
               >
                 ✕
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3185,12 +3185,12 @@ const HomePage: React.FC = () => {
                 }}>
                   订单已发送给客户，我们会在1小时内联系您取件
                 </p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3243,13 +3243,13 @@ const HomePage: React.FC = () => {
                     fontSize: '0.9rem'
                   }}>
                     正在生成二维码...
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                   </div>
                 )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3263,7 +3263,7 @@ const HomePage: React.FC = () => {
                 快递员将扫描此二维码进行取件<br/>
                 请妥善保管此二维码
               </p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3315,7 +3315,7 @@ const HomePage: React.FC = () => {
                       borderTop: '2px solid white',
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3349,17 +3349,17 @@ const HomePage: React.FC = () => {
               >
                 关闭
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3396,7 +3396,7 @@ const HomePage: React.FC = () => {
               <h2 style={{ color: 'white', marginBottom: '1rem' }}>
                 选择{mapSelectionType === 'sender' ? t.order.sender : t.order.receiver}
               </h2>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3444,7 +3444,7 @@ const HomePage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3517,14 +3517,14 @@ const HomePage: React.FC = () => {
                     background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)',
                     color: '#4a5568'
                   }}>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
                     <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
                     <p style={{ margin: '0', opacity: 0.8 }}>请检查网络连接</p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3544,13 +3544,13 @@ const HomePage: React.FC = () => {
                       fontSize: '2rem', 
                       marginBottom: '1rem',
                       animation: 'spin 1s linear infinite'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                     }}>🌍</div>
                     <h3 style={{ margin: '0' }}>地图加载中...</h3>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3816,12 +3816,12 @@ const HomePage: React.FC = () => {
               >
                 📍
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3831,7 +3831,7 @@ const HomePage: React.FC = () => {
             <div style={{ marginBottom: '2rem' }}>
               <div style={{ marginBottom: '0.5rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
                 📍 点击地图、右键选择位置或点击店铺图标选择位置
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3872,7 +3872,7 @@ const HomePage: React.FC = () => {
                     marginBottom: '0.5rem'
                   }}>
                     ✅ 已选择: {selectedPOI.name}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3882,18 +3882,18 @@ const HomePage: React.FC = () => {
                     fontSize: '0.8rem'
                   }}>
                     类型: {selectedPOI.types.slice(0, 3).join(', ')}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                   </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
                 </div>
               )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -3993,17 +3993,17 @@ const HomePage: React.FC = () => {
               >
                 {t.ui.cancelPayment}
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4042,7 +4042,7 @@ const HomePage: React.FC = () => {
                 fontSize: '3.5rem', 
                 marginBottom: '0.5rem',
                 filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3))'
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4063,7 +4063,7 @@ const HomePage: React.FC = () => {
               }}>
                 选择您希望的配送时间
               </p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4149,12 +4149,12 @@ const HomePage: React.FC = () => {
                     {option.label}
                   </button>
                 ))}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4206,7 +4206,7 @@ const HomePage: React.FC = () => {
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4245,12 +4245,12 @@ const HomePage: React.FC = () => {
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4329,17 +4329,17 @@ const HomePage: React.FC = () => {
               >
                 ❌ {t.ui.cancel}
               </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
             </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4375,7 +4375,7 @@ const HomePage: React.FC = () => {
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>
                 {isLoginMode ? '🔐' : '📝'}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4396,7 +4396,7 @@ const HomePage: React.FC = () => {
                    'မှတ်ပုံတင်ရန် သင့်အချက်အလက်များဖြည့်ပါ')
                 }
               </p>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4438,7 +4438,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4488,7 +4488,7 @@ const HomePage: React.FC = () => {
                      language === 'en' ? 'Enter Myanmar phone number (starting with 09)' : 
                      'မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်)'}
                   </small>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4529,7 +4529,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4570,7 +4570,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4643,7 +4643,7 @@ const HomePage: React.FC = () => {
                       }
                     </button>
                   )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4660,7 +4660,7 @@ const HomePage: React.FC = () => {
                      'အတည်ပြုကုဒ်ကို သင့်အီးမေးလ်သို့ ပေးပို့ပါမည်'}
                   </small>
                 )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4699,7 +4699,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4742,7 +4742,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4783,7 +4783,7 @@ const HomePage: React.FC = () => {
                     onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
                     onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
                   />
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
@@ -4856,24 +4856,24 @@ const HomePage: React.FC = () => {
                 >
                   {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မလုပ်တော့'}
                 </button>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
               </div>
             </form>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
           </div>
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
         </div>
       )}
-              <div style={{ fontSize: x270.85remx27, color: x27#e53e3ex27, marginTop: x271remx27, textAlign: x27centerx27, fontWeight: x27500x27 }}>
+              <div style={{ fontSize: '0.85rem', color: '#e53e3e', marginTop: '1rem', textAlign: 'center', fontWeight: 500 }}>
                 {t.ui.paymentWarning}
               </div>
 
