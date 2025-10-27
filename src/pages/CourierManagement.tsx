@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';

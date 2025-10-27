@@ -190,3 +190,4 @@ export const ShakeView: React.FC<ShakeViewProps> = ({
     </Animated.View>
   );
 };
+

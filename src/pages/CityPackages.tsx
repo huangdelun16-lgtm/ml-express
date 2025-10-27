@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { packageService, Package, supabase, auditLogService, deliveryPhotoService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
+import { SkeletonCard } from '../components/SkeletonLoader';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();

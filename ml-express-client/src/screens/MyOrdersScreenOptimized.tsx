@@ -95,7 +95,22 @@ export default function MyOrdersScreen({ navigation }: any) {
       placeOrder: '立即下单',
       networkError: '网络连接失败',
       retry: '重试',
-    },
+    
+      packageTypes: {
+        'standard': '标准件',
+        'document': '文件',
+        'fragile': '易碎品',
+        'food': '食物和饮料',
+        'overweight': '超重件',
+        'oversized': '超规件',
+      },
+      statusTypes: {
+        'pending': '待取件',
+        'picked_up': '已取件',
+        'in_transit': '配送中',
+        'delivered': '已送达',
+        'cancelled': '已取消',
+      },},
     en: {
       title: 'My Orders',
       subtitle: 'View and manage your orders',
@@ -117,7 +132,22 @@ export default function MyOrdersScreen({ navigation }: any) {
       placeOrder: 'Place Order',
       networkError: 'Network connection failed',
       retry: 'Retry',
-    },
+    
+      packageTypes: {
+        'standard': 'Standard',
+        'document': 'Document',
+        'fragile': 'Fragile',
+        'food': 'Food & Beverage',
+        'overweight': 'Overweight',
+        'oversized': 'Oversized',
+      },
+      statusTypes: {
+        'pending': 'Pending',
+        'picked_up': 'Picked Up',
+        'in_transit': 'In Transit',
+        'delivered': 'Delivered',
+        'cancelled': 'Cancelled',
+      },},
     my: {
       title: 'ကျွန်ုပ်၏အမှာစာများ',
       subtitle: 'သင့်အမှာစာများကိုကြည့်ရှုနှင့်စီမံခန့်ခွဲပါ',
@@ -139,7 +169,22 @@ export default function MyOrdersScreen({ navigation }: any) {
       placeOrder: 'အမှာစာတင်ရန်',
       networkError: 'အင်တာနက်ချိတ်ဆက်မှုမအောင်မြင်ပါ',
       retry: 'ပြန်လည်ကြိုးစားပါ',
-    },
+    
+      packageTypes: {
+        'standard': 'စံပါဆယ်',
+        'document': 'စာရွက်စာတမ်း',
+        'fragile': 'အလွယ်တကူကျိုးပဲ့နိုင်သော',
+        'food': 'အစားအစာ နှင့် သောက်စရာ',
+        'overweight': 'အလွန်လေးသော',
+        'oversized': 'အလွန်ကြီးသော',
+      },
+      statusTypes: {
+        'pending': 'စောင့်ဆိုင်းဆဲ',
+        'picked_up': 'ထုပ်ယူပြီး',
+        'in_transit': 'ပို့ဆောင်နေသည်',
+        'delivered': 'ပို့ဆောင်ပြီး',
+        'cancelled': 'ပယ်ဖျက်ပြီး',
+      },},
   }), []);
 
   const t = translations[language] || translations.zh;
@@ -306,7 +351,7 @@ export default function MyOrdersScreen({ navigation }: any) {
       <View style={styles.orderHeader}>
         <Text style={styles.orderId}>#{order.id}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-          <Text style={styles.statusText}>{order.status}</Text>
+          <Text style={styles.statusText}>{translateStatus(order.status)}</Text>
         </View>
       </View>
       
@@ -349,7 +394,7 @@ export default function MyOrdersScreen({ navigation }: any) {
         </View>
         <View style={styles.orderInfo}>
           <Text style={styles.orderLabel}>📦 包裹:</Text>
-          <Text style={styles.orderValue}>{order.package_type} ({order.weight}kg)</Text>
+          <Text style={styles.orderValue}>{translatePackageType(order.package_type)} ({order.weight}kg)</Text>
         </View>
       </View>
       

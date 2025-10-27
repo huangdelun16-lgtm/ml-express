@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';

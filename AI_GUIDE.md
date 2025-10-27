@@ -1,5 +1,30 @@
 # MARKET LINK EXPRESS - AI 开发指南
 
+## 🚀 最新功能更新 (2024年10月24日)
+
+### ✅ Web系统价格估算功能优化
+- **问题解决**: 修复了价格估算窗口缺少重量费用显示的问题
+- **新增功能**: 
+  - 重量费用显示 (超过5KG时)
+  - 包裹类型费用显示 (超规件、易碎品、食品饮料)
+  - 配送速度费用显示 (加急配送、准时达)
+- **多语言支持**: 所有新增费用项目支持中文、英文、缅语
+- **部署状态**: ✅ 已成功部署到Netlify生产环境
+- **访问地址**: https://market-link-express.com
+
+### 📱 客户端APP优化
+- **UI优化**: 统一颜色主题、字体、间距、动画系统
+- **图标组件**: 创建统一的图标组件库
+- **动画效果**: 添加淡入、缩放、脉冲、震动动画
+- **iOS Store准备**: 完成所有上架材料准备
+
+### 🔧 技术改进
+- **依赖冲突解决**: 使用`--legacy-peer-deps`解决版本冲突
+- **通知服务**: 重新启用并优化通知功能
+- **坐标显示**: 完善经纬度坐标在订单中的显示
+
+---
+
 ## 📋 项目概览
 
 MARKET LINK EXPRESS 是一个完整的快递管理系统，包含三个主要组件：
@@ -1410,6 +1435,78 @@ const copyOrderNumber = async () => {
 - 重量: 8 KG
 - 配送员: AUNG AUNG
 
+### 💰 Web系统价格估算功能优化详情
+
+#### 🎯 问题背景
+用户反馈Web系统的"立即下单"弹窗中的"价格估算"部分缺少重量费用的显示，只显示了基础费用和距离费用，导致总费用计算不透明。
+
+#### ✅ 解决方案
+1. **新增重量费用显示**
+   - 当重量超过5KG时显示重量费用
+   - 计算公式: `(重量 - 5) × 重量附加费率`
+   - 颜色编码: 红色 (#ef4444)
+
+2. **新增包裹类型费用显示**
+   - 超规件: 按距离计算附加费
+   - 易碎品: 固定附加费
+   - 食品和饮料: 按距离计算附加费
+   - 颜色编码: 橙色 (#f97316)
+
+3. **新增配送速度费用显示**
+   - 加急配送: 固定附加费
+   - 准时达: 固定附加费
+   - 颜色编码: 青色 (#06b6d4)
+
+#### 🌍 多语言支持
+所有新增费用项目都支持三种语言：
+- **中文**: 重量费用、包裹类型费用、配送速度费用
+- **English**: Weight Fee、Package Type Fee、Delivery Speed Fee
+- **Myanmar**: အလေးချိန်အခ、ပစ္စည်းအမျိုးအစားအခ、ပို့ဆောင်မြန်နှုန်းအခ
+
+#### 🔧 技术实现
+```typescript
+// 重量费用计算
+const weightNum = parseFloat(weight) || 1;
+const weightThreshold = 5;
+const weightFee = weightNum > weightThreshold ? 
+  (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
+
+// 包裹类型费用计算
+let packageTypeFee = 0;
+if (packageType === '超规件') {
+  packageTypeFee = distance * pricingSettings.oversizeSurcharge;
+} else if (packageType === '易碎品') {
+  packageTypeFee = pricingSettings.fragileSurcharge;
+} else if (packageType === '食品和饮料') {
+  packageTypeFee = distance * pricingSettings.foodBeverageSurcharge;
+}
+
+// 配送速度费用计算
+let speedFee = 0;
+if (deliverySpeed === '加急配送') {
+  speedFee = pricingSettings.urgentSurcharge;
+} else if (deliverySpeed === '准时达') {
+  speedFee = pricingSettings.scheduledSurcharge;
+}
+```
+
+#### 📊 优化后的价格估算显示
+现在价格估算窗口将显示完整的费用构成：
+1. **配送距离**: X公里
+2. **基础费用**: 1500 MMK (蓝色)
+3. **距离费用**: X MMK (紫色)
+4. **重量费用**: X MMK (红色) - **新增**
+5. **包裹类型费用**: X MMK (橙色) - **新增**
+6. **配送速度费用**: X MMK (青色) - **新增**
+7. **总费用**: X MMK (橙色)
+
+#### 🚀 部署状态
+- **部署平台**: Netlify
+- **生产环境URL**: https://market-link-express.com
+- **部署时间**: 2024年10月24日
+- **构建状态**: ✅ 成功
+- **功能状态**: ✅ 正常运行
+
 ### 🚀 iOS Store上架准备
 
 #### 📋 上架前检查清单
@@ -1431,7 +1528,7 @@ const copyOrderNumber = async () => {
 
 ---
 
-*最后更新：2025年10月24日*
-*版本：3.3.0*
+*最后更新：2024年10月24日*
+*版本：3.5.0*
 *状态：生产环境运行中*
-*新增功能：追踪功能修复 + 订单号复制功能 + 依赖问题解决 + iOS上架准备*
+*新增功能：Web价格估算优化 + Netlify部署 + 客户端APP UI优化 + iOS Store准备*

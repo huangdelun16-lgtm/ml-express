@@ -130,6 +130,24 @@ export default function MyOrdersScreen({ navigation }: any) {
       packageType: 'အမျိုးအစား',
       weight: 'အလေးချိန်',
       courier: 'ပို့ဆောင်သူ',
+      // 包裹类型翻译
+      packageTypes: {
+        'standard': 'စံပါဆယ်',
+        'document': 'စာရွက်စာတမ်း',
+        'fragile': 'အလွယ်တကူကျိုးပဲ့နိုင်သော',
+        'food': 'အစားအစာ နှင့် သောက်စရာ',
+        'overweight': 'အလွန်လေးသော',
+        'oversized': 'အလွန်ကြီးသော',
+      },
+      // 状态翻译
+      statusTypes: {
+        'pending': 'စောင့်ဆိုင်းဆဲ',
+        'picked_up': 'ထုပ်ယူပြီး',
+        'in_transit': 'ပို့ဆောင်နေသည်',
+        'delivered': 'ပို့ဆောင်ပြီး',
+        'cancelled': 'ပယ်ဖျက်ပြီး',
+      },
+
     },
   };
 
@@ -231,6 +249,32 @@ export default function MyOrdersScreen({ navigation }: any) {
   const getStatusColor = (status: string) => {
     const filter = statusFilters.find(f => f.key === status);
     return filter?.color || '#6b7280';
+  };
+
+  // 翻译包裹类型
+  const getPackageTypeTranslation = (type: string) => {
+    const t = translations[language];
+    if (!t || !t.packageTypes) return type;
+    
+    const typeLower = type.toLowerCase();
+    return t.packageTypes[typeLower] || type;
+  };
+  
+  // 翻译状态
+  const getStatusTranslation = (status: string) => {
+    const t = translations[language];
+    if (!t || !t.statusTypes) return status;
+    
+    // 中文状态映射
+    const statusMap: {[key: string]: string} = {
+      '待取件': t.statusTypes['pending'] || status,
+      '已取件': t.statusTypes['picked_up'] || status,
+      '配送中': t.statusTypes['in_transit'] || status,
+      '已送达': t.statusTypes['delivered'] || status,
+      '已取消': t.statusTypes['cancelled'] || status,
+    };
+    
+    return statusMap[status] || status;
   };
 
   // 格式化日期
@@ -383,11 +427,11 @@ export default function MyOrdersScreen({ navigation }: any) {
               {/* 订单头部 */}
               <View style={styles.orderHeader}>
                 <View style={styles.orderHeaderLeft}>
-                  <Text style={styles.orderPackageType}>{order.package_type}</Text>
+                  <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
                   <Text style={styles.orderWeight}>{order.weight}</Text>
                 </View>
                 <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
-                  <Text style={styles.orderStatusText}>{order.status}</Text>
+                  <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
                 </View>
               </View>
 
