@@ -14,6 +14,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [courierDetail, setCourierDetail] = useState<any>(null);
   const [courierLoading, setCourierLoading] = useState(false);
   
