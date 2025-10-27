@@ -828,6 +828,7 @@ const HomePage: React.FC = () => {
         weightFee: '重量费用',
         speedFee: '速度费用'
       }
+      },
     en: {
       nav: {
         home: 'Home',
