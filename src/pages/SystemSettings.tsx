@@ -322,6 +322,8 @@ const [activeTab, setActiveTab] = useState<'billing' | 'automation' | 'security'
 
   const [loading, setLoading] = useState(true);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [settingsMetadata, setSettingsMetadata] = useState<Record<string, { updated_at?: string | null; updated_by?: string | null }>>({});
