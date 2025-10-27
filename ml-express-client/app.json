@@ -8,7 +8,17 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "MARKET LINK EXPRESS - 专业的快递配送服务平台，提供快速、安全、可靠的包裹配送服务。支持实时追踪、多语言界面和智能路线规划。",
-    "keywords": ["快递", "配送", "包裹", "追踪", "物流", "delivery", "express", "shipping", "tracking"],
+    "keywords": [
+      "快递",
+      "配送",
+      "包裹",
+      "追踪",
+      "物流",
+      "delivery",
+      "express",
+      "shipping",
+      "tracking"
+    ],
     "privacy": "public",
     "splash": {
       "image": "./assets/splash.png",
@@ -36,7 +46,9 @@
         "CFBundleVersion": "1",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
-        "UIRequiredDeviceCapabilities": ["armv7"],
+        "UIRequiredDeviceCapabilities": [
+          "armv7"
+        ],
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown"
@@ -87,6 +99,18 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
+        }
+      ],
+      "expo-sqlite",
+      "sentry-expo",
+      [
+        "expo-sqlite"
+      ],
+      [
+        "sentry-expo",
+        {
+          "organization": "your-org",
+          "project": "ml-express"
         }
       ]
     ],
