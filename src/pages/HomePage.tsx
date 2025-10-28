@@ -600,6 +600,8 @@ const HomePage: React.FC = () => {
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
     try {
+      console.log('生成订单二维码，订单ID:', orderId);
+      
       const qrCodeUrl = await QRCode.toDataURL(orderId, {
         width: 200,
         margin: 2,
@@ -608,9 +610,13 @@ const HomePage: React.FC = () => {
           light: '#FFFFFF'
         }
       });
+      
+      console.log('二维码生成成功，数据长度:', qrCodeUrl?.length || 0);
       setQrCodeDataUrl(qrCodeUrl);
+      console.log('二维码已设置到状态变量qrCodeDataUrl');
     } catch (error) {
-      console.error(t.errors.qrGenerationFailed, error);
+      console.error('二维码生成失败:', error);
+      alert('二维码生成失败，但订单已创建成功。订单号：' + orderId);
     }
   };
 
@@ -2801,11 +2807,20 @@ const HomePage: React.FC = () => {
                     localStorage.removeItem('pendingOrder');
                     
                     // 使用包裹ID生成二维码
+                    console.log('开始生成订单二维码，包裹ID:', packageId);
                     setGeneratedOrderId(packageId);
+                    
+                    // 等待二维码生成完成
                     await generateQRCode(packageId);
+                    
+                    console.log('二维码生成完成，准备显示订单成功模态框');
                     
                     // 关闭支付模态框，显示订单成功模态框
                     setShowPaymentModal(false);
+                    
+                    // 添加短暂延迟确保二维码已设置
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
                     setShowOrderSuccessModal(true);
                   } else {
                     console.error('包裹创建失败，检查控制台获取详细错误信息');
