@@ -4,63 +4,13 @@ import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
+import { Courier, CourierWithLocation, Coordinates, DeliveryStore } from '../types';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
+const GOOGLE_MAPS_LIBRARIES = ['places'] as const;
 
-// 快递员数据接口（扩展数据库接口）
-interface Courier {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  vehicle_type?: string;
-  license_number?: string;
-  status: string;
-  join_date?: string;
-  last_active?: string;
-  total_deliveries?: number;
-  rating?: number;
-  notes?: string;
-  // 位置信息
-  latitude?: number;
-  longitude?: number;
-  // 实时状态
-  currentPackages?: number;
-  todayDeliveries?: number;
-  batteryLevel?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface CourierWithLocation extends Courier {
-  location?: CourierLocation;
-}
-
-interface DeliveryStore {
-  id?: string;
-  store_name: string;
-  store_code: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  phone: string;
-  email?: string;
-  manager_name: string;
-  manager_phone: string;
-  store_type: 'hub' | 'branch' | 'pickup_point' | 'transit_station';
-  status: 'active' | 'inactive' | 'maintenance';
-  operating_hours: string;
-  service_area_radius: number;
-  capacity: number;
-  facilities?: string[];
-  notes?: string;
-  created_by?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+// 配送商店接口已在types/index.ts中定义
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -70,8 +20,8 @@ const [packages, setPackages] = useState<Package[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('yangon');
-  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [selectedCity, setSelectedCity] = useState<'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe'>('yangon');
+  const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
