@@ -43,7 +43,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
     vehicle_type: 'motorcycle',
     license_number: '',
     status: 'active',
-    notes: ''
+    notes: '',
+    employee_id: '',
+    department: '',
+    position: '',
+    role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
+    region: 'yangon' as 'yangon' | 'mandalay'
   });
 
   // 加载快递员数据
@@ -74,6 +79,50 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 自动生成员工编号
+  const generateEmployeeId = (region: string, position: string, role: string): string => {
+    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+    
+    // 根据角色确定职位类型
+    let positionType = '';
+    if (position.includes('骑手') || position === '骑手') {
+      positionType = 'RIDER';
+    } else if (role === 'finance' || position.includes('财务')) {
+      positionType = 'ACCOUNT';
+    } else if (role === 'manager' || position.includes('经理')) {
+      positionType = 'MANAGER';
+    } else if (role === 'admin' || position.includes('管理员')) {
+      positionType = 'ADMIN';
+    } else {
+      positionType = 'STAFF';
+    }
+    
+    // 获取该区域该类型的现有账号数量（需要从admin_accounts表查询）
+    // 这里简化处理，使用couriers表作为参考
+    const filteredCouriers = couriers.filter(c => {
+      const idPrefix = `${regionPrefix}-${positionType}`;
+      return c.employee_id && c.employee_id.startsWith(idPrefix);
+    });
+    
+    // 生成下一个编号
+    const nextNumber = (filteredCouriers.length + 1).toString().padStart(3, '0');
+    return `${regionPrefix}-${positionType}-${nextNumber}`;
+  };
+
+  // 处理表单输入变化，自动生成员工编号
+  const handleFormChange = (field: string, value: any) => {
+    setCourierForm(prev => {
+      const newData = { ...prev, [field]: value };
+      // 当选择区域、职位或角色时，自动生成员工编号
+      if ((field === 'region' || field === 'position' || field === 'role') && 
+          newData.region && newData.position && newData.role) {
+        const autoId = generateEmployeeId(newData.region, newData.position, newData.role);
+        return { ...newData, employee_id: autoId };
+      }
+      return newData;
+    });
   };
 
   // 从账号系统导入骑手
@@ -204,7 +253,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
         vehicle_type: 'motorcycle',
         license_number: '',
         status: 'active',
-        notes: ''
+        notes: '',
+        employee_id: '',
+        department: '',
+        position: '',
+        role: 'operator',
+        region: 'yangon'
       });
       setActiveTab('list');
     } catch (error) {
@@ -771,9 +825,36 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
 
         {activeTab === 'create' && (
           <div>
-            <h2 style={{ color: 'white', marginBottom: '20px' }}>
-              {editingCourier ? '编辑快递员' : '添加快递员'}
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ color: 'white', margin: 0 }}>
+                {editingCourier ? '编辑快递员' : '添加快递员'}
+              </h2>
+              {/* 区域选择下拉框 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 500, color: 'white' }}>区域：</label>
+                <select
+                  value={courierForm.region}
+                  onChange={(e) => handleFormChange('region', e.target.value)}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    border: '2px solid #4299e1',
+                    background: 'rgba(15, 32, 60, 0.55)',
+                    color: 'white',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLSelectElement).style.borderColor = '#63b3ed'}
+                  onMouseLeave={(e) => (e.target as HTMLSelectElement).style.borderColor = '#4299e1'}
+                >
+                  <option value="yangon" style={{ color: '#000' }}>仰光 (YGN)</option>
+                  <option value="mandalay" style={{ color: '#000' }}>曼德勒 (MDY)</option>
+                </select>
+              </div>
+            </div>
             <form onSubmit={editingCourier ? handleUpdateCourier : handleCreateCourier}>
               <div style={{
                 display: 'grid',
@@ -800,6 +881,113 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
                       fontSize: '1rem'
                     }}
                   />
+                </div>
+                <div>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px' }}>
+                    员工编号 * (自动生成)
+                  </label>
+                  <input
+                    type="text"
+                    value={courierForm.employee_id}
+                    readOnly
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(72, 187, 120, 0.5)',
+                      background: 'rgba(72, 187, 120, 0.1)',
+                      color: '#48bb78',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: 'not-allowed'
+                    }}
+                    placeholder="请先选择区域、职位和角色"
+                  />
+                </div>
+                <div>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px' }}>
+                    部门 *
+                  </label>
+                  <select
+                    value={courierForm.department}
+                    onChange={(e) => handleFormChange('department', e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="" style={{ color: '#000' }}>请选择部门</option>
+                    <option value="运营部" style={{ color: '#000' }}>运营部</option>
+                    <option value="配送部" style={{ color: '#000' }}>配送部</option>
+                    <option value="客服部" style={{ color: '#000' }}>客服部</option>
+                    <option value="财务部" style={{ color: '#000' }}>财务部</option>
+                    <option value="技术部" style={{ color: '#000' }}>技术部</option>
+                    <option value="人事部" style={{ color: '#000' }}>人事部</option>
+                    <option value="市场部" style={{ color: '#000' }}>市场部</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px' }}>
+                    职位 *
+                  </label>
+                  <select
+                    value={courierForm.position}
+                    onChange={(e) => handleFormChange('position', e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="" style={{ color: '#000' }}>请选择职位</option>
+                    <option value="总经理" style={{ color: '#000' }}>总经理</option>
+                    <option value="部门经理" style={{ color: '#000' }}>部门经理</option>
+                    <option value="主管" style={{ color: '#000' }}>主管</option>
+                    <option value="骑手队长" style={{ color: '#000' }}>骑手队长</option>
+                    <option value="骑手" style={{ color: '#000' }}>骑手</option>
+                    <option value="客服专员" style={{ color: '#000' }}>客服专员</option>
+                    <option value="财务专员" style={{ color: '#000' }}>财务专员</option>
+                    <option value="技术专员" style={{ color: '#000' }}>技术专员</option>
+                    <option value="操作员" style={{ color: '#000' }}>操作员</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: 'white', display: 'block', marginBottom: '8px' }}>
+                    角色 *
+                  </label>
+                  <select
+                    value={courierForm.role}
+                    onChange={(e) => handleFormChange('role', e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="operator" style={{ color: '#000' }}>操作员</option>
+                    <option value="manager" style={{ color: '#000' }}>经理</option>
+                    <option value="admin" style={{ color: '#000' }}>管理员</option>
+                    <option value="finance" style={{ color: '#000' }}>财务</option>
+                  </select>
                 </div>
                 <div>
                   <label style={{ color: 'white', display: 'block', marginBottom: '8px' }}>
@@ -980,7 +1168,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
                       vehicle_type: 'motorcycle',
                       license_number: '',
                       status: 'active',
-                      notes: ''
+                      notes: '',
+                      employee_id: '',
+                      department: '',
+                      position: '',
+                      role: 'operator',
+                      region: 'yangon'
                     });
                     setActiveTab('list');
                   }}
