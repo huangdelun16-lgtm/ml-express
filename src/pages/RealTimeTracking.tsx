@@ -112,9 +112,24 @@ const [packages, setPackages] = useState<Package[]>([]);
       const data = await packageService.getAllPackages();
       console.log('📦 加载的所有包裹:', data);
       
+      // 根据当前选择城市过滤包裹
+      const cityPrefixMap: { [key: string]: string[] } = {
+        'yangon': ['YGN', 'YGN1'],  // 仰光
+        'mandalay': ['MDY', 'MDY1'] // 曼德勒
+      };
+      
+      const prefixes = cityPrefixMap[selectedCity] || [];
+      const cityPackages = data.filter(p => {
+        // 根据包裹ID前缀判断城市
+        const matchesPrefix = prefixes.some(prefix => p.id.startsWith(prefix));
+        return matchesPrefix;
+      });
+      
+      console.log(`📦 当前城市(${selectedCity})的包裹:`, cityPackages.length, '个');
+      
       // 分离不同状态的包裹
-      const pendingPackages = data.filter(p => p.status === '待取件');
-      const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
+      const pendingPackages = cityPackages.filter(p => p.status === '待取件');
+      const assignedPackages = cityPackages.filter(p => p.status === '已取件' || p.status === '配送中');                                                                
       
       console.log('📦 待分配包裹:', pendingPackages.length, '个');
       console.log('📦 已分配包裹:', assignedPackages.length, '个');
@@ -136,6 +151,7 @@ const [packages, setPackages] = useState<Package[]>([]);
       setPackages([]);
     }
   };
+
 
   const loadCouriers = async () => {
     try {
