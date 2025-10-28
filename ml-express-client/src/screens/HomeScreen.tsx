@@ -356,6 +356,7 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.statCard}
                 activeOpacity={0.7}
+                onPress={() => navigation.navigate('MyOrders', { filterStatus: '待取件' })}
               >
                 <LinearGradient
                   colors={['#f59e0b', '#d97706']}
@@ -371,6 +372,7 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.statCard}
                 activeOpacity={0.7}
+                onPress={() => navigation.navigate('MyOrders', { filterStatus: '配送中' })}
               >
                 <LinearGradient
                   colors={['#8b5cf6', '#7c3aed']}
@@ -386,6 +388,7 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.statCard}
                 activeOpacity={0.7}
+                onPress={() => navigation.navigate('MyOrders', { filterStatus: '已送达' })}
               >
                 <LinearGradient
                   colors={['#10b981', '#059669']}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,6 +9,11 @@ import { LoadingProvider } from './src/contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
 import NotificationService from './src/services/notificationService';
+// import { UpdateService } from './src/services/UpdateService';
+// import { sentryService } from './src/services/SentryService';
+// import { linkingService } from './src/services/LinkingService';
+// import { databaseService } from './src/services/DatabaseService';
+import * as Linking from 'expo-linking';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -142,11 +147,41 @@ const styles = StyleSheet.create({
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const navigationRef = useRef<any>(null);
 
   useEffect(() => {
-    checkLoginStatus();
-    initializeNotificationService();
+    initializeApp();
   }, []);
+
+  // 初始化所有服务
+  const initializeApp = async () => {
+    try {
+      // 初始化Sentry
+      sentryService.init();
+      
+      // 初始化数据库
+      await databaseService.initialize();
+      
+      // 设置深度链接
+      linkingService.setNavigationRef(navigationRef.current);
+      await linkingService.handleInitialURL();
+      linkingService.setupURLListener();
+      
+      // 检查应用更新
+      if (!__DEV__) {
+        await UpdateService.checkForUpdates();
+      }
+      
+      // 初始化通知服务
+      await initializeNotificationService();
+      
+      // 检查登录状态
+      await checkLoginStatus();
+    } catch (error) {
+      console.error('应用初始化失败:', error);
+      sentryService.captureException(error as Error);
+    }
+  };
 
   // 初始化通知服务
   const initializeNotificationService = async () => {
@@ -157,6 +192,7 @@ export default function App() {
       console.log('通知服务初始化成功');
     } catch (error) {
       console.error('通知服务初始化失败:', error);
+      sentryService.captureException(error as Error);
     }
   };
 
@@ -164,8 +200,16 @@ export default function App() {
     try {
       const userId = await AsyncStorage.getItem('userId');
       setIsLoggedIn(!!userId);
+      
+      // 设置Sentry用户
+      if (userId) {
+        sentryService.setUser(userId, {
+          loginTime: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       console.error('检查登录状态失败:', error);
+      sentryService.captureException(error as Error);
       setIsLoggedIn(false);
     }
   };
@@ -177,7 +221,7 @@ export default function App() {
   return (
     <AppProvider>
       <LoadingProvider>
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
           <Stack.Navigator
             initialRouteName={isLoggedIn ? "Main" : "Login"}
             screenOptions={{

@@ -45,12 +45,13 @@ interface Order {
   customer_comment?: string;
 }
 
-export default function MyOrdersScreen({ navigation }: any) {
+export default function MyOrdersScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  // 从路由参数中获取筛选状态，默认为'all'
+  const [selectedStatus, setSelectedStatus] = useState(route?.params?.filterStatus || 'all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
