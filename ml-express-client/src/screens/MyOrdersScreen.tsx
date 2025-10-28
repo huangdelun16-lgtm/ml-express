@@ -176,6 +176,23 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     loadCustomerId();
   }, []);
 
+  // 监听路由参数变化，自动设置筛选状态
+  useEffect(() => {
+    if (route?.params?.filterStatus) {
+      const filterStatus = route.params.filterStatus;
+      if (filterStatus !== selectedStatus) {
+        setSelectedStatus(filterStatus);
+      }
+    }
+  }, [route?.params?.filterStatus]);
+
+  // 当订单数据加载完成后，应用初始筛选
+  useEffect(() => {
+    if (orders.length > 0 && selectedStatus) {
+      filterOrders(orders, selectedStatus);
+    }
+  }, [orders, selectedStatus]);
+
   const loadCustomerId = async () => {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
