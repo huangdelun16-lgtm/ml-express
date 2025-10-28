@@ -407,6 +407,33 @@ const [packages, setPackages] = useState<Package[]>([]);
       setMapCenter({ lat: city.lat, lng: city.lng });
     }
   };
+  
+  // 根据城市过滤包裹
+  const filterPackagesByCity = (pkgList: Package[]) => {
+    const cityPrefixMap: { [key: string]: string } = {
+      'yangon': 'YGN',
+      'mandalay': 'MDY',
+      'naypyidaw': 'NYT',
+      'bago': 'BGO',
+      'mawlamyine': 'MWL',
+      'pathein': 'PAT',
+      'monywa': 'MON',
+      'myitkyina': 'MYI',
+      'taunggyi': 'TAU',
+      'sittwe': 'SIT'
+    };
+    
+    const prefix = cityPrefixMap[selectedCity] || 'ALL';
+    
+    if (prefix === 'ALL') {
+      return pkgList;
+    }
+    
+    return pkgList.filter(pkg => {
+      // 检查包裹ID是否以该城市的前缀开头
+      return pkg.id.startsWith(prefix);
+    });
+  };
 
   return (
     <div style={{ 
@@ -496,7 +523,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             borderRadius: '8px',
             fontWeight: 'bold'
           }}>
-            📦 待分配: {packages.filter(p => p.status === '待取件').length}
+            📦 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件').length}
           </div>
         </div>
       </div>
@@ -823,10 +850,10 @@ const [packages, setPackages] = useState<Package[]>([]);
               {/* 待分配包裹 */}
               <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ⏳ 待分配包裹 ({packages.filter(p => p.status === '待取件').length})
+              ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件').length})
             </h3>
 
-          {packages.filter(p => p.status === '待取件').length === 0 ? (
+          {filterPackagesByCity(packages).filter(p => p.status === '待取件').length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '3rem',
@@ -836,7 +863,7 @@ const [packages, setPackages] = useState<Package[]>([]);
               <p>当前没有待分配的包裹</p>
             </div>
           ) : (
-            packages
+            filterPackagesByCity(packages)
               .filter(p => p.status === '待取件')
               .map(pkg => (
                 <div
@@ -981,10 +1008,10 @@ const [packages, setPackages] = useState<Package[]>([]);
           {/* 已分配包裹 */}
           <div>
             <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ✅ 已分配包裹 ({packages.filter(p => p.status === '已取件' || p.status === '配送中').length})
+              ✅ 已分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length})
             </h3>
             
-            {packages.filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
+            {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
               <div style={{
                 textAlign: 'center',
                 padding: '2rem',
@@ -994,7 +1021,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                 <p>暂无已分配包裹</p>
               </div>
             ) : (
-              packages
+              filterPackagesByCity(packages)
                 .filter(p => p.status === '已取件' || p.status === '配送中')
                 .map(pkg => (
                   <div
