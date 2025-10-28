@@ -27,8 +27,11 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
 
   const loadData = async () => {
     setLoading(true);
+    // 自动删除一周前的数据
+    await auditLogService.deleteOldLogs(7);
+    
     const [logsData, accountsData] = await Promise.all([
-      auditLogService.getAllLogs(1000),
+      auditLogService.getAllLogs(5000),
       adminAccountService.getAllAccounts()
     ]);
     setLogs(logsData);

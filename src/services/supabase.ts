@@ -1414,7 +1414,7 @@ export const auditLogService = {
   },
 
   // 获取所有日志
-  async getAllLogs(limit: number = 500): Promise<AuditLog[]> {
+  async getAllLogs(limit: number = 5000): Promise<AuditLog[]> {
     try {
       const { data, error } = await supabase
         .from('audit_logs')
@@ -1519,6 +1519,40 @@ export const auditLogService = {
     } catch (err) {
       console.error('获取时间范围审计日志异常:', err);
       return [];
+    }
+  },
+
+  // 删除指定天数前的旧日志
+  async deleteOldLogs(days: number): Promise<boolean> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      const cutoffDateStr = cutoffDate.toISOString();
+
+      console.log(`🗑️  开始删除 ${days} 天前的审计日志 (早于 ${cutoffDateStr})`);
+
+      // 先查询要删除的记录数
+      const { count: queryCount } = await supabase
+        .from('audit_logs')
+        .select('*', { count: 'exact', head: true })
+        .lt('action_time', cutoffDateStr);
+
+      // 执行删除
+      const { error } = await supabase
+        .from('audit_logs')
+        .delete()
+        .lt('action_time', cutoffDateStr);
+
+      if (error) {
+        console.error('删除旧审计日志失败:', error);
+        return false;
+      }
+
+      console.log(`✅ 已删除 ${queryCount || 0} 条旧审计日志`);
+      return true;
+    } catch (err) {
+      console.error('删除旧审计日志异常:', err);
+      return false;
     }
   }
 };
