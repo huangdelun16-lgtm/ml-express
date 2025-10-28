@@ -339,7 +339,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.statsGrid}>
               <TouchableOpacity
                 style={styles.statCard}
-                onPress={() => navigation.navigate('MyOrders')}
+                onPress={() => navigation.navigate('MyOrders', { filterStatus: 'all' })}
                 activeOpacity={0.7}
               >
                 <LinearGradient
