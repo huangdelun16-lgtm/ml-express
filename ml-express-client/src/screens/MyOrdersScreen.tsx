@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -55,6 +55,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  
+  // 筛选卡片的位置记录
+  const filterCardPositions = useRef<{[key: string]: number}>({});
+  // ScrollView引用
+  const scrollViewRef = useRef<ScrollView>(null);
   
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -193,6 +198,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   }, [orders, selectedStatus]);
 
+  // 当筛选状态改变且从首页跳转来时，自动滚动到对应卡片
+  useEffect(() => {
+    if (route?.params?.filterStatus && selectedStatus === route.params.filterStatus) {
+      // 延迟滚动，确保布局已完成
+      setTimeout(() => {
+        scrollToFilter(selectedStatus);
+      }, 300);
+    }
+  }, [route?.params?.filterStatus, selectedStatus]);
+
   const loadCustomerId = async () => {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
@@ -257,10 +272,31 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   };
 
+  // 居中滚动到指定筛选卡片
+  const scrollToFilter = (status: string) => {
+    if (!scrollViewRef.current) return;
+    
+    const position = filterCardPositions.current[status];
+    if (position !== undefined) {
+      const cardWidth = 120; // 筛选卡片的宽度（包括间距）
+      const screenWidth = Dimensions.get('window').width;
+      
+      // 计算居中位置：卡片位置 - (屏幕宽度 - 卡片宽度) / 2
+      const scrollX = position - (screenWidth - cardWidth) / 2;
+      
+      scrollViewRef.current.scrollTo({
+        x: Math.max(0, scrollX),
+        animated: true,
+      });
+    }
+  };
+
   // 切换状态筛选
   const handleStatusChange = (status: string) => {
     setSelectedStatus(status);
     filterOrders(orders, status);
+    // 滚动到选中卡片
+    scrollToFilter(status);
   };
 
   // 获取状态颜色
@@ -349,6 +385,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       {/* 状态筛选器 */}
       <View style={styles.filtersContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersContent}
@@ -361,6 +398,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 selectedStatus === filter.key && styles.filterChipActive,
               ]}
               onPress={() => handleStatusChange(filter.key)}
+              onLayout={(event) => {
+                const { x } = event.nativeEvent.layout;
+                filterCardPositions.current[filter.key] = x;
+              }}
               activeOpacity={0.7}
             >
               <LinearGradient
