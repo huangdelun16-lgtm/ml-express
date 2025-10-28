@@ -1081,7 +1081,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 生成缅甸时间格式的包裹ID
+  // 生成缅甸时间格式的包裹ID（根据城市自动选择前缀）
   const generateMyanmarPackageId = () => {
     const now = new Date();
     // 缅甸时间 (UTC+6:30)
@@ -1095,7 +1095,23 @@ const HomePage: React.FC = () => {
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
-    return `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+    // 根据选中的城市生成对应的前缀
+    const cityPrefixMap: { [key: string]: string } = {
+      'yangon': 'YGN',
+      'mandalay': 'MDY',
+      'naypyidaw': 'NYT',
+      'mawlamyine': 'MWL',
+      'pathein': 'PAT',
+      'monywa': 'MON',
+      'myitkyina': 'MYI',
+      'taunggyi': 'TAU',
+      'sittwe': 'SIT',
+      'kalay': 'KAL'
+    };
+    
+    const prefix = cityPrefixMap[selectedCity] || 'MDY'; // 默认使用MDY
+    
+    return `${prefix}${year}${month}${day}${hour}${minute}${random1}${random2}`;
   };
 
   // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
