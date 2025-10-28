@@ -65,7 +65,8 @@ const AccountManagement: React.FC = () => {
     emergency_contact: '',
     emergency_phone: '',
     address: '',
-    notes: ''
+    notes: '',
+    region: 'yangon' as 'yangon' | 'mandalay'
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -87,7 +88,50 @@ const AccountManagement: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // 当选择区域、职位或角色时，自动生成员工编号
+    if (name === 'region' || name === 'position' || name === 'role') {
+      setFormData(prev => {
+        const newData = { ...prev, [name]: value };
+        // 如果三个字段都有值，自动生成员工编号
+        if (newData.region && newData.position && newData.role) {
+          const autoId = generateEmployeeId(newData.region, newData.position, newData.role);
+          return { ...newData, employee_id: autoId };
+        }
+        return newData;
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // 自动生成员工编号
+  const generateEmployeeId = (region: string, position: string, role: string): string => {
+    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+    
+    // 根据角色确定职位类型
+    let positionType = '';
+    if (position.includes('骑手') || position === '骑手') {
+      positionType = 'RIDER';
+    } else if (role === 'finance' || position.includes('财务')) {
+      positionType = 'ACCOUNT';
+    } else if (role === 'manager' || position.includes('经理')) {
+      positionType = 'MANAGER';
+    } else if (role === 'admin' || position.includes('管理员')) {
+      positionType = 'ADMIN';
+    } else {
+      positionType = 'STAFF';
+    }
+    
+    // 获取该区域该类型的现有账号数量
+    const filteredAccounts = accounts.filter(acc => {
+      const idPrefix = `${regionPrefix}-${positionType}`;
+      return acc.employee_id && acc.employee_id.startsWith(idPrefix);
+    });
+    
+    // 生成下一个编号
+    const nextNumber = (filteredAccounts.length + 1).toString().padStart(3, '0');
+    return `${regionPrefix}-${positionType}-${nextNumber}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,11 +139,14 @@ const AccountManagement: React.FC = () => {
     setErrorMessage(null);
 
     try {
+      // 自动生成员工编号（如果没有手动输入）
+      const autoEmployeeId = generateEmployeeId(formData.region, formData.position, formData.role);
+      
       const newAccount = {
         username: formData.username,
         password: formData.password,
         employee_name: formData.employee_name,
-        employee_id: formData.employee_id,
+        employee_id: formData.employee_id || autoEmployeeId,
         phone: formData.phone,
         email: formData.email,
         department: formData.department,
@@ -115,7 +162,7 @@ const AccountManagement: React.FC = () => {
       };
 
       await adminAccountService.createAccount(newAccount);
-      setSuccessMessage('账号创建成功！');
+      setSuccessMessage(`账号创建成功！员工编号：${formData.employee_id || autoEmployeeId}`);
       setFormData({
         username: '',
         password: '',
@@ -132,7 +179,8 @@ const AccountManagement: React.FC = () => {
         emergency_contact: '',
         emergency_phone: '',
         address: '',
-        notes: ''
+        notes: '',
+        region: 'yangon'
       });
       setShowForm(false);
       loadAccounts();
@@ -545,7 +593,35 @@ const AccountManagement: React.FC = () => {
             marginBottom: '32px',
             border: '1px solid rgba(255,255,255,0.1)'
           }}>
-            <h2 style={{ marginBottom: '24px' }}>创建新账号</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0 }}>创建新账号</h2>
+              {/* 区域选择下拉框 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>区域：</label>
+                <select
+                  name="region"
+                  value={formData.region}
+                  onChange={handleInputChange}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    border: '2px solid #4299e1',
+                    background: 'rgba(15, 32, 60, 0.55)',
+                    color: 'white',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLSelectElement).style.borderColor = '#63b3ed'}
+                  onMouseLeave={(e) => (e.target as HTMLSelectElement).style.borderColor = '#4299e1'}
+                >
+                  <option value="yangon" style={{ color: '#000' }}>仰光 (YGN)</option>
+                  <option value="mandalay" style={{ color: '#000' }}>曼德勒 (MDY)</option>
+                </select>
+              </div>
+            </div>
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: isMobile ? '12px' : '20px' }}>
                 <div>
@@ -619,24 +695,26 @@ const AccountManagement: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    员工编号 *
+                    员工编号 * （自动生成）
                   </label>
                   <input
                     type="text"
                     name="employee_id"
                     value={formData.employee_id}
-                    onChange={handleInputChange}
+                    readOnly
                     style={{
                       width: '100%',
                       padding: '12px',
                       borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
+                      border: '1px solid rgba(72, 187, 120, 0.5)',
+                      background: 'rgba(72, 187, 120, 0.1)',
+                      color: '#48bb78',
                       fontSize: '1rem',
-                      outline: 'none'
+                      outline: 'none',
+                      fontWeight: 'bold',
+                      cursor: 'not-allowed'
                     }}
-                    required
+                    placeholder="请先选择区域、职位和角色"
                   />
                 </div>
 
