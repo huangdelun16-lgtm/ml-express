@@ -19,6 +19,11 @@ interface Courier {
   total_deliveries: number;
   rating: number;
   notes: string;
+  employee_id?: string;
+  department?: string;
+  position?: string;
+  role?: string;
+  region?: string;
   created_at?: string;
   updated_at?: string;
 }
