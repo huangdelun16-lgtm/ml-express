@@ -422,20 +422,15 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        console.log('📧 发送验证码到邮箱:', registerForm.email);
-        
         // 调用邮箱服务
         const { sendEmailVerificationCode } = await import('../services/emailService');
         const result = await sendEmailVerificationCode(registerForm.email, language as 'zh' | 'en' | 'my');
-        
-        console.log('📧 邮箱服务返回结果:', result);
         
         if (result.success) {
           setCodeSent(true);
           setCountdown(60); // 60秒倒计时
           if (result.code) {
-            setSentCode(result.code); // 开发模式可能会返回验证码
-            console.log('🔑 验证码:', result.code);
+          setSentCode(result.code); // 开发模式可能会返回验证码
           }
           alert(result.message);
         } else {
@@ -464,7 +459,6 @@ const HomePage: React.FC = () => {
 
         // 确保手机号以0开头（统一格式）
         const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
-        console.log('📱 发送验证码到手机:', normalizedPhone);
         
         // 调用SMS服务
         const { sendVerificationCode } = await import('../services/smsService');
@@ -474,8 +468,7 @@ const HomePage: React.FC = () => {
           setCodeSent(true);
           setCountdown(60); // 60秒倒计时
           if (result.code) {
-            setSentCode(result.code); // 开发模式可能会返回验证码
-            console.log('🔑 验证码:', result.code);
+          setSentCode(result.code); // 开发模式可能会返回验证码
           }
           alert(result.message);
         } else {
@@ -554,7 +547,6 @@ const HomePage: React.FC = () => {
       // 更新选中位置
       setSelectedLocation({ lat, lng, address: fullAddress });
       
-      console.log(`✅ 长按选中位置：${fullAddress}`);
     } catch (error) {
       console.error('地址获取失败:', error);
       // 出错时使用城市名称和坐标
@@ -600,8 +592,6 @@ const HomePage: React.FC = () => {
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
     try {
-      console.log('生成订单二维码，订单ID:', orderId);
-      
       const qrCodeUrl = await QRCode.toDataURL(orderId, {
         width: 200,
         margin: 2,
@@ -611,9 +601,7 @@ const HomePage: React.FC = () => {
         }
       });
       
-      console.log('二维码生成成功，数据长度:', qrCodeUrl?.length || 0);
       setQrCodeDataUrl(qrCodeUrl);
-      console.log('二维码已设置到状态变量qrCodeDataUrl');
     } catch (error) {
       console.error('二维码生成失败:', error);
       alert('二维码生成失败，但订单已创建成功。订单号：' + orderId);
@@ -676,17 +664,13 @@ const HomePage: React.FC = () => {
   // 自动保存客户信息到用户管理
   const saveCustomerToUsers = async (orderInfo: any) => {
     try {
-      console.log('开始保存客户信息:', orderInfo);
-      
       // 检查客户是否已存在
       const existingUser = await userService.getUserByPhone(orderInfo.senderPhone);
       
       if (existingUser) {
-        console.log('客户已存在，更新统计信息:', existingUser);
         // 更新现有客户的订单统计
         await userService.updateUserStats(existingUser.id, 5000);
       } else {
-        console.log('创建新客户:', orderInfo);
         // 创建新客户
         const newCustomer = await userService.createCustomer({
           name: orderInfo.senderName,
@@ -1122,8 +1106,6 @@ const HomePage: React.FC = () => {
 
   // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
   const calculateDistance = async (origin: string, destination: string): Promise<number> => {
-    console.log('开始计算距离:', { origin, destination });
-    
     try {
       if (!window.google || !window.google.maps) {
         console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
@@ -1154,8 +1136,6 @@ const HomePage: React.FC = () => {
           (response: any, status: any) => {
             clearTimeout(timeoutId);
             
-            console.log('距离计算响应:', { status, response });
-            
             if (status === 'OK') {
               const element = response.rows[0]?.elements[0];
               
@@ -1163,7 +1143,6 @@ const HomePage: React.FC = () => {
                 const distanceInMeters = element.distance.value;
                 const distanceInKm = distanceInMeters / 1000;
                 const roundedDistance = Math.round(distanceInKm * 10) / 10;
-                console.log('✅ 距离计算成功:', roundedDistance, 'km');
                 resolve(roundedDistance);
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
@@ -1319,8 +1298,6 @@ const HomePage: React.FC = () => {
   // 生成收款二维码
   const generatePaymentQRCode = async (amount: number, orderId: string) => {
     try {
-      console.log('开始生成收款二维码...', { amount, orderId });
-      
       // 生成支付信息（可以根据实际支付方式调整）
       const paymentInfo = {
         amount: amount,
@@ -1331,7 +1308,6 @@ const HomePage: React.FC = () => {
       };
       
       const paymentString = JSON.stringify(paymentInfo);
-      console.log('支付信息:', paymentString);
       
       const qrDataUrl = await QRCode.toDataURL(paymentString, {
         width: 300,
@@ -1342,9 +1318,7 @@ const HomePage: React.FC = () => {
         }
       });
       
-      console.log('二维码生成成功，长度:', qrDataUrl.length);
       setPaymentQRCode(qrDataUrl);
-      console.log('二维码已设置到状态');
     } catch (error) {
       console.error('生成收款二维码失败:', error);
       alert('生成二维码失败，请刷新页面重试');
@@ -1395,8 +1369,6 @@ const HomePage: React.FC = () => {
     setShowOrderForm(false);
     
     try {
-      console.log('开始处理订单...');
-      
       // 1. 等待Google Maps API加载
       let retryCount = 0;
       while (!isMapLoaded && retryCount < 10) {
@@ -1405,31 +1377,25 @@ const HomePage: React.FC = () => {
       }
       
       // 2. 计算距离
-      console.log('计算配送距离...');
       const distance = await calculateDistance(
         orderInfo.senderAddress,
         orderInfo.receiverAddress
       );
-      console.log('距离:', distance, 'km');
       setDeliveryDistance(distance);
       
       // 3. 计算价格
-      console.log('计算配送价格...');
       const price = isCalculated ? calculatedPriceDetail : calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
         distance
       );
-      console.log('价格:', price, 'MMK');
       setCalculatedPrice(price);
       
       // 4. 生成临时订单ID
       const tempOrderId = generateMyanmarPackageId();
-      console.log('订单ID:', tempOrderId);
       
       // 5. 生成收款二维码
-      console.log('生成收款二维码...');
       await generatePaymentQRCode(price, tempOrderId);
       
       // 6. 存储订单信息（包含价格和距离）
@@ -1442,8 +1408,7 @@ const HomePage: React.FC = () => {
       localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
       
       // 7. 显示支付模态框
-      console.log('显示支付页面');
-    setShowPaymentModal(true);
+      setShowPaymentModal(true);
     } catch (error) {
       console.error('订单处理失败:', error);
       const errorMessage = error instanceof Error ? error.message : '未知错误';
@@ -1675,7 +1640,6 @@ const HomePage: React.FC = () => {
                   <button
                     key={option.value}
                     onClick={() => {
-                      console.log('Language changed to:', option.value);
                       handleLanguageChange(option.value);
                       setShowLanguageDropdown(false);
                     }}
@@ -2796,7 +2760,6 @@ const HomePage: React.FC = () => {
                   };
                   
                   // 保存到数据库
-                  console.log('准备保存包裹数据:', packageData);
                   const result = await packageService.createPackage(packageData);
                   
                   if (result) {
@@ -2807,13 +2770,10 @@ const HomePage: React.FC = () => {
                     localStorage.removeItem('pendingOrder');
                     
                     // 使用包裹ID生成二维码
-                    console.log('开始生成订单二维码，包裹ID:', packageId);
                     setGeneratedOrderId(packageId);
                     
                     // 等待二维码生成完成
                     await generateQRCode(packageId);
-                    
-                    console.log('二维码生成完成，准备显示订单成功模态框');
                     
                     // 关闭支付模态框，显示订单成功模态框
                     setShowPaymentModal(false);

@@ -99,24 +99,15 @@ const [packages, setPackages] = useState<Package[]>([]);
     libraries: GOOGLE_MAPS_LIBRARIES
   });
 
-  // 调试信息
+  // 检查Google Maps加载状态
   useEffect(() => {
-    console.log('=== Google Maps 调试信息 ===');
-    console.log('Google Maps API Key:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
-    console.log('API Key length:', GOOGLE_MAPS_API_KEY?.length || 0);
-    console.log('API Key starts with AIza:', GOOGLE_MAPS_API_KEY?.startsWith('AIza') || false);
-    console.log('Map loaded:', isMapLoaded);
-    console.log('Load error:', loadError);
-    console.log('========================');
-    
     if (loadError) {
       console.error('Google Maps load error:', loadError);
     }
     
     // 如果API密钥缺失，显示警告
     if (!GOOGLE_MAPS_API_KEY) {
-      console.error('❌ Google Maps API密钥未设置！');
-      console.log('请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+      console.error('❌ Google Maps API密钥未设置！请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
     }
   }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
@@ -142,7 +133,6 @@ const [packages, setPackages] = useState<Package[]>([]);
       setLoadingStores(true);
       const data = await deliveryStoreService.getAllStores();
       setStores(data);
-      console.log('🏪 加载的快递店:', data.length, '个');
     } catch (error) {
       console.error('加载快递店失败:', error);
       setStores([]);
@@ -153,26 +143,19 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   const loadPackages = async () => {
     try {
-      console.log('🔄 开始加载包裹数据...');
       const data = await packageService.getAllPackages();
-      console.log('📦 加载的所有包裹:', data);
       
       // 分离不同状态的包裹
       const pendingPackages = data.filter(p => p.status === '待取件');
       const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
       
-      console.log('📦 待分配包裹:', pendingPackages.length, '个');
-      console.log('📦 已分配包裹:', assignedPackages.length, '个');
-      
       // 显示所有活跃包裹（待分配 + 已分配）
       const activePackages = [...pendingPackages, ...assignedPackages];
-      console.log('📦 总活跃包裹:', activePackages.length, '个');
       
       setPackages(activePackages);
       
       // 强制触发重新渲染
       setTimeout(() => {
-        console.log('🔄 强制重新渲染包裹列表');
         setPackages([...activePackages]);
       }, 100);
       
