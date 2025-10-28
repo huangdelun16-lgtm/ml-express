@@ -282,7 +282,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
       vehicle_type: courier.vehicle_type,
       license_number: courier.license_number,
       status: courier.status,
-      notes: courier.notes
+      notes: courier.notes,
+      employee_id: courier.employee_id || '',
+      department: courier.department || '',
+      position: courier.position || '',
+      role: (courier.role as 'operator' | 'manager' | 'admin' | 'finance') || 'operator',
+      region: (courier.region as 'yangon' | 'mandalay') || 'yangon'
     });
     setActiveTab('create');
   };
