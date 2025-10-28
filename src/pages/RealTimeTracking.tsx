@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 
 // Google Maps 配置
@@ -38,6 +38,29 @@ interface CourierWithLocation extends Courier {
   location?: CourierLocation;
 }
 
+interface DeliveryStore {
+  id?: string;
+  store_name: string;
+  store_code: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  email?: string;
+  manager_name: string;
+  manager_phone: string;
+  store_type: 'hub' | 'branch' | 'pickup_point' | 'transit_station';
+  status: 'active' | 'inactive' | 'maintenance';
+  operating_hours: string;
+  service_area_radius: number;
+  capacity: number;
+  facilities?: string[];
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
 const [packages, setPackages] = useState<Package[]>([]);
@@ -50,6 +73,11 @@ const [packages, setPackages] = useState<Package[]>([]);
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 选项卡和快递店相关状态
+  const [activeTab, setActiveTab] = useState<'packages' | 'stores'>('packages');
+  const [stores, setStores] = useState<DeliveryStore[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
 
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -96,15 +124,32 @@ const [packages, setPackages] = useState<Package[]>([]);
   useEffect(() => {
     loadPackages();
     loadCouriers();
+    loadStores();
     
     // 每30秒刷新一次数据
     const interval = setInterval(() => {
       loadPackages();
       loadCouriers();
+      loadStores();
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
+  
+  // 加载快递店数据
+  const loadStores = async () => {
+    try {
+      setLoadingStores(true);
+      const data = await deliveryStoreService.getAllStores();
+      setStores(data);
+      console.log('🏪 加载的快递店:', data.length, '个');
+    } catch (error) {
+      console.error('加载快递店失败:', error);
+      setStores([]);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
 
   const loadPackages = async () => {
     try {
@@ -605,6 +650,26 @@ const [packages, setPackages] = useState<Package[]>([]);
                       />
                     ))}
 
+                  {/* 显示快递店位置 */}
+                  {stores
+                    .filter(store => store.latitude && store.longitude)
+                    .map(store => (
+                      <Marker
+                        key={`store-${store.id}`}
+                        position={{ lat: store.latitude!, lng: store.longitude! }}
+                        icon={{
+                          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="20" cy="20" r="18" fill="${store.status === 'active' ? '#10b981' : '#f59e0b'}" stroke="white" stroke-width="3"/>
+                              <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏪</text>
+                            </svg>
+                          `)}`,
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 20)
+                        }}
+                      />
+                    ))}
+
                   {/* 信息窗口 */}
                   {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
                     <InfoWindow
@@ -685,9 +750,46 @@ const [packages, setPackages] = useState<Package[]>([]);
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            marginBottom: '1.5rem'
+            marginBottom: '1rem'
           }}>
-            <h2 style={{ marginTop: 0, marginBottom: 0, color: '#1f2937' }}>📦 包裹管理</h2>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={() => setActiveTab('packages')}
+                style={{
+                  background: activeTab === 'packages' 
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
+                    : 'transparent',
+                  color: activeTab === 'packages' ? 'white' : '#6b7280',
+                  border: '2px solid',
+                  borderColor: activeTab === 'packages' ? '#3b82f6' : '#e5e7eb',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📦 包裹管理
+              </button>
+              <button
+                onClick={() => setActiveTab('stores')}
+                style={{
+                  background: activeTab === 'stores' 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                    : 'transparent',
+                  color: activeTab === 'stores' ? 'white' : '#6b7280',
+                  border: '2px solid',
+                  borderColor: activeTab === 'stores' ? '#10b981' : '#e5e7eb',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🏪 快递店管理
+              </button>
+            </div>
             {/* 区域按钮 - 显示当前选中的城市 */}
             <div style={{
               background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
@@ -715,8 +817,11 @@ const [packages, setPackages] = useState<Package[]>([]);
             </div>
           </div>
           
-          {/* 待分配包裹 */}
-          <div style={{ marginBottom: '2rem' }}>
+          {/* 根据选项卡显示不同内容 */}
+          {activeTab === 'packages' ? (
+            <>
+              {/* 待分配包裹 */}
+              <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
               ⏳ 待分配包裹 ({packages.filter(p => p.status === '待取件').length})
             </h3>
@@ -956,6 +1061,98 @@ const [packages, setPackages] = useState<Package[]>([]);
                 ))
             )}
           </div>
+            </>
+          ) : (
+            // 快递店管理内容
+            <div>
+              <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                🏪 快递店列表 ({stores.length})
+              </h3>
+              
+              {loadingStores ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                  <p>加载中...</p>
+                </div>
+              ) : stores.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏪</div>
+                  <p>暂无快递店</p>
+                  <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', color: '#6b7280' }}>
+                    请前往独立页面添加快递店
+                  </p>
+                </div>
+              ) : (
+                stores.map(store => (
+                  <div
+                    key={store.id}
+                    style={{
+                      background: store.status === 'active' 
+                        ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
+                        : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      marginBottom: '1rem',
+                      border: store.status === 'active' 
+                        ? '2px solid #86efac' 
+                        : '2px solid #fcd34d'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <div>
+                        <strong style={{ color: store.status === 'active' ? '#166534' : '#92400e' }}>
+                          {store.store_name}
+                        </strong>
+                        <span style={{
+                          background: store.status === 'active' ? '#dcfce7' : '#fef3c7',
+                          color: store.status === 'active' ? '#166534' : '#92400e',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          marginLeft: '0.5rem'
+                        }}>
+                          {store.store_type === 'hub' ? '🏢 总店' : 
+                           store.store_type === 'branch' ? '🏪 分店' : 
+                           store.store_type === 'pickup_point' ? '📦 自提点' : '🚚 中转站'}
+                        </span>
+                      </div>
+                      <span style={{
+                        background: store.status === 'active' ? '#10b981' : '#f59e0b',
+                        color: 'white',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {store.status === 'active' ? '✅ 营业中' : store.status === 'inactive' ? '⏸️ 暂停' : '🔧 维护中'}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📍 地址:</strong> {store.address}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📞 电话:</strong> {store.phone}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>👤 店长:</strong> {store.manager_name} ({store.manager_phone})
+                      </p>
+                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#059669' }}>
+                        📍 坐标: ({store.latitude.toFixed(6)}, {store.longitude.toFixed(6)})
+                      </p>
+                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                        ⏰ 营业时间: {store.operating_hours} | 
+                        📦 容量: {store.capacity} | 
+                        🎯 服务半径: {store.service_area_radius}km
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
