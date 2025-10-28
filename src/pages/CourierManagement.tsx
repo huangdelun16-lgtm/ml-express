@@ -231,7 +231,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
       last_active: '从未上线',
       total_deliveries: 0,
       rating: 0,
-      notes: courierForm.notes
+      notes: courierForm.notes,
+      employee_id: courierForm.employee_id,
+      department: courierForm.department,
+      position: courierForm.position,
+      role: courierForm.role,
+      region: courierForm.region
     };
 
     try {
@@ -324,7 +329,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
         vehicle_type: 'motorcycle',
         license_number: '',
         status: 'active',
-        notes: ''
+        notes: '',
+        employee_id: '',
+        department: '',
+        position: '',
+        role: 'operator',
+        region: 'yangon'
       });
       setActiveTab('list');
     } catch (error) {
