@@ -3260,9 +3260,6 @@ const HomePage: React.FC = () => {
                       center={mapCenter}
                       zoom={15}
                       onLoad={(map) => {
-                        // 地图加载完成后的提示
-                        console.log('地图加载完成，可以开始定位');
-                        
                         // 添加地图POI点击事件监听
                         map.addListener('click', async (e: any) => {
                           if (e.placeId) {
@@ -3296,9 +3293,6 @@ const HomePage: React.FC = () => {
                                   
                                   // 设置选中的POI信息
                                   setSelectedPOI({ name: place.name, types: place.types || [] });
-                                  
-                                  // 显示选中POI的提示
-                                  console.log('✅ 已选择POI:', place.name, '类型:', place.types);
                                 }
                               }
                             );
@@ -3595,11 +3589,9 @@ const HomePage: React.FC = () => {
                       if (mapSelectionType === 'sender') {
                         setSenderAddressText(addressWithCoords);
                         setSelectedSenderLocation(finalCoords);
-                        console.log('✅ 寄件地址坐标已保存:', finalCoords);
                       } else if (mapSelectionType === 'receiver') {
                         setReceiverAddressText(addressWithCoords);
                         setSelectedReceiverLocation(finalCoords);
-                        console.log('✅ 收件地址坐标已保存:', finalCoords);
                       }
                     } else {
                       // 如果没有坐标，只添加地址

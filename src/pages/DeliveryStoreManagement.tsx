@@ -162,7 +162,6 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 打开地图选择
   const openMapSelection = () => {
-    console.log('🗺️ 打开地图选择，API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? '已设置' : '未设置');
     setMapError(null);
     setMapLoading(true);
     setShowMapModal(true);
@@ -178,7 +177,6 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 地图加载成功回调
   const onMapLoad = useCallback(() => {
-    console.log('✅ Google Maps 加载成功');
     setMapLoading(false);
     setMapError(null);
   }, []);
@@ -314,8 +312,6 @@ const DeliveryStoreManagement: React.FC = () => {
     try {
       // 直接从数据库获取属于该店铺的包裹
       const packages = await packageService.getPackagesByStore(store.id);
-      
-      console.log(`店铺 ${store.store_name} (ID: ${store.id}) - 获取到 ${packages.length} 个入库包裹`);
       
       setStoragePackages(packages);
     } catch (error) {

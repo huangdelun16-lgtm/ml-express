@@ -113,7 +113,6 @@ export default function DeliveryAlerts() {
           table: 'delivery_alerts'
         },
         (payload) => {
-          console.log('🚨 实时警报更新:', payload);
           loadAlerts(); // 重新加载警报
           updateRealTimeStats(); // 更新实时统计
           
@@ -227,7 +226,6 @@ export default function DeliveryAlerts() {
         return false;
       }
 
-      console.log('✅ 违规记录创建成功');
       return true;
     } catch (error) {
       console.error('创建违规记录异常:', error);
@@ -349,8 +347,6 @@ export default function DeliveryAlerts() {
 
       if (error) {
         console.error('记录操作日志失败:', error);
-      } else {
-        console.log('✅ 操作日志记录成功');
       }
     } catch (error) {
       console.error('记录操作日志异常:', error);

@@ -167,8 +167,6 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   const loadCouriers = async () => {
     try {
-      console.log('开始加载快递员数据...');
-      
       // 1. 从数据库获取快递员列表
       const { data: couriersData, error: couriersError } = await supabase
         .from('couriers')
@@ -182,7 +180,6 @@ const [packages, setPackages] = useState<Package[]>([]);
       }
 
       if (!couriersData || couriersData.length === 0) {
-        console.log('数据库中没有快递员数据');
         setCouriers([]);
         return;
       }
@@ -251,7 +248,6 @@ const [packages, setPackages] = useState<Package[]>([]);
         };
       });
 
-      console.log('加载了', enrichedCouriers.length, '个快递员');
       setCouriers(enrichedCouriers);
     } catch (error) {
       console.error('加载快递员数据失败:', error);
@@ -261,27 +257,17 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   // 自动分配包裹
   const autoAssignPackage = async (packageData: Package) => {
-    console.log('🤖 开始自动分配包裹:', packageData.id);
-    console.log('📊 当前快递员列表:', couriers);
-    
     // 找到在线且当前包裹最少的快递员
     const availableCouriers = couriers
-      .filter(c => {
-        console.log(`快递员 ${c.name} 状态: ${c.status}, 当前包裹数: ${c.currentPackages || 0}`);
-        return c.status === 'online' || c.status === 'active';
-      })
+      .filter(c => c.status === 'online' || c.status === 'active')
       .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
-    console.log('✅ 可用快递员:', availableCouriers);
-
     if (availableCouriers.length === 0) {
-      console.log('❌ 没有可用的快递员');
       alert('当前没有在线的快递员，请稍后再试');
       return;
     }
 
     const bestCourier = availableCouriers[0];
-    console.log('🎯 选择最佳快递员:', bestCourier);
     await assignPackageToCourier(packageData, bestCourier);
   };
 
@@ -289,12 +275,6 @@ const [packages, setPackages] = useState<Package[]>([]);
   const assignPackageToCourier = async (packageData: Package, courier: Courier) => {
     setIsAssigning(true);
     try {
-      console.log('📦 开始分配包裹:', packageData.id, '给快递员:', courier.name);
-      console.log('📍 包裹经纬度信息:', {
-        sender: { lat: packageData.sender_latitude, lng: packageData.sender_longitude },
-        receiver: { lat: packageData.receiver_latitude, lng: packageData.receiver_longitude }
-      });
-      
       // 更新包裹状态为"待取件"并分配骑手
       const success = await packageService.updatePackageStatus(
         packageData.id,
@@ -304,10 +284,7 @@ const [packages, setPackages] = useState<Package[]>([]);
         courier.name  // courierName
       );
 
-      console.log('📦 包裹状态更新结果:', success);
-
       if (success) {
-        console.log('🔔 开始发送通知...');
         // 🔔 发送通知给快递员
         const notificationSuccess = await notificationService.sendPackageAssignedNotification(
           courier.id,
@@ -321,8 +298,6 @@ const [packages, setPackages] = useState<Package[]>([]);
           }
         );
 
-        console.log('🔔 通知发送结果:', notificationSuccess);
-
         // 显示明确的成功消息
         const successMessage = `✅ 分配成功！\n\n📦 包裹：${packageData.id}\n🚚 骑手：${courier.name}\n📲 通知：${notificationSuccess ? '已发送' : '发送失败'}\n\n包裹已从待分配列表移除`;
         alert(successMessage);
@@ -331,15 +306,12 @@ const [packages, setPackages] = useState<Package[]>([]);
         setSelectedPackage(null);
         
         // 立即重新加载包裹数据
-        console.log('🔄 重新加载包裹数据...');
         await loadPackages();
         
         // 验证包裹状态是否已更新
-        const updatedPackage = await packageService.getPackageById(packageData.id);
-        console.log('🔍 验证包裹状态更新:', updatedPackage);
+        await packageService.getPackageById(packageData.id);
         
         // 强制刷新页面数据
-        console.log('🔄 强制刷新页面数据...');
         setTimeout(async () => {
           await loadPackages();
           await loadCouriers();
@@ -352,7 +324,6 @@ const [packages, setPackages] = useState<Package[]>([]);
             : c
         ));
       } else {
-        console.log('❌ 包裹状态更新失败');
         alert('❌ 分配失败！\n\n包裹状态更新失败，请重试');
       }
     } catch (error) {

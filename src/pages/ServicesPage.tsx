@@ -344,7 +344,6 @@ const ServicesPage: React.FC = () => {
                   <button
                     key={option.value}
                     onClick={() => {
-                      console.log('Language changed to:', option.value);
                       handleLanguageChange(option.value);
                       setShowLanguageDropdown(false);
                     }}
