@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
@@ -135,7 +136,7 @@ const [packages, setPackages] = useState<Package[]>([]);
       const data = await deliveryStoreService.getAllStores();
       setStores(data);
     } catch (error) {
-      console.error('加载快递店失败:', error);
+      errorHandler.handleErrorSilent(error, '加载快递店数据');
       setStores([]);
     } finally {
       setLoadingStores(false);
@@ -156,7 +157,7 @@ const [packages, setPackages] = useState<Package[]>([]);
       setPackages(activePackages);
       
     } catch (error) {
-      console.error('❌ 加载包裹数据失败:', error);
+      errorHandler.handleErrorSilent(error, '加载包裹数据');
       setPackages([]);
     }
   };
@@ -246,7 +247,7 @@ const [packages, setPackages] = useState<Package[]>([]);
 
       setCouriers(enrichedCouriers);
     } catch (error) {
-      console.error('加载快递员数据失败:', error);
+      errorHandler.handleErrorSilent(error, '加载快递员数据');
       setCouriers([]);
     }
   };
