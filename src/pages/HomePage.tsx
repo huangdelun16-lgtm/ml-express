@@ -1313,6 +1313,8 @@ const HomePage: React.FC = () => {
   // 生成收款二维码
   const generatePaymentQRCode = async (amount: number, orderId: string) => {
     try {
+      console.log('开始生成收款二维码...', { amount, orderId });
+      
       // 生成支付信息（可以根据实际支付方式调整）
       const paymentInfo = {
         amount: amount,
@@ -1323,6 +1325,8 @@ const HomePage: React.FC = () => {
       };
       
       const paymentString = JSON.stringify(paymentInfo);
+      console.log('支付信息:', paymentString);
+      
       const qrDataUrl = await QRCode.toDataURL(paymentString, {
         width: 300,
         margin: 2,
@@ -1332,9 +1336,12 @@ const HomePage: React.FC = () => {
         }
       });
       
+      console.log('二维码生成成功，长度:', qrDataUrl.length);
       setPaymentQRCode(qrDataUrl);
+      console.log('二维码已设置到状态');
     } catch (error) {
       console.error('生成收款二维码失败:', error);
+      alert('生成二维码失败，请刷新页面重试');
     }
   };
 
@@ -2753,7 +2760,8 @@ const HomePage: React.FC = () => {
                   }
                   
                   const orderInfo = JSON.parse(pendingOrder);
-                  const packageId = generateMyanmarPackageId();
+                  // 使用存储的tempOrderId作为包裹ID，确保一致性
+                  const packageId = orderInfo.tempOrderId || generateMyanmarPackageId();
                   
                   // 创建包裹数据 - 使用数据库字段名
                   const packageData = {
@@ -2792,10 +2800,9 @@ const HomePage: React.FC = () => {
                     // 清除临时订单信息
                     localStorage.removeItem('pendingOrder');
                     
-                    // 生成订单ID和二维码
-                    const orderId = generateOrderId();
-                    setGeneratedOrderId(orderId);
-                    await generateQRCode(orderId);
+                    // 使用包裹ID生成二维码
+                    setGeneratedOrderId(packageId);
+                    await generateQRCode(packageId);
                     
                     // 关闭支付模态框，显示订单成功模态框
                     setShowPaymentModal(false);
