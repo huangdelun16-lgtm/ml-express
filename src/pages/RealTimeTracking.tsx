@@ -117,12 +117,13 @@ const [packages, setPackages] = useState<Package[]>([]);
     loadCouriers();
     loadStores();
     
-    // 每30秒刷新一次数据
+    // 优化：每分钟刷新一次数据，减少不必要的API调用
+    // 实际使用实时订阅机制来更新数据
     const interval = setInterval(() => {
       loadPackages();
       loadCouriers();
       loadStores();
-    }, 30000);
+    }, 60000); // 从30秒改为60秒
 
     return () => clearInterval(interval);
   }, []);
@@ -153,11 +154,6 @@ const [packages, setPackages] = useState<Package[]>([]);
       const activePackages = [...pendingPackages, ...assignedPackages];
       
       setPackages(activePackages);
-      
-      // 强制触发重新渲染
-      setTimeout(() => {
-        setPackages([...activePackages]);
-      }, 100);
       
     } catch (error) {
       console.error('❌ 加载包裹数据失败:', error);

@@ -125,7 +125,7 @@ export default function DeliveryAlerts() {
       .subscribe();
 
     // 设置定时更新统计
-    const statsInterval = setInterval(updateRealTimeStats, 30000); // 每30秒更新一次
+    const statsInterval = setInterval(updateRealTimeStats, 60000); // 每60秒更新一次，优化性能
 
     return () => {
       subscription.unsubscribe();
