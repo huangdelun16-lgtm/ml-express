@@ -30,7 +30,6 @@ export interface Package {
   delivery_time: string;
   courier: string;
   price: string;
-  region?: string; // 区域字段：'yangon', 'mandalay', 'other' 等
   created_at?: string;
   updated_at?: string;
   // 新增字段：店铺关联
