@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, Text, StyleSheet, Platform } from 'react-native';
-import { AppProvider, useApp } from './src/contexts/AppContext';
-import { LoadingProvider } from './src/contexts/LoadingContext';
-import { LinearGradient } from 'expo-linear-gradient';
 import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
 import NotificationService from './src/services/notificationService';
+import { AppProvider } from './src/contexts/AppContext';
+import { LoadingProvider } from './src/contexts/LoadingContext';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -23,122 +20,6 @@ import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen
 import NotificationWorkflowScreen from './src/screens/NotificationWorkflowScreen';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
-
-// 客户端底部导航
-function ClientTabs() {
-  const { language } = useApp();
-  
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#1e40af',
-        tabBarInactiveTintColor: '#64748b',
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          elevation: 8,
-          backgroundColor: '#ffffff',
-          borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          paddingTop: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
-          marginTop: 4,
-        },
-        tabBarIconStyle: {
-          marginTop: 4,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: language === 'zh' ? '首页' : language === 'en' ? 'Home' : 'ပင်မ',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-              <Text style={{ fontSize: 26 }}>🏠</Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="PlaceOrder"
-        component={PlaceOrderScreen}
-        options={{
-          tabBarLabel: language === 'zh' ? '下单' : language === 'en' ? 'Order' : 'အမှာစာ',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-              <Text style={{ fontSize: 26 }}>📦</Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="MyOrders"
-        component={MyOrdersScreen}
-        options={{
-          tabBarLabel: language === 'zh' ? '订单' : language === 'en' ? 'Orders' : 'အမှာစာများ',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-              <Text style={{ fontSize: 26 }}>📋</Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="TrackOrder"
-        component={TrackOrderScreen}
-        options={{
-          tabBarLabel: language === 'zh' ? '追踪' : language === 'en' ? 'Track' : 'ခြေရာခံ',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-              <Text style={{ fontSize: 26 }}>🔍</Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-              <Text style={{ fontSize: 26 }}>👤</Text>
-            </View>
-          ),
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
-
-const styles = StyleSheet.create({
-  tabIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  tabIconActive: {
-    backgroundColor: '#eff6ff',
-    transform: [{ scale: 1.1 }],
-  },
-});
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -202,12 +83,42 @@ export default function App() {
               }}
             />
             
-            {/* 主应用 */}
+            {/* 主应用 - 直接显示首页，不使用底部导航 */}
             <Stack.Screen 
               name="Main" 
-              component={ClientTabs}
+              component={HomeScreen}
               options={{
                 animation: 'fade',
+              }}
+            />
+            
+            {/* 使用Stack导航，代替Tab导航 */}
+            <Stack.Screen 
+              name="PlaceOrder" 
+              component={PlaceOrderScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="MyOrders" 
+              component={MyOrdersScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="TrackOrder" 
+              component={TrackOrderScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="Profile" 
+              component={ProfileScreen}
+              options={{
+                animation: 'slide_from_right',
               }}
             />
             
