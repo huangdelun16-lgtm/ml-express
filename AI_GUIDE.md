@@ -1528,7 +1528,110 @@ if (deliverySpeed === '加急配送') {
 
 ---
 
-*最后更新：2024年10月24日*
-*版本：3.5.0*
+## 🔧 最新功能更新 (2025年1月28日)
+
+### 📊 员工监督中心优化
+
+#### ✅ 审计日志扩容
+- **更新前**: 记录1000条审计日志
+- **更新后**: 记录增加到5000条
+- **实现**: 修改`auditLogService.getAllLogs()`默认limit参数为5000
+
+#### 🗑️ 自动数据清理
+- **新增功能**: 自动删除一周前的审计日志
+- **实现方式**: 
+  - 新增`deleteOldLogs(days: number)`方法
+  - 每次加载员工监督中心页面时自动执行清理
+  - 只保留最近7天的操作记录
+- **优势**: 减少数据库存储压力，只监督一周内的数据
+
+#### 🔧 技术实现
+```typescript
+// 删除指定天数前的旧日志
+async deleteOldLogs(days: number): Promise<boolean> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const cutoffDateStr = cutoffDate.toISOString();
+
+  // 执行删除
+  const { error } = await supabase
+    .from('audit_logs')
+    .delete()
+    .lt('action_time', cutoffDateStr);
+}
+```
+
+### 📝 订单ID生成优化
+
+#### 🏙️ 根据城市自动选择前缀
+- **仰光区域**: YGN前缀 (Yangon)
+- **曼德勒区域**: MDY前缀 (Mandalay)
+- **支持城市**: 仰光、曼德勒、内比都、毛淡棉、勃生、蒙育瓦、密支那、东枝、实兑、葛礼等10个城市
+- **ID格式**: `城市前缀 + 年月日 + 时分 + 随机两位数`
+
+#### 📱 Web端实现
+- 根据页面选择的城市(`selectedCity`)自动生成对应前缀
+- 示例: 选择"仰光"时生成`YGN20250314153052`
+
+#### 📲 App端实现  
+- 根据寄件地址自动识别城市
+- 支持中文、英文、缅文城市名称识别
+- 识别逻辑: 遍历地址文本，查找包含的城市名称
+
+#### 🔧 技术实现
+```typescript
+const generateMyanmarPackageId = () => {
+  const cityPrefixMap: { [key: string]: string } = {
+    'yangon': 'YGN',
+    'mandalay': 'MDY',
+    // ... 其他城市
+  };
+  
+  const prefix = cityPrefixMap[selectedCity] || 'MDY';
+  return `${prefix}${year}${month}${day}${hour}${minute}${random1}${random2}`;
+};
+```
+
+### 🔧 Web端二维码生成修复
+
+#### ✅ 问题解决
+- **问题**: Web端提交订单后，二维码不显示
+- **原因**: 异步执行顺序问题，二维码生成未完成就显示了模态框
+- **解决**: 
+  1. 确保等待二维码生成完成
+  2. 添加100ms延迟确保状态更新
+  3. 增强错误处理和日志输出
+
+#### 🔧 修复内容
+```typescript
+// 使用包裹ID生成二维码
+console.log('开始生成订单二维码，包裹ID:', packageId);
+setGeneratedOrderId(packageId);
+
+// 等待二维码生成完成
+await generateQRCode(packageId);
+
+console.log('二维码生成完成，准备显示订单成功模态框');
+
+// 关闭支付模态框，显示订单成功模态框
+setShowPaymentModal(false);
+
+// 添加短暂延迟确保二维码已设置
+await new Promise(resolve => setTimeout(resolve, 100));
+
+setShowOrderSuccessModal(true);
+```
+
+#### 📋 订单ID一致性修复
+- **修复**: 确保Web端和App端使用相同的临时订单ID
+- **实现**: 
+  - Web端生成tempOrderId并存储到localStorage
+  - 确认支付时使用存储的tempOrderId作为包裹ID
+  - 保证订单ID在整个流程中保持一致
+
+---
+
+*最后更新：2025年1月28日*
+*版本：3.6.0*
 *状态：生产环境运行中*
-*新增功能：Web价格估算优化 + Netlify部署 + 客户端APP UI优化 + iOS Store准备*
+*新增功能：员工监督中心数据管理优化 + 订单ID智能生成 + Web端二维码生成修复*
