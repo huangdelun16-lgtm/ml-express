@@ -446,6 +446,31 @@ const [packages, setPackages] = useState<Package[]>([]);
           </h1>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* 区域按钮 - 显示当前选中的城市 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            color: 'white',
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          >
+            <span>📍</span>
+            <span>{myanmarCities[selectedCity as keyof typeof myanmarCities]?.name}</span>
+          </div>
           <div style={{ 
             background: '#10b981', 
             color: 'white', 
@@ -789,31 +814,6 @@ const [packages, setPackages] = useState<Package[]>([]);
               >
                 🏪 快递店管理
               </button>
-            </div>
-            {/* 区域按钮 - 显示当前选中的城市 */}
-            <div style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            >
-              <span>📍</span>
-              <span>{myanmarCities[selectedCity as keyof typeof myanmarCities]?.name}</span>
             </div>
           </div>
           
