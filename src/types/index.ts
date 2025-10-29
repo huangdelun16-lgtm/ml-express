@@ -456,49 +456,7 @@ export interface FormField {
   defaultValue?: any;
 }
 
-// ==================== 导出所有类型 ====================
-
-export type {
-  PaginationParams,
-  PaginatedResult,
-  UserType,
-  UserStatus,
-  User,
-  PackageStatus,
-  DeliverySpeed,
-  PackageType,
-  Package,
-  VehicleType,
-  CourierStatus,
-  Courier,
-  CourierLocation,
-  CourierWithLocation,
-  AdminRole,
-  AccountStatus,
-  AdminAccount,
-  ActionType,
-  AuditLog,
-  FinanceRecordType,
-  FinanceRecordStatus,
-  FinanceRecord,
-  StoreStatus,
-  DeliveryStore,
-  NotificationRecipientType,
-  NotificationType,
-  Notification,
-  AlertSeverity,
-  AlertStatus,
-  DeliveryAlert,
-  DeliveryPhoto,
-  Coordinates,
-  MapCenter,
-  POI,
-  SortDirection,
-  FilterParams,
-  FormFieldType,
-  ValidationRule,
-  FormField
-};
-
-export default {};
+// ==================== 类型导出说明 ====================
+// 所有类型和接口已经通过 export interface 和 export type 直接导出
+// 无需再次导出，避免重复导出错误
 
