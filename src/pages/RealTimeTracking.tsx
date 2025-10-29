@@ -8,7 +8,7 @@ import { Courier, CourierWithLocation, Coordinates, DeliveryStore } from '../typ
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
-const GOOGLE_MAPS_LIBRARIES: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ['places'];
+const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 配送商店接口已在types/index.ts中定义
 
