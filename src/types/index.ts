@@ -179,6 +179,8 @@ export interface CourierLocation extends BaseEntity {
  */
 export interface CourierWithLocation extends Courier {
   location?: CourierLocation;
+  latitude?: number;
+  longitude?: number;
   currentPackages?: number;
   todayDeliveries?: number;
   batteryLevel?: number;
