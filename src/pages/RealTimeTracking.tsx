@@ -309,8 +309,9 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   // 切换城市
   const handleCityChange = (cityKey: string) => {
-    setSelectedCity(cityKey);
-    const city = myanmarCities[cityKey as keyof typeof myanmarCities];
+    const validCityKey = cityKey as 'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe';
+    setSelectedCity(validCityKey);
+    const city = myanmarCities[validCityKey];
     if (city) {
       setMapCenter({ lat: city.lat, lng: city.lng });
     }
