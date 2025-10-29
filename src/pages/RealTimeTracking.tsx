@@ -29,6 +29,13 @@ const [packages, setPackages] = useState<Package[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'stores'>('packages');
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
+  
+  // 包裹位置点显示状态
+  const [selectedLocationPoint, setSelectedLocationPoint] = useState<{
+    packageId: string;
+    type: 'pickup' | 'delivery';
+    coordinates: Coordinates;
+  } | null>(null);
 
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -623,6 +630,44 @@ const [packages, setPackages] = useState<Package[]>([]);
                       />
                     ))}
 
+                  {/* 显示包裹的取件点(P)和配送点(D) */}
+                  {selectedLocationPoint && (
+                    <Marker
+                      position={selectedLocationPoint.coordinates}
+                      icon={{
+                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                          <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="24" cy="24" r="20" fill="${selectedLocationPoint.type === 'pickup' ? '#3b82f6' : '#ef4444'}" stroke="white" stroke-width="3"/>
+                            <text x="24" y="31" text-anchor="middle" fill="white" font-size="24" font-weight="bold">${selectedLocationPoint.type === 'pickup' ? 'P' : 'D'}</text>
+                          </svg>
+                        `)}`,
+                        scaledSize: new window.google.maps.Size(48, 48),
+                        anchor: new window.google.maps.Point(24, 24)
+                      }}
+                      zIndex={1000}
+                    />
+                  )}
+                  {selectedLocationPoint && (
+                    <InfoWindow
+                      position={selectedLocationPoint.coordinates}
+                      onCloseClick={() => setSelectedLocationPoint(null)}
+                    >
+                      <div style={{ padding: '0.5rem', minWidth: '200px' }}>
+                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
+                          {selectedLocationPoint.type === 'pickup' ? '📍 取件点 (P)' : '📍 配送点 (D)'}
+                        </h3>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>包裹ID:</strong> {selectedLocationPoint.packageId}
+                          </p>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>坐标:</strong> {selectedLocationPoint.coordinates.lat.toFixed(6)}, {selectedLocationPoint.coordinates.lng.toFixed(6)}
+                          </p>
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
+
                   {/* 信息窗口 */}
                   {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
                     <InfoWindow
@@ -808,7 +853,36 @@ const [packages, setPackages] = useState<Package[]>([]);
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 从: {pkg.sender_address}
                       {pkg.sender_latitude && pkg.sender_longitude && (
-                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const coords = { lat: pkg.sender_latitude!, lng: pkg.sender_longitude! };
+                            setSelectedLocationPoint({
+                              packageId: pkg.id,
+                              type: 'pickup',
+                              coordinates: coords
+                            });
+                            setMapCenter(coords);
+                            setSelectedCourier(null); // 清除选中的快递员
+                          }}
+                          style={{ 
+                            color: '#3b82f6', 
+                            fontSize: '0.8rem', 
+                            marginLeft: '0.5rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#2563eb';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#3b82f6';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
                           ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
                         </span>
                       )}
@@ -816,7 +890,36 @@ const [packages, setPackages] = useState<Package[]>([]);
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 到: {pkg.receiver_address}
                       {pkg.receiver_latitude && pkg.receiver_longitude && (
-                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const coords = { lat: pkg.receiver_latitude!, lng: pkg.receiver_longitude! };
+                            setSelectedLocationPoint({
+                              packageId: pkg.id,
+                              type: 'delivery',
+                              coordinates: coords
+                            });
+                            setMapCenter(coords);
+                            setSelectedCourier(null); // 清除选中的快递员
+                          }}
+                          style={{ 
+                            color: '#ef4444', 
+                            fontSize: '0.8rem', 
+                            marginLeft: '0.5rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#dc2626';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
                           ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
                         </span>
                       )}
@@ -963,7 +1066,36 @@ const [packages, setPackages] = useState<Package[]>([]);
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📍 从:</strong> {pkg.sender_address}
                         {pkg.sender_latitude && pkg.sender_longitude && (
-                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const coords = { lat: pkg.sender_latitude!, lng: pkg.sender_longitude! };
+                              setSelectedLocationPoint({
+                                packageId: pkg.id,
+                                type: 'pickup',
+                                coordinates: coords
+                              });
+                              setMapCenter(coords);
+                              setSelectedCourier(null);
+                            }}
+                            style={{ 
+                              color: '#3b82f6', 
+                              fontSize: '0.8rem', 
+                              marginLeft: '0.5rem',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#2563eb';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#3b82f6';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
                             ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
                           </span>
                         )}
@@ -971,7 +1103,36 @@ const [packages, setPackages] = useState<Package[]>([]);
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📍 到:</strong> {pkg.receiver_address}
                         {pkg.receiver_latitude && pkg.receiver_longitude && (
-                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const coords = { lat: pkg.receiver_latitude!, lng: pkg.receiver_longitude! };
+                              setSelectedLocationPoint({
+                                packageId: pkg.id,
+                                type: 'delivery',
+                                coordinates: coords
+                              });
+                              setMapCenter(coords);
+                              setSelectedCourier(null);
+                            }}
+                            style={{ 
+                              color: '#ef4444', 
+                              fontSize: '0.8rem', 
+                              marginLeft: '0.5rem',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#dc2626';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#ef4444';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
                             ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
                           </span>
                         )}
