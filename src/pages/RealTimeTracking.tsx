@@ -16,8 +16,8 @@ const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
 const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-  const [couriers, setCouriers] = useState<Courier[]>([]);
-  const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
+  const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
+  const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCity, setSelectedCity] = useState<'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe'>('yangon');
@@ -162,7 +162,7 @@ const [packages, setPackages] = useState<Package[]>([]);
       });
 
       // 4. 合并数据
-      const enrichedCouriers: Courier[] = couriersData.map(courier => {
+      const enrichedCouriers: CourierWithLocation[] = couriersData.map(courier => {
         // 查找对应的位置信息
         const location = locationsData?.find(loc => loc.courier_id === courier.id);
         
@@ -199,7 +199,7 @@ const [packages, setPackages] = useState<Package[]>([]);
           currentPackages: currentPackages,
           todayDeliveries: courier.total_deliveries || 0,
           batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
-        } as Courier;
+        } as CourierWithLocation;
       });
 
       setCouriers(enrichedCouriers);
@@ -570,8 +570,8 @@ const [packages, setPackages] = useState<Package[]>([]);
                   )}
                 </div>
               ) : (
-                <GoogleMap
-                  key={selectedCity}
+                  <GoogleMap
+                  key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={mapCenter}
                   zoom={13}
@@ -580,6 +580,9 @@ const [packages, setPackages] = useState<Package[]>([]);
                     fullscreenControlOptions: {
                       position: window.google.maps.ControlPosition.TOP_RIGHT
                     },
+                    zoomControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: false,
                     styles: [
                       {
                         featureType: 'poi',
@@ -855,15 +858,17 @@ const [packages, setPackages] = useState<Package[]>([]);
                       {pkg.sender_latitude && pkg.sender_longitude && (
                         <span 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            const coords = { lat: pkg.sender_latitude!, lng: pkg.sender_longitude! };
+                            if (!pkg.sender_latitude || !pkg.sender_longitude) return;
+                            const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
                             setSelectedLocationPoint({
                               packageId: pkg.id,
                               type: 'pickup',
                               coordinates: coords
                             });
                             setMapCenter(coords);
-                            setSelectedCourier(null); // 清除选中的快递员
+                            setSelectedCourier(null);
                           }}
                           style={{ 
                             color: '#3b82f6', 
@@ -892,15 +897,17 @@ const [packages, setPackages] = useState<Package[]>([]);
                       {pkg.receiver_latitude && pkg.receiver_longitude && (
                         <span 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            const coords = { lat: pkg.receiver_latitude!, lng: pkg.receiver_longitude! };
+                            if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
+                            const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
                             setSelectedLocationPoint({
                               packageId: pkg.id,
                               type: 'delivery',
                               coordinates: coords
                             });
                             setMapCenter(coords);
-                            setSelectedCourier(null); // 清除选中的快递员
+                            setSelectedCourier(null);
                           }}
                           style={{ 
                             color: '#ef4444', 
@@ -1068,8 +1075,10 @@ const [packages, setPackages] = useState<Package[]>([]);
                         {pkg.sender_latitude && pkg.sender_longitude && (
                           <span 
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
-                              const coords = { lat: pkg.sender_latitude!, lng: pkg.sender_longitude! };
+                              if (!pkg.sender_latitude || !pkg.sender_longitude) return;
+                              const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
                               setSelectedLocationPoint({
                                 packageId: pkg.id,
                                 type: 'pickup',
@@ -1105,8 +1114,10 @@ const [packages, setPackages] = useState<Package[]>([]);
                         {pkg.receiver_latitude && pkg.receiver_longitude && (
                           <span 
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
-                              const coords = { lat: pkg.receiver_latitude!, lng: pkg.receiver_longitude! };
+                              if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
+                              const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
                               setSelectedLocationPoint({
                                 packageId: pkg.id,
                                 type: 'delivery',
