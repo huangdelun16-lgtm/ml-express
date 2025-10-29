@@ -170,7 +170,7 @@ const [packages, setPackages] = useState<Package[]>([]);
         const currentPackages = packageCounts[courier.name] || 0;
 
         // 确定显示状态
-        let displayStatus = courier.status;
+        let displayStatus: Courier['status'] = courier.status as Courier['status'];
         if (courier.status === 'active') {
           // 根据last_active判断是否在线
           if (courier.last_active) {
@@ -179,7 +179,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             const diffMinutes = (now - lastActiveTime) / (1000 * 60);
             
             if (diffMinutes < 30) {
-              displayStatus = currentPackages >= 5 ? 'busy' : 'online';
+              displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
             } else {
               displayStatus = 'offline';
             }
@@ -199,7 +199,7 @@ const [packages, setPackages] = useState<Package[]>([]);
           currentPackages: currentPackages,
           todayDeliveries: courier.total_deliveries || 0,
           batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
-        };
+        } as Courier;
       });
 
       setCouriers(enrichedCouriers);
