@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
-import { Courier, CourierWithLocation, Coordinates, DeliveryStore } from '../types';
+import { Courier, CourierWithLocation, Coordinates } from '../types';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
