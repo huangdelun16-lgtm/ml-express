@@ -20,7 +20,8 @@ const [packages, setPackages] = useState<Package[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState<'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe'>('yangon');
+  type CityKey = 'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe';
+  const [selectedCity, setSelectedCity] = useState<CityKey>('yangon');
   const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -309,11 +310,13 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   // 切换城市
   const handleCityChange = (cityKey: string) => {
-    const validCityKey = cityKey as 'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe';
-    setSelectedCity(validCityKey);
-    const city = myanmarCities[validCityKey];
-    if (city) {
-      setMapCenter({ lat: city.lat, lng: city.lng });
+    const validCityKey = cityKey as CityKey;
+    if (validCityKey in myanmarCities) {
+      setSelectedCity(validCityKey);
+      const city = myanmarCities[validCityKey];
+      if (city) {
+        setMapCenter({ lat: city.lat, lng: city.lng });
+      }
     }
   };
   
