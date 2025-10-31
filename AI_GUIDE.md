@@ -1,5 +1,31 @@
 # MARKET LINK EXPRESS - AI 开发指南
 
+## 🚀 最新功能更新 (2025年1月29日)
+
+### 📱 移动应用部署准备
+
+#### Google Play Store 上架准备
+- **配置文件更新**:
+  - ✅ `ml-express-mobile-app/eas.json` - 配置 `app-bundle` 构建类型用于生产环境
+  - ✅ `ml-express-mobile-app/app.json` - 添加 `versionCode: 1` 并清理重复权限
+  - ✅ 创建 `GOOGLE_PLAY_STORE_GUIDE.md` - 完整的上架流程文档
+- **构建配置**:
+  - Android 构建类型已设置为 `app-bundle` (Google Play Store 必需格式)
+  - 版本代码 (`versionCode`) 已正确配置
+  - 所有必需的权限和配置已就绪
+- **上架状态**: ⏳ 等待 Google Play 开发者账号注册完成 ($25 一次性费用)
+
+#### iOS TestFlight 部署准备
+- **配置文件更新**:
+  - ✅ `ml-express-client/eas.json` - 添加 `testflight` 构建配置
+  - ✅ 创建 `TESTFLIGHT_GUIDE.md` - 详细的 TestFlight 部署指南
+- **构建配置**:
+  - iOS TestFlight 构建配置已完成
+  - App Store Connect 准备就绪
+- **部署状态**: ✅ 配置文件已就绪，等待构建和上传
+
+---
+
 ## 🚀 最新功能更新 (2024年10月29日)
 
 ### 🎨 用户体验优化
