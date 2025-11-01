@@ -4,6 +4,7 @@
     "slug": "ml-express-client",
     "version": "1.0.0",
     "expo": "~54.0.12",
+    "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

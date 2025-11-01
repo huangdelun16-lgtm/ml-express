@@ -3,6 +3,7 @@
     "name": "ML Express Staff",
     "slug": "MarketLinkStaffApp",
     "version": "1.0.0",
+    "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
