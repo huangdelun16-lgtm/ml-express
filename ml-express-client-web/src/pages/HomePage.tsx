@@ -79,8 +79,9 @@ const HomePage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  // const [trackingNumber, setTrackingNumber] = useState(''); // 未使用
-  // const [trackingResult, setTrackingResult] = useState<any>(null); // 未使用
+  const [trackingNumber] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [trackingResult, setTrackingResult] = useState<any>(null);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
@@ -98,12 +99,15 @@ const HomePage: React.FC = () => {
   const [orderError, setOrderError] = useState<string>('');
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
-  // const [orderConfirmationStatus, setOrderConfirmationStatus] = useState<OrderConfirmationStatus>('idle'); // 未使用
-  // const [orderConfirmationMessage, setOrderConfirmationMessage] = useState(''); // 未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [orderConfirmationStatus, setOrderConfirmationStatus] = useState<OrderConfirmationStatus>('idle');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [orderConfirmationMessage, setOrderConfirmationMessage] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState('yangon');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  // const [isLongPressing, setIsLongPressing] = useState(false); // 未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isLongPressing, setIsLongPressing] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
@@ -131,9 +135,11 @@ const HomePage: React.FC = () => {
   });
   
   // 验证码相关状态
-  // const [codeSent, setCodeSent] = useState(false); // 未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  // const [sentCode, setSentCode] = useState(''); // 未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [sentCode, setSentCode] = useState('');
   const [verificationType] = useState<'email' | 'sms'>('email'); // 固定使用邮箱验证
   
   // 系统价格设置
@@ -1083,6 +1089,7 @@ const HomePage: React.FC = () => {
 
   const t = translations[language as keyof typeof translations];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleTracking = () => {
     if (trackingNumber) {
       // 模拟跟踪结果
@@ -1119,7 +1126,7 @@ const HomePage: React.FC = () => {
     try {
       if (!window.google || !window.google.maps) {
         console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
-        alert(t.errors.distanceCalculationFailed + '\n' + '使用默认距离: 5 km');
+        alert(`${t.errors.distanceCalculationFailed}\n使用默认距离: 5 km`);
         return 5;
       }
 
@@ -1183,7 +1190,7 @@ const HomePage: React.FC = () => {
     } catch (error) {
       console.error('❌ 距离计算异常:', error);
       const errorMsg = error instanceof Error ? error.message : '未知错误';
-      alert(t.errors.distanceCalculationFailed + '\n' + errorMsg + '\n使用默认距离: 5 km');
+      alert(`${t.errors.distanceCalculationFailed}\n${errorMsg}\n使用默认距离: 5 km`);
       return 5;
     }
   };
