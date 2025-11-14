@@ -1,0 +1,27 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# SPA重定向配置 - 解决React Router路由问题
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 环境变量
+# 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
+# Dashboard 中的环境变量优先级高于此文件中的配置
+# 访问：Site settings → Environment variables
+
+[context.production.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.deploy-preview.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.branch-deploy.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
