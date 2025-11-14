@@ -1169,7 +1169,7 @@ const DeliveryStoreManagement: React.FC = () => {
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
           <ErrorBoundary>
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"}>
+          <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"}>
               <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
                 center={mapCenter}
@@ -2030,7 +2030,7 @@ const DeliveryStoreManagement: React.FC = () => {
               ) : (
                 <ErrorBoundary>
                   <LoadScript 
-                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM"}
+                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"}
                     onLoad={onMapLoad}
                     onError={onMapError}
                   >

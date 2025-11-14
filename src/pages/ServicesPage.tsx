@@ -44,7 +44,8 @@ const ServicesPage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
-        admin: '管理后台'
+        admin: '管理后台',
+        adminLogin: '管理员登录'
       },
       features: {
         title: '服务特色',
@@ -87,7 +88,8 @@ const ServicesPage: React.FC = () => {
         services: 'Services',
         tracking: 'Tracking',
         contact: 'Contact',
-        admin: 'Admin'
+        admin: 'Admin',
+        adminLogin: 'Admin Login'
       },
       features: {
         title: 'Service Features',
@@ -130,7 +132,8 @@ const ServicesPage: React.FC = () => {
         services: 'ဝန်ဆောင်မှု',
         tracking: 'ထုပ်ပိုးခြင်း',
         contact: 'ဆက်သွယ်ရန်',
-        admin: 'စီမံခန့်ခွဲမှု'
+        admin: 'စီမံခန့်ခွဲမှု',
+        adminLogin: 'စီမံခန့်ခွဲသူဝင်ရန်'
       },
       features: {
         title: 'ဝန်ဆောင်မှုများ',
@@ -205,11 +208,19 @@ const ServicesPage: React.FC = () => {
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
       }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '1200px',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: window.innerWidth < 768 ? '1rem' : '2rem',
+          flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
+          rowGap: '0.75rem'
+        }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
             src="/logo.png" 
@@ -236,7 +247,13 @@ const ServicesPage: React.FC = () => {
           </span>
         </div>
         
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: window.innerWidth < 768 ? '1rem' : '1.5rem', 
+          alignItems: 'center',
+          flexWrap: window.innerWidth < 640 ? 'wrap' : 'nowrap',
+          rowGap: '0.4rem'
+        }}>
           <button onClick={() => handleNavigation('/')} style={{ 
             color: 'white', 
             textDecoration: 'none',
@@ -288,14 +305,18 @@ const ServicesPage: React.FC = () => {
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease',
-            background: 'rgba(255,255,255,0.2)',
-            padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            border: '1px solid rgba(255,255,255,0.3)'
+            opacity: 0.8
           }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-          >{t.nav.admin}</a>
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = '#C0C0C0';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          title={language === 'zh' ? '管理员登录入口' : language === 'en' ? 'Admin Login' : 'စီမံခန့်ခွဲသူဝင်ရန်'}
+          >{t.nav.adminLogin}</a>
           
           {/* 自定义语言选择器 */}
           <div style={{ position: 'relative' }} data-language-dropdown>
@@ -367,6 +388,7 @@ const ServicesPage: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
         </div>
       </nav>
 

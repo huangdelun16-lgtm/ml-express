@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
+// 使用环境变量，如果不存在则回退到硬编码（仅用于开发环境）
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
+
+if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+  console.warn('⚠️ 警告：使用硬编码的 Supabase 密钥。生产环境应使用环境变量。');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -1096,34 +1101,68 @@ export const userService = {
 
 // 管理员账号数据库操作
 export const adminAccountService = {
-  // 登录验证
+  // 登录验证（使用加密密码验证）
   async login(username: string, password: string): Promise<AdminAccount | null> {
     try {
-      const { data, error } = await supabase
-        .from('admin_accounts')
-        .select('*')
-        .eq('username', username)
-        .eq('password', password)
-        .eq('status', 'active')
-        .single();
+      // 使用 Netlify Function 验证登录（包含密码加密验证）
+      const response = await fetch('/.netlify/functions/admin-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'login',
+          username,
+          password
+        })
+      });
 
-      if (error) {
-        console.error('登录失败:', error);
+      const result = await response.json();
+
+      if (!result.success || !result.account) {
+        console.error('登录失败:', result.error || '未知错误');
         return null;
       }
 
       // 更新最后登录时间
-      if (data?.id) {
+      if (result.account.id) {
         await supabase
           .from('admin_accounts')
           .update({ last_login: new Date().toISOString() })
-          .eq('id', data.id);
+          .eq('id', result.account.id);
       }
 
-      return data;
+      // 返回账户信息（不包含密码）
+      return result.account as AdminAccount;
     } catch (err) {
       console.error('登录异常:', err);
-      return null;
+      // 如果 Function 调用失败，回退到旧的验证方式（向后兼容）
+      try {
+        const { data, error } = await supabase
+          .from('admin_accounts')
+          .select('*')
+          .eq('username', username)
+          .eq('password', password)
+          .eq('status', 'active')
+          .single();
+
+        if (error || !data) {
+          return null;
+        }
+
+        // 更新最后登录时间
+        if (data?.id) {
+          await supabase
+            .from('admin_accounts')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', data.id);
+        }
+
+        return data;
+      } catch (fallbackErr) {
+        console.error('回退登录验证失败:', fallbackErr);
+        return null;
+      }
     }
   },
 
@@ -1147,13 +1186,40 @@ export const adminAccountService = {
     }
   },
 
-  // 创建新账号
+  // 创建新账号（密码会自动加密）
   async createAccount(accountData: Omit<AdminAccount, 'id' | 'status' | 'created_at' | 'updated_at'>): Promise<AdminAccount | null> {
     try {
+      // 如果提供了密码，先加密
+      let encryptedPassword = accountData.password;
+      if (accountData.password && !accountData.password.startsWith('$2a$') && !accountData.password.startsWith('$2b$') && !accountData.password.startsWith('$2y$')) {
+        // 密码是明文，需要加密
+        try {
+          const response = await fetch('/.netlify/functions/admin-password', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              action: 'hash',
+              plainPassword: accountData.password
+            })
+          });
+
+          const result = await response.json();
+          if (result.hashedPassword) {
+            encryptedPassword = result.hashedPassword;
+          }
+        } catch (hashError) {
+          console.warn('密码加密失败，使用明文存储（不推荐）:', hashError);
+          // 如果加密失败，继续使用明文（向后兼容，但不推荐）
+        }
+      }
+
       const { data, error } = await supabase
         .from('admin_accounts')
         .insert([{
           ...accountData,
+          password: encryptedPassword,
           status: 'active'
         }])
         .select()
@@ -1170,7 +1236,9 @@ export const adminAccountService = {
         throw new Error(error.message || '创建账号失败');
       }
 
-      return data;
+      // 返回时不包含密码
+      const { password: _, ...accountWithoutPassword } = data;
+      return accountWithoutPassword as AdminAccount;
     } catch (err: any) {
       console.error('创建账号异常:', err);
       throw err; // 重新抛出错误
@@ -1197,9 +1265,34 @@ export const adminAccountService = {
     }
   },
 
-  // 更新账号信息
+  // 更新账号信息（如果更新密码，会自动加密）
   async updateAccount(id: string, updateData: Partial<AdminAccount>): Promise<boolean> {
     try {
+      // 如果更新了密码，先加密
+      if (updateData.password && !updateData.password.startsWith('$2a$') && !updateData.password.startsWith('$2b$') && !updateData.password.startsWith('$2y$')) {
+        // 密码是明文，需要加密
+        try {
+          const response = await fetch('/.netlify/functions/admin-password', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              action: 'hash',
+              plainPassword: updateData.password
+            })
+          });
+
+          const result = await response.json();
+          if (result.hashedPassword) {
+            updateData.password = result.hashedPassword;
+          }
+        } catch (hashError) {
+          console.warn('密码加密失败，使用明文存储（不推荐）:', hashError);
+          // 如果加密失败，继续使用明文（向后兼容，但不推荐）
+        }
+      }
+
       const { error } = await supabase
         .from('admin_accounts')
         .update(updateData)

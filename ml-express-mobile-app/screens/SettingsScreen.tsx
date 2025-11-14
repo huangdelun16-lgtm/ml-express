@@ -16,6 +16,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, adminAccountService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
+const HOTLINE_NUMBERS = [
+  { display: '(+95) 09788848928', tel: '+959788848928' },
+  { display: '(+95) 09259369349', tel: '+959259369349' },
+];
+
 export default function SettingsScreen({ navigation }: any) {
   const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme } = useApp();
   const [settings, setSettings] = useState({
@@ -31,6 +36,31 @@ export default function SettingsScreen({ navigation }: any) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  
+  const hotlineDisplay = HOTLINE_NUMBERS.map(item => item.display).join(' / ');
+  const hotlineNewlineDisplay = HOTLINE_NUMBERS.map(item => item.display).join('\n');
+
+  const openHotlineSelector = () => {
+    const cancelText = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မဆက်တော့ပါ';
+    const title =
+      language === 'zh'
+        ? '选择拨打的客服热线'
+        : language === 'en'
+        ? 'Choose a hotline number'
+        : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ';
+
+    Alert.alert(
+      title,
+      '',
+      [
+        ...HOTLINE_NUMBERS.map(item => ({
+          text: item.display,
+          onPress: () => Linking.openURL(`tel:${item.tel}`),
+        })),
+        { text: cancelText, style: 'cancel' },
+      ]
+    );
+  };
   
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -268,8 +298,8 @@ export default function SettingsScreen({ navigation }: any) {
         { 
           icon: '📞', 
           label: language === 'zh' ? '联系客服' : 'Contact Support', 
-          subtitle: '09-000000000', 
-          action: () => Linking.openURL('tel:09-000000000')
+          subtitle: hotlineDisplay, 
+          action: openHotlineSelector
         },
       ]
     },
@@ -580,10 +610,10 @@ export default function SettingsScreen({ navigation }: any) {
                 <View style={styles.contactInfo}>
                   <TouchableOpacity 
                     style={styles.contactItem}
-                    onPress={() => Linking.openURL('tel:09-000000000')}
+                    onPress={openHotlineSelector}
                   >
                     <Text style={styles.contactIcon}>📞</Text>
-                    <Text style={styles.contactText}>客服热线: 09-000000000</Text>
+                    <Text style={styles.contactText}>{`客服热线:\n${hotlineNewlineDisplay}`}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.contactItem}
@@ -591,6 +621,13 @@ export default function SettingsScreen({ navigation }: any) {
                   >
                     <Text style={styles.contactIcon}>🌐</Text>
                     <Text style={styles.contactText}>官方网站: market-link-express.com</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.contactItem}
+                    onPress={() => Linking.openURL('mailto:marketlink982@gmail.com')}
+                  >
+                    <Text style={styles.contactIcon}>✉️</Text>
+                    <Text style={styles.contactText}>客服邮箱: marketlink982@gmail.com</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -629,7 +666,7 @@ export default function SettingsScreen({ navigation }: any) {
                 },
                 {
                   title: '📞 如何联系客服',
-                  content: '1. 在首页点击"联系客服"\n2. 或拨打客服热线：09-000000000\n3. 客服时间：周一至周日 8:00-22:00\n4. 微信客服：（开发中）'
+                  content: `1. 在首页点击"联系客服"\n2. 或拨打客服热线：${hotlineDisplay}\n3. 客服时间：周一至周日 8:00-22:00\n4. 微信客服：（开发中）`
                 },
                 {
                   title: '💰 配送费用',
@@ -654,7 +691,7 @@ export default function SettingsScreen({ navigation }: any) {
                 <Text style={styles.helpContactTitle}>还有问题？</Text>
                 <TouchableOpacity 
                   style={styles.helpContactButton}
-                  onPress={() => Linking.openURL('tel:09-000000000')}
+                  onPress={openHotlineSelector}
                 >
                   <Text style={styles.helpContactButtonText}>📞 联系客服</Text>
                 </TouchableOpacity>

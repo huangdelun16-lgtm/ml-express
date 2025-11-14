@@ -11,6 +11,7 @@ import {
   Platform,
   Animated,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
@@ -19,6 +20,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { packageService } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
+
+const HOTLINE_NUMBERS = [
+  { display: '(+95) 09788848928', tel: '+959788848928' },
+  { display: '(+95) 09259369349', tel: '+959259369349' },
+];
 
 interface OrderStats {
   total: number;
@@ -187,6 +193,29 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const currentT = t[language];
+  const hotlineDisplay = HOTLINE_NUMBERS.map(item => item.display).join('\n');
+
+  const handleCallHotline = () => {
+    const cancelText = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မဆက်တော့ပါ';
+    const title =
+      language === 'zh'
+        ? '选择拨打的客服热线'
+        : language === 'en'
+        ? 'Choose a hotline number'
+        : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ';
+
+    Alert.alert(
+      title,
+      '',
+      [
+        ...HOTLINE_NUMBERS.map(item => ({
+          text: item.display,
+          onPress: () => Linking.openURL(`tel:${item.tel}`),
+        })),
+        { text: cancelText, style: 'cancel' },
+      ]
+    );
+  };
 
   // 加载用户信息和订单数据
   useEffect(() => {
@@ -647,7 +676,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.contactGrid}>
             <TouchableOpacity
               style={styles.contactCard}
-              onPress={() => Linking.openURL('tel:+959123456789')}
+              onPress={handleCallHotline}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -658,13 +687,13 @@ export default function HomeScreen({ navigation }: any) {
               >
                 <Text style={styles.contactIcon}>📞</Text>
                 <Text style={styles.contactLabel}>{currentT.phone}</Text>
-                <Text style={styles.contactValue}>+95 9123456789</Text>
+                <Text style={styles.contactValue}>{hotlineDisplay}</Text>
               </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.contactCard}
-              onPress={() => Linking.openURL('mailto:info@marketlink.com')}
+              onPress={() => Linking.openURL('mailto:marketlink982@gmail.com')}
               activeOpacity={0.7}
             >
               <LinearGradient
@@ -675,7 +704,7 @@ export default function HomeScreen({ navigation }: any) {
               >
                 <Text style={styles.contactIcon}>✉️</Text>
                 <Text style={styles.contactLabel}>{currentT.email}</Text>
-                <Text style={styles.contactValue}>info@marketlink.com</Text>
+                <Text style={styles.contactValue}>marketlink982@gmail.com</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1099,5 +1128,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#ffffff',
+    textAlign: 'center',
   },
 });

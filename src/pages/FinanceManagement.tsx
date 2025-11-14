@@ -1,9 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ComposedChart
+} from 'recharts';
 
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
 type FilterStatus = 'all' | FinanceRecord['status'];
@@ -86,6 +104,11 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   // 工资管理相关状态
   const [courierSalaries, setCourierSalaries] = useState<CourierSalary[]>([]);
   const [salaryFilterStatus, setSalaryFilterStatus] = useState<'all' | CourierSalary['status']>('all');
+  const [selectedSalaryMonth, setSelectedSalaryMonth] = useState<string>(() => {
+    // 默认选择当前月份
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showSalaryForm, setShowSalaryForm] = useState<boolean>(false);
   const [showSalaryDetail, setShowSalaryDetail] = useState<boolean>(false);
   const [selectedSalary, setSelectedSalary] = useState<CourierSalary | null>(null);
@@ -97,6 +120,126 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
     payment_reference: '',
     payment_date: new Date().toISOString().split('T')[0]
   });
+  const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]); // 账号列表，用于获取工资
+  
+  // 包裹收支记录分页状态
+  const [packageRecordsPage, setPackageRecordsPage] = useState<number>(1);
+  const [packageRecordsPerPage, setPackageRecordsPerPage] = useState<number>(20);
+  
+  const deliveredPackages = useMemo(() => {
+    return packages.filter(pkg => pkg.status === '已送达');
+  }, [packages]);
+
+  const deliveredPackagesSorted = useMemo(() => {
+    return [...deliveredPackages].sort((a, b) => {
+      const timeA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
+      const timeB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [deliveredPackages]);
+
+  const inProgressPackages = useMemo(() => {
+    return packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消');
+  }, [packages]);
+
+  const deliveredIncome = useMemo(() => {
+    return deliveredPackages.reduce((sum, pkg) => {
+      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+      return sum + price;
+    }, 0);
+  }, [deliveredPackages]);
+
+  const inProgressIncome = useMemo(() => {
+    return inProgressPackages.reduce((sum, pkg) => {
+      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+      return sum + price;
+    }, 0);
+  }, [inProgressPackages]);
+
+  useEffect(() => {
+    setPackageRecordsPage(prev => {
+      const maxPage = Math.max(1, Math.ceil(deliveredPackagesSorted.length / packageRecordsPerPage));
+      return prev > maxPage ? maxPage : prev;
+    });
+  }, [deliveredPackagesSorted.length, packageRecordsPerPage]);
+
+  const packagePagination = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(deliveredPackagesSorted.length / packageRecordsPerPage));
+    const currentPage = Math.min(packageRecordsPage, totalPages);
+    const startIndex = (currentPage - 1) * packageRecordsPerPage;
+    const endIndex = Math.min(startIndex + packageRecordsPerPage, deliveredPackagesSorted.length);
+    const currentPackages = deliveredPackagesSorted.slice(startIndex, endIndex);
+    return {
+      totalPages,
+      currentPage,
+      startIndex,
+      endIndex,
+      currentPackages,
+    };
+  }, [deliveredPackagesSorted, packageRecordsPage, packageRecordsPerPage]);
+
+  const {
+    totalPages: packageTotalPages,
+    currentPage: packageCurrentPage,
+    startIndex: packageStartIndex,
+    endIndex: packageEndIndex,
+    currentPackages: packageCurrentPackages,
+  } = packagePagination;
+  const packageDisplayStart = deliveredPackagesSorted.length === 0 ? 0 : packageStartIndex + 1;
+  const packageDisplayEnd = deliveredPackagesSorted.length === 0 ? 0 : packageEndIndex;
+
+
+  // 根据月份过滤工资记录
+  const getFilteredSalariesByMonth = (salaries: CourierSalary[], month: string): CourierSalary[] => {
+    if (!month) return salaries;
+    
+    const [year, monthNum] = month.split('-').map(Number);
+    const startDate = new Date(year, monthNum - 1, 1);
+    const endDate = new Date(year, monthNum, 0, 23, 59, 59);
+    
+    return salaries.filter(salary => {
+      const periodStart = new Date(salary.period_start_date);
+      const periodEnd = new Date(salary.period_end_date);
+      
+      // 检查结算周期是否与选择的月份有重叠
+      return (periodStart <= endDate && periodEnd >= startDate);
+    });
+  };
+  
+  // 获取可用的月份列表（从工资记录中提取）
+  const getAvailableMonths = (): string[] => {
+    const months = new Set<string>();
+    
+    courierSalaries.forEach(salary => {
+      const periodStart = new Date(salary.period_start_date);
+      const year = periodStart.getFullYear();
+      const month = periodStart.getMonth() + 1;
+      months.add(`${year}-${String(month).padStart(2, '0')}`);
+      
+      // 如果结算周期跨月，也添加结束月份
+      const periodEnd = new Date(salary.period_end_date);
+      const endYear = periodEnd.getFullYear();
+      const endMonth = periodEnd.getMonth() + 1;
+      if (year !== endYear || month !== endMonth) {
+        months.add(`${endYear}-${String(endMonth).padStart(2, '0')}`);
+      }
+    });
+    
+    // 按日期倒序排列（最新的在前）
+    return Array.from(months).sort((a, b) => {
+      const dateA = new Date(a + '-01');
+      const dateB = new Date(b + '-01');
+      return dateB.getTime() - dateA.getTime();
+    });
+  };
+  
+  // 格式化月份显示
+  const formatMonthDisplay = (month: string): string => {
+    if (!month) return '';
+    const [year, monthNum] = month.split('-');
+    const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+    return `${year}年${monthNames[parseInt(monthNum) - 1]}`;
+  };
   
   // 多语言翻译
   const t = {
@@ -284,15 +427,17 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const loadRecords = async () => {
     try {
       setLoading(true);
-      // 同时加载财务记录、包裹数据和工资数据
-      const [financeData, packageData, salaryData] = await Promise.all([
+      // 同时加载财务记录、包裹数据、工资数据和账号数据
+      const [financeData, packageData, salaryData, accountsData] = await Promise.all([
         financeService.getAllRecords(),
         packageService.getAllPackages(),
-        courierSalaryService.getAllSalaries()
+        courierSalaryService.getAllSalaries(),
+        adminAccountService.getAllAccounts()
       ]);
       setRecords(financeData);
       setPackages(packageData);
       setCourierSalaries(salaryData);
+      setAdminAccounts(accountsData);
     } catch (error) {
       console.error('加载财务数据失败:', error);
       // 添加用户友好的错误提示
@@ -308,6 +453,13 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
     
     setLoading(true);
     try {
+      // 确保账号数据已加载（如果没有，先加载一次）
+      if (adminAccounts.length === 0) {
+        console.log('📋 加载账号数据以获取骑手工资信息...');
+        const accountsData = await adminAccountService.getAllAccounts();
+        setAdminAccounts(accountsData);
+      }
+      
       // 获取所有已送达包裹
       const deliveredPackages = packages.filter(pkg => pkg.status === '已送达' && pkg.courier && pkg.courier !== '待分配');
       
@@ -328,25 +480,52 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
       
       // 为每个骑手生成工资记录
       let successCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
       for (const [courierId, pkgs] of Object.entries(courierGroups)) {
         // 计算统计数据
         const totalDeliveries = pkgs.length;
         const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
         const relatedPackageIds = pkgs.map(p => p.id); // <-- 新增：收集包裹ID
         
+        // 从账号管理中获取骑手的基本工资
+        // courierId 是骑手名称，需要匹配 admin_accounts.employee_name
+        const courierAccount = adminAccounts.find(account => 
+          account.employee_name === courierId && 
+          (account.position === '骑手' || account.position === '骑手队长')
+        );
+        
+        // 如果找到账号且设置了工资，使用账号中的工资；否则使用默认值
+        const DEFAULT_BASE_SALARY = 200000; // 默认基本工资 MMK
+        const baseSalary = courierAccount?.salary && courierAccount.salary > 0 
+          ? courierAccount.salary 
+          : DEFAULT_BASE_SALARY;
+        
+        // 记录工资来源（用于调试和日志）
+        if (courierAccount?.salary && courierAccount.salary > 0) {
+          console.log(`✅ 骑手 ${courierId} 使用账号管理中的工资: ${courierAccount.salary.toLocaleString()} MMK`);
+        } else {
+          console.log(`⚠️ 骑手 ${courierId} 未在账号管理中设置工资，使用默认值: ${DEFAULT_BASE_SALARY.toLocaleString()} MMK`);
+        }
+        
         // 计算各项费用（仅计算送货距离费用，不包含取件距离）
         const COURIER_KM_RATE = 500; // MMK/KM（仅送货距离）
         const DELIVERY_BONUS_RATE = 1000; // MMK/单
-        const BASE_SALARY = 200000; // 基本工资 MMK
         
         const kmFee = totalKm * COURIER_KM_RATE; // 仅送货距离费用
         const deliveryBonus = totalDeliveries * DELIVERY_BONUS_RATE;
-        const baseSalary = BASE_SALARY;
         
         const grossSalary = baseSalary + kmFee + deliveryBonus;
         const netSalary = grossSalary;
         
-        const salary: Omit<CourierSalary, 'id'> = {
+        // 检查该骑手是否已经存在本月的工资记录
+        const existingSalary = courierSalaries.find(s => 
+          s.courier_id === courierId && 
+          s.period_start_date === periodStart && 
+          s.period_end_date === periodEnd
+        );
+        
+        const salaryData: Omit<CourierSalary, 'id'> = {
           courier_id: courierId,
           courier_name: courierId,
           settlement_period: 'monthly',
@@ -369,11 +548,51 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
           related_package_ids: relatedPackageIds, // <-- 新增：保存包裹ID
         };
         
-        const success = await courierSalaryService.createSalary(salary);
-        if (success) successCount++;
+        let success = false;
+        if (existingSalary) {
+          // 如果已存在，则更新现有记录（保留原有状态，除非是pending状态）
+          const updateData: Partial<CourierSalary> = {
+            base_salary: baseSalary,
+            km_fee: kmFee,
+            delivery_bonus: deliveryBonus,
+            total_deliveries: totalDeliveries,
+            total_km: totalKm,
+            on_time_deliveries: totalDeliveries,
+            late_deliveries: 0,
+            gross_salary: grossSalary,
+            net_salary: netSalary,
+            related_package_ids: relatedPackageIds,
+            // 如果原记录是pending状态，保持pending；否则保持原状态
+            status: existingSalary.status === 'pending' ? 'pending' : existingSalary.status
+          };
+          
+          success = await courierSalaryService.updateSalary(existingSalary.id!, updateData);
+          if (success) {
+            console.log(`🔄 更新骑手 ${courierId} 的本月工资记录`);
+            successCount++;
+            updatedCount++;
+          }
+        } else {
+          // 如果不存在，则创建新记录
+          success = await courierSalaryService.createSalary(salaryData);
+          if (success) {
+            console.log(`✅ 创建骑手 ${courierId} 的本月工资记录`);
+            successCount++;
+            createdCount++;
+          }
+        }
       }
       
-      window.alert(`成功生成 ${successCount} 条工资记录！`);
+      // 显示详细的结果信息
+      let message = `成功处理 ${successCount} 条工资记录！`;
+      if (createdCount > 0 && updatedCount > 0) {
+        message += `\n\n新建：${createdCount} 条\n更新：${updatedCount} 条`;
+      } else if (createdCount > 0) {
+        message += `\n\n新建：${createdCount} 条`;
+      } else if (updatedCount > 0) {
+        message += `\n\n更新：${updatedCount} 条`;
+      }
+      window.alert(message);
       await loadRecords();
     } catch (error) {
       console.error('生成工资失败:', error);
@@ -1166,13 +1385,13 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '24px' }}>
+                      <td colSpan={12} style={{ textAlign: 'center', padding: '24px' }}>
                         加载中...
                       </td>
                     </tr>
                   ) : filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '24px' }}>
+                      <td colSpan={12} style={{ textAlign: 'center', padding: '24px' }}>
                         暂无财务记录
                       </td>
                     </tr>
@@ -1509,63 +1728,272 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   );
                 }
                 
+                // 准备图表数据
+                const chartData = sortedMonths.map(month => {
+                  const data = monthlyData[month];
+                  return {
+                    month: `${month.split('-')[0]}年${month.split('-')[1]}月`,
+                    monthShort: `${month.split('-')[1]}月`,
+                    income: data.income,
+                    expense: data.expense,
+                    profit: data.income - data.expense,
+                    packageIncome: data.packageIncome,
+                    packageCount: data.packageCount
+                  };
+                });
+
                 return (
                   <div>
-                    {/* 简化版柱状图 */}
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '300px', marginBottom: '24px' }}>
-                      {sortedMonths.map(month => {
-                        const data = monthlyData[month];
-                        const maxValue = Math.max(...sortedMonths.map(m => Math.max(monthlyData[m].income, monthlyData[m].expense)));
-                        const incomeHeight = (data.income / maxValue) * 250;
-                        const expenseHeight = (data.expense / maxValue) * 250;
-                        
-                        return (
-                          <div key={month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', height: '250px' }}>
-                              <div
-                                style={{
-                                  width: '40px',
-                                  height: `${incomeHeight}px`,
-                                  background: 'linear-gradient(180deg, #2ecc71 0%, #27ae60 100%)',
-                                  borderRadius: '8px 8px 0 0',
-                                  position: 'relative',
-                                  boxShadow: '0 4px 12px rgba(46, 204, 113, 0.3)',
-                                  transition: 'all 0.3s ease'
-                                }}
-                                title={`收入: ${data.income.toLocaleString()} MMK`}
-                              />
-                              <div
-                                style={{
-                                  width: '40px',
-                                  height: `${expenseHeight}px`,
-                                  background: 'linear-gradient(180deg, #e74c3c 0%, #c0392b 100%)',
-                                  borderRadius: '8px 8px 0 0',
-                                  position: 'relative',
-                                  boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)',
-                                  transition: 'all 0.3s ease'
-                                }}
-                                title={`支出: ${data.expense.toLocaleString()} MMK`}
-                              />
-                            </div>
-                            <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: '500', textAlign: 'center' }}>
-                              {month.split('-')[1]}月
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* 组合图表：柱状图 + 折线图 */}
+                    <div style={{ marginBottom: '32px' }}>
+                      <h5 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px', fontSize: '1.1rem' }}>
+                        📊 收支对比（柱状图 + 利润趋势）
+                      </h5>
+                      <ResponsiveContainer width="100%" height={350}>
+                        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                          <XAxis 
+                            dataKey="monthShort" 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                          />
+                          <Legend 
+                            wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)', paddingTop: '20px' }}
+                          />
+                          <Bar 
+                            dataKey="income" 
+                            fill="#2ecc71" 
+                            name="收入"
+                            radius={[8, 8, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="expense" 
+                            fill="#e74c3c" 
+                            name="支出"
+                            radius={[8, 8, 0, 0]}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="profit" 
+                            stroke="#00cec9" 
+                            strokeWidth={3}
+                            name="利润"
+                            dot={{ fill: '#00cec9', r: 5 }}
+                            activeDot={{ r: 7 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
                     </div>
 
-                    {/* 图例 */}
-                    <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '20px', height: '20px', background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)', borderRadius: '4px' }} />
-                        <span style={{ color: 'white', fontSize: '0.9rem' }}>收入</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '20px', height: '20px', background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)', borderRadius: '4px' }} />
-                        <span style={{ color: 'white', fontSize: '0.9rem' }}>支出</span>
-                      </div>
+                    {/* 收入趋势折线图 */}
+                    <div style={{ marginBottom: '32px' }}>
+                      <h5 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px', fontSize: '1.1rem' }}>
+                        📈 收入趋势（折线图）
+                      </h5>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#2ecc71" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#2ecc71" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                          <XAxis 
+                            dataKey="monthShort" 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="income" 
+                            stroke="#2ecc71" 
+                            fillOpacity={1} 
+                            fill="url(#colorIncome)"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
+
+                    {/* 支出趋势折线图 */}
+                    <div style={{ marginBottom: '32px' }}>
+                      <h5 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px', fontSize: '1.1rem' }}>
+                        📉 支出趋势（折线图）
+                      </h5>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#e74c3c" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#e74c3c" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                          <XAxis 
+                            dataKey="monthShort" 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="expense" 
+                            stroke="#e74c3c" 
+                            fillOpacity={1} 
+                            fill="url(#colorExpense)"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* 每日收支趋势（最近30天） */}
+                    {(() => {
+                      // 按日期统计最近30天的数据
+                      const dailyData: Record<string, { income: number, expense: number, profit: number }> = {};
+                      const days = 30;
+                      const today = new Date();
+                      
+                      // 初始化最近30天的数据
+                      for (let i = days - 1; i >= 0; i--) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() - i);
+                        const dateKey = date.toISOString().slice(0, 10);
+                        dailyData[dateKey] = { income: 0, expense: 0, profit: 0 };
+                      }
+                      
+                      // 统计财务记录
+                      const recentRecords = filterByTimePeriod(records, '30days', 'record_date');
+                      recentRecords.forEach(record => {
+                        const dateKey = record.record_date;
+                        if (dailyData[dateKey]) {
+                          if (record.record_type === 'income') {
+                            dailyData[dateKey].income += record.amount || 0;
+                          } else {
+                            dailyData[dateKey].expense += record.amount || 0;
+                          }
+                          dailyData[dateKey].profit = dailyData[dateKey].income - dailyData[dateKey].expense;
+                        }
+                      });
+                      
+                      const dailyChartData = Object.entries(dailyData)
+                        .map(([date, data]) => ({
+                          date: new Date(date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }),
+                          dateFull: date,
+                          income: data.income,
+                          expense: data.expense,
+                          profit: data.profit
+                        }))
+                        .sort((a, b) => a.dateFull.localeCompare(b.dateFull));
+                      
+                      return (
+                        <div style={{ marginBottom: '32px' }}>
+                          <h5 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px', fontSize: '1.1rem' }}>
+                            📅 每日收支趋势（最近30天）
+                          </h5>
+                          <ResponsiveContainer width="100%" height={350}>
+                            <LineChart data={dailyChartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                              <XAxis 
+                                dataKey="date" 
+                                stroke="rgba(255, 255, 255, 0.7)"
+                                style={{ fontSize: '11px' }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                              />
+                              <YAxis 
+                                stroke="rgba(255, 255, 255, 0.7)"
+                                style={{ fontSize: '12px' }}
+                                tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  borderRadius: '8px',
+                                  color: 'white'
+                                }}
+                                formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                              />
+                              <Legend 
+                                wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)', paddingTop: '20px' }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="income" 
+                                stroke="#2ecc71" 
+                                strokeWidth={2}
+                                name="收入"
+                                dot={{ fill: '#2ecc71', r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="expense" 
+                                stroke="#e74c3c" 
+                                strokeWidth={2}
+                                name="支出"
+                                dot={{ fill: '#e74c3c', r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="profit" 
+                                stroke="#00cec9" 
+                                strokeWidth={2}
+                                name="利润"
+                                strokeDasharray="5 5"
+                                dot={{ fill: '#00cec9', r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })()}
 
                     {/* 月度详细数据表格 */}
                     <div style={{
@@ -1631,7 +2059,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))',
               gap: isMobile ? '12px' : '20px'
             }}>
-              {/* 包裹类型分布 */}
+              {/* 包裹类型分布 - 饼图 */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.12)',
                 borderRadius: '16px',
@@ -1648,45 +2076,266 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   
                   const total = Object.values(typeStats).reduce((sum, count) => sum + count, 0);
                   
+                  if (total === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        暂无包裹数据
+                      </div>
+                    );
+                  }
+
+                  // 准备饼图数据
+                  const pieColors = ['#6c5ce7', '#a29bfe', '#fd79a8', '#fdcb6e', '#55efc4', '#74b9ff', '#0984e3', '#00b894'];
+                  const pieData = Object.entries(typeStats)
+                    .map(([name, value], index) => ({
+                      name,
+                      value,
+                      percentage: ((value / total) * 100).toFixed(1)
+                    }))
+                    .sort((a, b) => b.value - a.value);
+
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {Object.entries(typeStats).map(([type, count]) => {
-                        const percentage = (count / total * 100).toFixed(1);
-                        return (
-                          <div key={type}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                              <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem' }}>{type}</span>
-                              <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>{count}个 ({percentage}%)</span>
-                            </div>
+                    <div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value} 个`}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {pieData.map((item, index) => (
+                          <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{ 
-                              height: '8px', 
-                              background: 'rgba(255, 255, 255, 0.1)', 
-                              borderRadius: '4px',
-                              overflow: 'hidden'
-                            }}>
-                              <div style={{ 
-                                width: `${percentage}%`, 
-                                height: '100%', 
-                                background: 'linear-gradient(90deg, #6c5ce7 0%, #a29bfe 100%)',
-                                transition: 'width 0.5s ease'
-                              }} />
-                            </div>
+                              width: '12px', 
+                              height: '12px', 
+                              borderRadius: '3px',
+                              background: pieColors[index % pieColors.length]
+                            }} />
+                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.85rem', flex: 1 }}>
+                              {item.name}
+                            </span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
+                              {item.value}个 ({item.percentage}%)
+                            </span>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* 骑手效率排名 */}
+              {/* 收入分类分布 - 饼图 */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.12)',
                 borderRadius: '16px',
                 padding: '24px',
                 border: '1px solid rgba(255, 255, 255, 0.18)'
               }}>
-                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>🏆 骑手效率排名 TOP 5</h4>
+                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>💰 收入分类分布</h4>
+                {(() => {
+                  const recentRecords = filterByTimePeriod(records, timePeriod, 'record_date');
+                  const incomeStats: Record<string, number> = {};
+                  
+                  recentRecords
+                    .filter(r => r.record_type === 'income')
+                    .forEach(record => {
+                      const category = record.category || '其他';
+                      incomeStats[category] = (incomeStats[category] || 0) + (record.amount || 0);
+                    });
+                  
+                  const total = Object.values(incomeStats).reduce((sum, amount) => sum + amount, 0);
+                  
+                  if (total === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        暂无收入数据
+                      </div>
+                    );
+                  }
+
+                  // 准备饼图数据
+                  const incomeColors = ['#2ecc71', '#27ae60', '#55efc4', '#00b894', '#00cec9', '#74b9ff', '#0984e3', '#6c5ce7'];
+                  const incomePieData = Object.entries(incomeStats)
+                    .map(([name, value]) => ({
+                      name,
+                      value,
+                      percentage: ((value / total) * 100).toFixed(1)
+                    }))
+                    .sort((a, b) => b.value - a.value);
+
+                  return (
+                    <div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={incomePieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {incomePieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={incomeColors[index % incomeColors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {incomePieData.map((item, index) => (
+                          <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ 
+                              width: '12px', 
+                              height: '12px', 
+                              borderRadius: '3px',
+                              background: incomeColors[index % incomeColors.length]
+                            }} />
+                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.85rem', flex: 1 }}>
+                              {item.name}
+                            </span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
+                              {item.value.toLocaleString()} MMK ({item.percentage}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 支出分类分布 - 饼图 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.18)'
+              }}>
+                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>💸 支出分类分布</h4>
+                {(() => {
+                  const recentRecords = filterByTimePeriod(records, timePeriod, 'record_date');
+                  const expenseStats: Record<string, number> = {};
+                  
+                  recentRecords
+                    .filter(r => r.record_type === 'expense')
+                    .forEach(record => {
+                      const category = record.category || '其他';
+                      expenseStats[category] = (expenseStats[category] || 0) + (record.amount || 0);
+                    });
+                  
+                  const total = Object.values(expenseStats).reduce((sum, amount) => sum + amount, 0);
+                  
+                  if (total === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        暂无支出数据
+                      </div>
+                    );
+                  }
+
+                  // 准备饼图数据
+                  const expenseColors = ['#e74c3c', '#c0392b', '#ff6b6b', '#ff7675', '#fd79a8', '#fdcb6e', '#e17055', '#d63031'];
+                  const expensePieData = Object.entries(expenseStats)
+                    .map(([name, value]) => ({
+                      name,
+                      value,
+                      percentage: ((value / total) * 100).toFixed(1)
+                    }))
+                    .sort((a, b) => b.value - a.value);
+
+                  return (
+                    <div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={expensePieData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {expensePieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={expenseColors[index % expenseColors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number) => `${value.toLocaleString()} MMK`}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {expensePieData.map((item, index) => (
+                          <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ 
+                              width: '12px', 
+                              height: '12px', 
+                              borderRadius: '3px',
+                              background: expenseColors[index % expenseColors.length]
+                            }} />
+                            <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.85rem', flex: 1 }}>
+                              {item.name}
+                            </span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
+                              {item.value.toLocaleString()} MMK ({item.percentage}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 骑手效率排名 - 柱状图 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.18)'
+              }}>
+                <h4 style={{ marginTop: 0, color: 'white', marginBottom: '16px' }}>🏆 骑手效率排名 TOP 10</h4>
                 {(() => {
                   const courierStats: Record<string, { count: number, km: number }> = {};
                   
@@ -1701,40 +2350,91 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   
                   const topCouriers = Object.entries(courierStats)
                     .sort((a, b) => b[1].count - a[1].count)
-                    .slice(0, 5);
+                    .slice(0, 10);
                   
+                  if (topCouriers.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        暂无骑手数据
+                      </div>
+                    );
+                  }
+
+                  // 准备柱状图数据
+                  const courierChartData = topCouriers.map(([courier, stats]) => ({
+                    name: courier.length > 8 ? `${courier.substring(0, 8)}...` : courier,
+                    fullName: courier,
+                    count: stats.count,
+                    km: stats.km
+                  }));
+
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {topCouriers.map(([courier, stats], index) => {
-                        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-                        return (
-                          <div key={courier} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            padding: '12px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            borderRadius: '10px'
-                          }}>
-                            <div style={{ fontSize: '1.5rem' }}>{medals[index]}</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: 'white', fontSize: '0.95rem', fontWeight: '600', marginBottom: '4px' }}>
-                                {courier}
-                              </div>
-                              <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>
-                                {stats.count}单 · {stats.km.toFixed(1)} KM
-                              </div>
-                            </div>
-                            <div style={{ 
-                              color: '#2ecc71', 
-                              fontSize: '1.2rem', 
-                              fontWeight: '700' 
+                    <div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={courierChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                          <XAxis 
+                            dataKey="name" 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '11px' }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            stroke="rgba(255, 255, 255, 0.7)"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '8px',
+                              color: 'white'
+                            }}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'count') return [`${value} 单`, '配送单数'];
+                              if (name === 'km') return [`${value.toFixed(1)} KM`, '配送距离'];
+                              return value;
+                            }}
+                            labelFormatter={(label) => `骑手: ${courierChartData.find(d => d.name === label)?.fullName || label}`}
+                          />
+                          <Legend 
+                            wrapperStyle={{ color: 'rgba(255, 255, 255, 0.9)', paddingTop: '20px' }}
+                          />
+                          <Bar 
+                            dataKey="count" 
+                            fill="#2ecc71" 
+                            name="配送单数"
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {topCouriers.map(([courier, stats], index) => {
+                          const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+                          return (
+                            <div key={courier} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '8px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              borderRadius: '8px'
                             }}>
-                              {stats.count}
+                              <div style={{ fontSize: '1.2rem', width: '30px' }}>{medals[index] || `${index + 1}.`}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: '600' }}>
+                                  {courier}
+                                </div>
+                                <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.75rem' }}>
+                                  {stats.count}单 · {stats.km.toFixed(1)} KM
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })()}
@@ -1772,7 +2472,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {packages.filter(pkg => pkg.status === '已送达').length}
+                    {deliveredPackages.length}
                   </div>
                   <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹数量</div>
                 </div>
@@ -1784,10 +2484,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {packages.filter(pkg => pkg.status === '已送达').reduce((sum, pkg) => {
-                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                      return sum + price;
-                    }, 0).toLocaleString()} MMK
+                    {deliveredIncome.toLocaleString()} MMK
                   </div>
                   <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹收入</div>
                 </div>
@@ -1799,7 +2496,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消').length}
+                    {inProgressPackages.length}
                   </div>
                   <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>进行中的包裹</div>
                 </div>
@@ -1811,10 +2508,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消').reduce((sum, pkg) => {
-                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                      return sum + price;
-                    }, 0).toLocaleString()} MMK
+                    {inProgressIncome.toLocaleString()} MMK
                   </div>
                   <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>预期收入</div>
                 </div>
@@ -1824,7 +2518,42 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
             {/* 包裹收支记录表格 */}
             <div style={{ marginTop: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>最近包裹收入记录 (最新20个)</h4>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>包裹收入记录</h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                    每页显示：
+                  </label>
+                  <select
+                    value={packageRecordsPerPage}
+                    onChange={(e) => {
+                      setPackageRecordsPerPage(Number(e.target.value));
+                      setPackageRecordsPage(1); // 重置到第一页
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      background: 'rgba(7, 23, 53, 0.65)',
+                      color: 'white',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={10} style={{ background: '#0f1729', color: 'white' }}>10</option>
+                    <option value={20} style={{ background: '#0f1729', color: 'white' }}>20</option>
+                    <option value={50} style={{ background: '#0f1729', color: 'white' }}>50</option>
+                    <option value={100} style={{ background: '#0f1729', color: 'white' }}>100</option>
+                  </select>
+                </div>
+              </div>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
@@ -1844,54 +2573,212 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     </tr>
                   </thead>
                   <tbody>
-                    {packages.filter(pkg => pkg.status === '已送达').slice(0, 20).map((pkg) => {
-                      const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                      return (
-                        <tr key={pkg.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            {pkg.id}
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            {pkg.sender_name}
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            {pkg.receiver_name}
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            {pkg.package_type}
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            <span style={{ color: '#22c55e', fontWeight: 'bold' }}>
-                              {price.toLocaleString()} MMK
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.8rem',
-                              background: 'rgba(34, 197, 94, 0.2)',
-                              color: '#22c55e'
-                            }}>
-                              已送达
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                            {pkg.delivery_time || '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {packages.filter(pkg => pkg.status === '已送达').length === 0 && (
+                    {deliveredPackagesSorted.length === 0 ? (
                       <tr>
                         <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
                           暂无已送达的包裹记录
                         </td>
                       </tr>
+                    ) : (
+                      packageCurrentPackages.map((pkg) => {
+                        const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                        return (
+                          <tr key={pkg.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkg.id}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkg.sender_name}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkg.receiver_name}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkg.package_type}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              <span style={{ color: '#22c55e', fontWeight: 'bold' }}>
+                                {price.toLocaleString()} MMK
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                background: 'rgba(34, 197, 94, 0.2)',
+                                color: '#22c55e'
+                              }}>
+                                已送达
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkg.delivery_time || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
+              
+              {/* 分页控件 */}
+              {packageTotalPages <= 1 ? null : (() => {
+                const getPageNumbers = () => {
+                  const pages: (number | string)[] = [];
+                  const maxVisible = 5;
+                  
+                  if (packageTotalPages <= maxVisible) {
+                    // 如果总页数少于等于5，显示所有页码
+                    for (let i = 1; i <= packageTotalPages; i++) {
+                      pages.push(i);
+                    }
+                  } else {
+                    // 总是显示第一页
+                    pages.push(1);
+                    
+                    if (packageCurrentPage > 3) {
+                      pages.push('...');
+                    }
+                    
+                    // 显示当前页前后各1页
+                    const start = Math.max(2, packageCurrentPage - 1);
+                    const end = Math.min(packageTotalPages - 1, packageCurrentPage + 1);
+                    
+                    for (let i = start; i <= end; i++) {
+                      pages.push(i);
+                    }
+                    
+                    if (packageCurrentPage < packageTotalPages - 2) {
+                      pages.push('...');
+                    }
+                    
+                    // 总是显示最后一页
+                    pages.push(packageTotalPages);
+                  }
+                  
+                  return pages;
+                };
+                
+                return (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '20px',
+                    padding: '16px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                      显示第 {packageDisplayStart} - {packageDisplayEnd} 条，共 {deliveredPackagesSorted.length} 条记录
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {/* 上一页按钮 */}
+                      <button
+                        onClick={() => setPackageRecordsPage(prev => Math.max(1, prev - 1))}
+                        disabled={packageCurrentPage === 1}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: packageCurrentPage === 1 
+                            ? 'rgba(255, 255, 255, 0.1)' 
+                            : 'rgba(59, 130, 246, 0.2)',
+                          color: packageCurrentPage === 1 
+                            ? 'rgba(255, 255, 255, 0.4)' 
+                            : 'white',
+                          cursor: packageCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        ← 上一页
+                      </button>
+                      
+                      {/* 页码按钮 */}
+                      {getPageNumbers().map((page, index) => {
+                        if (page === '...') {
+                          return (
+                            <span key={`ellipsis-${index}`} style={{ 
+                              color: 'rgba(255, 255, 255, 0.6)', 
+                              padding: '0 8px',
+                              fontSize: '0.9rem'
+                            }}>
+                              ...
+                            </span>
+                          );
+                        }
+                        
+                        const pageNum = page as number;
+                        const isActive = pageNum === packageCurrentPage;
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setPackageRecordsPage(pageNum)}
+                            style={{
+                              minWidth: '40px',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              background: isActive 
+                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                                : 'rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: isActive ? 'bold' : 'normal',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                              if (!isActive) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (!isActive) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              }
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      
+                      {/* 下一页按钮 */}
+                      <button
+                        onClick={() => setPackageRecordsPage(prev => Math.min(packageTotalPages, prev + 1))}
+                        disabled={packageCurrentPage === packageTotalPages}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          background: packageCurrentPage === packageTotalPages 
+                            ? 'rgba(255, 255, 255, 0.1)' 
+                            : 'rgba(59, 130, 246, 0.2)',
+                          color: packageCurrentPage === packageTotalPages 
+                            ? 'rgba(255, 255, 255, 0.4)' 
+                            : 'white',
+                          cursor: packageCurrentPage === packageTotalPages ? 'not-allowed' : 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        下一页 →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -2013,6 +2900,53 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               )}
             </div>
 
+            {/* 月份选择器 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: isMobile ? '12px' : '20px',
+              marginBottom: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <label style={{ color: 'white', fontSize: '0.95rem', fontWeight: '600' }}>
+                📅 选择月份：
+              </label>
+              <select
+                value={selectedSalaryMonth}
+                onChange={(e) => {
+                  setSelectedSalaryMonth(e.target.value);
+                  setSelectedSalaries([]); // 切换月份时清空选择
+                }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  background: 'rgba(7, 23, 53, 0.65)',
+                  color: 'white',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  minWidth: '180px'
+                }}
+              >
+                {getAvailableMonths().map(month => (
+                  <option key={month} value={month} style={{ background: '#0f1729', color: 'white' }}>
+                    {formatMonthDisplay(month)}
+                  </option>
+                ))}
+              </select>
+              <div style={{ 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                fontSize: '0.85rem',
+                marginLeft: 'auto'
+              }}>
+                共 {getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录
+              </div>
+            </div>
+
             {/* 工资统计卡片 */}
             <div style={{
               display: 'grid',
@@ -2020,57 +2954,64 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               gap: isMobile ? '12px' : '16px',
               marginBottom: '24px'
             }}>
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%)',
-                border: '1px solid rgba(251, 191, 36, 0.3)',
-                borderRadius: '16px',
-                padding: isMobile ? '12px' : '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ color: '#fbbf24', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                  {courierSalaries.filter(s => s.status === 'pending').length}
-                </div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>待结算</div>
-              </div>
-              
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
-                borderRadius: '16px',
-                padding: isMobile ? '12px' : '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ color: '#22c55e', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                  {courierSalaries.filter(s => s.status === 'approved').length}
-                </div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已审核</div>
-              </div>
-              
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '16px',
-                padding: isMobile ? '12px' : '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ color: '#3b82f6', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                  {courierSalaries.filter(s => s.status === 'paid').length}
-                </div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已发放</div>
-              </div>
-              
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                borderRadius: '16px',
-                padding: isMobile ? '12px' : '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ color: '#a855f7', fontSize: '1.6rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                  {courierSalaries.reduce((sum, s) => sum + s.net_salary, 0).toLocaleString()} MMK
-                </div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>工资总额</div>
-              </div>
+              {(() => {
+                const monthFilteredSalaries = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                return (
+                  <>
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%)',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      borderRadius: '16px',
+                      padding: isMobile ? '12px' : '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ color: '#fbbf24', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                        {monthFilteredSalaries.filter(s => s.status === 'pending').length}
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>待结算</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      borderRadius: '16px',
+                      padding: isMobile ? '12px' : '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ color: '#22c55e', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                        {monthFilteredSalaries.filter(s => s.status === 'approved').length}
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已审核</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '16px',
+                      padding: isMobile ? '12px' : '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ color: '#3b82f6', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                        {monthFilteredSalaries.filter(s => s.status === 'paid').length}
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已发放</div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)',
+                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                      borderRadius: '16px',
+                      padding: isMobile ? '12px' : '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ color: '#a855f7', fontSize: '1.6rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                        {monthFilteredSalaries.reduce((sum, s) => sum + s.net_salary, 0).toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>工资总额</div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* 工资记录表格 */}
@@ -2090,11 +3031,13 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                       <input
                         type="checkbox"
                         checked={(() => {
-                          const filtered = courierSalaries.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
+                          const monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                          const filtered = monthFiltered.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
                           return selectedSalaries.length === filtered.length && filtered.length > 0;
                         })()}
                         onChange={(e) => {
-                          const filtered = courierSalaries.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
+                          const monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                          const filtered = monthFiltered.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
                           if (e.target.checked) {
                             setSelectedSalaries(filtered.map(s => s.id!).filter(id => id !== undefined));
                           } else {
@@ -2117,13 +3060,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 </thead>
                 <tbody>
                   {(() => {
-                    const filtered = courierSalaries.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
+                    // 先按月份过滤，再按状态过滤
+                    const monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                    const filtered = monthFiltered.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
                     
                     if (filtered.length === 0) {
                       return (
                         <tr>
                           <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)', fontSize: '1rem' }}>
-                            暂无工资记录
+                            {selectedSalaryMonth ? `暂无 ${formatMonthDisplay(selectedSalaryMonth)} 的工资记录` : '暂无工资记录'}
                           </td>
                         </tr>
                       );

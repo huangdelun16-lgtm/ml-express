@@ -219,8 +219,8 @@ const notificationInterval = setInterval(async () => {
 ## 📞 技术支持
 
 如有任何问题，请联系技术团队：
-- 📧 Email: support@marketlinkexpress.com
-- 📱 Phone: 09-000000000
+- 📧 Email: marketlink982@gmail.com
+- 📱 Phone: (+95) 09788848928 / (+95) 09259369349
 
 ---
 

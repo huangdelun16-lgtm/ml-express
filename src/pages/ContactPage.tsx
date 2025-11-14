@@ -44,7 +44,8 @@ const ContactPage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
-        admin: '管理后台'
+        admin: '管理后台',
+        adminLogin: '管理员登录'
       },
       contact: {
         title: '联系我们',
@@ -53,8 +54,8 @@ const ContactPage: React.FC = () => {
         email: '邮箱联系',
         address: '公司地址',
         businessHours: '营业时间',
-        phoneValue: '+95 9 123 456 789',
-        emailValue: 'info@marketlinkexpress.com',
+        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        emailValue: 'marketlink982@gmail.com',
         addressValue: '缅甸',
         businessHoursValue: '周一至周日 8:00 - 20:00'
       }
@@ -65,7 +66,8 @@ const ContactPage: React.FC = () => {
         services: 'Services',
         tracking: 'Tracking',
         contact: 'Contact',
-        admin: 'Admin'
+        admin: 'Admin',
+        adminLogin: 'Admin Login'
       },
       contact: {
         title: 'Contact Us',
@@ -74,8 +76,8 @@ const ContactPage: React.FC = () => {
         email: 'Email Contact',
         address: 'Company Address',
         businessHours: 'Business Hours',
-        phoneValue: '+95 9 123 456 789',
-        emailValue: 'info@marketlinkexpress.com',
+        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        emailValue: 'marketlink982@gmail.com',
         addressValue: 'Myanmar',
         businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
       }
@@ -86,7 +88,8 @@ const ContactPage: React.FC = () => {
         services: 'ဝန်ဆောင်မှု',
         tracking: 'ထုပ်ပိုးခြင်း',
         contact: 'ဆက်သွယ်ရန်',
-        admin: 'စီမံခန့်ခွဲမှု'
+        admin: 'စီမံခန့်ခွဲမှု',
+        adminLogin: 'စီမံခန့်ခွဲသူဝင်ရန်'
       },
       contact: {
         title: 'ဆက်သွယ်ရန်',
@@ -95,8 +98,8 @@ const ContactPage: React.FC = () => {
         email: 'အီးမေးလ်ဆက်သွယ်ရန်',
         address: 'ကုမ္ပဏီလိပ်စာ',
         businessHours: 'အလုပ်ချိန်',
-        phoneValue: '+95 9 123 456 789',
-        emailValue: 'info@marketlinkexpress.com',
+        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        emailValue: 'marketlink982@gmail.com',
         addressValue: 'မန္တလေး၊ မြန်မာ',
         businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00'
       }
@@ -222,14 +225,18 @@ const ContactPage: React.FC = () => {
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease',
-            background: 'rgba(255,255,255,0.2)',
-            padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            border: '1px solid rgba(255,255,255,0.3)'
+            opacity: 0.8
           }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-          >{t.nav.admin}</a>
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = '#C0C0C0';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          title={language === 'zh' ? '管理员登录入口' : language === 'en' ? 'Admin Login' : 'စီမံခန့်ခွဲသူဝင်ရန်'}
+          >{t.nav.adminLogin}</a>
           
           {/* 自定义语言选择器 */}
           <div style={{ position: 'relative' }} data-language-dropdown>

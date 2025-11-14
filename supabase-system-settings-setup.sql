@@ -22,8 +22,8 @@ FOR ALL USING (true) WITH CHECK (true);
 INSERT INTO system_settings (category, settings_key, settings_value, description, updated_by)
 VALUES
   ('general', 'company.name', to_jsonb('Market Link Express'::text), '用于系统展示和通知模板的公司名称', 'initial-script'),
-  ('general', 'company.contact_phone', to_jsonb('09-000000000'::text), '客户服务热线号码', 'initial-script'),
-  ('general', 'company.contact_email', to_jsonb('support@marketlinkexpress.com'::text), '客服邮箱地址', 'initial-script'),
+  ('general', 'company.contact_phone', to_jsonb('(+95) 09788848928 / (+95) 09259369349'::text), '客户服务热线号码', 'initial-script'),
+  ('general', 'company.contact_email', to_jsonb('marketlink982@gmail.com'::text), '客服邮箱地址', 'initial-script'),
   ('pricing', 'pricing.base_fee', to_jsonb(1500), '基础起步价', 'initial-script'),
   ('notification', 'notification.sms_enabled', to_jsonb(true), '是否启用短信通知', 'initial-script'),
   ('automation', 'automation.auto_assign_strategy', to_jsonb('distance_first'::text), '自动派单策略', 'initial-script'),

@@ -36,20 +36,19 @@
   paths = ["*.md", "*.html", "test-*", "diagnose-*"]
 
 # 环境变量
+# 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
+# Dashboard 中的环境变量优先级高于此文件中的配置
+# 访问：Site settings → Environment variables
+
 [context.production.environment]
-  REACT_APP_GOOGLE_MAPS_API_KEY = "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
-  REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY"
+  # Google Maps API Key（如果需要在 netlify.toml 中配置）
+  # REACT_APP_GOOGLE_MAPS_API_KEY = "your-key-here"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [context.deploy-preview.environment]
-  REACT_APP_GOOGLE_MAPS_API_KEY = "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
-  REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY"
+  # REACT_APP_GOOGLE_MAPS_API_KEY = "your-key-here"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [context.branch-deploy.environment]
-  REACT_APP_GOOGLE_MAPS_API_KEY = "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
-  REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY"
+  # REACT_APP_GOOGLE_MAPS_API_KEY = "your-key-here"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"

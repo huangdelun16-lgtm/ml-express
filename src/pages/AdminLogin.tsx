@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAccountService, auditLogService } from '../services/supabase';
+import { saveToken } from '../services/authService';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,10 +18,8 @@ const AdminLogin: React.FC = () => {
       const account = await adminAccountService.login(username, password);
       
       if (account) {
-        // 登录成功，保存用户信息到 localStorage
-        localStorage.setItem('currentUser', account.username);
-        localStorage.setItem('currentUserName', account.employee_name);
-        localStorage.setItem('currentUserRole', account.role);
+        // 登录成功，生成并保存 Token
+        saveToken(account.username, account.role, account.employee_name);
         
         // 记录登录日志
         await auditLogService.log({
@@ -33,11 +32,9 @@ const AdminLogin: React.FC = () => {
         
         navigate('/admin/dashboard');
       } else {
-        // 如果数据库登录失败，回退到硬编码验证（兼容模式）
+        // 如果数据库登录失败，回退到硬编码验证（兼容模式，仅用于紧急情况）
         if (username === 'admin' && password === 'admin') {
-          localStorage.setItem('currentUser', 'admin');
-          localStorage.setItem('currentUserName', '管理员');
-          localStorage.setItem('currentUserRole', 'admin');
+          saveToken('admin', 'admin', '管理员');
           
           // 记录登录日志
           await auditLogService.log({

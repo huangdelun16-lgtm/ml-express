@@ -24,6 +24,10 @@ yarn-error.log*
 # Netlify
 .netlify
 
+# Client Web (exclude node_modules and build)
+ml-express-client-web/node_modules/
+ml-express-client-web/build/
+
 # User-specific files
 .idea/
 .vscode/

@@ -327,7 +327,7 @@ A: 不需要！地址解析完全离线。但实际导航需要网络（Google M
 A: 编辑 `MapScreen.tsx` 中的 `mandalayLocations` 对象
 
 ### 技术支持
-- 📧 Email: support@marketlinkexpress.com
+- 📧 Email: marketlink982@gmail.com
 - 📱 电话: [联系电话]
 - 💬 在线支持: [支持链接]
 

@@ -17,6 +17,7 @@ import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
 import { LanguageProvider } from './contexts/LanguageContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -24,25 +25,116 @@ function App() {
       <Router>
         <div className="App">
           <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/services" element={<ServicesPage />} />
-            <Route path="/tracking" element={<TrackingPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            {/* 后台管理登录页（公开） */}
+            <Route path="/" element={<Navigate to="/admin/login" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/city-packages" element={<CityPackages />} />
-            <Route path="/admin/users" element={<UserManagement />} />
-            <Route path="/admin/couriers" element={<CourierManagement />} />
-            <Route path="/admin/finance" element={<FinanceManagement />} />
-            <Route path="/admin/tracking" element={<RealTimeTracking />} />
-            <Route path="/admin/realtime-tracking" element={<RealTimeTracking />} />
-            <Route path="/admin/settings" element={<SystemSettings />} />
-            <Route path="/admin/system-settings" element={<SystemSettings />} />
-            <Route path="/admin/accounts" element={<AccountManagement />} />
-            <Route path="/admin/delivery-stores" element={<DeliveryStoreManagement />} />
-            <Route path="/admin/supervision" element={<EmployeeSupervision />} />
-            <Route path="/admin/delivery-alerts" element={<DeliveryAlerts />} />
+            
+            {/* 后台管理路由（受保护） */}
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/city-packages" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']}>
+                  <CityPackages />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/users" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <UserManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/couriers" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <CourierManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/finance" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']}>
+                  <FinanceManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/tracking" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']}>
+                  <RealTimeTracking />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/realtime-tracking" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']}>
+                  <RealTimeTracking />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/settings" 
+              element={
+                <ProtectedRoute requiredRoles={['admin']}>
+                  <SystemSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/system-settings" 
+              element={
+                <ProtectedRoute requiredRoles={['admin']}>
+                  <SystemSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/accounts" 
+              element={
+                <ProtectedRoute requiredRoles={['admin']}>
+                  <AccountManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/delivery-stores" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <DeliveryStoreManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/supervision" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <EmployeeSupervision />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/delivery-alerts" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <DeliveryAlerts />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </div>
       </Router>

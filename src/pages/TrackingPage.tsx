@@ -4,17 +4,25 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { packageService, trackingService } from '../services/supabase';
 
 // Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
   
   // Google Maps API 加载
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: GOOGLE_MAPS_LIBRARIES
   });
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.error('[TrackingPage] 未找到 REACT_APP_GOOGLE_MAPS_API_KEY 环境变量。');
+    }
+    if (mapLoadError) {
+      console.error('[TrackingPage] Google Maps 加载失败:', mapLoadError);
+    }
+  }, [mapLoadError]);
   
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
@@ -127,7 +135,8 @@ const TrackingPage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
-        admin: '管理后台'
+        admin: '管理后台',
+        adminLogin: '管理员登录'
       },
       tracking: {
         title: '包裹跟踪',
@@ -159,7 +168,8 @@ const TrackingPage: React.FC = () => {
         services: 'Services',
         tracking: 'Tracking',
         contact: 'Contact',
-        admin: 'Admin'
+        admin: 'Admin',
+        adminLogin: 'Admin Login'
       },
       tracking: {
         title: 'Package Tracking',
@@ -191,7 +201,8 @@ const TrackingPage: React.FC = () => {
         services: 'ဝန်ဆောင်မှု',
         tracking: 'ထုပ်ပိုးခြင်း',
         contact: 'ဆက်သွယ်ရန်',
-        admin: 'စီမံခန့်ခွဲမှု'
+        admin: 'စီမံခန့်ခွဲမှု',
+        adminLogin: 'စီမံခန့်ခွဲသူဝင်ရန်'
       },
       tracking: {
         title: 'ထုပ်ပိုးခြင်း',
@@ -407,14 +418,18 @@ const TrackingPage: React.FC = () => {
             textDecoration: 'none',
             fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
             transition: 'color 0.3s ease',
-            background: 'rgba(255,255,255,0.2)',
-            padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            border: '1px solid rgba(255,255,255,0.3)'
+            opacity: 0.8
           }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-          >{t.nav.admin}</a>
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = '#C0C0C0';
+            e.currentTarget.style.opacity = '1';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.opacity = '0.8';
+          }}
+          title={language === 'zh' ? '管理员登录入口' : language === 'en' ? 'Admin Login' : 'စီမံခန့်ခွဲသူဝင်ရန်'}
+          >{t.nav.adminLogin}</a>
           
           {/* 自定义语言选择器 */}
           <div style={{ position: 'relative' }} data-language-dropdown>

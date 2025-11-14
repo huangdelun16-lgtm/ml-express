@@ -38,8 +38,8 @@ const settingDefinitions: SettingDefinition[] = [
     description: '接收客户咨询和紧急联系的电话号码。',
     category: 'general',
     type: 'text',
-    defaultValue: '09-000000000',
-    placeholder: '09-000000000'
+    defaultValue: '(+95) 09788848928 / (+95) 09259369349',
+    placeholder: '(+95) 09788848928 / (+95) 09259369349'
   },
   {
     key: 'company.contact_email',
@@ -47,8 +47,8 @@ const settingDefinitions: SettingDefinition[] = [
     description: '对外提供的服务邮箱地址，用于系统通知和邮件提醒。',
     category: 'general',
     type: 'text',
-    defaultValue: 'support@marketlinkexpress.com',
-    placeholder: 'support@marketlinkexpress.com'
+    defaultValue: 'marketlink982@gmail.com',
+    placeholder: 'marketlink982@gmail.com'
   },
   {
     key: 'service.operation_hours',
@@ -125,10 +125,10 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'pricing.fragile_surcharge',
     label: '易碎品附加费',
-    description: '运输易碎物品时收取的额外保护和小心处理费用。',
+    description: '运输易碎物品时收取的额外保护和小心处理费用，按距离计算（MMK/公里）。',
     category: 'pricing',
     type: 'number',
-    defaultValue: 400,
+    defaultValue: 300,
     suffix: 'MMK/公里'
   },
   {

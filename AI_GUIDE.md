@@ -1186,7 +1186,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - **自动警报**: 违规行为自动发送到"配送警报管理"页面
 
 #### 2. 高级地图导航
-- **Google Maps集成**: 使用最新API Key (AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM)
+- **Google Maps集成**: 使用最新API Key (AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE)
 - **智能路线规划**: 多包裹取货点和送货点最优路径计算
 - **实时位置跟踪**: GPS定位和路线导航
 - **坐标优先**: 优先使用经纬度坐标，地址作为备用
