@@ -302,11 +302,11 @@ const TrackingPage: React.FC = () => {
         position: 'relative',
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
+        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        boxShadow: 'var(--shadow-lg)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
@@ -338,48 +338,85 @@ const TrackingPage: React.FC = () => {
           <button onClick={() => handleNavigation('/')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.home}</button>
           <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white',
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.services}</button>
           <button style={{ 
             color: '#FFD700', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-bold)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            lineHeight: 'var(--line-height-normal)'
           }}>{t.nav.tracking}</button>
           <button onClick={() => handleNavigation('/contact')} style={{ 
             color: 'white',
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.contact}</button>
           {/* 客户端页面不包含管理员登录入口 */}
           
@@ -517,15 +554,24 @@ const TrackingPage: React.FC = () => {
                 onKeyPress={(e) => e.key === 'Enter' && handleTracking()}
                 style={{
                   flex: 1,
-                  padding: '1.2rem',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '1.1rem',
-                  transition: 'border-color 0.3s ease',
-                  background: 'white'
+                  padding: 'var(--spacing-4) var(--spacing-5)',
+                  border: '2px solid var(--color-border-dark)',
+                  borderRadius: 'var(--radius-lg)',
+                  fontSize: 'var(--font-size-lg)',
+                  lineHeight: 'var(--line-height-normal)',
+                  textAlign: 'left',
+                  transition: 'all var(--transition-base)',
+                  background: 'white',
+                  fontFamily: 'var(--font-family-base)'
                 }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
               <button
                 onClick={handleTracking}
@@ -534,14 +580,17 @@ const TrackingPage: React.FC = () => {
                   background: loading ? '#cbd5e0' : 'linear-gradient(to right top, #498ab6, #428cc9, #468dda, #558cea)',
                   color: 'white',
                   border: 'none',
-                  padding: '1.2rem 2.5rem',
-                  borderRadius: '12px',
+                  padding: 'var(--spacing-4) var(--spacing-6)',
+                  borderRadius: 'var(--radius-lg)',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem',
+                  fontWeight: 'var(--font-weight-bold)',
+                  fontSize: 'var(--font-size-lg)',
+                  textAlign: 'center',
                   minWidth: window.innerWidth < 768 ? '100%' : 'auto',
+                  lineHeight: 'var(--line-height-normal)',
+                  fontFamily: 'var(--font-family-base)',
                   boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all var(--transition-base)'
                 }}
                 onMouseOver={(e) => {
                   if (!loading) {

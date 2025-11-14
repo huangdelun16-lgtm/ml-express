@@ -55,7 +55,7 @@ const ContactPage: React.FC = () => {
         businessHours: '营业时间',
         phoneValue: '(+95) 09788848928 / (+95) 09259369349',
         emailValue: 'marketlink982@gmail.com',
-        addressValue: '缅甸',
+        addressValue: 'ChanMyaThaZi Mandalay',
         businessHoursValue: '周一至周日 8:00 - 20:00'
       }
     },
@@ -76,7 +76,7 @@ const ContactPage: React.FC = () => {
         businessHours: 'Business Hours',
         phoneValue: '(+95) 09788848928 / (+95) 09259369349',
         emailValue: 'marketlink982@gmail.com',
-        addressValue: 'Myanmar',
+        addressValue: 'ChanMyaThaZi Mandalay',
         businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
       }
     },
@@ -97,7 +97,7 @@ const ContactPage: React.FC = () => {
         businessHours: 'အလုပ်ချိန်',
         phoneValue: '(+95) 09788848928 / (+95) 09259369349',
         emailValue: 'marketlink982@gmail.com',
-        addressValue: 'မန္တလေး၊ မြန်မာ',
+        addressValue: 'ChanMyaThaZi Mandalay',
         businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00'
       }
     }
@@ -138,11 +138,11 @@ const ContactPage: React.FC = () => {
         position: 'relative',
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
+        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        boxShadow: 'var(--shadow-lg)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
@@ -174,48 +174,85 @@ const ContactPage: React.FC = () => {
           <button onClick={() => handleNavigation('/')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.home}</button>
           <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.services}</button>
           <button onClick={() => handleNavigation('/tracking')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.tracking}</button>
           <button style={{ 
             color: '#FFD700', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-bold)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            lineHeight: 'var(--line-height-normal)'
           }}>{t.nav.contact}</button>
           {/* 客户端页面不包含管理员登录入口 */}
           

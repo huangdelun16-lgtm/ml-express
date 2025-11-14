@@ -1533,8 +1533,8 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="homepage" style={{ 
-      fontFamily: 'Arial, sans-serif', 
-      lineHeight: '1.6',
+      fontFamily: 'var(--font-family-base)', 
+      lineHeight: 'var(--line-height-normal)',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -1556,14 +1556,14 @@ const HomePage: React.FC = () => {
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         color: 'white',
-        padding: '1rem 2rem',
+        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-        gap: window.innerWidth < 768 ? '1rem' : '2rem',
+        boxShadow: 'var(--shadow-lg)',
+        gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
         flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
-        rowGap: '0.75rem'
+        rowGap: 'var(--spacing-3)'
       }}>
         <Logo size="small" />
         
@@ -1586,47 +1586,91 @@ const HomePage: React.FC = () => {
             <a href="#home" style={{ 
               color: 'white', 
               textDecoration: 'none',
-              fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-              transition: 'color 0.3s ease'
+              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: 'var(--font-weight-medium)',
+              textAlign: 'center',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              borderRadius: 'var(--radius-md)',
+              transition: 'all var(--transition-fast)',
+              lineHeight: 'var(--line-height-normal)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-            onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
             >{t.nav.home}</a>
             <button onClick={() => handleNavigation('/services')} style={{ 
               color: 'white', 
               textDecoration: 'none',
-              fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-              transition: 'color 0.3s ease',
+              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: 'var(--font-weight-medium)',
+              textAlign: 'center',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              borderRadius: 'var(--radius-md)',
+              transition: 'all var(--transition-fast)',
               background: 'none',
               border: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              lineHeight: 'var(--line-height-normal)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-            onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
             >{t.nav.services}</button>
             <button onClick={() => handleNavigation('/tracking')} style={{ 
               color: 'white', 
               textDecoration: 'none',
-              fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-              transition: 'color 0.3s ease',
+              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: 'var(--font-weight-medium)',
+              textAlign: 'center',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              borderRadius: 'var(--radius-md)',
+              transition: 'all var(--transition-fast)',
               background: 'none',
               border: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              lineHeight: 'var(--line-height-normal)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-            onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
             >{t.nav.tracking}</button>
             <button onClick={() => handleNavigation('/contact')} style={{ 
               color: 'white', 
               textDecoration: 'none',
-              fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-              transition: 'color 0.3s ease',
+              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: 'var(--font-weight-medium)',
+              textAlign: 'center',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              borderRadius: 'var(--radius-md)',
+              transition: 'all var(--transition-fast)',
               background: 'none',
               border: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              lineHeight: 'var(--line-height-normal)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-            onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
             >{t.nav.contact}</button>
             {/* 客户端页面不包含管理员登录入口 */}
           </div>
@@ -2109,14 +2153,24 @@ const HomePage: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease'
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    fontFamily: 'var(--font-family-base)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
                 <input
                   type="tel"
@@ -2125,14 +2179,24 @@ const HomePage: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease'
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    fontFamily: 'var(--font-family-base)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
                 <div style={{ position: 'relative' }}>
                   <textarea
@@ -2142,17 +2206,27 @@ const HomePage: React.FC = () => {
                     value={senderAddressText}
                     style={{
                       width: '100%',
-                      padding: '0.8rem',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '8px',
+                      padding: 'var(--spacing-3) var(--spacing-4)',
+                      border: '2px solid var(--color-border-dark)',
+                      borderRadius: 'var(--radius-md)',
                       height: '80px',
                       resize: 'vertical',
-                      transition: 'border-color 0.3s ease',
+                      fontSize: 'var(--font-size-base)',
+                      lineHeight: 'var(--line-height-normal)',
+                      textAlign: 'left',
+                      transition: 'all var(--transition-base)',
                       background: 'rgba(255, 255, 255, 0.9)',
-                      backdropFilter: 'blur(5px)'
+                      backdropFilter: 'blur(5px)',
+                      fontFamily: 'var(--font-family-base)'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                     onChange={(e) => {
                       const value = e.target.value;
                       // 如果用户手动编辑地址，移除坐标信息
@@ -2204,14 +2278,24 @@ const HomePage: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease'
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    fontFamily: 'var(--font-family-base)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
                 <input
                   type="tel"
@@ -2220,14 +2304,24 @@ const HomePage: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'border-color 0.3s ease'
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    fontFamily: 'var(--font-family-base)'
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
                 <div style={{ position: 'relative' }}>
                   <textarea
@@ -2237,17 +2331,27 @@ const HomePage: React.FC = () => {
                     value={receiverAddressText}
                     style={{
                       width: '100%',
-                      padding: '0.8rem',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '8px',
+                      padding: 'var(--spacing-3) var(--spacing-4)',
+                      border: '2px solid var(--color-border-dark)',
+                      borderRadius: 'var(--radius-md)',
                       height: '80px',
                       resize: 'vertical',
-                      transition: 'border-color 0.3s ease',
+                      fontSize: 'var(--font-size-base)',
+                      lineHeight: 'var(--line-height-normal)',
+                      textAlign: 'left',
+                      transition: 'all var(--transition-base)',
                       background: 'rgba(255, 255, 255, 0.9)',
-                      backdropFilter: 'blur(5px)'
+                      backdropFilter: 'blur(5px)',
+                      fontFamily: 'var(--font-family-base)'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                     onChange={(e) => {
                       const value = e.target.value;
                       // 如果用户手动编辑地址，移除坐标信息

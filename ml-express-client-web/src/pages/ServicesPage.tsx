@@ -204,8 +204,8 @@ const ServicesPage: React.FC = () => {
         position: 'relative',
         zIndex: 10,
         background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: window.innerWidth < 768 ? '1rem' : '1.5rem 2rem',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
+        boxShadow: 'var(--shadow-lg)'
       }}>
         <div style={{
           width: '100%',
@@ -254,48 +254,85 @@ const ServicesPage: React.FC = () => {
           <button onClick={() => handleNavigation('/')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.home}</button>
           <button style={{ 
             color: '#FFD700', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-bold)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            lineHeight: 'var(--line-height-normal)'
           }}>{t.nav.services}</button>
           <button onClick={() => handleNavigation('/tracking')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.tracking}</button>
           <button onClick={() => handleNavigation('/contact')} style={{ 
             color: 'white', 
             textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? '0.9rem' : '1rem',
-            transition: 'color 0.3s ease',
+            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-medium)',
+            textAlign: 'center',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            borderRadius: 'var(--radius-md)',
+            transition: 'all var(--transition-fast)',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            lineHeight: 'var(--line-height-normal)'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#C0C0C0'}
-          onMouseOut={(e) => e.currentTarget.style.color = 'white'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
           >{t.nav.contact}</button>
           {/* 客户端页面不包含管理员登录入口 */}
           
