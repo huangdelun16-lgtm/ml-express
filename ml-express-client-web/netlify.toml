@@ -1,7 +1,7 @@
 [build]
   command = "npm install && npm run build"
   publish = "build"
-  base = "."
+  # base 不需要设置，因为 Netlify Dashboard 中已经配置了 base directory
 
 [build.environment]
   NODE_VERSION = "18"
