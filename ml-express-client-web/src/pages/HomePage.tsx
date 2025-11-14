@@ -79,8 +79,8 @@ const HomePage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [trackingNumber, setTrackingNumber] = useState('');
-  const [trackingResult, setTrackingResult] = useState<any>(null);
+  // const [trackingNumber, setTrackingNumber] = useState(''); // 未使用
+  // const [trackingResult, setTrackingResult] = useState<any>(null); // 未使用
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
@@ -98,12 +98,12 @@ const HomePage: React.FC = () => {
   const [orderError, setOrderError] = useState<string>('');
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
-  const [orderConfirmationStatus, setOrderConfirmationStatus] = useState<OrderConfirmationStatus>('idle');
-  const [orderConfirmationMessage, setOrderConfirmationMessage] = useState('');
+  // const [orderConfirmationStatus, setOrderConfirmationStatus] = useState<OrderConfirmationStatus>('idle'); // 未使用
+  // const [orderConfirmationMessage, setOrderConfirmationMessage] = useState(''); // 未使用
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState('yangon');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [isLongPressing, setIsLongPressing] = useState(false);
+  // const [isLongPressing, setIsLongPressing] = useState(false); // 未使用
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
@@ -131,9 +131,9 @@ const HomePage: React.FC = () => {
   });
   
   // 验证码相关状态
-  const [codeSent, setCodeSent] = useState(false);
+  // const [codeSent, setCodeSent] = useState(false); // 未使用
   const [countdown, setCountdown] = useState(0);
-  const [sentCode, setSentCode] = useState('');
+  // const [sentCode, setSentCode] = useState(''); // 未使用
   const [verificationType] = useState<'email' | 'sms'>('email'); // 固定使用邮箱验证
   
   // 系统价格设置
@@ -663,6 +663,7 @@ const HomePage: React.FC = () => {
     };
     
     checkConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 自动保存客户信息到用户管理
