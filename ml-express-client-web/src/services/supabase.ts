@@ -47,6 +47,26 @@ export interface Package {
 
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
+  // 获取所有包裹（用于跟踪页面）
+  async getAllPackages(): Promise<Package[]> {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取包裹列表失败:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error('获取包裹列表异常:', err);
+      return [];
+    }
+  },
+
   // 创建新包裹
   async createPackage(packageData: Omit<Package, 'id' | 'created_at' | 'updated_at'>): Promise<Package | null> {
     try {
