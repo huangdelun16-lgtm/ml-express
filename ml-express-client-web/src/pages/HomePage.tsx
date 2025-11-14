@@ -2130,7 +2130,7 @@ const HomePage: React.FC = () => {
             backdropFilter: 'blur(15px)',
             padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
             borderRadius: '15px',
-            maxWidth: '500px',
+            maxWidth: '420px',
             width: '90%',
             maxHeight: '80vh',
             overflow: 'auto',
@@ -2409,31 +2409,34 @@ const HomePage: React.FC = () => {
                   }}
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'all 0.3s ease',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(5px)',
+                    fontFamily: 'var(--font-family-base)',
                     cursor: 'pointer',
                     appearance: 'none',
-                    color: '#2c5282',
-                    fontWeight: '500',
-                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c5282' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    color: 'var(--color-text-primary)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.7rem center',
+                    backgroundPosition: 'right var(--spacing-3) center',
                     backgroundSize: '1em',
-                    paddingRight: '2.5rem',
-                    boxShadow: '0 4px 15px rgba(44, 82, 130, 0.1)'
+                    paddingRight: '2.5rem'
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(44, 82, 130, 0.6)';
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(44, 82, 130, 0.2)';
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   <option value={t.ui.standardPackage}>{t.ui.standardPackage}</option>
@@ -2454,13 +2457,26 @@ const HomePage: React.FC = () => {
                       required
                       style={{
                         width: '100%',
-                        padding: '0.8rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '8px',
-                        transition: 'border-color 0.3s ease'
+                        padding: 'var(--spacing-3) var(--spacing-4)',
+                        border: '2px solid var(--color-border-dark)',
+                        borderRadius: 'var(--radius-md)',
+                        marginBottom: 'var(--spacing-2)',
+                        fontSize: 'var(--font-size-base)',
+                        lineHeight: 'var(--line-height-normal)',
+                        textAlign: 'left',
+                        transition: 'all var(--transition-base)',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(5px)',
+                        fontFamily: 'var(--font-family-base)'
                       }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
                 )}
@@ -2481,31 +2497,34 @@ const HomePage: React.FC = () => {
                   }}
                   style={{
                     width: '100%',
-                    padding: '0.8rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    marginBottom: '0.5rem',
-                    transition: 'all 0.3s ease',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
+                    padding: 'var(--spacing-3) var(--spacing-4)',
+                    border: '2px solid var(--color-border-dark)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--spacing-2)',
+                    fontSize: 'var(--font-size-base)',
+                    lineHeight: 'var(--line-height-normal)',
+                    textAlign: 'left',
+                    transition: 'all var(--transition-base)',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(5px)',
+                    fontFamily: 'var(--font-family-base)',
                     cursor: 'pointer',
                     appearance: 'none',
-                    color: '#2c5282',
-                    fontWeight: '500',
-                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c5282' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    color: 'var(--color-text-primary)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.7rem center',
+                    backgroundPosition: 'right var(--spacing-3) center',
                     backgroundSize: '1em',
-                    paddingRight: '2.5rem',
-                    boxShadow: '0 4px 15px rgba(44, 82, 130, 0.1)'
+                    paddingRight: '2.5rem'
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(44, 82, 130, 0.6)';
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(44, 82, 130, 0.2)';
+                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.1)';
+                    e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   <option value="">{t.ui.selectDeliverySpeed}</option>
