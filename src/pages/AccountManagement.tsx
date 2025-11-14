@@ -65,7 +65,8 @@ const AccountManagement: React.FC = () => {
     emergency_contact: '',
     emergency_phone: '',
     address: '',
-    notes: ''
+    notes: '',
+    region: 'yangon' as 'yangon' | 'mandalay'
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -87,7 +88,50 @@ const AccountManagement: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // 当选择区域、职位或角色时，自动生成员工编号
+    if (name === 'region' || name === 'position' || name === 'role') {
+      setFormData(prev => {
+        const newData = { ...prev, [name]: value };
+        // 如果三个字段都有值，自动生成员工编号
+        if (newData.region && newData.position && newData.role) {
+          const autoId = generateEmployeeId(newData.region, newData.position, newData.role);
+          return { ...newData, employee_id: autoId };
+        }
+        return newData;
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // 自动生成员工编号
+  const generateEmployeeId = (region: string, position: string, role: string): string => {
+    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+    
+    // 根据角色确定职位类型
+    let positionType = '';
+    if (position.includes('骑手') || position === '骑手') {
+      positionType = 'RIDER';
+    } else if (role === 'finance' || position.includes('财务')) {
+      positionType = 'ACCOUNT';
+    } else if (role === 'manager' || position.includes('经理')) {
+      positionType = 'MANAGER';
+    } else if (role === 'admin' || position.includes('管理员')) {
+      positionType = 'ADMIN';
+    } else {
+      positionType = 'STAFF';
+    }
+    
+    // 获取该区域该类型的现有账号数量
+    const filteredAccounts = accounts.filter(acc => {
+      const idPrefix = `${regionPrefix}-${positionType}`;
+      return acc.employee_id && acc.employee_id.startsWith(idPrefix);
+    });
+    
+    // 生成下一个编号
+    const nextNumber = (filteredAccounts.length + 1).toString().padStart(3, '0');
+    return `${regionPrefix}-${positionType}-${nextNumber}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,11 +139,14 @@ const AccountManagement: React.FC = () => {
     setErrorMessage(null);
 
     try {
+      // 自动生成员工编号（如果没有手动输入）
+      const autoEmployeeId = generateEmployeeId(formData.region, formData.position, formData.role);
+      
       const newAccount = {
         username: formData.username,
         password: formData.password,
         employee_name: formData.employee_name,
-        employee_id: formData.employee_id,
+        employee_id: formData.employee_id || autoEmployeeId,
         phone: formData.phone,
         email: formData.email,
         department: formData.department,
@@ -115,7 +162,7 @@ const AccountManagement: React.FC = () => {
       };
 
       await adminAccountService.createAccount(newAccount);
-      setSuccessMessage('账号创建成功！');
+      setSuccessMessage(`账号创建成功！员工编号：${formData.employee_id || autoEmployeeId}`);
       setFormData({
         username: '',
         password: '',
@@ -132,7 +179,8 @@ const AccountManagement: React.FC = () => {
         emergency_contact: '',
         emergency_phone: '',
         address: '',
-        notes: ''
+        notes: '',
+        region: 'yangon'
       });
       setShowForm(false);
       loadAccounts();
@@ -545,7 +593,35 @@ const AccountManagement: React.FC = () => {
             marginBottom: '32px',
             border: '1px solid rgba(255,255,255,0.1)'
           }}>
-            <h2 style={{ marginBottom: '24px' }}>创建新账号</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0 }}>创建新账号</h2>
+              {/* 区域选择下拉框 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>区域：</label>
+                <select
+                  name="region"
+                  value={formData.region}
+                  onChange={handleInputChange}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    border: '2px solid #4299e1',
+                    background: 'rgba(15, 32, 60, 0.55)',
+                    color: 'white',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => (e.target as HTMLSelectElement).style.borderColor = '#63b3ed'}
+                  onMouseLeave={(e) => (e.target as HTMLSelectElement).style.borderColor = '#4299e1'}
+                >
+                  <option value="yangon" style={{ color: '#000' }}>仰光 (YGN)</option>
+                  <option value="mandalay" style={{ color: '#000' }}>曼德勒 (MDY)</option>
+                </select>
+              </div>
+            </div>
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: isMobile ? '12px' : '20px' }}>
                 <div>
@@ -619,24 +695,26 @@ const AccountManagement: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    员工编号 *
+                    员工编号 * （自动生成）
                   </label>
                   <input
                     type="text"
                     name="employee_id"
                     value={formData.employee_id}
-                    onChange={handleInputChange}
+                    readOnly
                     style={{
                       width: '100%',
                       padding: '12px',
                       borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
+                      border: '1px solid rgba(72, 187, 120, 0.5)',
+                      background: 'rgba(72, 187, 120, 0.1)',
+                      color: '#48bb78',
                       fontSize: '1rem',
-                      outline: 'none'
+                      outline: 'none',
+                      fontWeight: 'bold',
+                      cursor: 'not-allowed'
                     }}
-                    required
+                    placeholder="请先选择区域、职位和角色"
                   />
                 </div>
 
@@ -836,33 +914,33 @@ const AccountManagement: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>用户名</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>员工姓名</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>员工编号</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>部门</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>职位</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>角色</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>手机</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>状态</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>最后登录</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600 }}>操作</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>用户名</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工姓名</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工编号</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>部门</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>职位</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>角色</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>手机</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>状态</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>最后登录</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {accounts.map((account) => (
                     <tr key={account.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.username}</td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.employee_name}</td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.employee_id}</td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.department || '-'}</td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.position || '-'}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.username}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_name}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_id}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.department || '-'}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.position || '-'}</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{
                           background: getRoleColor(account.role),
                           color: 'white',
-                          padding: '4px 8px',
+                          padding: '3px 6px',
                           borderRadius: '4px',
-                          fontSize: '0.8rem',
+                          fontSize: '0.75rem',
                           fontWeight: 500
                         }}>
                           {account.role === 'admin' ? '管理员' : 
@@ -871,7 +949,7 @@ const AccountManagement: React.FC = () => {
                            account.role === 'finance' ? '财务' : account.role}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>{account.phone || '-'}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.phone || '-'}</td>
                       <td style={{ padding: '12px' }}>
                         <select
                           value={account.status || 'active'}
@@ -880,9 +958,9 @@ const AccountManagement: React.FC = () => {
                             background: getStatusColor(account.status || 'active'),
                             color: 'white',
                             border: 'none',
-                            padding: '4px 8px',
+                            padding: '3px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.8rem',
+                            fontSize: '0.75rem',
                             cursor: 'pointer'
                           }}
                         >
@@ -891,21 +969,21 @@ const AccountManagement: React.FC = () => {
                           <option value="suspended">暂停</option>
                         </select>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>
                         {account.last_login ? new Date(account.last_login).toLocaleString('zh-CN') : '从未登录'}
                       </td>
                       <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
                           <button
                             onClick={() => handleEditAccount(account)}
                             style={{
-                              padding: '6px 12px',
+                              padding: '5px 10px',
                               borderRadius: '6px',
                               border: '1px solid rgba(255,255,255,0.3)',
                               background: 'rgba(72, 187, 120, 0.3)',
                               color: 'white',
                               cursor: 'pointer',
-                              fontSize: '0.85rem'
+                              fontSize: '0.75rem'
                             }}
                           >
                             编辑
@@ -913,13 +991,13 @@ const AccountManagement: React.FC = () => {
                           <button
                             onClick={() => handleViewAccount(account)}
                             style={{
-                              padding: '6px 12px',
+                              padding: '5px 10px',
                               borderRadius: '6px',
                               border: '1px solid rgba(255,255,255,0.3)',
                               background: 'rgba(66, 153, 225, 0.3)',
                               color: 'white',
                               cursor: 'pointer',
-                              fontSize: '0.85rem'
+                              fontSize: '0.75rem'
                             }}
                           >
                             查看

@@ -61,7 +61,6 @@ const TrackingPage: React.FC = () => {
       const courier = couriers.find((c: any) => c.name === courierName);
       
       if (!courier) {
-        console.log('未找到快递员:', courierName);
         setCourierLocation(null);
         return;
       }
@@ -71,8 +70,6 @@ const TrackingPage: React.FC = () => {
       const isAllowedToTrack = courier.current_delivering_package_id === currentPackageId;
       
       if (!isAllowedToTrack) {
-        console.log('🔒 隐私保护：骑手正在配送其他包裹，您暂时无法跟踪位置');
-        console.log(`骑手当前配送: ${courier.current_delivering_package_id}, 您的包裹: ${currentPackageId}`);
         setCourierLocation(null);
         return;
       }
@@ -82,7 +79,6 @@ const TrackingPage: React.FC = () => {
       const courierLocation = locations.find((loc: any) => loc.courier_id === courier.id);
       
       if (courierLocation) {
-        console.log('✅ 位置可见：骑手正在配送您的包裹');
         setCourierLocation({
           lat: courierLocation.latitude,
           lng: courierLocation.longitude,
@@ -92,7 +88,6 @@ const TrackingPage: React.FC = () => {
           last_active: courierLocation.last_update
         });
       } else {
-        console.log('⚠️ 骑手位置信息不可用');
         setCourierLocation(null);
       }
     } catch (error) {

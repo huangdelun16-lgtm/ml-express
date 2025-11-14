@@ -510,16 +510,64 @@ export default function PlaceOrderScreen({ navigation }: any) {
     showLoading('正在提交订单...');
 
     try {
-      // 生成订单号
+      // 生成订单号（根据寄件地址所在城市自动选择前缀）
+      const generateOrderId = (address: string) => {
+        const cityPrefixMap: { [key: string]: string } = {
+          '仰光': 'YGN',
+          'Yangon': 'YGN',
+          'ရန်ကုန်': 'YGN',
+          '曼德勒': 'MDY',
+          'Mandalay': 'MDY',
+          'မန္တလေး': 'MDY',
+          '内比都': 'NYT',
+          'Naypyidaw': 'NYT',
+          'နေပြည်တော်': 'NYT',
+          '毛淡棉': 'MWL',
+          'Mawlamyine': 'MWL',
+          'မော်လမြိုင်': 'MWL',
+          '勃生': 'PAT',
+          'Pathein': 'PAT',
+          'ပုသိမ်': 'PAT',
+          '蒙育瓦': 'MON',
+          'Monywa': 'MON',
+          'မုံရွာ': 'MON',
+          '密支那': 'MYI',
+          'Myitkyina': 'MYI',
+          'မြစ်ကြီးနား': 'MYI',
+          '东枝': 'TAU',
+          'Taunggyi': 'TAU',
+          'တောင်ကြီး': 'TAU',
+          '实兑': 'SIT',
+          'Sittwe': 'SIT',
+          'စစ်တွေ': 'SIT',
+          '葛礼': 'KAL',
+          'Kalay': 'KAL',
+          'ကလေး': 'KAL'
+        };
+        
+        // 判断城市前缀
+        let prefix = 'MDY'; // 默认曼德勒
+        for (const [city, cityPrefix] of Object.entries(cityPrefixMap)) {
+          if (address.includes(city)) {
+            prefix = cityPrefix;
+            break;
+          }
+        }
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const random1 = Math.floor(Math.random() * 10);
+        const random2 = Math.floor(Math.random() * 10);
+        
+        return `${prefix}${year}${month}${day}${hour}${minute}${random1}${random2}`;
+      };
+      
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hour = String(now.getHours()).padStart(2, '0');
-      const minute = String(now.getMinutes()).padStart(2, '0');
-      const random1 = Math.floor(Math.random() * 10);
-      const random2 = Math.floor(Math.random() * 10);
-      const orderId = `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+      const orderId = generateOrderId(state.senderAddress);
 
       const orderData = {
         id: orderId,

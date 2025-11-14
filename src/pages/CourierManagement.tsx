@@ -19,6 +19,11 @@ interface Courier {
   total_deliveries: number;
   rating: number;
   notes: string;
+  employee_id?: string;
+  department?: string;
+  position?: string;
+  role?: string;
+  region?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -43,7 +48,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
     vehicle_type: 'motorcycle',
     license_number: '',
     status: 'active',
-    notes: ''
+    notes: '',
+    employee_id: '',
+    department: '',
+    position: '',
+    role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
+    region: 'yangon' as 'yangon' | 'mandalay'
   });
 
   // 加载快递员数据
@@ -74,6 +84,50 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 自动生成员工编号
+  const generateEmployeeId = (region: string, position: string, role: string): string => {
+    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+    
+    // 根据角色确定职位类型
+    let positionType = '';
+    if (position.includes('骑手') || position === '骑手') {
+      positionType = 'RIDER';
+    } else if (role === 'finance' || position.includes('财务')) {
+      positionType = 'ACCOUNT';
+    } else if (role === 'manager' || position.includes('经理')) {
+      positionType = 'MANAGER';
+    } else if (role === 'admin' || position.includes('管理员')) {
+      positionType = 'ADMIN';
+    } else {
+      positionType = 'STAFF';
+    }
+    
+    // 获取该区域该类型的现有账号数量（需要从admin_accounts表查询）
+    // 这里简化处理，使用couriers表作为参考
+    const filteredCouriers = couriers.filter(c => {
+      const idPrefix = `${regionPrefix}-${positionType}`;
+      return c.employee_id && c.employee_id.startsWith(idPrefix);
+    });
+    
+    // 生成下一个编号
+    const nextNumber = (filteredCouriers.length + 1).toString().padStart(3, '0');
+    return `${regionPrefix}-${positionType}-${nextNumber}`;
+  };
+
+  // 处理表单输入变化，自动生成员工编号
+  const handleFormChange = (field: string, value: any) => {
+    setCourierForm(prev => {
+      const newData = { ...prev, [field]: value };
+      // 当选择区域、职位或角色时，自动生成员工编号
+      if ((field === 'region' || field === 'position' || field === 'role') && 
+          newData.region && newData.position && newData.role) {
+        const autoId = generateEmployeeId(newData.region, newData.position, newData.role);
+        return { ...newData, employee_id: autoId };
+      }
+      return newData;
+    });
   };
 
   // 从账号系统导入骑手
@@ -177,7 +231,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
       last_active: '从未上线',
       total_deliveries: 0,
       rating: 0,
-      notes: courierForm.notes
+      notes: courierForm.notes,
+      employee_id: courierForm.employee_id,
+      department: courierForm.department,
+      position: courierForm.position,
+      role: courierForm.role,
+      region: courierForm.region
     };
 
     try {
@@ -204,7 +263,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
         vehicle_type: 'motorcycle',
         license_number: '',
         status: 'active',
-        notes: ''
+        notes: '',
+        employee_id: '',
+        department: '',
+        position: '',
+        role: 'operator',
+        region: 'yangon'
       });
       setActiveTab('list');
     } catch (error) {
@@ -223,7 +287,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
       vehicle_type: courier.vehicle_type,
       license_number: courier.license_number,
       status: courier.status,
-      notes: courier.notes
+      notes: courier.notes,
+      employee_id: courier.employee_id || '',
+      department: courier.department || '',
+      position: courier.position || '',
+      role: (courier.role as 'operator' | 'manager' | 'admin' | 'finance') || 'operator',
+      region: (courier.region as 'yangon' | 'mandalay') || 'yangon'
     });
     setActiveTab('create');
   };
@@ -260,7 +329,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
         vehicle_type: 'motorcycle',
         license_number: '',
         status: 'active',
-        notes: ''
+        notes: '',
+        employee_id: '',
+        department: '',
+        position: '',
+        role: 'operator',
+        region: 'yangon'
       });
       setActiveTab('list');
     } catch (error) {
@@ -980,7 +1054,12 @@ const [couriers, setCouriers] = useState<Courier[]>([]);
                       vehicle_type: 'motorcycle',
                       license_number: '',
                       status: 'active',
-                      notes: ''
+                      notes: '',
+                      employee_id: '',
+                      department: '',
+                      position: '',
+                      role: 'operator',
+                      region: 'yangon'
                     });
                     setActiveTab('list');
                   }}

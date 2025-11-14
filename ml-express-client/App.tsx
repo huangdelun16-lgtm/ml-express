@@ -21,6 +21,25 @@ import NotificationWorkflowScreen from './src/screens/NotificationWorkflowScreen
 
 const Stack = createNativeStackNavigator();
 
+// Deep Link 配置
+const linking = {
+  prefixes: ['ml-express-client://', 'https://mlexpress.com', 'https://www.mlexpress.com'],
+  config: {
+    screens: {
+      Login: 'login',
+      Register: 'register',
+      Main: '',
+      PlaceOrder: 'place-order',
+      MyOrders: 'my-orders',
+      TrackOrder: 'track-order',
+      Profile: 'profile',
+      OrderDetail: 'order/:orderId',
+      NotificationSettings: 'settings/notifications',
+      NotificationWorkflow: 'settings/notifications/workflow',
+    },
+  },
+};
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
@@ -58,7 +77,7 @@ export default function App() {
   return (
     <AppProvider>
       <LoadingProvider>
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
           <Stack.Navigator
             initialRouteName={isLoggedIn ? "Main" : "Login"}
             screenOptions={{

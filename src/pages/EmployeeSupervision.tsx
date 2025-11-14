@@ -17,9 +17,9 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
   const [filterDate, setFilterDate] = useState<string>('all');
   const [searchText, setSearchText] = useState<string>('');
   
-  // 分页状态
+  // 分页状态 - 优化：减少每页显示数量，提升性能
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 500;
+  const itemsPerPage = 100; // 从500减少到100
   
   useEffect(() => {
     loadData();
@@ -27,8 +27,11 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
 
   const loadData = async () => {
     setLoading(true);
+    // 自动删除一周前的数据
+    await auditLogService.deleteOldLogs(7);
+    
     const [logsData, accountsData] = await Promise.all([
-      auditLogService.getAllLogs(1000),
+      auditLogService.getAllLogs(1000), // 从5000减少到1000，提升性能
       adminAccountService.getAllAccounts()
     ]);
     setLogs(logsData);

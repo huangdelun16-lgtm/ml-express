@@ -1,5 +1,10 @@
 import React from 'react';
 
+/**
+ * 骨架屏组件集
+ * 用于显示加载状态，提升用户体验
+ */
+
 // 骨架屏卡片组件
 export const SkeletonCard: React.FC<{ count?: number }> = ({ count = 3 }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

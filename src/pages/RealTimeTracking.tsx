@@ -1,55 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation, notificationService } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
+import { Courier, CourierWithLocation, Coordinates } from '../types';
 
 // Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCtf57YS_4-7meheIlUONuf0IPHYDcgilM";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
-// 快递员数据接口（扩展数据库接口）
-interface Courier {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  vehicle_type?: string;
-  license_number?: string;
-  status: string;
-  join_date?: string;
-  last_active?: string;
-  total_deliveries?: number;
-  rating?: number;
-  notes?: string;
-  // 位置信息
-  latitude?: number;
-  longitude?: number;
-  // 实时状态
-  currentPackages?: number;
-  todayDeliveries?: number;
-  batteryLevel?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface CourierWithLocation extends Courier {
-  location?: CourierLocation;
-}
+// 配送商店接口已在types/index.ts中定义
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
 const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
-  const [couriers, setCouriers] = useState<Courier[]>([]);
-  const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
+  const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
+  const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('yangon');
-  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  type CityKey = 'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe';
+  const [selectedCity, setSelectedCity] = useState<CityKey>('yangon');
+  const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 选项卡和快递店相关状态
+  const [activeTab, setActiveTab] = useState<'packages' | 'stores'>('packages');
+  const [stores, setStores] = useState<DeliveryStore[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
+  
+  // 包裹位置点显示状态
+  const [selectedLocationPoint, setSelectedLocationPoint] = useState<{
+    packageId: string;
+    type: 'pickup' | 'delivery';
+    coordinates: Coordinates;
+  } | null>(null);
 
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -71,24 +58,15 @@ const [packages, setPackages] = useState<Package[]>([]);
     libraries: GOOGLE_MAPS_LIBRARIES
   });
 
-  // 调试信息
+  // 检查Google Maps加载状态
   useEffect(() => {
-    console.log('=== Google Maps 调试信息 ===');
-    console.log('Google Maps API Key:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
-    console.log('API Key length:', GOOGLE_MAPS_API_KEY?.length || 0);
-    console.log('API Key starts with AIza:', GOOGLE_MAPS_API_KEY?.startsWith('AIza') || false);
-    console.log('Map loaded:', isMapLoaded);
-    console.log('Load error:', loadError);
-    console.log('========================');
-    
     if (loadError) {
       console.error('Google Maps load error:', loadError);
     }
     
     // 如果API密钥缺失，显示警告
     if (!GOOGLE_MAPS_API_KEY) {
-      console.error('❌ Google Maps API密钥未设置！');
-      console.log('请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+      console.error('❌ Google Maps API密钥未设置！请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
     }
   }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
@@ -96,51 +74,54 @@ const [packages, setPackages] = useState<Package[]>([]);
   useEffect(() => {
     loadPackages();
     loadCouriers();
+    loadStores();
     
-    // 每30秒刷新一次数据
+    // 优化：每分钟刷新一次数据，减少不必要的API调用
+    // 实际使用实时订阅机制来更新数据
     const interval = setInterval(() => {
       loadPackages();
       loadCouriers();
-    }, 30000);
+      loadStores();
+    }, 60000); // 从30秒改为60秒
 
     return () => clearInterval(interval);
   }, []);
+  
+  // 加载快递店数据
+  const loadStores = async () => {
+    try {
+      setLoadingStores(true);
+      const data = await deliveryStoreService.getAllStores();
+      setStores(data);
+    } catch (error) {
+      errorHandler.handleErrorSilent(error, '加载快递店数据');
+      setStores([]);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
 
   const loadPackages = async () => {
     try {
-      console.log('🔄 开始加载包裹数据...');
       const data = await packageService.getAllPackages();
-      console.log('📦 加载的所有包裹:', data);
       
       // 分离不同状态的包裹
       const pendingPackages = data.filter(p => p.status === '待取件');
       const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
       
-      console.log('📦 待分配包裹:', pendingPackages.length, '个');
-      console.log('📦 已分配包裹:', assignedPackages.length, '个');
-      
       // 显示所有活跃包裹（待分配 + 已分配）
       const activePackages = [...pendingPackages, ...assignedPackages];
-      console.log('📦 总活跃包裹:', activePackages.length, '个');
       
       setPackages(activePackages);
       
-      // 强制触发重新渲染
-      setTimeout(() => {
-        console.log('🔄 强制重新渲染包裹列表');
-        setPackages([...activePackages]);
-      }, 100);
-      
     } catch (error) {
-      console.error('❌ 加载包裹数据失败:', error);
+      errorHandler.handleErrorSilent(error, '加载包裹数据');
       setPackages([]);
     }
   };
 
   const loadCouriers = async () => {
     try {
-      console.log('开始加载快递员数据...');
-      
       // 1. 从数据库获取快递员列表
       const { data: couriersData, error: couriersError } = await supabase
         .from('couriers')
@@ -154,7 +135,6 @@ const [packages, setPackages] = useState<Package[]>([]);
       }
 
       if (!couriersData || couriersData.length === 0) {
-        console.log('数据库中没有快递员数据');
         setCouriers([]);
         return;
       }
@@ -183,7 +163,7 @@ const [packages, setPackages] = useState<Package[]>([]);
       });
 
       // 4. 合并数据
-      const enrichedCouriers: Courier[] = couriersData.map(courier => {
+      const enrichedCouriers: CourierWithLocation[] = couriersData.map(courier => {
         // 查找对应的位置信息
         const location = locationsData?.find(loc => loc.courier_id === courier.id);
         
@@ -191,7 +171,7 @@ const [packages, setPackages] = useState<Package[]>([]);
         const currentPackages = packageCounts[courier.name] || 0;
 
         // 确定显示状态
-        let displayStatus = courier.status;
+        let displayStatus: Courier['status'] = courier.status as Courier['status'];
         if (courier.status === 'active') {
           // 根据last_active判断是否在线
           if (courier.last_active) {
@@ -200,7 +180,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             const diffMinutes = (now - lastActiveTime) / (1000 * 60);
             
             if (diffMinutes < 30) {
-              displayStatus = currentPackages >= 5 ? 'busy' : 'online';
+              displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
             } else {
               displayStatus = 'offline';
             }
@@ -220,40 +200,29 @@ const [packages, setPackages] = useState<Package[]>([]);
           currentPackages: currentPackages,
           todayDeliveries: courier.total_deliveries || 0,
           batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
-        };
+        } as CourierWithLocation;
       });
 
-      console.log('加载了', enrichedCouriers.length, '个快递员');
       setCouriers(enrichedCouriers);
     } catch (error) {
-      console.error('加载快递员数据失败:', error);
+      errorHandler.handleErrorSilent(error, '加载快递员数据');
       setCouriers([]);
     }
   };
 
   // 自动分配包裹
   const autoAssignPackage = async (packageData: Package) => {
-    console.log('🤖 开始自动分配包裹:', packageData.id);
-    console.log('📊 当前快递员列表:', couriers);
-    
     // 找到在线且当前包裹最少的快递员
     const availableCouriers = couriers
-      .filter(c => {
-        console.log(`快递员 ${c.name} 状态: ${c.status}, 当前包裹数: ${c.currentPackages || 0}`);
-        return c.status === 'online' || c.status === 'active';
-      })
+      .filter(c => c.status === 'online' || c.status === 'active')
       .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
-    console.log('✅ 可用快递员:', availableCouriers);
-
     if (availableCouriers.length === 0) {
-      console.log('❌ 没有可用的快递员');
       alert('当前没有在线的快递员，请稍后再试');
       return;
     }
 
     const bestCourier = availableCouriers[0];
-    console.log('🎯 选择最佳快递员:', bestCourier);
     await assignPackageToCourier(packageData, bestCourier);
   };
 
@@ -261,12 +230,6 @@ const [packages, setPackages] = useState<Package[]>([]);
   const assignPackageToCourier = async (packageData: Package, courier: Courier) => {
     setIsAssigning(true);
     try {
-      console.log('📦 开始分配包裹:', packageData.id, '给快递员:', courier.name);
-      console.log('📍 包裹经纬度信息:', {
-        sender: { lat: packageData.sender_latitude, lng: packageData.sender_longitude },
-        receiver: { lat: packageData.receiver_latitude, lng: packageData.receiver_longitude }
-      });
-      
       // 更新包裹状态为"待取件"并分配骑手
       const success = await packageService.updatePackageStatus(
         packageData.id,
@@ -276,10 +239,7 @@ const [packages, setPackages] = useState<Package[]>([]);
         courier.name  // courierName
       );
 
-      console.log('📦 包裹状态更新结果:', success);
-
       if (success) {
-        console.log('🔔 开始发送通知...');
         // 🔔 发送通知给快递员
         const notificationSuccess = await notificationService.sendPackageAssignedNotification(
           courier.id,
@@ -293,8 +253,6 @@ const [packages, setPackages] = useState<Package[]>([]);
           }
         );
 
-        console.log('🔔 通知发送结果:', notificationSuccess);
-
         // 显示明确的成功消息
         const successMessage = `✅ 分配成功！\n\n📦 包裹：${packageData.id}\n🚚 骑手：${courier.name}\n📲 通知：${notificationSuccess ? '已发送' : '发送失败'}\n\n包裹已从待分配列表移除`;
         alert(successMessage);
@@ -303,15 +261,12 @@ const [packages, setPackages] = useState<Package[]>([]);
         setSelectedPackage(null);
         
         // 立即重新加载包裹数据
-        console.log('🔄 重新加载包裹数据...');
         await loadPackages();
         
         // 验证包裹状态是否已更新
-        const updatedPackage = await packageService.getPackageById(packageData.id);
-        console.log('🔍 验证包裹状态更新:', updatedPackage);
+        await packageService.getPackageById(packageData.id);
         
         // 强制刷新页面数据
-        console.log('🔄 强制刷新页面数据...');
         setTimeout(async () => {
           await loadPackages();
           await loadCouriers();
@@ -324,7 +279,6 @@ const [packages, setPackages] = useState<Package[]>([]);
             : c
         ));
       } else {
-        console.log('❌ 包裹状态更新失败');
         alert('❌ 分配失败！\n\n包裹状态更新失败，请重试');
       }
     } catch (error) {
@@ -356,11 +310,41 @@ const [packages, setPackages] = useState<Package[]>([]);
 
   // 切换城市
   const handleCityChange = (cityKey: string) => {
-    setSelectedCity(cityKey);
-    const city = myanmarCities[cityKey as keyof typeof myanmarCities];
-    if (city) {
-      setMapCenter({ lat: city.lat, lng: city.lng });
+    const validCityKey = cityKey as CityKey;
+    if (validCityKey in myanmarCities) {
+      setSelectedCity(validCityKey);
+      const city = myanmarCities[validCityKey];
+      if (city) {
+        setMapCenter({ lat: city.lat, lng: city.lng });
+      }
     }
+  };
+  
+  // 根据城市过滤包裹
+  const filterPackagesByCity = (pkgList: Package[]) => {
+    const cityPrefixMap: { [key: string]: string } = {
+      'yangon': 'YGN',
+      'mandalay': 'MDY',
+      'naypyidaw': 'NYT',
+      'bago': 'BGO',
+      'mawlamyine': 'MWL',
+      'pathein': 'PAT',
+      'monywa': 'MON',
+      'myitkyina': 'MYI',
+      'taunggyi': 'TAU',
+      'sittwe': 'SIT'
+    };
+    
+    const prefix = cityPrefixMap[selectedCity] || 'ALL';
+    
+    if (prefix === 'ALL') {
+      return pkgList;
+    }
+    
+    return pkgList.filter(pkg => {
+      // 检查包裹ID是否以该城市的前缀开头
+      return pkg.id.startsWith(prefix);
+    });
   };
 
   return (
@@ -401,6 +385,31 @@ const [packages, setPackages] = useState<Package[]>([]);
           </h1>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* 区域按钮 - 显示当前选中的城市 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            color: 'white',
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          >
+            <span>📍</span>
+            <span>{myanmarCities[selectedCity as keyof typeof myanmarCities]?.name}</span>
+          </div>
           <div style={{ 
             background: '#10b981', 
             color: 'white', 
@@ -426,7 +435,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             borderRadius: '8px',
             fontWeight: 'bold'
           }}>
-            📦 待分配: {packages.filter(p => p.status === '待取件').length}
+            📦 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件').length}
           </div>
         </div>
       </div>
@@ -565,8 +574,8 @@ const [packages, setPackages] = useState<Package[]>([]);
                   )}
                 </div>
               ) : (
-                <GoogleMap
-                  key={selectedCity}
+                  <GoogleMap
+                  key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={mapCenter}
                   zoom={13}
@@ -575,6 +584,9 @@ const [packages, setPackages] = useState<Package[]>([]);
                     fullscreenControlOptions: {
                       position: window.google.maps.ControlPosition.TOP_RIGHT
                     },
+                    zoomControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: false,
                     styles: [
                       {
                         featureType: 'poi',
@@ -604,6 +616,64 @@ const [packages, setPackages] = useState<Package[]>([]);
                         onClick={() => setSelectedCourier(courier)}
                       />
                     ))}
+
+                  {/* 显示快递店位置 */}
+                  {stores
+                    .filter(store => store.latitude && store.longitude)
+                    .map(store => (
+                      <Marker
+                        key={`store-${store.id}`}
+                        position={{ lat: store.latitude!, lng: store.longitude! }}
+                        icon={{
+                          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="20" cy="20" r="18" fill="${store.status === 'active' ? '#10b981' : '#f59e0b'}" stroke="white" stroke-width="3"/>
+                              <text x="20" y="26" text-anchor="middle" fill="white" font-size="20" font-weight="bold">🏪</text>
+                            </svg>
+                          `)}`,
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 20)
+                        }}
+                      />
+                    ))}
+
+                  {/* 显示包裹的取件点(P)和配送点(D) */}
+                  {selectedLocationPoint && (
+                    <Marker
+                      position={selectedLocationPoint.coordinates}
+                      icon={{
+                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                          <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="24" cy="24" r="20" fill="${selectedLocationPoint.type === 'pickup' ? '#3b82f6' : '#ef4444'}" stroke="white" stroke-width="3"/>
+                            <text x="24" y="31" text-anchor="middle" fill="white" font-size="24" font-weight="bold">${selectedLocationPoint.type === 'pickup' ? 'P' : 'D'}</text>
+                          </svg>
+                        `)}`,
+                        scaledSize: new window.google.maps.Size(48, 48),
+                        anchor: new window.google.maps.Point(24, 24)
+                      }}
+                      zIndex={1000}
+                    />
+                  )}
+                  {selectedLocationPoint && (
+                    <InfoWindow
+                      position={selectedLocationPoint.coordinates}
+                      onCloseClick={() => setSelectedLocationPoint(null)}
+                    >
+                      <div style={{ padding: '0.5rem', minWidth: '200px' }}>
+                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
+                          {selectedLocationPoint.type === 'pickup' ? '📍 取件点 (P)' : '📍 配送点 (D)'}
+                        </h3>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>包裹ID:</strong> {selectedLocationPoint.packageId}
+                          </p>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>坐标:</strong> {selectedLocationPoint.coordinates.lat.toFixed(6)}, {selectedLocationPoint.coordinates.lng.toFixed(6)}
+                          </p>
+                        </div>
+                      </div>
+                    </InfoWindow>
+                  )}
 
                   {/* 信息窗口 */}
                   {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
@@ -681,15 +751,62 @@ const [packages, setPackages] = useState<Package[]>([]);
           maxHeight: '700px',
           overflow: 'auto'
         }}>
-          <h2 style={{ marginTop: 0, color: '#1f2937' }}>📦 包裹管理</h2>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={() => setActiveTab('packages')}
+                style={{
+                  background: activeTab === 'packages' 
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
+                    : 'transparent',
+                  color: activeTab === 'packages' ? 'white' : '#6b7280',
+                  border: '2px solid',
+                  borderColor: activeTab === 'packages' ? '#3b82f6' : '#e5e7eb',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📦 包裹管理
+              </button>
+              <button
+                onClick={() => setActiveTab('stores')}
+                style={{
+                  background: activeTab === 'stores' 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                    : 'transparent',
+                  color: activeTab === 'stores' ? 'white' : '#6b7280',
+                  border: '2px solid',
+                  borderColor: activeTab === 'stores' ? '#10b981' : '#e5e7eb',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🏪 快递店管理
+              </button>
+            </div>
+          </div>
           
-          {/* 待分配包裹 */}
-          <div style={{ marginBottom: '2rem' }}>
+          {/* 根据选项卡显示不同内容 */}
+          {activeTab === 'packages' ? (
+            <>
+              {/* 待分配包裹 */}
+              <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ⏳ 待分配包裹 ({packages.filter(p => p.status === '待取件').length})
+              ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件').length})
             </h3>
 
-          {packages.filter(p => p.status === '待取件').length === 0 ? (
+          {filterPackagesByCity(packages).filter(p => p.status === '待取件').length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '3rem',
@@ -699,7 +816,7 @@ const [packages, setPackages] = useState<Package[]>([]);
               <p>当前没有待分配的包裹</p>
             </div>
           ) : (
-            packages
+            filterPackagesByCity(packages)
               .filter(p => p.status === '待取件')
               .map(pkg => (
                 <div
@@ -743,7 +860,38 @@ const [packages, setPackages] = useState<Package[]>([]);
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 从: {pkg.sender_address}
                       {pkg.sender_latitude && pkg.sender_longitude && (
-                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                        <span 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!pkg.sender_latitude || !pkg.sender_longitude) return;
+                            const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
+                            setSelectedLocationPoint({
+                              packageId: pkg.id,
+                              type: 'pickup',
+                              coordinates: coords
+                            });
+                            setMapCenter(coords);
+                            setSelectedCourier(null);
+                          }}
+                          style={{ 
+                            color: '#3b82f6', 
+                            fontSize: '0.8rem', 
+                            marginLeft: '0.5rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#2563eb';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#3b82f6';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
                           ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
                         </span>
                       )}
@@ -751,7 +899,38 @@ const [packages, setPackages] = useState<Package[]>([]);
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 到: {pkg.receiver_address}
                       {pkg.receiver_latitude && pkg.receiver_longitude && (
-                        <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                        <span 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
+                            const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
+                            setSelectedLocationPoint({
+                              packageId: pkg.id,
+                              type: 'delivery',
+                              coordinates: coords
+                            });
+                            setMapCenter(coords);
+                            setSelectedCourier(null);
+                          }}
+                          style={{ 
+                            color: '#ef4444', 
+                            fontSize: '0.8rem', 
+                            marginLeft: '0.5rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#dc2626';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
                           ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
                         </span>
                       )}
@@ -844,10 +1023,10 @@ const [packages, setPackages] = useState<Package[]>([]);
           {/* 已分配包裹 */}
           <div>
             <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ✅ 已分配包裹 ({packages.filter(p => p.status === '已取件' || p.status === '配送中').length})
+              ✅ 已分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length})
             </h3>
             
-            {packages.filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
+            {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
               <div style={{
                 textAlign: 'center',
                 padding: '2rem',
@@ -857,7 +1036,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                 <p>暂无已分配包裹</p>
               </div>
             ) : (
-              packages
+              filterPackagesByCity(packages)
                 .filter(p => p.status === '已取件' || p.status === '配送中')
                 .map(pkg => (
                   <div
@@ -898,7 +1077,38 @@ const [packages, setPackages] = useState<Package[]>([]);
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📍 从:</strong> {pkg.sender_address}
                         {pkg.sender_latitude && pkg.sender_longitude && (
-                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          <span 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!pkg.sender_latitude || !pkg.sender_longitude) return;
+                              const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
+                              setSelectedLocationPoint({
+                                packageId: pkg.id,
+                                type: 'pickup',
+                                coordinates: coords
+                              });
+                              setMapCenter(coords);
+                              setSelectedCourier(null);
+                            }}
+                            style={{ 
+                              color: '#3b82f6', 
+                              fontSize: '0.8rem', 
+                              marginLeft: '0.5rem',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#2563eb';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#3b82f6';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
                             ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
                           </span>
                         )}
@@ -906,7 +1116,38 @@ const [packages, setPackages] = useState<Package[]>([]);
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📍 到:</strong> {pkg.receiver_address}
                         {pkg.receiver_latitude && pkg.receiver_longitude && (
-                          <span style={{ color: '#059669', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                          <span 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
+                              const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
+                              setSelectedLocationPoint({
+                                packageId: pkg.id,
+                                type: 'delivery',
+                                coordinates: coords
+                              });
+                              setMapCenter(coords);
+                              setSelectedCourier(null);
+                            }}
+                            style={{ 
+                              color: '#ef4444', 
+                              fontSize: '0.8rem', 
+                              marginLeft: '0.5rem',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#dc2626';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#ef4444';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
                             ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
                           </span>
                         )}
@@ -924,6 +1165,98 @@ const [packages, setPackages] = useState<Package[]>([]);
                 ))
             )}
           </div>
+            </>
+          ) : (
+            // 快递店管理内容
+            <div>
+              <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                🏪 快递店列表 ({stores.length})
+              </h3>
+              
+              {loadingStores ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                  <p>加载中...</p>
+                </div>
+              ) : stores.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏪</div>
+                  <p>暂无快递店</p>
+                  <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', color: '#6b7280' }}>
+                    请前往独立页面添加快递店
+                  </p>
+                </div>
+              ) : (
+                stores.map(store => (
+                  <div
+                    key={store.id}
+                    style={{
+                      background: store.status === 'active' 
+                        ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
+                        : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      marginBottom: '1rem',
+                      border: store.status === 'active' 
+                        ? '2px solid #86efac' 
+                        : '2px solid #fcd34d'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <div>
+                        <strong style={{ color: store.status === 'active' ? '#166534' : '#92400e' }}>
+                          {store.store_name}
+                        </strong>
+                        <span style={{
+                          background: store.status === 'active' ? '#dcfce7' : '#fef3c7',
+                          color: store.status === 'active' ? '#166534' : '#92400e',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          marginLeft: '0.5rem'
+                        }}>
+                          {store.store_type === 'hub' ? '🏢 总店' : 
+                           store.store_type === 'branch' ? '🏪 分店' : 
+                           store.store_type === 'pickup_point' ? '📦 自提点' : '🚚 中转站'}
+                        </span>
+                      </div>
+                      <span style={{
+                        background: store.status === 'active' ? '#10b981' : '#f59e0b',
+                        color: 'white',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {store.status === 'active' ? '✅ 营业中' : store.status === 'inactive' ? '⏸️ 暂停' : '🔧 维护中'}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📍 地址:</strong> {store.address}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>📞 电话:</strong> {store.phone}
+                      </p>
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>👤 店长:</strong> {store.manager_name} ({store.manager_phone})
+                      </p>
+                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#059669' }}>
+                        📍 坐标: ({store.latitude.toFixed(6)}, {store.longitude.toFixed(6)})
+                      </p>
+                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                        ⏰ 营业时间: {store.operating_hours} | 
+                        📦 容量: {store.capacity} | 
+                        🎯 服务半径: {store.service_area_radius}km
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,7 @@
     "name": "ML Express Staff",
     "slug": "MarketLinkStaffApp",
     "version": "1.0.0",
+    "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -39,9 +40,8 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.marketlinkexpress.staff",
+      "versionCode": 1,
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],

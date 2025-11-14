@@ -21,10 +21,18 @@
     },
     "production": {
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "simulator": false
       },
       "android": {
         "buildType": "app-bundle"
+      }
+    },
+    "testflight": {
+      "extends": "production",
+      "distribution": "store",
+      "ios": {
+        "simulator": false
       }
     }
   },
