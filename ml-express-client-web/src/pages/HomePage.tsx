@@ -1549,6 +1549,30 @@ const HomePage: React.FC = () => {
       overflow: 'hidden',
       padding: window.innerWidth < 768 ? '12px' : '20px'
     }}>
+      {/* 背景装饰 */}
+      <div style={{
+        position: 'absolute',
+        top: '5%',
+        right: '5%',
+        width: '200px',
+        height: '200px',
+        background: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: '50%',
+        filter: 'blur(40px)',
+        zIndex: 1
+      }}></div>
+      <div style={{
+        position: 'absolute',
+        bottom: '5%',
+        left: '5%',
+        width: '150px',
+        height: '150px',
+        background: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: '50%',
+        filter: 'blur(30px)',
+        zIndex: 1
+      }}></div>
+      
       {/* 顶部导航栏 */}
       <nav style={{
         position: 'relative',
