@@ -45,49 +45,29 @@
 
 ### 2. 📱 Android 权限说明（必需）
 
-**状态**: ⚠️ **部分完成**
+**状态**: ✅ **已完成**
 
-**当前权限**:
+**已添加权限**:
 ```json
 "permissions": [
   "ACCESS_FINE_LOCATION",
-  "ACCESS_COARSE_LOCATION"
+  "ACCESS_COARSE_LOCATION",
+  "CAMERA",
+  "READ_EXTERNAL_STORAGE",
+  "WRITE_EXTERNAL_STORAGE"
 ]
 ```
 
-**问题**:
-- 缺少相机权限声明（应用使用了相机扫描二维码）
-- 缺少存储权限声明（应用保存图片）
-- 权限使用说明不够详细
+**已添加权限使用说明**（通过 plugins 配置）:
+- ✅ **相机权限**: "需要访问相机以扫描包裹二维码和中转码，用于快速识别包裹信息。"
+- ✅ **位置权限**: "需要获取您的位置来提供实时配送服务和显示配送路线。"
+- ✅ **存储权限**: "需要访问相册以保存包裹配送照片，用于记录配送凭证。"
 
-**需要完成**:
-
-1. **添加缺失的权限**（在 `app.json` 中）：
-   ```json
-   "android": {
-     "permissions": [
-       "ACCESS_FINE_LOCATION",
-       "ACCESS_COARSE_LOCATION",
-       "CAMERA",
-       "READ_EXTERNAL_STORAGE",
-       "WRITE_EXTERNAL_STORAGE"
-     ]
-   }
-   ```
-
-2. **添加权限使用说明**（在 `app.json` 中）：
-   ```json
-   "android": {
-     "permissions": [...],
-     "permissionDescriptions": {
-       "ACCESS_FINE_LOCATION": "用于显示配送路线和实时位置追踪",
-       "ACCESS_COARSE_LOCATION": "用于显示配送路线和实时位置追踪",
-       "CAMERA": "用于扫描包裹二维码和中转码",
-       "READ_EXTERNAL_STORAGE": "用于访问保存的图片",
-       "WRITE_EXTERNAL_STORAGE": "用于保存包裹照片和截图"
-     }
-   }
-   ```
+**配置方式**:
+通过 Expo plugins 配置添加权限使用说明：
+- `expo-camera` 插件：配置相机权限说明
+- `expo-location` 插件：配置位置权限说明
+- `expo-media-library` 插件：配置存储权限说明
 
 **优先级**: 🔴 **最高** - 审核必需
 

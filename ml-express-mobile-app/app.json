@@ -43,7 +43,10 @@
       "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -62,6 +65,30 @@
     "owner": "amt349",
     "privacy": "public",
     "privacyPolicy": "https://market-link-express.com/privacy-policy",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "需要访问相机以扫描包裹二维码和中转码，用于快速识别包裹信息。",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "需要获取您的位置来提供实时配送服务和显示配送路线。",
+          "locationAlwaysPermission": "需要获取您的位置来提供实时配送服务。",
+          "locationWhenInUsePermission": "需要获取您的位置来显示配送路线和导航。"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "需要访问相册以保存包裹配送照片，用于记录配送凭证。",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
+    ],
     "runtimeVersion": {
       "policy": "appVersion"
     },
