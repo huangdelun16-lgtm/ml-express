@@ -60,6 +60,8 @@
       }
     },
     "owner": "amt349",
+    "privacy": "public",
+    "privacyPolicy": "https://market-link-express.com/privacy-policy",
     "runtimeVersion": {
       "policy": "appVersion"
     },

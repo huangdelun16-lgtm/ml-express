@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import ServicesPage from './pages/ServicesPage';
 import TrackingPage from './pages/TrackingPage';
 import ContactPage from './pages/ContactPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -80,6 +81,7 @@ function App() {
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/tracking" element={<TrackingPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             </Routes>
           </div>
         </Router>

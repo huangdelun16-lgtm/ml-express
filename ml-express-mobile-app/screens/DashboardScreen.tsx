@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, supabase, notificationService, Notification } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -258,12 +259,25 @@ export default function DashboardScreen({ navigation }: any) {
   }
 
   const handleLogout = async () => {
-    await AsyncStorage.clear();
-    // 重置导航栈到客户专区
-    navigation.getParent()?.getParent()?.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      // 清除所有存储的数据
+      await AsyncStorage.clear();
+      
+      // 重置导航栈到登录页面
+      // 获取根导航器（Stack Navigator）
+      const rootNavigation = navigation.getParent()?.getParent() || navigation.getParent() || navigation;
+      
+      rootNavigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      // 如果重置导航失败，尝试直接导航
+      navigation.getParent()?.getParent()?.navigate('Login');
+    }
   };
 
   // 语言切换处理

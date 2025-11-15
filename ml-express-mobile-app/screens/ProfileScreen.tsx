@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -71,32 +72,45 @@ export default function ProfileScreen({ navigation }: any) {
           text: language === 'zh' ? '退出' : language === 'my' ? 'ထွက်ရန်' : 'Logout',
           style: 'destructive',
           onPress: async () => {
-            // 如果是骑手，更新快递员状态为离线
-            const userPosition = await AsyncStorage.getItem('currentUserPosition');
-            if (userPosition === '骑手' || userPosition === '骑手队长') {
-              try {
-                const courierId = await AsyncStorage.getItem('currentCourierId');
-                if (courierId) {
-                  await supabase
-                    .from('couriers')
-                    .update({ 
-                      last_active: new Date().toISOString(),
-                      status: 'inactive'
-                    })
-                    .eq('id', courierId);
-                  console.log('✅ 快递员状态已更新为离线');
+            try {
+              // 如果是骑手，更新快递员状态为离线
+              const userPosition = await AsyncStorage.getItem('currentUserPosition');
+              if (userPosition === '骑手' || userPosition === '骑手队长') {
+                try {
+                  const courierId = await AsyncStorage.getItem('currentCourierId');
+                  if (courierId) {
+                    await supabase
+                      .from('couriers')
+                      .update({ 
+                        last_active: new Date().toISOString(),
+                        status: 'inactive'
+                      })
+                      .eq('id', courierId);
+                    console.log('✅ 快递员状态已更新为离线');
+                  }
+                } catch (error) {
+                  console.error('更新快递员离线状态失败:', error);
                 }
-              } catch (error) {
-                console.error('更新快递员离线状态失败:', error);
               }
+              
+              // 清除所有存储的数据
+              await AsyncStorage.clear();
+              
+              // 重置导航栈到登录页面
+              // 获取根导航器（Stack Navigator）
+              const rootNavigation = navigation.getParent()?.getParent() || navigation.getParent() || navigation;
+              
+              rootNavigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                })
+              );
+            } catch (error) {
+              console.error('退出登录失败:', error);
+              // 如果重置导航失败，尝试直接导航
+              navigation.getParent()?.getParent()?.navigate('Login');
             }
-            
-            await AsyncStorage.clear();
-            // 重置导航栈到客户专区
-            navigation.getParent()?.getParent()?.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
           }
         }
       ]
