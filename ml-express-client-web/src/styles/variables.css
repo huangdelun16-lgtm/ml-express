@@ -110,6 +110,21 @@
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
   --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.25);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  
+  /* 卡片专用阴影 */
+  --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 30px 60px rgba(0, 0, 0, 0.15);
+  
+  /* ========== 卡片样式变量 ========== */
+  --card-padding-sm: var(--spacing-4);      /* 16px */
+  --card-padding-md: var(--spacing-6);      /* 24px */
+  --card-padding-lg: var(--spacing-8);      /* 32px */
+  --card-padding-xl: var(--spacing-10);     /* 40px */
+  --card-radius: var(--radius-xl);          /* 16px */
+  --card-radius-lg: var(--radius-2xl);      /* 24px */
+  --card-border: 1px solid var(--color-border-light);
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --card-backdrop: blur(20px);
 
   /* ========== 过渡动画 ========== */
   --transition-fast: 0.15s ease;

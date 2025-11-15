@@ -179,6 +179,23 @@ textarea::placeholder {
     font-size: var(--font-size-sm);
     padding: var(--spacing-1) var(--spacing-2);
   }
+  
+  /* 移动端卡片优化 */
+  .card {
+    padding: var(--card-padding-sm);
+    border-radius: var(--radius-lg);
+  }
+  
+  .card-lg {
+    padding: var(--card-padding-md);
+  }
+  
+  /* 移动端网格布局 */
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {

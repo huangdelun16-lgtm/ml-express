@@ -368,8 +368,8 @@ const ContactPage: React.FC = () => {
           maxWidth: '1000px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-          gap: '2rem'
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 'var(--spacing-8)'
         }}>
           {[
             {
@@ -402,15 +402,15 @@ const ContactPage: React.FC = () => {
             }
           ].map((contact, index) => (
             <div key={index} style={{
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '20px',
-              padding: '2.5rem',
+              background: 'var(--card-bg)',
+              backdropFilter: 'var(--card-backdrop)',
+              borderRadius: 'var(--card-radius-lg)',
+              padding: 'var(--card-padding-lg)',
               position: 'relative',
               overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.3)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              border: 'var(--card-border)',
+              boxShadow: 'var(--shadow-card)',
+              transition: 'all var(--transition-base)',
               cursor: 'pointer',
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`,
@@ -418,11 +418,11 @@ const ContactPage: React.FC = () => {
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-              e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
+              e.currentTarget.style.transform = isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`;
+              e.currentTarget.style.boxShadow = 'var(--shadow-card)';
             }}
             >
               {/* 装饰性背景 */}
@@ -487,12 +487,13 @@ const ContactPage: React.FC = () => {
         {/* 页脚信息 */}
         <div style={{
           textAlign: 'center',
-          marginTop: '4rem',
-          padding: '2rem',
+          marginTop: 'var(--spacing-16)',
+          padding: 'var(--card-padding-lg)',
           background: 'rgba(255,255,255,0.1)',
           backdropFilter: 'blur(10px)',
-          borderRadius: '20px',
-          border: '1px solid rgba(255,255,255,0.2)'
+          borderRadius: 'var(--card-radius-lg)',
+          border: 'var(--card-border)',
+          boxShadow: 'var(--shadow-md)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
             <img 

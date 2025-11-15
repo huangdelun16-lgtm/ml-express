@@ -533,13 +533,13 @@ const TrackingPage: React.FC = () => {
         }}>
           {/* 查询输入区域 */}
           <div style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            padding: '2rem',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            marginBottom: '2rem'
+            background: 'var(--card-bg)',
+            backdropFilter: 'var(--card-backdrop)',
+            borderRadius: 'var(--card-radius-lg)',
+            padding: 'var(--card-padding-lg)',
+            boxShadow: 'var(--shadow-card)',
+            border: 'var(--card-border)',
+            marginBottom: 'var(--spacing-8)'
           }}>
             <div style={{
               display: 'flex',
@@ -619,12 +619,12 @@ const TrackingPage: React.FC = () => {
               {/* 左侧：包裹信息 */}
               <div>
                 <div style={{
-                  background: 'rgba(255,255,255,0.95)',
-                  backdropFilter: 'blur(20px)',
-                  padding: '2rem',
-                  borderRadius: '20px',
+                  background: 'var(--card-bg)',
+                  backdropFilter: 'var(--card-backdrop)',
+                  padding: 'var(--card-padding-lg)',
+                  borderRadius: 'var(--card-radius-lg)',
                   border: '2px solid ' + getStatusColor(trackingResult.status),
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+                  boxShadow: 'var(--shadow-card)'
                 }}>
                   <h3 style={{ 
                     color: getStatusColor(trackingResult.status), 
