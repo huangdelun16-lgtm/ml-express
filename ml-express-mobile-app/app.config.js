@@ -47,13 +47,10 @@ module.exports = {
       },
       package: "com.marketlinkexpress.staff",
       // versionCode 已由 EAS 自动管理（eas.json 中 autoIncrement: true）
-      // 注意：权限由插件自动添加，不需要手动声明，避免 Manifest merger 冲突
+      // 注意：完全移除 permissions 数组，所有权限由插件自动管理，避免 Manifest merger 冲突
       // expo-camera 会自动添加 CAMERA 权限
-      // expo-location 会自动添加位置权限
-      // expo-media-library 会自动添加存储权限
-      permissions: [
-        "CAMERA"
-      ],
+      // expo-location 会自动添加 ACCESS_FINE_LOCATION 和 ACCESS_COARSE_LOCATION
+      // expo-media-library 会自动添加存储权限（根据 Android 版本自动选择）
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       config: {
@@ -71,28 +68,11 @@ module.exports = {
     privacy: "public",
     privacyPolicy: "https://market-link-express.com/privacy-policy",
     plugins: [
-      [
-        "expo-camera",
-        {
-          cameraPermission: "需要访问相机以扫描包裹二维码和中转码，用于快速识别包裹信息。",
-          microphonePermission: false
-        }
-      ],
-      [
-        "expo-location",
-        {
-          locationAlwaysAndWhenInUsePermission: "需要获取您的位置来提供实时配送服务和显示配送路线。",
-          locationAlwaysPermission: "需要获取您的位置来提供实时配送服务。",
-          locationWhenInUsePermission: "需要获取您的位置来显示配送路线和导航。"
-        }
-      ],
-      [
-        "expo-media-library",
-        {
-          savePhotosPermission: "需要访问相册以保存包裹配送照片，用于记录配送凭证。",
-          isAccessMediaLocationEnabled: true
-        }
-      ]
+      // 简化插件配置，避免 manifest merger 冲突
+      // 权限说明会在运行时通过权限请求对话框显示
+      "expo-camera",
+      "expo-location",
+      "expo-media-library"
     ],
     runtimeVersion: {
       policy: "appVersion"
