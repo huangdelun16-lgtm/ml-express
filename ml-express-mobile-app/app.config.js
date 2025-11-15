@@ -47,12 +47,12 @@ module.exports = {
       },
       package: "com.marketlinkexpress.staff",
       // versionCode 已由 EAS 自动管理（eas.json 中 autoIncrement: true）
+      // 注意：权限由插件自动添加，不需要手动声明，避免 Manifest merger 冲突
+      // expo-camera 会自动添加 CAMERA 权限
+      // expo-location 会自动添加位置权限
+      // expo-media-library 会自动添加存储权限
       permissions: [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "CAMERA"
       ],
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
