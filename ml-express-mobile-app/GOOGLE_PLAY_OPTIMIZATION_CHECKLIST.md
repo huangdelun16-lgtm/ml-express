@@ -75,35 +75,38 @@
 
 ### 3. 🔑 API 密钥安全（重要）
 
-**状态**: ⚠️ **需要优化**
+**状态**: ✅ **已完成**
 
-**问题**:
-- Google Maps API Key 直接暴露在 `app.json` 中
-- 如果密钥泄露，可能产生费用和安全风险
+**已完成内容**:
 
-**需要完成**:
+1. ✅ **使用环境变量**：
+   - ✅ 创建了 `.env.example` 作为模板
+   - ✅ `.env` 文件已添加到 `.gitignore`
+   - ✅ 创建了 `app.config.js` 来读取环境变量（替代静态 `app.json`）
+   - ✅ 安装了 `dotenv` 包支持环境变量
+   - ✅ API 密钥现在从 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` 环境变量读取
 
-1. **使用环境变量**：
-   - 创建 `.env` 文件（不要提交到 Git）
-   - 在 `app.json` 中使用环境变量：
-     ```json
-     "config": {
-       "googleMaps": {
-         "apiKey": process.env.GOOGLE_MAPS_API_KEY
-       }
-     }
-     ```
+2. ✅ **EAS Secrets 配置**：
+   - ✅ 创建了 `EAS_SECRETS_SETUP.md` 指南
+   - ✅ 更新了 `eas.json` 配置环境变量
+   - ✅ 提供了生产环境构建时的 Secret 配置说明
 
-2. **配置 API 密钥限制**（在 Google Cloud Console）：
-   - 限制 API 密钥只能用于 Android 应用
-   - 限制只能从特定包名调用
-   - 设置使用配额限制
+3. ✅ **Google Cloud Console 配置指南**：
+   - ✅ 创建了 `GOOGLE_CLOUD_API_KEY_SETUP.md` 详细指南
+   - ✅ 包含 Android 应用限制配置步骤
+   - ✅ 包含 API 限制配置步骤
+   - ✅ 包含使用配额限制配置步骤
 
-3. **更新 .gitignore**：
-   ```
-   .env
-   .env.local
-   ```
+**配置文件**:
+- `app.config.js` - 动态读取环境变量
+- `.env.example` - 环境变量模板
+- `.gitignore` - 已添加 `.env` 文件忽略规则
+- `GOOGLE_CLOUD_API_KEY_SETUP.md` - Google Cloud Console 配置指南
+- `EAS_SECRETS_SETUP.md` - EAS Secrets 配置指南
+
+**下一步操作**:
+1. ⚠️ **需要在 Google Cloud Console 中配置 API 密钥限制**（参考 `GOOGLE_CLOUD_API_KEY_SETUP.md`）
+2. ⚠️ **在生产构建前配置 EAS Secrets**（参考 `EAS_SECRETS_SETUP.md`）
 
 **优先级**: 🟡 **高** - 安全风险
 

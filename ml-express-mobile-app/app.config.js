@@ -1,0 +1,105 @@
+// app.config.js - 使用环境变量配置 Expo 应用
+// 此文件支持动态读取环境变量，比 app.json 更灵活
+
+// 加载环境变量
+require('dotenv').config();
+
+module.exports = {
+  expo: {
+    name: "ML Express Staff",
+    slug: "MarketLinkStaffApp",
+    version: "1.0.0",
+    scheme: "ml-express-staff",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#2c5282"
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.marketlinkexpress.staff",
+      infoPlist: {
+        LSApplicationQueriesSchemes: [
+          "comgooglemaps",
+          "maps",
+          "comgooglemaps",
+          "maps"
+        ],
+        NSLocationWhenInUseUsageDescription: "需要获取您的位置来显示配送路线和导航",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "需要获取您的位置来提供实时配送服务",
+        UIBackgroundModes: [
+          "location",
+          "location"
+        ]
+      },
+      config: {
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#2c5282"
+      },
+      package: "com.marketlinkexpress.staff",
+      versionCode: 1,
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false,
+      config: {
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+        }
+      }
+    },
+    extra: {
+      eas: {
+        projectId: "9831d961-9124-46ed-8581-bf406616439f"
+      }
+    },
+    owner: "amt349",
+    privacy: "public",
+    privacyPolicy: "https://market-link-express.com/privacy-policy",
+    plugins: [
+      [
+        "expo-camera",
+        {
+          cameraPermission: "需要访问相机以扫描包裹二维码和中转码，用于快速识别包裹信息。",
+          microphonePermission: false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "需要获取您的位置来提供实时配送服务和显示配送路线。",
+          locationAlwaysPermission: "需要获取您的位置来提供实时配送服务。",
+          locationWhenInUsePermission: "需要获取您的位置来显示配送路线和导航。"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          savePhotosPermission: "需要访问相册以保存包裹配送照片，用于记录配送凭证。",
+          isAccessMediaLocationEnabled: true
+        }
+      ]
+    ],
+    runtimeVersion: {
+      policy: "appVersion"
+    },
+    updates: {
+      url: "https://u.expo.dev/9831d961-9124-46ed-8581-bf406616439f"
+    }
+  }
+};
+
