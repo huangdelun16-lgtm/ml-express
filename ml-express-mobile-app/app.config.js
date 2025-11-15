@@ -51,6 +51,7 @@ module.exports = {
       // expo-camera 会自动添加 CAMERA 权限
       // expo-location 会自动添加 ACCESS_FINE_LOCATION 和 ACCESS_COARSE_LOCATION
       // expo-media-library 会自动添加存储权限（根据 Android 版本自动选择）
+      minSdkVersion: 23, // Android 6.0+，确保所有插件兼容
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       config: {
