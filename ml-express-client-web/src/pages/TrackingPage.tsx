@@ -301,12 +301,12 @@ const TrackingPage: React.FC = () => {
       <nav style={{
         position: 'relative',
         zIndex: 10,
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
+        background: 'transparent',
+        padding: window.innerWidth < 768 ? 'var(--spacing-4) var(--spacing-4)' : 'var(--spacing-6) var(--spacing-6)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: 'var(--shadow-lg)'
+        boxShadow: 'none'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
@@ -500,7 +500,7 @@ const TrackingPage: React.FC = () => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '2rem 2rem'
+        padding: window.innerWidth < 768 ? '0 1rem 2rem 1rem' : '0 2rem 2rem 2rem'
       }}>
         {/* 页面标题 */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>

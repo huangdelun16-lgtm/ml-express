@@ -418,7 +418,7 @@ const ServicesPage: React.FC = () => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        padding: window.innerWidth < 768 ? '2rem 1rem' : '4rem 2rem'
+        padding: window.innerWidth < 768 ? '0 1rem 2rem 1rem' : '0 2rem 4rem 2rem'
       }}>
         {/* 页面标题 */}
         <div style={{ textAlign: 'center', marginBottom: '4rem' }}>

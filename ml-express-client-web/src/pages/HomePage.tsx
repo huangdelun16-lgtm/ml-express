@@ -1562,13 +1562,13 @@ const HomePage: React.FC = () => {
       <nav style={{
         position: 'relative',
         zIndex: 10,
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
+        background: 'transparent',
         color: 'white',
-        padding: window.innerWidth < 768 ? 'var(--spacing-3) var(--spacing-4)' : 'var(--spacing-4) var(--spacing-6)',
+        padding: window.innerWidth < 768 ? 'var(--spacing-4) var(--spacing-4)' : 'var(--spacing-6) var(--spacing-6)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxShadow: 'var(--shadow-lg)',
+        boxShadow: 'none',
         gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
         flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
         rowGap: 'var(--spacing-3)'
