@@ -118,27 +118,16 @@ const ContactPage: React.FC = () => {
       minHeight: '100vh',
       background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      padding: window.innerWidth < 768 ? '12px' : '20px'
     }}>
-      {/* 页面切换动画背景 */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        opacity: isVisible ? 1 : 0,
-        transition: 'opacity 0.3s ease-in-out',
-        zIndex: 1
-      }} />
-
       {/* 导航栏 */}
       <nav style={{
         position: 'relative',
         zIndex: 10,
         background: 'transparent',
-        padding: window.innerWidth < 768 ? 'var(--spacing-4) var(--spacing-4)' : 'var(--spacing-6) var(--spacing-6)',
+        padding: 0,
+        marginBottom: window.innerWidth < 768 ? '24px' : '40px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -337,7 +326,7 @@ const ContactPage: React.FC = () => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        padding: window.innerWidth < 768 ? '0 1rem 2rem 1rem' : '0 2rem 4rem 2rem'
+        padding: 0
       }}>
         {/* 页面标题 */}
         <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
