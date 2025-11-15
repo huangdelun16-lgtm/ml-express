@@ -46,7 +46,7 @@ module.exports = {
         backgroundColor: "#2c5282"
       },
       package: "com.marketlinkexpress.staff",
-      versionCode: 1,
+      // versionCode 已由 EAS 自动管理（eas.json 中 autoIncrement: true）
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
