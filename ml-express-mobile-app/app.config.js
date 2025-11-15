@@ -37,7 +37,8 @@ module.exports = {
         ]
       },
       config: {
-        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+        // 直接使用 API key，避免构建时环境变量问题
+        googleMapsApiKey: "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
       }
     },
     android: {
@@ -56,7 +57,9 @@ module.exports = {
       predictiveBackGestureEnabled: false,
       config: {
         googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+          // 直接使用 API key，避免构建时环境变量问题
+          // 注意：生产环境应该使用 EAS Secrets
+          apiKey: "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
         }
       }
     },
