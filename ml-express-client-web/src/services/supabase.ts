@@ -245,6 +245,96 @@ export const userService = {
   }
 };
 
+// 临时订单服务（客户端使用）
+export interface PendingOrder {
+  id?: string;
+  temp_order_id: string;
+  sender_name: string;
+  sender_phone: string;
+  sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
+  receiver_name: string;
+  receiver_phone: string;
+  receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
+  package_type: string;
+  weight: string;
+  delivery_speed?: string;
+  scheduled_delivery_time?: string;
+  price: number;
+  distance: number;
+  payment_method: 'qr' | 'cash';
+  customer_email?: string;
+  customer_name?: string;
+  created_at?: string;
+  expires_at?: string;
+}
+
+export const pendingOrderService = {
+  // 创建临时订单
+  async createPendingOrder(orderData: Omit<PendingOrder, 'id' | 'created_at' | 'expires_at'>): Promise<PendingOrder | null> {
+    try {
+      const { data, error } = await supabase
+        .from('pending_orders')
+        .insert([{
+          ...orderData,
+          id: orderData.temp_order_id // 使用temp_order_id作为主键
+        }])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('创建临时订单失败:', error);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error('创建临时订单异常:', err);
+      return null;
+    }
+  },
+
+  // 根据临时订单ID获取订单
+  async getPendingOrderByTempId(tempOrderId: string): Promise<PendingOrder | null> {
+    try {
+      const { data, error } = await supabase
+        .from('pending_orders')
+        .select('*')
+        .eq('temp_order_id', tempOrderId)
+        .single();
+      
+      if (error || !data) {
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error('获取临时订单异常:', err);
+      return null;
+    }
+  },
+
+  // 删除临时订单
+  async deletePendingOrder(tempOrderId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('pending_orders')
+        .delete()
+        .eq('temp_order_id', tempOrderId);
+      
+      if (error) {
+        console.error('删除临时订单失败:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('删除临时订单异常:', err);
+      return false;
+    }
+  }
+};
+
 // 系统设置服务（客户端使用）
 export const systemSettingsService = {
   // 获取计费规则

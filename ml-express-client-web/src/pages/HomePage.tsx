@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService } from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
@@ -119,6 +119,7 @@ const HomePage: React.FC = () => {
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr'); // 支付方式：二维码或现金
+  const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   // const [orderData, setOrderData] = useState<any>(null);
   
   // 用户认证相关状态
@@ -1127,8 +1128,8 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 生成缅甸时间格式的包裹ID
-  const generateMyanmarPackageId = () => {
+  // 生成缅甸时间格式的包裹ID（根据寄件地址自动识别城市）
+  const generateMyanmarPackageId = (senderAddress?: string) => {
     const now = new Date();
     // 缅甸时间 (UTC+6:30)
     const myanmarTime = new Date(now.getTime() + (6.5 * 60 * 60 * 1000));
@@ -1141,7 +1142,52 @@ const HomePage: React.FC = () => {
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
-    return `MDY${year}${month}${day}${hour}${minute}${random1}${random2}`;
+    // 根据寄件地址自动识别城市前缀
+    const cityPrefixMap: { [key: string]: string } = {
+      '仰光': 'YGN',
+      'Yangon': 'YGN',
+      'ရန်ကုန်': 'YGN',
+      '曼德勒': 'MDY',
+      'Mandalay': 'MDY',
+      'မန္တလေး': 'MDY',
+      '内比都': 'NYT',
+      'Naypyidaw': 'NYT',
+      'နေပြည်တော်': 'NYT',
+      '毛淡棉': 'MWL',
+      'Mawlamyine': 'MWL',
+      'မော်လမြိုင်': 'MWL',
+      '勃生': 'PAT',
+      'Pathein': 'PAT',
+      'ပုသိမ်': 'PAT',
+      '蒙育瓦': 'MON',
+      'Monywa': 'MON',
+      'မုံရွာ': 'MON',
+      '密支那': 'MYI',
+      'Myitkyina': 'MYI',
+      'မြစ်ကြီးနား': 'MYI',
+      '东枝': 'TAU',
+      'Taunggyi': 'TAU',
+      'တောင်ကြီး': 'TAU',
+      '实兑': 'SIT',
+      'Sittwe': 'SIT',
+      'စစ်တွေ': 'SIT',
+      '葛礼': 'KAL',
+      'Kalay': 'KAL',
+      'ကလေး': 'KAL'
+    };
+    
+    // 判断城市前缀
+    let prefix = 'MDY'; // 默认曼德勒
+    if (senderAddress) {
+      for (const [city, cityPrefix] of Object.entries(cityPrefixMap)) {
+        if (senderAddress.includes(city)) {
+          prefix = cityPrefix;
+          break;
+        }
+      }
+    }
+    
+    return `${prefix}${year}${month}${day}${hour}${minute}${random1}${random2}`;
   };
 
   // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
@@ -1447,8 +1493,8 @@ const HomePage: React.FC = () => {
       console.log('价格:', price, 'MMK');
       setCalculatedPrice(price);
       
-      // 4. 生成临时订单ID
-      const tempOrderId = generateMyanmarPackageId();
+      // 4. 生成临时订单ID（根据寄件地址自动识别城市）
+      const tempOrderId = generateMyanmarPackageId(orderInfo.senderAddress);
       console.log('订单ID:', tempOrderId);
       
       // 5. 生成收款二维码（仅当选择二维码支付时）
@@ -1457,20 +1503,56 @@ const HomePage: React.FC = () => {
         await generatePaymentQRCode(price, tempOrderId);
       }
       
-      // 6. 存储订单信息（包含价格和距离）
-      const orderWithPrice = {
-        ...orderInfo,
+      // 6. 存储订单信息到Supabase数据库（替代localStorage）
+      console.log('保存临时订单到数据库...');
+      const pendingOrderData = {
+        temp_order_id: tempOrderId,
+        sender_name: orderInfo.senderName,
+        sender_phone: orderInfo.senderPhone,
+        sender_address: orderInfo.senderAddress,
+        sender_latitude: orderInfo.senderLatitude || null,
+        sender_longitude: orderInfo.senderLongitude || null,
+        receiver_name: orderInfo.receiverName,
+        receiver_phone: orderInfo.receiverPhone,
+        receiver_address: orderInfo.receiverAddress,
+        receiver_latitude: orderInfo.receiverLatitude || null,
+        receiver_longitude: orderInfo.receiverLongitude || null,
+        package_type: orderInfo.packageType,
+        weight: orderInfo.weight || '1',
+        delivery_speed: orderInfo.deliverySpeed || null,
+        scheduled_delivery_time: orderInfo.scheduledTime || null,
         price: price,
         distance: distance,
-        tempOrderId: tempOrderId,
-        customerEmail: currentUser?.email || '',
-        customerName: currentUser?.name || orderInfo.senderName,
-        paymentMethod: paymentMethod // 保存支付方式
+        payment_method: paymentMethod,
+        customer_email: currentUser?.email || null,
+        customer_name: currentUser?.name || orderInfo.senderName || null
       };
-      localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
       
-      // 7. 读取或设置支付方式（优先使用localStorage中的，如果没有则默认为二维码）
-      const savedPaymentMethod = orderWithPrice.paymentMethod || 'qr';
+      const savedPendingOrder = await pendingOrderService.createPendingOrder(pendingOrderData);
+      if (!savedPendingOrder) {
+        console.warn('保存临时订单到数据库失败，回退到localStorage');
+        // 如果数据库保存失败，回退到localStorage
+        const orderWithPrice = {
+          ...orderInfo,
+          price: price,
+          distance: distance,
+          tempOrderId: tempOrderId,
+          customerEmail: currentUser?.email || '',
+          customerName: currentUser?.name || orderInfo.senderName,
+          paymentMethod: paymentMethod
+        };
+        localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
+        setTempOrderId(tempOrderId); // 保存到状态中
+      } else {
+        console.log('临时订单已保存到数据库:', savedPendingOrder.temp_order_id);
+        // 保存tempOrderId到状态中，用于后续获取订单信息
+        setTempOrderId(savedPendingOrder.temp_order_id);
+        // 清除localStorage中的旧数据（如果存在）
+        localStorage.removeItem('pendingOrder');
+      }
+      
+      // 7. 读取或设置支付方式
+      const savedPaymentMethod = savedPendingOrder?.payment_method || paymentMethod || 'qr';
       setPaymentMethod(savedPaymentMethod);
       
       // 8. 显示支付模态框
@@ -2954,9 +3036,27 @@ const HomePage: React.FC = () => {
               }}>
                 {/* 二维码支付选项 */}
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setPaymentMethod('qr');
-                    // 更新localStorage中的支付方式
+                    // 更新数据库中的支付方式
+                    if (tempOrderId) {
+                      try {
+                        const dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(tempOrderId);
+                        if (dbPendingOrder) {
+                          // 更新数据库中的支付方式
+                          const { error } = await supabase
+                            .from('pending_orders')
+                            .update({ payment_method: 'qr' })
+                            .eq('temp_order_id', tempOrderId);
+                          if (error) {
+                            console.error('更新支付方式失败:', error);
+                          }
+                        }
+                      } catch (err) {
+                        console.error('更新支付方式异常:', err);
+                      }
+                    }
+                    // 同时更新localStorage（向后兼容）
                     const pendingOrder = localStorage.getItem('pendingOrder');
                     if (pendingOrder) {
                       const orderInfo = JSON.parse(pendingOrder);
@@ -2996,10 +3096,28 @@ const HomePage: React.FC = () => {
                 
                 {/* 现金支付选项 */}
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setPaymentMethod('cash');
                     setPaymentQRCode(''); // 清除二维码
-                    // 更新localStorage中的支付方式
+                    // 更新数据库中的支付方式
+                    if (tempOrderId) {
+                      try {
+                        const dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(tempOrderId);
+                        if (dbPendingOrder) {
+                          // 更新数据库中的支付方式
+                          const { error } = await supabase
+                            .from('pending_orders')
+                            .update({ payment_method: 'cash' })
+                            .eq('temp_order_id', tempOrderId);
+                          if (error) {
+                            console.error('更新支付方式失败:', error);
+                          }
+                        }
+                      } catch (err) {
+                        console.error('更新支付方式异常:', err);
+                      }
+                    }
+                    // 同时更新localStorage（向后兼容）
                     const pendingOrder = localStorage.getItem('pendingOrder');
                     if (pendingOrder) {
                       const orderInfo = JSON.parse(pendingOrder);
@@ -3108,9 +3226,55 @@ const HomePage: React.FC = () => {
                   setOrderSubmitStatus('processing');
                   
                   try {
-                    // 获取存储的订单信息
-                    const pendingOrder = localStorage.getItem('pendingOrder');
-                    if (!pendingOrder) {
+                    // 获取存储的订单信息（优先从数据库获取，如果失败则从localStorage获取）
+                    let orderInfo: any = null;
+                    let dbPendingOrder: any = null;
+                    const currentTempOrderId = tempOrderId || (() => {
+                      // 尝试从localStorage获取tempOrderId
+                      const localPendingOrder = localStorage.getItem('pendingOrder');
+                      if (localPendingOrder) {
+                        const localData = JSON.parse(localPendingOrder);
+                        return localData.tempOrderId;
+                      }
+                      return '';
+                    })();
+                    
+                    // 优先从数据库获取订单信息
+                    if (currentTempOrderId) {
+                      dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(currentTempOrderId);
+                      if (dbPendingOrder) {
+                        orderInfo = {
+                          senderName: dbPendingOrder.sender_name,
+                          senderPhone: dbPendingOrder.sender_phone,
+                          senderAddress: dbPendingOrder.sender_address,
+                          senderLatitude: dbPendingOrder.sender_latitude,
+                          senderLongitude: dbPendingOrder.sender_longitude,
+                          receiverName: dbPendingOrder.receiver_name,
+                          receiverPhone: dbPendingOrder.receiver_phone,
+                          receiverAddress: dbPendingOrder.receiver_address,
+                          receiverLatitude: dbPendingOrder.receiver_latitude,
+                          receiverLongitude: dbPendingOrder.receiver_longitude,
+                          packageType: dbPendingOrder.package_type,
+                          weight: dbPendingOrder.weight,
+                          deliverySpeed: dbPendingOrder.delivery_speed,
+                          scheduledTime: dbPendingOrder.scheduled_delivery_time,
+                          price: dbPendingOrder.price,
+                          distance: dbPendingOrder.distance,
+                          paymentMethod: dbPendingOrder.payment_method,
+                          tempOrderId: dbPendingOrder.temp_order_id
+                        };
+                      }
+                    }
+                    
+                    // 如果数据库中没有，尝试从localStorage获取（向后兼容）
+                    if (!orderInfo) {
+                      const localPendingOrder = localStorage.getItem('pendingOrder');
+                      if (localPendingOrder) {
+                        orderInfo = JSON.parse(localPendingOrder);
+                      }
+                    }
+                    
+                    if (!orderInfo) {
                       setOrderSubmitStatus('failed');
                       setOrderError(t.errors.orderInfoLost || '订单信息丢失，请重新下单');
                       setShowPaymentModal(false);
@@ -3118,11 +3282,10 @@ const HomePage: React.FC = () => {
                       return;
                     }
                     
-                    const orderInfo = JSON.parse(pendingOrder);
-                    const packageId = orderInfo.tempOrderId || generateMyanmarPackageId();
+                    const packageId = orderInfo.tempOrderId || generateMyanmarPackageId(orderInfo.senderAddress);
                     
                     // 获取当前选择的支付方式（优先使用当前状态，如果没有则使用存储的）
-                    const currentPaymentMethod = paymentMethod || orderInfo.paymentMethod || 'qr';
+                    const currentPaymentMethod = paymentMethod || orderInfo.paymentMethod || (dbPendingOrder?.payment_method) || 'qr';
                     
                     // 创建包裹数据 - 使用数据库字段名
                     // 确保 weight 字段始终有值（数据库要求非空）
@@ -3173,7 +3336,10 @@ const HomePage: React.FC = () => {
                       // 自动保存客户信息到用户管理
                       await saveCustomerToUsers(orderInfo);
 
-                      // 清除临时订单信息
+                      // 清除临时订单信息（数据库和localStorage）
+                      if (orderInfo.tempOrderId) {
+                        await pendingOrderService.deletePendingOrder(orderInfo.tempOrderId);
+                      }
                       localStorage.removeItem('pendingOrder');
 
                       // 使用包裹ID作为订单号，并生成二维码

@@ -720,12 +720,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
           }
         }
         
+        // 使用缅甸时间 (UTC+6:30)
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hour = String(now.getHours()).padStart(2, '0');
-        const minute = String(now.getMinutes()).padStart(2, '0');
+        const myanmarTime = new Date(now.getTime() + (6.5 * 60 * 60 * 1000));
+        
+        const year = myanmarTime.getFullYear();
+        const month = String(myanmarTime.getMonth() + 1).padStart(2, '0');
+        const day = String(myanmarTime.getDate()).padStart(2, '0');
+        const hour = String(myanmarTime.getHours()).padStart(2, '0');
+        const minute = String(myanmarTime.getMinutes()).padStart(2, '0');
         const random1 = Math.floor(Math.random() * 10);
         const random2 = Math.floor(Math.random() * 10);
         
