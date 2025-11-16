@@ -4,8 +4,22 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
 
+// 验证 API key 是否有效
+if (!supabaseKey || supabaseKey.trim() === '') {
+  console.error('❌ 错误：Supabase API Key 未配置！');
+  console.error('请在 Netlify Dashboard 中配置环境变量：REACT_APP_SUPABASE_ANON_KEY');
+}
+
+if (!supabaseUrl || supabaseUrl.trim() === '') {
+  console.error('❌ 错误：Supabase URL 未配置！');
+  console.error('请在 Netlify Dashboard 中配置环境变量：REACT_APP_SUPABASE_URL');
+}
+
 if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
   console.warn('⚠️ 警告：使用硬编码的 Supabase 密钥。生产环境应使用环境变量。');
+  console.warn('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
+  console.warn('  - REACT_APP_SUPABASE_URL');
+  console.warn('  - REACT_APP_SUPABASE_ANON_KEY');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
@@ -85,7 +99,19 @@ export const packageService = {
           hint: error.hint,
           code: error.code,
         });
-        throw new Error(`数据库错误: ${error.message} (代码: ${error.code})`);
+        
+        // 检查是否是 API key 错误
+        if (error.message && error.message.includes('Invalid API key')) {
+          const errorMsg = `API Key 配置错误：${error.message}\n\n` +
+            `请检查 Netlify Dashboard 中的环境变量配置：\n` +
+            `1. 访问 Netlify Dashboard → Site settings → Environment variables\n` +
+            `2. 确认已配置 REACT_APP_SUPABASE_ANON_KEY\n` +
+            `3. 确认 API Key 值正确且完整\n` +
+            `4. 重新部署网站以应用更改`;
+          throw new Error(errorMsg);
+        }
+        
+        throw new Error(`数据库错误: ${error.message} (代码: ${error.code || '未知'})`);
       }
       
       console.log('包裹创建成功:', data);

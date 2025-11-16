@@ -3197,11 +3197,18 @@ const HomePage: React.FC = () => {
                     // 捕获所有异常
                     console.error('订单提交异常:', error);
                     setOrderSubmitStatus('failed');
-                    setOrderError(
-                      error instanceof Error 
-                        ? error.message 
-                        : '订单提交失败，请稍后重试或联系客服。'
-                    );
+                    
+                    let errorMessage = '订单提交失败，请稍后重试或联系客服。';
+                    if (error instanceof Error) {
+                      errorMessage = error.message;
+                      // 如果是 API key 错误，提供更友好的提示
+                      if (error.message.includes('API Key') || error.message.includes('Invalid API key')) {
+                        errorMessage = `配置错误：${error.message}\n\n` +
+                          `请联系管理员检查系统配置，或稍后重试。`;
+                      }
+                    }
+                    
+                    setOrderError(errorMessage);
                     setShowPaymentModal(false);
                     setShowOrderSuccessModal(true);
                   }
