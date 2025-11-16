@@ -219,6 +219,77 @@ export const userService = {
   }
 };
 
+// 系统设置服务（客户端使用）
+export const systemSettingsService = {
+  // 获取计费规则
+  async getPricingSettings() {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
+
+      if (error) {
+        console.error('获取计费设置失败:', error);
+        // 返回默认值
+        return {
+          baseFee: 1500,
+          perKmFee: 500,
+          weightSurcharge: 150,
+          urgentSurcharge: 500,
+          oversizeSurcharge: 300,
+          scheduledSurcharge: 200,
+          fragileSurcharge: 200, // 易碎品附加费：每公里200MMK
+          foodBeverageSurcharge: 300,
+          freeKmThreshold: 3
+        };
+      }
+
+      // 转换为对象格式
+      const settings: { [key: string]: number } = {};
+      data?.forEach((item: any) => {
+        const key = item.settings_key.replace('pricing.', '');
+        // settings_value 可能是 JSON 字符串，需要解析
+        let value = item.settings_value;
+        if (typeof value === 'string') {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            value = parseFloat(value) || 0;
+          }
+        }
+        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+      });
+
+      return {
+        baseFee: settings.base_fee || 1500,
+        perKmFee: settings.per_km_fee || 500,
+        weightSurcharge: settings.weight_surcharge || 150,
+        urgentSurcharge: settings.urgent_surcharge || 500,
+        oversizeSurcharge: settings.oversize_surcharge || 300,
+        scheduledSurcharge: settings.scheduled_surcharge || 200,
+        fragileSurcharge: settings.fragile_surcharge || 200, // 易碎品附加费：每公里200MMK
+        foodBeverageSurcharge: settings.food_beverage_surcharge || 300,
+        freeKmThreshold: settings.free_km_threshold || 3
+      };
+    } catch (error) {
+      console.error('获取计费设置失败:', error);
+      // 返回默认值
+      return {
+        baseFee: 1500,
+        perKmFee: 500,
+        weightSurcharge: 150,
+        urgentSurcharge: 500,
+        oversizeSurcharge: 300,
+        scheduledSurcharge: 200,
+        fragileSurcharge: 200, // 易碎品附加费：每公里200MMK
+        foodBeverageSurcharge: 300,
+        freeKmThreshold: 3
+      };
+    }
+  }
+};
+
 // 测试连接（简化版）
 export const testConnection = async (): Promise<boolean> => {
   try {
