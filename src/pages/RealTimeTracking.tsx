@@ -7,7 +7,8 @@ import { useResponsive } from '../hooks/useResponsive';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
 
 // Google Maps 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE";
+// 优先使用环境变量，如果没有则使用默认值
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 配送商店接口已在types/index.ts中定义
@@ -65,8 +66,11 @@ const [packages, setPackages] = useState<Package[]>([]);
     }
     
     // 如果API密钥缺失，显示警告
-    if (!GOOGLE_MAPS_API_KEY) {
-      console.error('❌ Google Maps API密钥未设置！请在Netlify控制台设置环境变量：REACT_APP_GOOGLE_MAPS_API_KEY');
+    if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.trim() === '') {
+      console.error('❌ Google Maps API密钥未设置！');
+      console.error('请在部署平台（Vercel/Netlify）的环境变量设置中配置：REACT_APP_GOOGLE_MAPS_API_KEY');
+    } else {
+      console.log('✅ Google Maps API Key 已加载:', GOOGLE_MAPS_API_KEY.substring(0, 20) + '...');
     }
   }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
 
@@ -566,8 +570,13 @@ const [packages, setPackages] = useState<Package[]>([]);
                       <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', marginBottom: '1rem' }}>🌍</div>
                       <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>地图加载中...</div>
                       {loadError && (
-                        <div style={{ color: '#ef4444', marginTop: '0.5rem', background: '#fffbe B', padding: '0.5rem', borderRadius: '4px' }}>
+                        <div style={{ color: '#ef4444', marginTop: '0.5rem', background: '#fffbeB', padding: '0.5rem', borderRadius: '4px' }}>
                           加载错误: {loadError.message}
+                          {loadError.message && loadError.message.includes('API key') && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                              请检查 Vercel Dashboard 中的环境变量配置：REACT_APP_GOOGLE_MAPS_API_KEY
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
