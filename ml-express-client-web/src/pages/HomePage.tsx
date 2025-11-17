@@ -1127,15 +1127,19 @@ const HomePage: React.FC = () => {
 
   // 生成缅甸时间格式的包裹ID（根据寄件地址自动识别城市）
   const generateMyanmarPackageId = (senderAddress?: string) => {
+    // 获取当前 UTC 时间
     const now = new Date();
-    // 缅甸时间 (UTC+6:30)
-    const myanmarTime = new Date(now.getTime() + (6.5 * 60 * 60 * 1000));
+    // 获取 UTC 时间戳（毫秒）
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    // 缅甸时间 (UTC+6:30) = UTC + 6小时30分钟
+    const myanmarTime = new Date(utcTime + (6.5 * 60 * 60 * 1000));
     
-    const year = myanmarTime.getFullYear();
-    const month = String(myanmarTime.getMonth() + 1).padStart(2, '0');
-    const day = String(myanmarTime.getDate()).padStart(2, '0');
-    const hour = String(myanmarTime.getHours()).padStart(2, '0');
-    const minute = String(myanmarTime.getMinutes()).padStart(2, '0');
+    // 使用 UTC 方法获取日期时间组件，确保时间准确
+    const year = myanmarTime.getUTCFullYear();
+    const month = String(myanmarTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(myanmarTime.getUTCDate()).padStart(2, '0');
+    const hour = String(myanmarTime.getUTCHours()).padStart(2, '0');
+    const minute = String(myanmarTime.getUTCMinutes()).padStart(2, '0');
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
