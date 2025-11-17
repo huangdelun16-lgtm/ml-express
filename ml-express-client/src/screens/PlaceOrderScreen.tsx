@@ -92,6 +92,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [qrOrderId, setQrOrderId] = useState('');
   const [qrOrderPrice, setQrOrderPrice] = useState('');
   
+  // 支付方式
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
+  
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
     base_fee: 1000,
@@ -777,12 +780,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
-        status: '待取件',
+        status: paymentMethod === 'cash' ? '待收款' : '待取件', // 现金支付：状态设为"待收款"，骑手代收
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',
         courier: '待分配',
         price: isCalculated ? calculatedPrice : price,
+        payment_method: paymentMethod, // 添加支付方式字段
       };
 
       // 调用API创建订单
@@ -791,10 +795,33 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
 
       if (result) { // 假设成功时 result 不为 null
-        // 显示QR码模态框
-        setQrOrderId(orderId);
-        setQrOrderPrice(isCalculated ? calculatedPrice : price);
-        setShowQRCodeModal(true);
+        // 根据支付方式决定是否显示QR码
+        if (paymentMethod === 'qr') {
+          // 二维码支付：显示QR码模态框
+          setQrOrderId(orderId);
+          setQrOrderPrice(isCalculated ? calculatedPrice : price);
+          setShowQRCodeModal(true);
+        } else {
+          // 现金支付：显示成功提示，不显示QR码
+          Alert.alert(
+            currentT.orderSuccess,
+            `订单创建成功！\n订单号：${orderId}\n总金额：${isCalculated ? calculatedPrice : price} MMK\n\n骑手将在取件时代收费用。`,
+            [
+              {
+                text: '查看订单',
+                onPress: () => {
+                  navigation.navigate('MyOrders');
+                }
+              },
+              {
+                text: '继续下单',
+                onPress: () => {
+                  resetForm();
+                }
+              }
+            ]
+          );
+        }
         // 重置表单
         resetForm();
       } else {
@@ -1205,6 +1232,68 @@ export default function PlaceOrderScreen({ navigation }: any) {
             )}
           </View>
         </View>
+        </ScaleInView>
+
+        {/* 支付方式选择 */}
+        <ScaleInView delay={450}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleContainer}>
+              <MoneyIcon size={20} color="#1e293b" />
+              <Text style={styles.sectionTitle}> 选择支付方式</Text>
+            </View>
+            
+            <View style={styles.paymentMethodContainer}>
+              {/* 二维码支付 */}
+              <TouchableOpacity
+                style={[
+                  styles.paymentMethodOption,
+                  paymentMethod === 'qr' && styles.paymentMethodOptionActive
+                ]}
+                onPress={() => setPaymentMethod('qr')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.paymentMethodRadio}>
+                  {paymentMethod === 'qr' && <View style={styles.paymentMethodRadioInner} />}
+                </View>
+                <View style={styles.paymentMethodContent}>
+                  <Text style={[
+                    styles.paymentMethodLabel,
+                    paymentMethod === 'qr' && styles.paymentMethodLabelActive
+                  ]}>
+                    📱 二维码支付
+                  </Text>
+                  <Text style={styles.paymentMethodDesc}>
+                    扫描二维码完成支付
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* 现金支付 */}
+              <TouchableOpacity
+                style={[
+                  styles.paymentMethodOption,
+                  paymentMethod === 'cash' && styles.paymentMethodOptionActive
+                ]}
+                onPress={() => setPaymentMethod('cash')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.paymentMethodRadio}>
+                  {paymentMethod === 'cash' && <View style={styles.paymentMethodRadioInner} />}
+                </View>
+                <View style={styles.paymentMethodContent}>
+                  <Text style={[
+                    styles.paymentMethodLabel,
+                    paymentMethod === 'cash' && styles.paymentMethodLabelActive
+                  ]}>
+                    💵 现金支付
+                  </Text>
+                  <Text style={styles.paymentMethodDesc}>
+                    骑手将在取件时代收费用
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScaleInView>
 
         {/* 提交按钮 */}
