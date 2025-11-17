@@ -121,6 +121,16 @@ const [packages, setPackages] = useState<Package[]>([]);
     }
   };
 
+  // 获取未分配的包裹（用于在地图上显示P点和D点）
+  const getUnassignedPackages = () => {
+    return packages.filter(pkg => 
+      pkg.courier === '待分配' && 
+      pkg.status === '待取件' &&
+      // 确保有坐标信息
+      ((pkg.sender_latitude && pkg.sender_longitude) || (pkg.receiver_latitude && pkg.receiver_longitude))
+    );
+  };
+
   const loadCouriers = async () => {
     try {
       // 1. 从数据库获取快递员列表
