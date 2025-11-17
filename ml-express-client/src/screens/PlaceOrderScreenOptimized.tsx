@@ -554,19 +554,24 @@ export default function PlaceOrderScreen({ navigation }: any) {
           }
         }
         
-        // 获取当前 UTC 时间
+        // 使用Intl API获取缅甸时间（Asia/Yangon时区），确保年份和时间准确
         const now = new Date();
-        // 获取 UTC 时间戳（毫秒）
-        const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-        // 缅甸时间 (UTC+6:30) = UTC + 6小时30分钟
-        const myanmarTime = new Date(utcTime + (6.5 * 60 * 60 * 1000));
         
-        // 使用 UTC 方法获取日期时间组件，确保时间准确
-        const year = myanmarTime.getUTCFullYear();
-        const month = String(myanmarTime.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(myanmarTime.getUTCDate()).padStart(2, '0');
-        const hour = String(myanmarTime.getUTCHours()).padStart(2, '0');
-        const minute = String(myanmarTime.getUTCMinutes()).padStart(2, '0');
+        // 获取缅甸时间的各个组件
+        const myanmarTimeParts = {
+          year: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', year: 'numeric' }),
+          month: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', month: '2-digit' }),
+          day: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', day: '2-digit' }),
+          hour: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', hour: '2-digit', hour12: false }),
+          minute: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', minute: '2-digit' })
+        };
+        
+        // 格式化时间组件
+        const year = myanmarTimeParts.year;
+        const month = myanmarTimeParts.month.padStart(2, '0');
+        const day = myanmarTimeParts.day.padStart(2, '0');
+        const hour = myanmarTimeParts.hour.padStart(2, '0');
+        const minute = myanmarTimeParts.minute.padStart(2, '0');
         const random1 = Math.floor(Math.random() * 10);
         const random2 = Math.floor(Math.random() * 10);
         
