@@ -21,7 +21,7 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.marketlinkexpress.staff",
+      bundleIdentifier: "com.mlexpress.courier",
       infoPlist: {
         LSApplicationQueriesSchemes: [
           "comgooglemaps",
@@ -46,7 +46,7 @@ module.exports = {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#2c5282"
       },
-      package: "com.marketlinkexpress.staff",
+      package: "com.mlexpress.courier",
       // versionCode 已由 EAS 自动管理（eas.json 中 autoIncrement: true）
       // 注意：完全移除 permissions 数组，所有权限由插件自动管理，避免 Manifest merger 冲突
       // expo-camera 会自动添加 CAMERA 权限

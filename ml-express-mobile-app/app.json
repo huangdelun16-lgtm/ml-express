@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.marketlinkexpress.staff",
+      "bundleIdentifier": "com.mlexpress.courier",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
@@ -39,7 +39,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2c5282"
       },
-      "package": "com.marketlinkexpress.staff",
+      "package": "com.mlexpress.courier",
       "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
