@@ -65,7 +65,7 @@ const [packages, setPackages] = useState<Package[]>([]);
     // 如果API密钥缺失，显示警告
     if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.trim() === '') {
       console.error('❌ Google Maps API密钥未设置！');
-      console.error('请在部署平台（Vercel/Netlify）的环境变量设置中配置：REACT_APP_GOOGLE_MAPS_API_KEY');
+      console.error('请在 Netlify Dashboard 的环境变量设置中配置：REACT_APP_GOOGLE_MAPS_API_KEY');
     } else {
       console.log('✅ Google Maps API Key 已加载:', GOOGLE_MAPS_API_KEY.substring(0, 20) + '...');
     }
@@ -564,7 +564,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                       }}>
                         <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>🔧 解决方法</h4>
                         <p style={{ margin: 0, lineHeight: 1.6 }}>
-                          请在您的网站托管平台（如 Netlify 或 Vercel）的环境变量设置中，添加一个名为 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code> 的变量，并填入您有效的 Google Maps API 密钥。
+                          请在 Netlify Dashboard 的环境变量设置中，添加一个名为 <code>REACT_APP_GOOGLE_MAPS_API_KEY</code> 的变量，并填入您有效的 Google Maps API 密钥。
                         </p>
                       </div>
                     </>
@@ -577,7 +577,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                           加载错误: {loadError.message}
                           {loadError.message && loadError.message.includes('API key') && (
                             <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                              请检查 Vercel Dashboard 中的环境变量配置：REACT_APP_GOOGLE_MAPS_API_KEY
+                              请检查 Netlify Dashboard 中的环境变量配置：REACT_APP_GOOGLE_MAPS_API_KEY
                             </div>
                           )}
                         </div>
