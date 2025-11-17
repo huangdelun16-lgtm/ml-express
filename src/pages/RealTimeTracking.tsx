@@ -405,7 +405,7 @@ const [packages, setPackages] = useState<Package[]>([]);
           }}
           >
             <span>📍</span>
-            <span>{myanmarCities[selectedCity as keyof typeof myanmarCities]?.name}</span>
+            <span>{myanmarCities[selectedCity].name}</span>
           </div>
           <div style={{ 
             background: '#10b981', 
