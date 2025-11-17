@@ -157,18 +157,15 @@ const HomePage: React.FC = () => {
     freeKmThreshold: 3
   });
 
-  // 缅甸主要城市数据
+  // 缅甸主要城市数据（以曼德勒为中心）
   const myanmarCities = {
-    yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 },
-    mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 },
-    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 },
-    mawlamyine: { name: '毛淡棉', nameEn: 'Mawlamyine', nameMm: 'မော်လမြိုင်', lat: 16.4909, lng: 97.6282 },
-    taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 },
-    myitkyina: { name: '密支那', nameEn: 'Myitkyina', nameMm: 'မြစ်ကြီးနား', lat: 25.3833, lng: 97.4000 },
-    pathein: { name: '勃生', nameEn: 'Pathein', nameMm: 'ပုသိမ်', lat: 16.7833, lng: 94.7333 },
-    sittwe: { name: '实兑', nameEn: 'Sittwe', nameMm: 'စစ်တွေ', lat: 20.1500, lng: 92.9000 },
-    kalay: { name: '葛礼', nameEn: 'Kalay', nameMm: 'ကလေး', lat: 23.1833, lng: 94.0500 },
-    monywa: { name: '蒙育瓦', nameEn: 'Monywa', nameMm: 'မုံရွာ', lat: 22.1167, lng: 95.1333 }
+    mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 }, // 总部
+    pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', nameMm: 'ပင်းတလဲ', lat: 22.0333, lng: 96.4667 }, // 眉苗
+    yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 }, // 开发中
+    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 }, // 开发中
+    taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 }, // 开发中
+    lashio: { name: '腊戌', nameEn: 'Lashio', nameMm: 'လားရှိုး', lat: 22.9333, lng: 97.7500 }, // 开发中
+    muse: { name: '木姐', nameEn: 'Muse', nameMm: 'မူဆယ်', lat: 23.9833, lng: 97.9000 } // 开发中
   };
 
   useEffect(() => {
@@ -1142,38 +1139,37 @@ const HomePage: React.FC = () => {
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
-    // 根据寄件地址自动识别城市前缀
+    // 根据寄件地址自动识别城市前缀（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
-      '仰光': 'YGN',
-      'Yangon': 'YGN',
-      'ရန်ကုန်': 'YGN',
+      // 曼德勒（总部）
       '曼德勒': 'MDY',
       'Mandalay': 'MDY',
       'မန္တလေး': 'MDY',
-      '内比都': 'NYT',
-      'Naypyidaw': 'NYT',
-      'နေပြည်တော်': 'NYT',
-      '毛淡棉': 'MWL',
-      'Mawlamyine': 'MWL',
-      'မော်လမြိုင်': 'MWL',
-      '勃生': 'PAT',
-      'Pathein': 'PAT',
-      'ပုသိမ်': 'PAT',
-      '蒙育瓦': 'MON',
-      'Monywa': 'MON',
-      'မုံရွာ': 'MON',
-      '密支那': 'MYI',
-      'Myitkyina': 'MYI',
-      'မြစ်ကြီးနား': 'MYI',
-      '东枝': 'TAU',
-      'Taunggyi': 'TAU',
-      'တောင်ကြီး': 'TAU',
-      '实兑': 'SIT',
-      'Sittwe': 'SIT',
-      'စစ်တွေ': 'SIT',
-      '葛礼': 'KAL',
-      'Kalay': 'KAL',
-      'ကလေး': 'KAL'
+      // 眉苗
+      '眉苗': 'POL',
+      'Pyin Oo Lwin': 'POL',
+      '彬乌伦': 'POL',
+      'ပင်းတလဲ': 'POL',
+      // 仰光（开发中）
+      '仰光': 'YGN',
+      'Yangon': 'YGN',
+      'ရန်ကုန်': 'YGN',
+      // 内比都（开发中）
+      '内比都': 'NPW',
+      'Naypyidaw': 'NPW',
+      'နေပြည်တော်': 'NPW',
+      // 东枝（开发中）
+      '东枝': 'TGI',
+      'Taunggyi': 'TGI',
+      'တောင်ကြီး': 'TGI',
+      // 腊戌（开发中）
+      '腊戌': 'LSO',
+      'Lashio': 'LSO',
+      'လားရှိုး': 'LSO',
+      // 木姐（开发中）
+      '木姐': 'MSE',
+      'Muse': 'MSE',
+      'မူဆယ်': 'MSE'
     };
     
     // 判断城市前缀

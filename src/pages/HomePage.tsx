@@ -87,7 +87,7 @@ const HomePage: React.FC = () => {
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('yangon');
+  const [selectedCity, setSelectedCity] = useState('mandalay'); // 默认曼德勒（总部）
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
@@ -1085,18 +1085,15 @@ const HomePage: React.FC = () => {
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
-    // 根据选中的城市生成对应的前缀
+    // 根据选中的城市生成对应的前缀（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
-      'yangon': 'YGN',
-      'mandalay': 'MDY',
-      'naypyidaw': 'NYT',
-      'mawlamyine': 'MWL',
-      'pathein': 'PAT',
-      'monywa': 'MON',
-      'myitkyina': 'MYI',
-      'taunggyi': 'TAU',
-      'sittwe': 'SIT',
-      'kalay': 'KAL'
+      'mandalay': 'MDY',      // 曼德勒（总部）
+      'pyinoolwin': 'POL',    // 眉苗
+      'yangon': 'YGN',        // 仰光（开发中）
+      'naypyidaw': 'NPW',     // 内比都（开发中）
+      'taunggyi': 'TGI',      // 东枝（开发中）
+      'lashio': 'LSO',        // 腊戌（开发中）
+      'muse': 'MSE'           // 木姐（开发中）
     };
     
     const prefix = cityPrefixMap[selectedCity] || 'MDY'; // 默认使用MDY

@@ -21,9 +21,9 @@ const [packages, setPackages] = useState<Package[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  type CityKey = 'yangon' | 'mandalay' | 'naypyidaw' | 'bago' | 'mawlamyine' | 'pathein' | 'monywa' | 'myitkyina' | 'taunggyi' | 'sittwe';
-  const [selectedCity, setSelectedCity] = useState<CityKey>('yangon');
-  const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  type CityKey = 'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse';
+  const [selectedCity, setSelectedCity] = useState<CityKey>('mandalay'); // 默认曼德勒（总部）
+  const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 21.9588, lng: 96.0891 }); // 曼德勒中心（总部）
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
@@ -326,17 +326,15 @@ const [packages, setPackages] = useState<Package[]>([]);
   
   // 根据城市过滤包裹
   const filterPackagesByCity = (pkgList: Package[]) => {
+    // 城市前缀映射（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
-      'yangon': 'YGN',
-      'mandalay': 'MDY',
-      'naypyidaw': 'NYT',
-      'bago': 'BGO',
-      'mawlamyine': 'MWL',
-      'pathein': 'PAT',
-      'monywa': 'MON',
-      'myitkyina': 'MYI',
-      'taunggyi': 'TAU',
-      'sittwe': 'SIT'
+      'mandalay': 'MDY',      // 曼德勒（总部）
+      'pyinoolwin': 'POL',    // 眉苗
+      'yangon': 'YGN',        // 仰光（开发中）
+      'naypyidaw': 'NPW',     // 内比都（开发中）
+      'taunggyi': 'TGI',      // 东枝（开发中）
+      'lashio': 'LSO',        // 腊戌（开发中）
+      'muse': 'MSE'           // 木姐（开发中）
     };
     
     const prefix = cityPrefixMap[selectedCity] || 'ALL';

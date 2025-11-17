@@ -512,37 +512,37 @@ export default function PlaceOrderScreen({ navigation }: any) {
     try {
       // 生成订单号（根据寄件地址所在城市自动选择前缀）
       const generateOrderId = (address: string) => {
+        // 城市前缀映射（以曼德勒为中心）
         const cityPrefixMap: { [key: string]: string } = {
-          '仰光': 'YGN',
-          'Yangon': 'YGN',
-          'ရန်ကုန်': 'YGN',
+          // 曼德勒（总部）
           '曼德勒': 'MDY',
           'Mandalay': 'MDY',
           'မန္တလေး': 'MDY',
-          '内比都': 'NYT',
-          'Naypyidaw': 'NYT',
-          'နေပြည်တော်': 'NYT',
-          '毛淡棉': 'MWL',
-          'Mawlamyine': 'MWL',
-          'မော်လမြိုင်': 'MWL',
-          '勃生': 'PAT',
-          'Pathein': 'PAT',
-          'ပုသိမ်': 'PAT',
-          '蒙育瓦': 'MON',
-          'Monywa': 'MON',
-          'မုံရွာ': 'MON',
-          '密支那': 'MYI',
-          'Myitkyina': 'MYI',
-          'မြစ်ကြီးနား': 'MYI',
-          '东枝': 'TAU',
-          'Taunggyi': 'TAU',
-          'တောင်ကြီး': 'TAU',
-          '实兑': 'SIT',
-          'Sittwe': 'SIT',
-          'စစ်တွေ': 'SIT',
-          '葛礼': 'KAL',
-          'Kalay': 'KAL',
-          'ကလေး': 'KAL'
+          // 眉苗
+          '眉苗': 'POL',
+          'Pyin Oo Lwin': 'POL',
+          '彬乌伦': 'POL',
+          'ပင်းတလဲ': 'POL',
+          // 仰光（开发中）
+          '仰光': 'YGN',
+          'Yangon': 'YGN',
+          'ရန်ကုန်': 'YGN',
+          // 内比都（开发中）
+          '内比都': 'NPW',
+          'Naypyidaw': 'NPW',
+          'နေပြည်တော်': 'NPW',
+          // 东枝（开发中）
+          '东枝': 'TGI',
+          'Taunggyi': 'TGI',
+          'တောင်ကြီး': 'TGI',
+          // 腊戌（开发中）
+          '腊戌': 'LSO',
+          'Lashio': 'LSO',
+          'လားရှိုး': 'LSO',
+          // 木姐（开发中）
+          '木姐': 'MSE',
+          'Muse': 'MSE',
+          'မူဆယ်': 'MSE'
         };
         
         // 判断城市前缀
