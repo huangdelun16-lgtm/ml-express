@@ -5,7 +5,7 @@ import { packageService, supabase, userService, testConnection, systemSettingsSe
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 错误边界组件
