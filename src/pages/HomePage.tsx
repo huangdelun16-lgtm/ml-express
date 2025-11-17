@@ -82,7 +82,7 @@ const HomePage: React.FC = () => {
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
-  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [mapCenter, setMapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 曼德勒中心（总部）
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
