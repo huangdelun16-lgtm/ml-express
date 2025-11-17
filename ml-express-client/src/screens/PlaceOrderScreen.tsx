@@ -2211,6 +2211,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  // 支付方式选择样式
+  paymentMethodContainer: {
+    marginTop: 12,
+  },
+  paymentMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  paymentMethodOptionActive: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#3b82f6',
+  },
+  paymentMethodRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#94a3b8',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paymentMethodRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#3b82f6',
+  },
+  paymentMethodContent: {
+    flex: 1,
+  },
+  paymentMethodLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  paymentMethodLabelActive: {
+    color: '#3b82f6',
+  },
+  paymentMethodDesc: {
+    fontSize: 13,
+    color: '#64748b',
+  },
   qrModalButtons: {
     flexDirection: 'row',
     gap: 12,
