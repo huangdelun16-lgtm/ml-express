@@ -3998,8 +3998,9 @@ const HomePage: React.FC = () => {
                         // 地图加载完成后的提示
                         console.log('地图加载完成，可以开始定位');
                         
-                        // 添加地图POI点击事件监听
+                        // 添加地图点击事件监听（支持普通点击和POI点击）
                         map.addListener('click', async (e: any) => {
+                          // 如果点击的是POI（店铺、地点等）
                           if (e.placeId) {
                             // 阻止默认行为（打开信息窗口）
                             e.stop();
@@ -4034,9 +4035,58 @@ const HomePage: React.FC = () => {
                                   
                                   // 显示选中POI的提示
                                   console.log('✅ 已选择POI:', place.name, '类型:', place.types);
+                                } else {
+                                  console.error('获取POI详情失败:', status);
                                 }
                               }
                             );
+                          } else if (e.latLng) {
+                            // 如果点击的是普通地图位置（不是POI）
+                            const lat = e.latLng.lat();
+                            const lng = e.latLng.lng();
+                            
+                            // 设置地图点击位置
+                            setMapClickPosition({ lat, lng });
+                            
+                            // 使用Google Maps Geocoding API获取真实地址
+                            try {
+                              const geocoder = new window.google.maps.Geocoder();
+                              const response = await geocoder.geocode({ location: { lat, lng } });
+                              
+                              let fullAddress = '';
+                              if (response.results && response.results[0]) {
+                                fullAddress = response.results[0].formatted_address;
+                              } else {
+                                const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                                fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                              }
+                              
+                              // 自动填充到地址输入框
+                              const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+                              if (addressInput) {
+                                addressInput.value = fullAddress;
+                                addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                                addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                              }
+                              
+                              // 更新选中位置
+                              setSelectedLocation({ lat, lng, address: fullAddress });
+                              
+                              console.log('✅ 已选择位置:', fullAddress);
+                            } catch (error) {
+                              console.error('地址获取失败:', error);
+                              const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                              const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                              
+                              const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+                              if (addressInput) {
+                                addressInput.value = fallbackAddress;
+                                addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+                                addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
+                              }
+                              
+                              setSelectedLocation({ lat, lng, address: fallbackAddress });
+                            }
                           }
                         });
                       }}
