@@ -1,6 +1,6 @@
 # MARKET LINK EXPRESS - AI 开发指南
 
-## 🚀 最新架构更新 (2025年1月30日)
+## 🚀 最新架构更新 (2025年1月16日)
 
 ### 📐 完整系统架构
 
@@ -257,12 +257,12 @@ ml-express/
 ├── ml-express-client-web/          # 客户端 Web
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── HomePage.tsx       # 首页（下单）
+│   │   │   ├── HomePage.tsx       # 首页（下单）- 包含订单ID生成、地图选择
 │   │   │   ├── ServicesPage.tsx   # 服务介绍
 │   │   │   ├── TrackingPage.tsx   # 包裹跟踪
 │   │   │   └── ContactPage.tsx    # 联系我们
 │   │   ├── services/
-│   │   │   └── supabase.ts        # Supabase 服务（简化版）
+│   │   │   └── supabase.ts        # Supabase 服务（包含pendingOrderService）
 │   │   ├── contexts/
 │   │   │   └── LanguageContext.tsx # 多语言支持
 │   │   └── styles/
@@ -275,8 +275,13 @@ ml-express/
 │   ├── pages/
 │   │   ├── AdminLogin.tsx         # 管理员登录
 │   │   ├── AdminDashboard.tsx     # 管理仪表板
+│   │   ├── HomePage.tsx           # 包裹管理（包含订单ID生成）
+│   │   ├── RealTimeTracking.tsx   # 实时跟踪管理（地图显示）
 │   │   ├── FinanceManagement.tsx  # 财务管理
 │   │   ├── AccountManagement.tsx  # 账号管理
+│   │   ├── CourierManagement.tsx  # 快递员管理
+│   │   ├── DeliveryStoreManagement.tsx # 配送点管理
+│   │   ├── TrackingPage.tsx       # 包裹跟踪
 │   │   └── ...                     # 其他管理页面
 │   ├── components/
 │   │   └── ProtectedRoute.tsx     # 路由保护组件
@@ -292,22 +297,38 @@ ml-express/
 │   │   └── ...                     # 其他页面
 │   ├── services/
 │   │   └── supabase.ts            # Supabase 服务
-│   └── app.json                   # Expo 配置
+│   ├── app.config.js              # Expo 动态配置（包含Google Maps API Key）
+│   ├── app.json                   # Expo 基础配置
+│   ├── eas.json                   # EAS Build 配置
+│   └── package.json
 │
 ├── ml-express-client/             # 客户端 App
 │   ├── src/
 │   │   ├── screens/
-│   │   │   ├── PlaceOrderScreen.tsx # 下单页面
+│   │   │   ├── PlaceOrderScreen.tsx # 下单页面（包含订单ID生成）
+│   │   │   ├── PlaceOrderScreenOptimized.tsx # 下单页面优化版
 │   │   │   ├── TrackPackageScreen.tsx # 跟踪页面
 │   │   │   └── ...                  # 其他页面
+│   │   ├── contexts/
+│   │   │   ├── AppContext.tsx      # 应用上下文（语言设置等）
+│   │   │   └── LoadingContext.tsx  # 加载状态上下文
 │   │   └── services/
 │   │       └── supabase.ts         # Supabase 服务
-│   └── app.json                   # Expo 配置
+│   ├── app.json                   # Expo 配置
+│   └── package.json
 │
-└── netlify/
-    └── functions/
-        ├── verify-admin.js         # Token 验证函数
-        └── admin-password.js       # 密码哈希函数
+├── netlify/
+│   └── functions/
+│       ├── verify-admin.js         # Token 验证函数
+│       └── admin-password.js       # 密码哈希函数
+│
+└── 文档文件/
+    ├── AI_GUIDE.md                # AI 开发指南（本文件）
+    ├── ORDER_ID_TIME_FIX.md       # 订单ID时间修复文档
+    ├── PACKAGE_ID_GENERATION_LOGIC.md # 订单ID生成逻辑文档
+    ├── CLIENT_WEB_MAPS_TROUBLESHOOTING.md # 客户端Web地图问题排查
+    ├── GOOGLE_CLOUD_API_KEY_SETUP.md # Google Cloud API Key 设置指南
+    └── ...                         # 其他文档
 ```
 
 ### 🚀 部署配置
@@ -477,7 +498,110 @@ CREATE TABLE admin_accounts (
 );
 ```
 
-### 🔧 最新功能更新 (2025年1月30日)
+### 🔧 最新功能更新 (2025年1月16日)
+
+#### 1. 订单ID生成时间修复 ✅
+
+**问题**:
+- 订单ID生成时间与实际下单时间不匹配
+- 年份显示错误（2025而不是2024）
+- 时间相差约6小时30分钟
+
+**修复方案**:
+- ✅ 使用 Intl API 获取准确的缅甸时间（Asia/Yangon时区）
+- ✅ 修复客户端Web (`ml-express-client-web/src/pages/HomePage.tsx`)
+- ✅ 修复客户端App (`ml-express-client/src/screens/PlaceOrderScreen.tsx`)
+- ✅ 修复客户端App优化版 (`ml-express-client/src/screens/PlaceOrderScreenOptimized.tsx`)
+- ✅ 修复后台管理Web (`src/pages/HomePage.tsx`)
+
+**实现代码**:
+```javascript
+// 使用Intl API获取缅甸时间（Asia/Yangon时区），确保年份和时间准确
+const now = new Date();
+const myanmarTimeParts = {
+  year: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', year: 'numeric' }),
+  month: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', month: '2-digit' }),
+  day: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', day: '2-digit' }),
+  hour: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', hour: '2-digit', hour12: false }),
+  minute: now.toLocaleString('en-US', { timeZone: 'Asia/Yangon', minute: '2-digit' })
+};
+```
+
+**文档**:
+- `ORDER_ID_TIME_FIX.md` - 订单ID时间修复指南
+- `TIME_CALCULATION_DEBUG.md` - 时间计算调试指南
+
+#### 2. 地图坐标标注功能优化 ✅
+
+**问题**:
+- 地图中点击店铺位置无法正确标注坐标
+- 只能通过右键点击选择位置
+
+**修复方案**:
+- ✅ 地图点击事件同时支持POI（店铺、地点）点击和普通位置点击
+- ✅ 点击POI时自动获取店铺详细信息（名称、地址、坐标）
+- ✅ 点击普通位置时使用Geocoding API获取地址和坐标
+- ✅ 自动填充地址到输入框并显示标记
+
+**实现位置**:
+- `ml-express-client-web/src/pages/HomePage.tsx` - 地图点击事件处理
+
+**文档**:
+- `CLIENT_WEB_MAPS_TROUBLESHOOTING.md` - 地图问题排查指南
+
+#### 3. 临时订单存储优化 ✅
+
+**改进**:
+- ✅ 临时订单从 `localStorage` 迁移到 Supabase 数据库
+- ✅ 创建 `pending_orders` 表存储临时订单
+- ✅ 实现 `pendingOrderService` 服务
+- ✅ 保留 `localStorage` 作为回退机制
+
+**数据库表**:
+```sql
+CREATE TABLE pending_orders (
+  id TEXT PRIMARY KEY,
+  temp_order_id TEXT UNIQUE NOT NULL,
+  sender_name TEXT NOT NULL,
+  sender_phone TEXT NOT NULL,
+  sender_address TEXT NOT NULL,
+  sender_latitude DECIMAL(10,8),
+  sender_longitude DECIMAL(11,8),
+  receiver_name TEXT NOT NULL,
+  receiver_phone TEXT NOT NULL,
+  receiver_address TEXT NOT NULL,
+  receiver_latitude DECIMAL(10,8),
+  receiver_longitude DECIMAL(11,8),
+  package_type TEXT NOT NULL,
+  weight TEXT NOT NULL,
+  delivery_speed TEXT,
+  scheduled_delivery_time TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  distance DECIMAL(10,2) NOT NULL,
+  payment_method TEXT NOT NULL,
+  customer_email TEXT,
+  customer_name TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP
+);
+```
+
+**文档**:
+- `ORDER_GENERATION_IMPROVEMENTS.md` - 订单生成改进文档
+- `supabase-pending-orders-setup.sql` - 数据库表创建脚本
+
+#### 4. 城市前缀映射更新 ✅
+
+**更新内容**:
+- ✅ 更新城市前缀映射，以曼德勒为中心
+- ✅ 支持的城市：曼德勒(MDY)、眉苗(POL)、仰光(YGN)、内比都(NPW)、东枝(TGI)、腊戌(LSO)、木姐(MSE)
+- ✅ 客户端Web根据寄件地址自动识别城市前缀
+- ✅ 客户端App和后台管理Web使用城市选择
+
+**文档**:
+- `PACKAGE_ID_GENERATION_LOGIC.md` - 订单ID生成逻辑文档
+
+### 🔧 历史功能更新 (2025年1月30日)
 
 #### 1. 客户端 Web UI/UX 优化
 
@@ -580,7 +704,8 @@ CI=true npm run build
 
 ---
 
-*最后更新：2025年1月30日*  
-*版本：4.0.0*  
+*最后更新：2025年1月16日*  
+*版本：4.1.0*  
 *状态：生产环境运行中*  
-*架构：完全分离的客户端和后台管理系统*
+*架构：完全分离的客户端和后台管理系统*  
+*最新更新：订单ID时间修复、地图坐标标注优化、临时订单存储优化*
