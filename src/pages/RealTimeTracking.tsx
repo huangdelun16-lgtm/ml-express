@@ -649,7 +649,57 @@ const [packages, setPackages] = useState<Package[]>([]);
                       />
                     ))}
 
-                  {/* 显示包裹的取件点(P)和配送点(D) */}
+                  {/* 显示未分配包裹的取件点(P)和配送点(D) */}
+                  {getUnassignedPackages().map(pkg => {
+                    const markers = [];
+                    
+                    // P点（取件点）- 寄件地址
+                    if (pkg.sender_latitude && pkg.sender_longitude) {
+                      markers.push({
+                        id: `pickup-${pkg.id}`,
+                        position: { lat: pkg.sender_latitude, lng: pkg.sender_longitude },
+                        type: 'pickup' as const,
+                        pkg: pkg
+                      });
+                    }
+                    
+                    // D点（送达点）- 收件地址
+                    if (pkg.receiver_latitude && pkg.receiver_longitude) {
+                      markers.push({
+                        id: `delivery-${pkg.id}`,
+                        position: { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude },
+                        type: 'delivery' as const,
+                        pkg: pkg
+                      });
+                    }
+                    
+                    return markers.map(marker => (
+                      <Marker
+                        key={marker.id}
+                        position={marker.position}
+                        icon={{
+                          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="20" cy="20" r="18" fill="${marker.type === 'pickup' ? '#3b82f6' : '#ef4444'}" stroke="white" stroke-width="2"/>
+                              <text x="20" y="26" text-anchor="middle" fill="white" font-size="18" font-weight="bold">${marker.type === 'pickup' ? 'P' : 'D'}</text>
+                            </svg>
+                          `)}`,
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 20)
+                        }}
+                        zIndex={500}
+                        onClick={() => {
+                          setSelectedLocationPoint({
+                            packageId: marker.pkg.id,
+                            type: marker.type,
+                            coordinates: marker.position
+                          });
+                        }}
+                      />
+                    ));
+                  }).flat()}
+
+                  {/* 显示选中的包裹位置点（高亮显示） */}
                   {selectedLocationPoint && (
                     <Marker
                       position={selectedLocationPoint.coordinates}
@@ -679,6 +729,28 @@ const [packages, setPackages] = useState<Package[]>([]);
                           <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                             <strong>包裹ID:</strong> {selectedLocationPoint.packageId}
                           </p>
+                          {(() => {
+                            const pkg = packages.find(p => p.id === selectedLocationPoint.packageId);
+                            if (pkg) {
+                              return (
+                                <>
+                                  <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                                    <strong>寄件人:</strong> {pkg.sender_name}
+                                  </p>
+                                  <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                                    <strong>收件人:</strong> {pkg.receiver_name}
+                                  </p>
+                                  <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                                    <strong>地址:</strong> {selectedLocationPoint.type === 'pickup' ? pkg.sender_address : pkg.receiver_address}
+                                  </p>
+                                  <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                                    <strong>状态:</strong> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>待分配</span>
+                                  </p>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
                           <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                             <strong>坐标:</strong> {selectedLocationPoint.coordinates.lat.toFixed(6)}, {selectedLocationPoint.coordinates.lng.toFixed(6)}
                           </p>
