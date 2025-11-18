@@ -724,17 +724,17 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <div style={{
-                        background: getStatusColor(pkg.status),
+                        background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
                         color: 'white',
                         padding: '4px 12px',
                         borderRadius: '15px',
                         fontSize: '0.8rem',
                         fontWeight: 'bold'
                       }}>
-                        {getStatusText(pkg.status)}
+                        {pkg.status === '待收款' ? '待取件' : getStatusText(pkg.status)}
                       </div>
-                      {/* 支付方式标识（仅在待取件状态时显示） */}
-                      {pkg.status === '待取件' && (
+                      {/* 支付方式标识（在待取件或待收款状态时显示） */}
+                      {(pkg.status === '待取件' || pkg.status === '待收款') && (
                         <>
                           {pkg.payment_method === 'cash' && (
                             <span style={{
