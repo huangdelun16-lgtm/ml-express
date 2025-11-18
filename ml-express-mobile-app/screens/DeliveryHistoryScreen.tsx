@@ -85,11 +85,36 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
               : `${language === 'zh' ? '取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး'}: ${item.create_time}`}
           </Text>
         </View>
-        <View style={[styles.statusBadge, { 
-          backgroundColor: item.status === '已送达' ? '#27ae60' : '#e74c3c'
-        }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
+        {/* 支付方式标识（替换原来的状态标识） */}
+        {item.status === '已取消' ? (
+          <View style={[styles.statusBadge, { backgroundColor: '#e74c3c' }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
+        ) : (
+          <View>
+            {item.payment_method === 'cash' && (
+              <View style={[styles.paymentBadge, { backgroundColor: '#f59e0b' }]}>
+                <Text style={styles.paymentBadgeText}>
+                  💵 {language === 'zh' ? '现金' : language === 'en' ? 'Cash' : 'ငွေသား'}
+                </Text>
+              </View>
+            )}
+            {item.payment_method === 'qr' && (
+              <View style={[styles.paymentBadge, { backgroundColor: '#3b82f6' }]}>
+                <Text style={styles.paymentBadgeText}>
+                  📱 {language === 'zh' ? '二维码' : language === 'en' ? 'QR Code' : 'QR Code'}
+                </Text>
+              </View>
+            )}
+            {!item.payment_method && (
+              <View style={[styles.paymentBadge, { backgroundColor: '#6b7280' }]}>
+                <Text style={styles.paymentBadgeText}>
+                  💰 {language === 'zh' ? '已支付' : language === 'en' ? 'Paid' : 'ပေးချေပြီး'}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
       
       <View style={styles.cardBody}>
@@ -316,6 +341,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  paymentBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  paymentBadgeText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
