@@ -55,6 +55,7 @@ module.exports = {
       minSdkVersion: 23, // Android 6.0+，确保所有插件兼容
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
+      enableProguardInReleaseBuilds: true, // 启用代码混淆，生成 mapping.txt
       config: {
         googleMaps: {
           // 直接使用 API key，避免构建时环境变量问题
