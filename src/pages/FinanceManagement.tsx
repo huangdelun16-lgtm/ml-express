@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount, supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import {
@@ -125,6 +125,14 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   // 包裹收支记录分页状态
   const [packageRecordsPage, setPackageRecordsPage] = useState<number>(1);
   const [packageRecordsPerPage, setPackageRecordsPerPage] = useState<number>(20);
+  
+  // 现金收款管理相关状态
+  const [couriers, setCouriers] = useState<any[]>([]); // 快递员列表
+  const [showCashDetailModal, setShowCashDetailModal] = useState<boolean>(false);
+  const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
+  const [cashDetailDateFilter, setCashDetailDateFilter] = useState<string>('all'); // 'all' | '7days' | '30days' | '90days' | 'custom'
+  const [cashDetailStartDate, setCashDetailStartDate] = useState<string>('');
+  const [cashDetailEndDate, setCashDetailEndDate] = useState<string>('');
   
   const deliveredPackages = useMemo(() => {
     return packages.filter(pkg => pkg.status === '已送达');
@@ -427,17 +435,19 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const loadRecords = async () => {
     try {
       setLoading(true);
-      // 同时加载财务记录、包裹数据、工资数据和账号数据
-      const [financeData, packageData, salaryData, accountsData] = await Promise.all([
+      // 同时加载财务记录、包裹数据、工资数据、账号数据和快递员数据
+      const [financeData, packageData, salaryData, accountsData, couriersData] = await Promise.all([
         financeService.getAllRecords(),
         packageService.getAllPackages(),
         courierSalaryService.getAllSalaries(),
-        adminAccountService.getAllAccounts()
+        adminAccountService.getAllAccounts(),
+        supabase.from('couriers').select('*').order('created_at', { ascending: false })
       ]);
       setRecords(financeData);
       setPackages(packageData);
       setCourierSalaries(salaryData);
       setAdminAccounts(accountsData);
+      setCouriers(couriersData.data || []);
     } catch (error) {
       console.error('加载财务数据失败:', error);
       // 添加用户友好的错误提示
@@ -3830,17 +3840,6 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                   return sum + price;
                 }, 0);
-                const courierGroups: Record<string, { packages: Package[], total: number }> = {};
-                
-                cashPackages.forEach(pkg => {
-                  const courier = pkg.courier || '未分配';
-                  if (!courierGroups[courier]) {
-                    courierGroups[courier] = { packages: [], total: 0 };
-                  }
-                  courierGroups[courier].packages.push(pkg);
-                  const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                  courierGroups[courier].total += price;
-                });
 
                 return (
                   <div style={{
@@ -3868,12 +3867,12 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                       padding: '20px',
                       border: '1px solid rgba(219, 234, 254, 0.3)'
                     }}>
-                      <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>涉及骑手</div>
+                      <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>总快递员数</div>
                       <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
-                        {Object.keys(courierGroups).length}
+                        {couriers.length}
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                        位骑手
+                        位快递员
                       </div>
                     </div>
                   </div>
@@ -3881,24 +3880,22 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               })()}
             </div>
 
-            {/* 按骑手分组的现金收款列表 */}
+            {/* 快递员列表 */}
             {(() => {
               const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
-              const courierGroups: Record<string, { packages: Package[], total: number }> = {};
+              const courierCashMap: Record<string, { packages: Package[], total: number }> = {};
               
               cashPackages.forEach(pkg => {
                 const courier = pkg.courier || '未分配';
-                if (!courierGroups[courier]) {
-                  courierGroups[courier] = { packages: [], total: 0 };
+                if (!courierCashMap[courier]) {
+                  courierCashMap[courier] = { packages: [], total: 0 };
                 }
-                courierGroups[courier].packages.push(pkg);
+                courierCashMap[courier].packages.push(pkg);
                 const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                courierGroups[courier].total += price;
+                courierCashMap[courier].total += price;
               });
 
-              const sortedCouriers = Object.entries(courierGroups).sort((a, b) => b[1].total - a[1].total);
-
-              if (sortedCouriers.length === 0) {
+              if (couriers.length === 0) {
                 return (
                   <div style={{
                     background: 'rgba(255, 255, 255, 0.12)',
@@ -3907,69 +3904,364 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     textAlign: 'center',
                     border: '1px solid rgba(255, 255, 255, 0.18)'
                   }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>💵</div>
+                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚚</div>
                     <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
-                      暂无现金收款记录
+                      暂无快递员数据
                     </div>
                   </div>
                 );
               }
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {sortedCouriers.map(([courier, { packages: courierPackages, total }]) => (
-                    <div
-                      key={courier}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        borderRadius: '16px',
-                        padding: isMobile ? '16px' : '24px',
-                        border: '1px solid rgba(255, 255, 255, 0.18)'
-                      }}
-                    >
-                      {/* 骑手头部信息 */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '20px',
-                        flexWrap: 'wrap',
-                        gap: '12px'
-                      }}>
-                        <div>
-                          <h4 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 'bold' }}>
-                            🚚 {courier}
-                          </h4>
-                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', marginTop: '4px' }}>
-                            {courierPackages.length} 个包裹
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {couriers.map(courier => {
+                    const courierName = courier.name || '未知';
+                    const employeeId = courier.employee_id || '无';
+                    const cashData = courierCashMap[courierName] || { packages: [], total: 0 };
+                    
+                    return (
+                      <div
+                        key={courier.id}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.12)',
+                          borderRadius: '16px',
+                          padding: isMobile ? '16px' : '20px',
+                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                            <h4 style={{ margin: 0, color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                              🚚 {courierName}
+                            </h4>
+                            {employeeId !== '无' && (
+                              <span style={{
+                                background: 'rgba(219, 234, 254, 0.2)',
+                                color: '#dbeafe',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '500'
+                              }}>
+                                工号: {employeeId}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
+                            {cashData.packages.length > 0 ? (
+                              <>现金收款: {cashData.total.toLocaleString()} MMK ({cashData.packages.length} 个包裹)</>
+                            ) : (
+                              <>暂无现金收款记录</>
+                            )}
                           </div>
                         </div>
-                        <div style={{
-                          background: 'rgba(254, 243, 199, 0.2)',
-                          borderRadius: '12px',
-                          padding: '16px 24px',
-                          border: '1px solid rgba(254, 243, 199, 0.3)'
-                        }}>
-                          <div style={{ color: '#fef3c7', fontSize: '0.85rem', marginBottom: '4px' }}>总收款</div>
-                          <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                            {total.toLocaleString()} MMK
-                          </div>
+                        <button
+                          onClick={() => {
+                            setSelectedCourier(courierName);
+                            setShowCashDetailModal(true);
+                            setCashDetailDateFilter('all');
+                            setCashDetailStartDate('');
+                            setCashDetailEndDate('');
+                          }}
+                          style={{
+                            background: cashData.packages.length > 0 
+                              ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                              : 'rgba(255, 255, 255, 0.1)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            fontWeight: '600',
+                            cursor: cashData.packages.length > 0 ? 'pointer' : 'not-allowed',
+                            opacity: cashData.packages.length > 0 ? 1 : 0.5,
+                            transition: 'all 0.3s ease',
+                            boxShadow: cashData.packages.length > 0 
+                              ? '0 4px 12px rgba(59, 130, 246, 0.3)'
+                              : 'none'
+                          }}
+                          disabled={cashData.packages.length === 0}
+                          onMouseOver={(e) => {
+                            if (cashData.packages.length > 0) {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (cashData.packages.length > 0) {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                            }
+                          }}
+                        >
+                          详情
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 现金收款详情弹窗 */}
+        {showCashDetailModal && selectedCourier && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            padding: isMobile ? '16px' : '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCashDetailModal(false);
+            }
+          }}
+          >
+            <div style={{
+              background: 'linear-gradient(145deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)',
+              borderRadius: '20px',
+              padding: 0,
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            >
+              {/* 弹窗头部 */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                padding: '24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>
+                    💵 {selectedCourier} - 现金收款详情
+                  </h2>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
+                    查看该快递员的所有现金收款包裹
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCashDetailModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 弹窗内容 */}
+              <div style={{
+                padding: '24px',
+                overflowY: 'auto',
+                flex: 1
+              }}>
+                {/* 日期筛选 */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div style={{ color: 'white', fontSize: '0.9rem', marginBottom: '12px', fontWeight: '600' }}>
+                    日期筛选
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select
+                      value={cashDetailDateFilter}
+                      onChange={(e) => {
+                        setCashDetailDateFilter(e.target.value);
+                        if (e.target.value !== 'custom') {
+                          setCashDetailStartDate('');
+                          setCashDetailEndDate('');
+                        }
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        background: 'rgba(7, 23, 53, 0.65)',
+                        color: 'white',
+                        fontSize: '0.9rem',
+                        minWidth: '120px'
+                      }}
+                    >
+                      <option value="all">全部</option>
+                      <option value="7days">最近7天</option>
+                      <option value="30days">最近30天</option>
+                      <option value="90days">最近90天</option>
+                      <option value="custom">自定义</option>
+                    </select>
+                    {cashDetailDateFilter === 'custom' && (
+                      <>
+                        <input
+                          type="date"
+                          value={cashDetailStartDate}
+                          onChange={(e) => setCashDetailStartDate(e.target.value)}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.25)',
+                            background: 'rgba(7, 23, 53, 0.65)',
+                            color: 'white',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                        <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>至</span>
+                        <input
+                          type="date"
+                          value={cashDetailEndDate}
+                          onChange={(e) => setCashDetailEndDate(e.target.value)}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.25)',
+                            background: 'rgba(7, 23, 53, 0.65)',
+                            color: 'white',
+                            fontSize: '0.9rem'
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* 包裹列表 */}
+                {(() => {
+                  let filteredPackages = packages.filter(
+                    pkg => pkg.payment_method === 'cash' 
+                    && pkg.status === '已送达' 
+                    && pkg.courier === selectedCourier
+                  );
+
+                  // 日期筛选
+                  if (cashDetailDateFilter !== 'all') {
+                    const now = new Date();
+                    let startDate: Date | null = null;
+                    
+                    if (cashDetailDateFilter === 'custom') {
+                      if (cashDetailStartDate) {
+                        startDate = new Date(cashDetailStartDate);
+                        startDate.setHours(0, 0, 0, 0);
+                      }
+                      const endDate = cashDetailEndDate ? new Date(cashDetailEndDate) : null;
+                      if (endDate) {
+                        endDate.setHours(23, 59, 59, 999);
+                      }
+                      
+                      filteredPackages = filteredPackages.filter(pkg => {
+                        if (!pkg.delivery_time) return false;
+                        const deliveryDate = new Date(pkg.delivery_time);
+                        if (startDate && deliveryDate < startDate) return false;
+                        if (endDate && deliveryDate > endDate) return false;
+                        return true;
+                      });
+                    } else {
+                      const days = cashDetailDateFilter === '7days' ? 7 : cashDetailDateFilter === '30days' ? 30 : 90;
+                      startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+                      startDate.setHours(0, 0, 0, 0);
+                      
+                      filteredPackages = filteredPackages.filter(pkg => {
+                        if (!pkg.delivery_time) return false;
+                        const deliveryDate = new Date(pkg.delivery_time);
+                        return deliveryDate >= startDate!;
+                      });
+                    }
+                  }
+
+                  const totalAmount = filteredPackages.reduce((sum, pkg) => {
+                    const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                    return sum + price;
+                  }, 0);
+
+                  if (filteredPackages.length === 0) {
+                    return (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        padding: '60px 20px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📦</div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
+                          该时间段内暂无现金收款包裹
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {/* 统计信息 */}
+                      <div style={{
+                        background: 'rgba(254, 243, 199, 0.2)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        marginBottom: '20px',
+                        border: '1px solid rgba(254, 243, 199, 0.3)'
+                      }}>
+                        <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '4px' }}>筛选结果</div>
+                        <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                          {totalAmount.toLocaleString()} MMK
+                        </div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                          {filteredPackages.length} 个包裹
                         </div>
                       </div>
 
                       {/* 包裹列表 */}
                       <div style={{
                         display: 'grid',
-                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
                         gap: '12px'
                       }}>
-                        {courierPackages.map(pkg => {
+                        {filteredPackages.map(pkg => {
                           const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                           return (
                             <div
                               key={pkg.id}
                               style={{
-                                background: 'rgba(255, 255, 255, 0.08)',
+                                background: 'rgba(255, 255, 255, 0.1)',
                                 borderRadius: '10px',
                                 padding: '16px',
                                 border: '1px solid rgba(255, 255, 255, 0.15)'
@@ -4019,15 +4311,24 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                                   送达时间: {pkg.delivery_time}
                                 </div>
                               )}
+                              {pkg.create_time && (
+                                <div style={{
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  fontSize: '0.75rem',
+                                  marginTop: '2px'
+                                }}>
+                                  创建时间: {pkg.create_time}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
       </div>
