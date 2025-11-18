@@ -8,10 +8,32 @@ const ContactPage: React.FC = () => {
   });
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     setIsVisible(true);
+    loadUserFromStorage();
   }, []);
+
+  // 从本地存储加载用户信息
+  const loadUserFromStorage = () => {
+    const savedUser = localStorage.getItem('ml-express-customer');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('加载用户信息失败:', error);
+      }
+    }
+  };
+
+  // 退出登录
+  const handleLogout = () => {
+    localStorage.removeItem('ml-express-customer');
+    setCurrentUser(null);
+    // 刷新页面以更新UI
+    window.location.reload();
+  };
 
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
@@ -266,8 +288,53 @@ const ContactPage: React.FC = () => {
             border: 'none',
             cursor: 'pointer',
             lineHeight: 'var(--line-height-normal)'
-          }}>{t.nav.contact}</button>
-          {/* 客户端页面不包含管理员登录入口 */}
+          }}          >{t.nav.contact}</button>
+          
+          {/* 注册/登录按钮（放在语言选择器右侧） */}
+          {currentUser ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'rgba(72, 187, 120, 0.2)',
+              border: '2px solid rgba(72, 187, 120, 0.5)',
+              padding: '0.5rem 1rem',
+              borderRadius: '10px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <span style={{ 
+                color: 'white',
+                fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
+                fontWeight: 'bold'
+              }}>
+                {language === 'zh' ? `欢迎，${currentUser.name}` : 
+                 language === 'en' ? `Welcome, ${currentUser.name}` : 
+                 `ကြိုဆိုပါတယ်, ${currentUser.name}`}
+              </span>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.4)',
+                  padding: '0.3rem 0.8rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+              >
+                {language === 'zh' ? '退出' : language === 'en' ? 'Logout' : 'ထွက်'}
+              </button>
+            </div>
+          ) : null}
           
           {/* 自定义语言选择器 */}
           <div style={{ position: 'relative' }} data-language-dropdown>

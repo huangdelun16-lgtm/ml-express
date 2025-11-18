@@ -1606,8 +1606,8 @@ const HomePage: React.FC = () => {
           }}
         />
         
-        {/* 公司名称 - 与标题相同大小和样式 */}
-        <div style={{
+        {/* 公司名称 - 与其他页面一致的单行显示 */}
+        <span style={{
           color: 'white',
           fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '4rem' : '2.2rem',
           fontWeight: '800',
@@ -1618,24 +1618,10 @@ const HomePage: React.FC = () => {
           backgroundClip: 'text',
           letterSpacing: '-1px',
           lineHeight: '1.1',
-          whiteSpace: 'nowrap',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
+          whiteSpace: 'nowrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            MARKET LINK
-          </div>
-          <div style={{
-            fontSize: '0.6em', 
-            fontStyle: 'italic', 
-            fontWeight: '400',
-            marginTop: '-0.2em'
-          }}>
-            EXPRESS
-          </div>
-        </div>
+          MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+        </span>
       </div>
     );
   };
