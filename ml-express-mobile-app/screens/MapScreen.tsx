@@ -3287,7 +3287,74 @@ export default function MapScreen({ navigation }: any) {
                     <Text style={styles.routeNumberText}>{index + 1}</Text>
                   </View>
                   <View style={styles.routeInfo}>
-                    <Text style={styles.routeName}>包裹 {packageNumber}: {pkg.receiver_name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                      <Text style={styles.routeName}>包裹 {packageNumber}: {pkg.receiver_name}</Text>
+                      {/* 支付方式标识 */}
+                      {pkg.payment_method === 'cash' && (
+                        <View style={{
+                          backgroundColor: '#f59e0b',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}>
+                          <Text style={{
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                          }}>
+                            💵 {language === 'zh' ? '现金' : language === 'en' ? 'Cash' : 'ငွေသား'}
+                          </Text>
+                        </View>
+                      )}
+                      {pkg.payment_method === 'transfer' && (
+                        <View style={{
+                          backgroundColor: '#9c27b0',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}>
+                          <Text style={{
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                          }}>
+                            💳 {language === 'zh' ? '转账' : language === 'en' ? 'Transfer' : 'လွှဲပြောင်း'}
+                          </Text>
+                        </View>
+                      )}
+                      {pkg.payment_method === 'qr' && (
+                        <View style={{
+                          backgroundColor: '#3b82f6',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}>
+                          <Text style={{
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                          }}>
+                            📱 {language === 'zh' ? '二维码' : language === 'en' ? 'QR Code' : 'QR Code'}
+                          </Text>
+                        </View>
+                      )}
+                      {!pkg.payment_method && (
+                        <View style={{
+                          backgroundColor: '#6b7280',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
+                        }}>
+                          <Text style={{
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                          }}>
+                            💰 {language === 'zh' ? '已支付' : language === 'en' ? 'Paid' : 'ပေးချေပြီး'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     
                     {/* 取货点信息 */}
                     <View style={styles.pickupInfo}>
