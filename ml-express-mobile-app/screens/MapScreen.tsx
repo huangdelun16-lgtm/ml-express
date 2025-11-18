@@ -3054,8 +3054,7 @@ export default function MapScreen({ navigation }: any) {
                         },
                       ]}
                     >
-                      <Text style={styles.pickupMarkerIcon}>{packageTypeIcon}</Text>
-                      <Text style={styles.pickupMarkerText}>P-{packageNumber}</Text>
+                      <Text style={styles.pickupMarkerText}>P{packageNumber}</Text>
                     </Animated.View>
                     <Callout>
                       <View style={styles.calloutContainer}>
@@ -3131,8 +3130,7 @@ export default function MapScreen({ navigation }: any) {
                         },
                       ]}
                     >
-                      <Text style={styles.packageMarkerIcon}>{packageTypeIcon}</Text>
-                      <Text style={styles.packageMarkerNumber}>D-{packageNumber}A</Text>
+                      <Text style={styles.packageMarkerNumber}>D{packageNumber}</Text>
                     </Animated.View>
                     <Callout>
                       <View style={styles.calloutContainer}>
@@ -3578,7 +3576,7 @@ export default function MapScreen({ navigation }: any) {
                   description={selectedPackageForMap.sender_address}
                 >
                   <View style={styles.pickupMarker}>
-                    <Text style={styles.pickupMarkerText}>P-1</Text>
+                    <Text style={styles.pickupMarkerText}>P1</Text>
                   </View>
                 </Marker>
               )}
@@ -3594,7 +3592,7 @@ export default function MapScreen({ navigation }: any) {
                   description={selectedPackageForMap.receiver_address}
                 >
                   <View style={styles.packageMarker}>
-                    <Text style={styles.packageMarkerNumber}>D-1A</Text>
+                    <Text style={styles.packageMarkerNumber}>D1</Text>
                   </View>
                 </Marker>
               )}
@@ -4544,9 +4542,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   packageMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    minWidth: 32,
+    height: 32,
+    paddingHorizontal: 6,
+    borderRadius: 16,
     backgroundColor: '#3182ce',
     justifyContent: 'center',
     alignItems: 'center',
@@ -4554,20 +4553,26 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 7,
   },
   packageMarkerNumber: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '900', // 最粗的字体
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    includeFontPadding: false, // Android上减少额外padding
   },
   // 取货点标记样式
   pickupMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    minWidth: 32,
+    height: 32,
+    paddingHorizontal: 6,
+    borderRadius: 16,
     backgroundColor: '#f59e0b',
     justifyContent: 'center',
     alignItems: 'center',
@@ -4575,22 +4580,29 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 7,
   },
   pickupMarkerText: {
     color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '900', // 最粗的字体
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    includeFontPadding: false, // Android上减少额外padding
   },
   pickupMarkerIcon: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 12, // 缩小图标
+    marginBottom: 1,
+    opacity: 0.7, // 降低图标透明度，突出文字
   },
   packageMarkerIcon: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 12, // 缩小图标
+    marginBottom: 1,
+    opacity: 0.7, // 降低图标透明度，突出文字
   },
   // 信息窗口样式
   calloutContainer: {
