@@ -1230,7 +1230,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                           fontSize: '0.8rem',
                           fontWeight: 'bold'
                         }}>
-                          {pkg.status}
+                          {pkg.status === '待收款' ? '待取件' : pkg.status}
                         </span>
                       </div>
                     </div>
