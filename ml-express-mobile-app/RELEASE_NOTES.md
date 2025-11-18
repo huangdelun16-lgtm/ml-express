@@ -1,174 +1,131 @@
-# 📝 Google Play Console Release Notes（版本说明）
+# 📱 ML Express Staff - Release Notes / 发布说明
 
-## 📋 使用方法
-
-在 Google Play Console 的 Release notes 文本框中，直接复制以下内容：
+## Version 1.0.0 - Initial Release / 版本 1.0.0 - 首次发布
 
 ---
 
-## ✅ 完整版本说明（多语言）
+## 🇨🇳 中文版本
 
-```
-<en-US>
-Initial Release
+### 🎉 欢迎使用 ML Express Staff 快递员应用！
 
-ML Express Staff is a professional express delivery management app designed for couriers.
+ML Express Staff 是一款专为快递员设计的移动应用，帮助您高效管理配送任务，提升工作效率。
 
-Key Features:
-- Courier login and account management
-- Package task list and details
-- Real-time map navigation and route planning
-- QR code scanning for quick package identification
-- Delivery photo upload for proof of delivery
-- Financial statistics and reports
+### ✨ 核心功能
 
-We are committed to providing the most convenient and efficient delivery management tools for couriers.
-</en-US>
+#### 📦 我的任务
+- 实时查看分配给您的包裹任务
+- 智能统计待取件、已取件、配送中数量
+- 快捷操作：一键拨打电话、导航、更新状态
+- 下拉刷新获取最新任务
 
-<zh-CN>
-首次发布
+#### 🗺️ 配送地图
+- 在地图上查看所有待配送包裹位置
+- 显示您的实时位置
+- 不同颜色标记不同状态（待取件/已取件/配送中）
+- 点击标记快速查看包裹详情
 
-ML Express Staff 是一款专业的快递配送管理应用，专为快递骑手设计。
+#### 📷 扫码查询
+- 扫描包裹二维码快速查询
+- 支持手动输入包裹编号
+- 即扫即查，快速获取包裹信息
 
-主要功能：
-- 骑手登录和账号管理
-- 包裹任务列表和详情查看
-- 实时地图导航和智能路线规划
-- 二维码扫描快速识别包裹信息
-- 配送照片上传记录配送凭证
-- 财务统计和报表查看
+#### 📊 个人中心
+- 查看今日配送统计
+- 累计完成数量
+- 配送历史记录
+- 快速访问各项功能
 
-我们致力于为快递骑手提供最便捷、最高效的配送管理工具。
-</zh-CN>
+#### 📜 配送历史
+- 查看所有已完成和已取消的包裹
+- 按状态筛选历史记录
+- 详细的配送信息展示
 
-<my-MM>
-ပထမဆုံး ထုတ်ဝေမှု
+### 🔧 技术特性
 
-ML Express Staff သည် ကုန်တင်ကုန်ချ ပို့ဆောင်သူများအတွက် ဒီဇိုင်းထုတ်ထားသော ပရော်ဖက်ရှင်နယ် ပို့ဆောင်မှု စီမံခန့်ခွဲမှု application တစ်ခု ဖြစ်ပါသည်။
+- ✅ 实时数据同步
+- ✅ 离线数据缓存
+- ✅ 流畅的用户体验
+- ✅ 安全的数据传输
+- ✅ 完整的审计日志
 
-အဓိက လုပ်ဆောင်ချက်များ:
-- ကုန်တင်ကုန်ချ ပို့ဆောင်သူ အကောင့် ဝင်ရောက်ခြင်းနှင့် စီမံခန့်ခွဲမှု
-- ထုပ်ပိုးများ လုပ်ငန်းစာရင်းနှင့် အသေးစိတ်များ
-- အချိန်နှင့်တပြေးညီ မြေပုံ လမ်းညွှန်မှုနှင့် လမ်းကြောင်း စီစဉ်မှု
-- ထုပ်ပိုးများကို အမြန်ခွဲခြားရန် QR code စကင်နာဖတ်ခြင်း
-- ပို့ဆောင်မှု သက်သေအထောက်အထားအတွက် ပို့ဆောင်မှု ဓာတ်ပုံ တင်ခြင်း
-- ငွေကြေး စာရင်းအင်းနှင့် အစီရင်ခံစာများ
+### 📋 系统要求
 
-ကျွန်ုပ်တို့သည် ကုန်တင်ကုန်ချ ပို့ဆောင်သူများအတွက် အဆင်ပြေဆုံးနှင့် အထိရောက်ဆုံး ပို့ဆောင်မှု စီမံခန့်ခွဲမှု ကိရိယာများကို ပေးဆောင်ရန် ကတိပြုထားပါသည်။
-</my-MM>
-```
+- Android 6.0 或更高版本
+- iOS 13.0 或更高版本
+- 需要网络连接和位置权限
 
----
+### 🆘 需要帮助？
 
-## 📝 简化版本（如果文本框不支持多语言标签）
-
-如果 Google Play Console 的文本框不支持多语言标签，可以只填写英文版本：
-
-```
-Initial Release
-
-ML Express Staff is a professional express delivery management app designed for couriers.
-
-Key Features:
-- Courier login and account management
-- Package task list and details
-- Real-time map navigation and route planning
-- QR code scanning for quick package identification
-- Delivery photo upload for proof of delivery
-- Financial statistics and reports
-
-We are committed to providing the most convenient and efficient delivery management tools for couriers.
-```
+如有任何问题或建议，请联系我们的客服团队。
 
 ---
 
-## 📋 各语言版本说明
+## 🇬🇧 English Version
 
-### 英文版本（en-US）
+### 🎉 Welcome to ML Express Staff!
 
-```
-Initial Release
+ML Express Staff is a mobile application designed specifically for couriers to efficiently manage delivery tasks and improve work productivity.
 
-ML Express Staff is a professional express delivery management app designed for couriers.
+### ✨ Key Features
 
-Key Features:
-- Courier login and account management
-- Package task list and details
-- Real-time map navigation and route planning
-- QR code scanning for quick package identification
-- Delivery photo upload for proof of delivery
-- Financial statistics and reports
+#### 📦 My Tasks
+- View assigned package tasks in real-time
+- Smart statistics for pending pickup, picked up, and in-transit packages
+- Quick actions: one-tap calling, navigation, and status updates
+- Pull-to-refresh for latest tasks
 
-We are committed to providing the most convenient and efficient delivery management tools for couriers.
-```
+#### 🗺️ Delivery Map
+- View all pending delivery package locations on the map
+- Display your real-time location
+- Color-coded markers for different statuses (pending pickup/picked up/in transit)
+- Tap markers to quickly view package details
 
-### 中文版本（zh-CN）
+#### 📷 QR Code Scanner
+- Scan package QR codes for quick queries
+- Support manual package number input
+- Instant scan and query for package information
 
-```
-首次发布
+#### 📊 Personal Center
+- View today's delivery statistics
+- Cumulative completion count
+- Delivery history records
+- Quick access to various features
 
-ML Express Staff 是一款专业的快递配送管理应用，专为快递骑手设计。
+#### 📜 Delivery History
+- View all completed and cancelled packages
+- Filter history records by status
+- Detailed delivery information display
 
-主要功能：
-- 骑手登录和账号管理
-- 包裹任务列表和详情查看
-- 实时地图导航和智能路线规划
-- 二维码扫描快速识别包裹信息
-- 配送照片上传记录配送凭证
-- 财务统计和报表查看
+### 🔧 Technical Features
 
-我们致力于为快递骑手提供最便捷、最高效的配送管理工具。
-```
+- ✅ Real-time data synchronization
+- ✅ Offline data caching
+- ✅ Smooth user experience
+- ✅ Secure data transmission
+- ✅ Complete audit logging
 
-### 缅甸语版本（my-MM）
+### 📋 System Requirements
 
-```
-ပထမဆုံး ထုတ်ဝေမှု
+- Android 6.0 or higher
+- iOS 13.0 or higher
+- Network connection and location permissions required
 
-ML Express Staff သည် ကုန်တင်ကုန်ချ ပို့ဆောင်သူများအတွက် ဒီဇိုင်းထုတ်ထားသော ပရော်ဖက်ရှင်နယ် ပို့ဆောင်မှု စီမံခန့်ခွဲမှု application တစ်ခု ဖြစ်ပါသည်။
+### 🆘 Need Help?
 
-အဓိက လုပ်ဆောင်ချက်များ:
-- ကုန်တင်ကုန်ချ ပို့ဆောင်သူ အကောင့် ဝင်ရောက်ခြင်းနှင့် စီမံခန့်ခွဲမှု
-- ထုပ်ပိုးများ လုပ်ငန်းစာရင်းနှင့် အသေးစိတ်များ
-- အချိန်နှင့်တပြေးညီ မြေပုံ လမ်းညွှန်မှုနှင့် လမ်းကြောင်း စီစဉ်မှု
-- ထုပ်ပိုးများကို အမြန်ခွဲခြားရန် QR code စကင်နာဖတ်ခြင်း
-- ပို့ဆောင်မှု သက်သေအထောက်အထားအတွက် ပို့ဆောင်မှု ဓာတ်ပုံ တင်ခြင်း
-- ငွေကြေး စာရင်းအင်းနှင့် အစီရင်ခံစာများ
-
-ကျွန်ုပ်တို့သည် ကုန်တင်ကုန်ချ ပို့ဆောင်သူများအတွက် အဆင်ပြေဆုံးနှင့် အထိရောက်ဆုံး ပို့ဆောင်မှု စီမံခန့်ခွဲမှု ကိရိယာများကို ပေးဆောင်ရန် ကတိပြုထားပါသည်။
-```
+If you have any questions or suggestions, please contact our customer service team.
 
 ---
 
-## 💡 提示
+## 📝 版本信息 / Version Info
 
-1. **如果支持多语言标签**：直接复制上面的完整版本说明（包含 `<en-US>`, `<zh-CN>`, `<my-MM>` 标签）
-
-2. **如果不支持多语言标签**：只填写英文版本即可
-
-3. **字符限制**：Release notes 通常有字符限制（约 500 字符），如果太长可以简化
-
----
-
-## 📝 简化版本（如果字符限制）
-
-如果字符限制太短，可以使用这个简化版本：
-
-```
-Initial Release
-
-Key Features:
-- Courier login and account management
-- Package task management
-- Map navigation and route planning
-- QR code scanning
-- Delivery photo upload
-- Financial statistics
-
-Professional express delivery management app for couriers.
-```
+**版本号 / Version**: 1.0.0  
+**发布日期 / Release Date**: 2025-01-16  
+**应用名称 / App Name**: ML Express Staff  
+**包名 / Package**: com.mlexpress.courier
 
 ---
 
-**直接复制上面的内容到 Release notes 文本框即可！** 📝
+## 🔗 相关链接 / Links
 
+- **隐私政策 / Privacy Policy**: https://market-link-express.com/privacy-policy
+- **官方网站 / Official Website**: https://market-link-express.com
