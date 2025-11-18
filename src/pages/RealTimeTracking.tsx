@@ -106,8 +106,8 @@ const [packages, setPackages] = useState<Package[]>([]);
     try {
       const data = await packageService.getAllPackages();
       
-      // 分离不同状态的包裹
-      const pendingPackages = data.filter(p => p.status === '待取件');
+      // 分离不同状态的包裹（包含待收款状态）
+      const pendingPackages = data.filter(p => p.status === '待取件' || p.status === '待收款');
       const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
       
       // 显示所有活跃包裹（待分配 + 已分配）
@@ -125,7 +125,7 @@ const [packages, setPackages] = useState<Package[]>([]);
   const getUnassignedPackages = () => {
     return packages.filter(pkg => 
       pkg.courier === '待分配' && 
-      pkg.status === '待取件' &&
+      (pkg.status === '待取件' || pkg.status === '待收款') && // 包含待收款状态
       // 确保有坐标信息
       ((pkg.sender_latitude && pkg.sender_longitude) || (pkg.receiver_latitude && pkg.receiver_longitude))
     );
@@ -887,10 +887,10 @@ const [packages, setPackages] = useState<Package[]>([]);
               {/* 待分配包裹 */}
               <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件').length})
+              ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length})
             </h3>
 
-          {filterPackagesByCity(packages).filter(p => p.status === '待取件').length === 0 ? (
+          {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '3rem',
@@ -901,7 +901,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             </div>
           ) : (
             filterPackagesByCity(packages)
-              .filter(p => p.status === '待取件')
+              .filter(p => p.status === '待取件' || p.status === '待收款')
               .map(pkg => (
                 <div
                   key={pkg.id}
@@ -921,23 +921,65 @@ const [packages, setPackages] = useState<Package[]>([]);
                   <div style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between',
-                    marginBottom: '0.5rem'
+                    alignItems: 'center',
+                    marginBottom: '0.5rem',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
-                    <span style={{
-                      background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                        ? '#dcfce7'
-                        : '#fef3c7',
-                      color: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                        ? '#166534'
-                        : '#92400e',
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '5px',
-                      fontSize: '0.8rem',
-                      fontWeight: 'bold'
-                    }}>
-                      {pkg.status}
-                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {/* 支付方式标识 */}
+                      {(pkg as any).payment_method === 'cash' && (
+                        <span style={{
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}>
+                          💵 现金
+                        </span>
+                      )}
+                      {(pkg as any).payment_method === 'transfer' && (
+                        <span style={{
+                          background: '#f3e5f5',
+                          color: '#7b1fa2',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}>
+                          💳 转账
+                        </span>
+                      )}
+                      {(!(pkg as any).payment_method || (pkg as any).payment_method === 'qr') && (
+                        <span style={{
+                          background: '#dbeafe',
+                          color: '#1e40af',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}>
+                          📱 已支付
+                        </span>
+                      )}
+                      <span style={{
+                        background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
+                          ? '#dcfce7'
+                          : '#fef3c7',
+                        color: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
+                          ? '#166534'
+                          : '#92400e',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {pkg.status}
+                      </span>
+                    </div>
                   </div>
                   
                   <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
@@ -1136,19 +1178,61 @@ const [packages, setPackages] = useState<Package[]>([]);
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between',
-                      marginBottom: '0.5rem'
+                      alignItems: 'center',
+                      marginBottom: '0.5rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
                     }}>
                       <strong style={{ color: '#166534' }}>{pkg.id}</strong>
-                      <span style={{
-                        background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
-                        color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '5px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {pkg.status}
-                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* 支付方式标识 */}
+                        {pkg.payment_method === 'cash' && (
+                          <span style={{
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            💵 现金
+                          </span>
+                        )}
+                        {pkg.payment_method === 'transfer' && (
+                          <span style={{
+                            background: '#f3e5f5',
+                            color: '#7b1fa2',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            💳 转账
+                          </span>
+                        )}
+                        {(!pkg.payment_method || pkg.payment_method === 'qr') && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 已支付
+                          </span>
+                        )}
+                        <span style={{
+                          background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
+                          color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold'
+                        }}>
+                          {pkg.status}
+                        </span>
+                      </div>
                     </div>
                     
                     <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>

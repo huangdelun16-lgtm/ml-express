@@ -44,6 +44,7 @@ export interface Package {
   store_receive_code?: string; // 店铺收件码
   sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
   transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
+  payment_method?: 'qr' | 'cash' | 'transfer'; // 支付方式：qr=二维码支付，cash=现金支付，transfer=转账支付
 }
 
 export interface FinanceRecord {
@@ -476,7 +477,7 @@ export const trackingService = {
     const { data, error } = await supabase
       .from('packages')
       .select('*')
-      .in('status', ['待取件', '已取件', '配送中']);
+      .in('status', ['待取件', '待收款', '已取件', '配送中']); // 添加'待收款'状态
 
     if (error) {
       console.error('获取实时跟踪包裹失败:', error);
