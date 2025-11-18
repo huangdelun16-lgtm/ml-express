@@ -1,6 +1,6 @@
 # MARKET LINK EXPRESS - AI 开发指南
 
-## 🚀 最新架构更新 (2025年1月16日)
+## 🚀 最新架构更新 (2025年1月17日)
 
 ### 📐 完整系统架构
 
@@ -436,6 +436,12 @@ REACT_APP_GOOGLE_MAPS_API_KEY
    - 工资记录管理（按月分页）
    - 生成本月工资（防重复生成）
    - 基本工资从账号管理读取
+   - **现金收款管理**（新增）:
+     - 显示所有快递员的现金收款情况
+     - 按快递员查看现金收款详情
+     - 日期筛选功能（全部、最近7天、30天、90天、自定义）
+     - 包裹选择功能（复选框、全选、全部结清）
+     - 结清后包裹自动消失
 
 2. **账号管理** (`AccountManagement.tsx`):
    - 员工账号列表
@@ -472,6 +478,7 @@ CREATE TABLE packages (
   courier TEXT,
   pickup_time TEXT,
   delivery_time TEXT,
+  payment_method TEXT DEFAULT 'qr', -- 支付方式：'qr'=二维码支付，'cash'=现金支付
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -704,8 +711,87 @@ CI=true npm run build
 
 ---
 
-*最后更新：2025年1月16日*  
-*版本：4.1.0*  
-*状态：生产环境运行中*  
-*架构：完全分离的客户端和后台管理系统*  
-*最新更新：订单ID时间修复、地图坐标标注优化、临时订单存储优化*
+### 🔧 最新功能更新 (2025年1月17日)
+
+#### 1. 客户端 Web UI/UX 优化 ✅
+
+**Header 统一优化**:
+- ✅ 统一所有页面的公司名称显示（单行显示 "MARKET LINK EXPRESS"）
+- ✅ 在"服务"、"包裹跟踪"、"联系我们"页面添加用户登录状态卡片
+- ✅ 调整"服务"页面 header 布局，与"包裹跟踪"页面一致
+- ✅ 用户登录状态卡片显示"欢迎，[用户名]"和"退出"按钮
+
+**修改文件**:
+- `ml-express-client-web/src/pages/HomePage.tsx` - Logo组件改为单行显示
+- `ml-express-client-web/src/pages/ServicesPage.tsx` - 添加用户认证，调整header布局
+- `ml-express-client-web/src/pages/TrackingPage.tsx` - 添加用户认证
+- `ml-express-client-web/src/pages/ContactPage.tsx` - 添加用户认证
+
+#### 2. 支付方式功能完善 ✅
+
+**数据库更新**:
+- ✅ 添加 `payment_method` 字段到 `packages` 表（支持 'qr' | 'cash'）
+- ✅ 移除 'transfer' 支付方式，仅保留 'qr' 和 'cash'
+
+**客户端 Web 更新**:
+- ✅ 订单页面移除"转账"支付选项
+- ✅ 现金支付订单状态设置为"待收款"
+- ✅ 二维码支付订单状态设置为"待取件"
+
+**客户端 App 更新**:
+- ✅ 订单页面移除"转账"支付选项
+- ✅ 应用与客户端Web相同的支付逻辑
+
+**后台管理 Web 更新**:
+- ✅ "实时跟踪管理"页面显示支付方式标识
+- ✅ "包裹管理"页面显示支付方式标识
+- ✅ 将"待收款"状态显示为"待取件"（UI显示优化）
+
+**骑手 App 更新**:
+- ✅ "我的任务"页面显示支付方式标识
+- ✅ "地图"页面"配送顺序"中显示支付方式标识
+- ✅ "配送历史"页面移除"已送达"状态，显示支付方式标识
+- ✅ 添加"确认支付"功能（现金支付待收款订单）
+
+**修改文件**:
+- `add-payment-method-field.sql` - 数据库迁移脚本
+- `ml-express-client-web/src/pages/HomePage.tsx` - 移除转账选项
+- `ml-express-client-web/src/pages/TrackingPage.tsx` - 显示支付方式
+- `ml-express-client/src/screens/PlaceOrderScreen.tsx` - 移除转账选项
+- `src/pages/RealTimeTracking.tsx` - 显示支付方式，待收款状态处理
+- `src/pages/CityPackages.tsx` - 显示支付方式，待收款状态处理
+- `ml-express-mobile-app/screens/MyTasksScreen.tsx` - 支付方式显示和确认支付
+- `ml-express-mobile-app/screens/MapScreen.tsx` - 支付方式显示
+- `ml-express-mobile-app/screens/DeliveryHistoryScreen.tsx` - 支付方式显示
+- 所有 `services/supabase.ts` 文件 - 更新 Package 接口
+
+#### 3. 财务管理 - 现金收款管理功能 ✅
+
+**新增功能**:
+- ✅ 添加"现金收款管理"标签页到财务管理页面
+- ✅ 自动从快递员管理页面加载所有快递员（名称和工作号）
+- ✅ 显示每个快递员的现金收款总额和包裹数量
+- ✅ 每个快递员旁边添加"详情"按钮
+
+**详情弹窗功能**:
+- ✅ 显示该快递员的所有现金收款包裹
+- ✅ 日期筛选功能（全部、最近7天、30天、90天、自定义日期范围）
+- ✅ 包裹卡片左上角添加白色复选框
+- ✅ 全选/取消全选功能（带图标按钮）
+- ✅ "全部结清"按钮（显示选中数量）
+- ✅ 点击"全部结清"后，选中的包裹自动消失
+- ✅ 统计信息实时更新
+
+**实现逻辑**:
+- 使用 `Set<string>` 管理选中包裹ID
+- 使用 `Set<string>` 管理已结清包裹ID
+- 已结清的包裹从列表中过滤掉
+- 统计信息基于可见包裹计算
+
+**修改文件**:
+- `src/pages/FinanceManagement.tsx` - 添加现金收款管理功能
+
+**数据库字段**:
+- `packages.payment_method` - 支付方式字段（'qr' | 'cash'）
+
+### 🔧 历史功能更新 (2025年1月16日)
