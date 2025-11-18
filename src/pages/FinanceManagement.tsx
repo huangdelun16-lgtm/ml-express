@@ -133,6 +133,8 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [cashDetailDateFilter, setCashDetailDateFilter] = useState<string>('all'); // 'all' | '7days' | '30days' | '90days' | 'custom'
   const [cashDetailStartDate, setCashDetailStartDate] = useState<string>('');
   const [cashDetailEndDate, setCashDetailEndDate] = useState<string>('');
+  const [selectedCashPackages, setSelectedCashPackages] = useState<Set<string>>(new Set()); // 选中的包裹ID集合
+  const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
   const deliveredPackages = useMemo(() => {
     return packages.filter(pkg => pkg.status === '已送达');
@@ -3967,6 +3969,8 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                             setCashDetailDateFilter('all');
                             setCashDetailStartDate('');
                             setCashDetailEndDate('');
+                            setSelectedCashPackages(new Set());
+                            setClearedCashPackages(new Set());
                           }}
                           style={{
                             background: cashData.packages.length > 0 
@@ -4230,6 +4234,44 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     );
                   }
 
+                  // 过滤掉已结清的包裹
+                  const visiblePackages = filteredPackages.filter(pkg => !clearedCashPackages.has(pkg.id));
+                  const visibleTotalAmount = visiblePackages.reduce((sum, pkg) => {
+                    const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                    return sum + price;
+                  }, 0);
+                  
+                  // 检查是否全选
+                  const allSelected = visiblePackages.length > 0 && visiblePackages.every(pkg => selectedCashPackages.has(pkg.id));
+                  
+                  // 全选/取消全选处理
+                  const handleSelectAll = () => {
+                    if (allSelected) {
+                      // 取消全选
+                      setSelectedCashPackages(new Set());
+                    } else {
+                      // 全选
+                      const allIds = new Set(visiblePackages.map(pkg => pkg.id));
+                      setSelectedCashPackages(allIds);
+                    }
+                  };
+                  
+                  // 全部结清处理
+                  const handleClearAll = () => {
+                    if (selectedCashPackages.size === 0) {
+                      window.alert('请先选择要结清的包裹');
+                      return;
+                    }
+                    if (window.confirm(`确定要结清 ${selectedCashPackages.size} 个包裹吗？`)) {
+                      setClearedCashPackages(prev => {
+                        const newSet = new Set(prev);
+                        selectedCashPackages.forEach(id => newSet.add(id));
+                        return newSet;
+                      });
+                      setSelectedCashPackages(new Set());
+                    }
+                  };
+
                   return (
                     <>
                       {/* 统计信息 */}
@@ -4238,61 +4280,199 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                         borderRadius: '12px',
                         padding: '16px',
                         marginBottom: '20px',
-                        border: '1px solid rgba(254, 243, 199, 0.3)'
+                        border: '1px solid rgba(254, 243, 199, 0.3)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px'
                       }}>
-                        <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '4px' }}>筛选结果</div>
-                        <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                          {totalAmount.toLocaleString()} MMK
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '4px' }}>筛选结果</div>
+                          <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                            {visibleTotalAmount.toLocaleString()} MMK
+                          </div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                            {visiblePackages.length} 个包裹
+                          </div>
                         </div>
-                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                          {filteredPackages.length} 个包裹
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {/* 全选图标 */}
+                          <button
+                            onClick={handleSelectAll}
+                            style={{
+                              background: allSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                              border: `2px solid ${allSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.3)'}`,
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = allSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.15)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = allSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)';
+                            }}
+                          >
+                            <span style={{ fontSize: '1.2rem' }}>{allSelected ? '☑️' : '☐'}</span>
+                            <span style={{ color: 'white', fontSize: '0.85rem', fontWeight: '600' }}>
+                              {allSelected ? '取消全选' : '全选'}
+                            </span>
+                          </button>
+                          
+                          {/* 全部结清按钮 */}
+                          <button
+                            onClick={handleClearAll}
+                            disabled={selectedCashPackages.size === 0}
+                            style={{
+                              background: selectedCashPackages.size > 0
+                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                : 'rgba(255, 255, 255, 0.1)',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '8px 16px',
+                              cursor: selectedCashPackages.size > 0 ? 'pointer' : 'not-allowed',
+                              opacity: selectedCashPackages.size > 0 ? 1 : 0.5,
+                              transition: 'all 0.3s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: selectedCashPackages.size > 0 
+                                ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                : 'none'
+                            }}
+                            onMouseOver={(e) => {
+                              if (selectedCashPackages.size > 0) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (selectedCashPackages.size > 0) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                              }
+                            }}
+                          >
+                            <span style={{ fontSize: '1rem' }}>✅</span>
+                            <span style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>
+                              全部结清 ({selectedCashPackages.size})
+                            </span>
+                          </button>
                         </div>
                       </div>
 
                       {/* 包裹列表 */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: '12px'
-                      }}>
-                        {filteredPackages.map(pkg => {
-                          const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                          return (
-                            <div
-                              key={pkg.id}
-                              style={{
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                borderRadius: '10px',
-                                padding: '16px',
-                                border: '1px solid rgba(255, 255, 255, 0.15)'
-                              }}
-                            >
-                              <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                marginBottom: '8px'
-                              }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '4px' }}>
-                                    {pkg.id}
-                                  </div>
-                                  <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
-                                    {pkg.receiver_name} - {pkg.receiver_phone}
-                                  </div>
+                      {visiblePackages.length === 0 ? (
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          borderRadius: '12px',
+                          padding: '60px 20px',
+                          textAlign: 'center',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
+                            所有包裹已结清
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
+                          gap: '12px'
+                        }}>
+                          {visiblePackages.map(pkg => {
+                            const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                            const isSelected = selectedCashPackages.has(pkg.id);
+                            return (
+                              <div
+                                key={pkg.id}
+                                style={{
+                                  background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '10px',
+                                  padding: '16px',
+                                  border: isSelected 
+                                    ? '2px solid #3b82f6' 
+                                    : '1px solid rgba(255, 255, 255, 0.15)',
+                                  position: 'relative',
+                                  transition: 'all 0.3s ease'
+                                }}
+                              >
+                                {/* 左上角白色复选框 */}
+                                <div
+                                  onClick={() => {
+                                    setSelectedCashPackages(prev => {
+                                      const newSet = new Set(prev);
+                                      if (newSet.has(pkg.id)) {
+                                        newSet.delete(pkg.id);
+                                      } else {
+                                        newSet.add(pkg.id);
+                                      }
+                                      return newSet;
+                                    });
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '12px',
+                                    left: '12px',
+                                    width: '20px',
+                                    height: '20px',
+                                    background: 'white',
+                                    border: `2px solid ${isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.5)'}`,
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s ease',
+                                    zIndex: 10
+                                  }}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.borderColor = '#3b82f6';
+                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.borderColor = isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.5)';
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                  }}
+                                >
+                                  {isSelected && (
+                                    <span style={{ color: '#3b82f6', fontSize: '14px', fontWeight: 'bold' }}>✓</span>
+                                  )}
                                 </div>
+                                
                                 <div style={{
-                                  background: '#fef3c7',
-                                  color: '#92400e',
-                                  padding: '4px 12px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.9rem',
-                                  fontWeight: 'bold',
-                                  whiteSpace: 'nowrap'
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  marginBottom: '8px',
+                                  paddingLeft: '32px'
                                 }}>
-                                  {price.toLocaleString()} MMK
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ color: 'white', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '4px' }}>
+                                      {pkg.id}
+                                    </div>
+                                    <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
+                                      {pkg.receiver_name} - {pkg.receiver_phone}
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    background: '#fef3c7',
+                                    color: '#92400e',
+                                    padding: '4px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 'bold',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {price.toLocaleString()} MMK
+                                  </div>
                                 </div>
-                              </div>
                               <div style={{
                                 color: 'rgba(255, 255, 255, 0.6)',
                                 fontSize: '0.8rem',
@@ -4320,10 +4500,11 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                                   创建时间: {pkg.create_time}
                                 </div>
                               )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   );
                 })()}
