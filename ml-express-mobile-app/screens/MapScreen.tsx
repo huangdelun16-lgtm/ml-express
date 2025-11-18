@@ -4416,20 +4416,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  trackingStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  trackingIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  trackingText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
   // 🗺️ 地图预览Modal样式
   mapModalContainer: {
     flex: 1,
