@@ -2775,7 +2775,9 @@ export default function MapScreen({ navigation }: any) {
             >
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
-            <Text style={styles.mapModalTitle}>📍 配送路线预览</Text>
+            <Text style={styles.mapModalTitle}>
+              📍 {language === 'zh' ? '配送路线预览' : language === 'en' ? 'Delivery Route Preview' : 'ပို့ဆောင်လမ်းကြောင်းအစမ်းကြည့်ရှုခြင်း'}
+            </Text>
             <View style={{ width: 40 }} />
           </View>
 
@@ -4646,7 +4648,7 @@ const styles = StyleSheet.create({
   // 地图控制按钮
   mapControls: {
     position: 'absolute',
-    top: 100,
+    bottom: 100, // 移动到地图底部，在"查找位置"按钮上方
     right: 16,
     zIndex: 1000,
     flexDirection: 'column',
