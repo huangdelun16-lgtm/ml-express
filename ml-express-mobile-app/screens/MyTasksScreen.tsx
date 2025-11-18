@@ -614,23 +614,33 @@ const MyTasksScreen: React.FC = () => {
                 {language === 'zh' ? '包裹信息' : language === 'en' ? 'Package Info' : 'ပက်ကေ့ဂျ်အချက်အလက်'}
               </Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>包裹编号：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '包裹编号：' : language === 'en' ? 'Package ID: ' : 'ပက်ကေ့ဂျ်နံပါတ်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.id}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>包裹类型：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '包裹类型：' : language === 'en' ? 'Package Type: ' : 'ပက်ကေ့ဂျ်အမျိုးအစား: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.package_type}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>重量：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '重量：' : language === 'en' ? 'Weight: ' : 'အလေးချိန်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.weight}kg</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>描述：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '描述：' : language === 'en' ? 'Description: ' : 'ဖော်ပြချက်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.description}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>预估费用：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '预估费用：' : language === 'en' ? 'Estimated Cost: ' : 'ခန့်မှန်းကုန်ကျစရိတ်: '}
+                </Text>
                 <Text style={styles.detailValue}>¥{selectedPackage.estimated_cost}</Text>
               </View>
             </View>
@@ -640,11 +650,15 @@ const MyTasksScreen: React.FC = () => {
                 {language === 'zh' ? '寄件人信息' : language === 'en' ? 'Sender Info' : 'ပေးပို့သူအချက်အလက်'}
               </Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>姓名：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '姓名：' : language === 'en' ? 'Name: ' : 'အမည်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.sender_name}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>电话：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '电话：' : language === 'en' ? 'Phone: ' : 'ဖုန်း: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.sender_phone}</Text>
               </View>
             </View>
@@ -654,15 +668,21 @@ const MyTasksScreen: React.FC = () => {
                 {language === 'zh' ? '收件人信息' : language === 'en' ? 'Receiver Info' : 'လက်ခံသူအချက်အလက်'}
               </Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>姓名：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '姓名：' : language === 'en' ? 'Name: ' : 'အမည်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.receiver_name}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>电话：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '电话：' : language === 'en' ? 'Phone: ' : 'ဖုန်း: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.receiver_phone}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>地址：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '地址：' : language === 'en' ? 'Address: ' : 'လိပ်စာ: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.receiver_address}</Text>
               </View>
             </View>
@@ -672,28 +692,38 @@ const MyTasksScreen: React.FC = () => {
                 {language === 'zh' ? '配送信息' : language === 'en' ? 'Delivery Info' : 'ပို့ဆောင်မှုအချက်အလက်'}
               </Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>状态：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '状态：' : language === 'en' ? 'Status: ' : 'အခြေအနေ: '}
+                </Text>
                 <Text style={[styles.detailValue, { color: getStatusColor(selectedPackage.status) }]}>
                   {getStatusText(selectedPackage.status)}
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>负责骑手：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '负责骑手：' : language === 'en' ? 'Courier: ' : 'မောင်းသူ: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.courier}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>创建时间：</Text>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '创建时间：' : language === 'en' ? 'Created At: ' : 'ဖန်တီးသည့်အချိန်: '}
+                </Text>
                 <Text style={styles.detailValue}>{selectedPackage.created_at}</Text>
               </View>
               {selectedPackage.pickup_time && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>取件时间：</Text>
+                  <Text style={styles.detailLabel}>
+                    {language === 'zh' ? '取件时间：' : language === 'en' ? 'Pickup Time: ' : 'ယူသည့်အချိန်: '}
+                  </Text>
                   <Text style={styles.detailValue}>{selectedPackage.pickup_time}</Text>
                 </View>
               )}
               {selectedPackage.delivery_time && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>送达时间：</Text>
+                  <Text style={styles.detailLabel}>
+                    {language === 'zh' ? '送达时间：' : language === 'en' ? 'Delivery Time: ' : 'ပို့ဆောင်သည့်အချိန်: '}
+                  </Text>
                   <Text style={styles.detailValue}>{selectedPackage.delivery_time}</Text>
                 </View>
               )}
@@ -738,12 +768,13 @@ const MyTasksScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
             {language === 'zh' ? '我的任务' : language === 'en' ? 'My Tasks' : 'ကျွန်ုပ်၏တာဝန်'}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {language === 'zh' ? '当前骑手：' : language === 'en' ? 'Current Rider: ' : 'လက်ရှိမောင်းသူ: '}
-            {currentCourierName || (language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'ခေါင်းစဉ်...')}
+            {'  •  '}
+            <Text style={styles.headerSubtitle}>
+              {language === 'zh' ? '当前骑手：' : language === 'en' ? 'Current Rider: ' : 'လက်ရှိမောင်းသူ: '}
+              {currentCourierName || (language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'ခေါင်းစဉ်...')}
+            </Text>
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -993,22 +1024,32 @@ const MyTasksScreen: React.FC = () => {
             </View>
             
             <View style={styles.addressContent}>
-              <Text style={styles.addressLabel}>收件人：</Text>
+              <Text style={styles.addressLabel}>
+                {language === 'zh' ? '收件人：' : language === 'en' ? 'Receiver: ' : 'လက်ခံသူ: '}
+              </Text>
               <Text style={styles.addressValue}>{selectedPackage?.receiver_name}</Text>
               
-              <Text style={styles.addressLabel}>联系电话：</Text>
+              <Text style={styles.addressLabel}>
+                {language === 'zh' ? '联系电话：' : language === 'en' ? 'Contact Phone: ' : 'ဆက်သွယ်ရန်ဖုန်း: '}
+              </Text>
               <Text style={styles.addressValue}>{selectedPackage?.receiver_phone}</Text>
               
-              <Text style={styles.addressLabel}>详细地址：</Text>
+              <Text style={styles.addressLabel}>
+                {language === 'zh' ? '详细地址：' : language === 'en' ? 'Detailed Address: ' : 'အသေးစိတ်လိပ်စာ: '}
+              </Text>
               <Text style={styles.addressDetail}>{selectedPackage?.receiver_address}</Text>
               
               <View style={styles.addressActions}>
                 <TouchableOpacity style={styles.addressActionButton} onPress={handleCall}>
-                  <Text style={styles.addressActionText}>📞 拨打电话</Text>
+                  <Text style={styles.addressActionText}>
+                    📞 {language === 'zh' ? '拨打电话' : language === 'en' ? 'Call' : 'ဖုန်းခေါ်'}
+                  </Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.addressActionButton} onPress={handleNavigate}>
-                  <Text style={styles.addressActionText}>🗺️ 导航前往</Text>
+                  <Text style={styles.addressActionText}>
+                    🗺️ {language === 'zh' ? '导航前往' : language === 'en' ? 'Navigate' : 'လမ်းညွှန်'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1039,19 +1080,23 @@ const MyTasksScreen: React.FC = () => {
             
             <View style={styles.cameraContent}>
               <Text style={styles.cameraInstruction}>
-                选择功能：拍照或扫码
+                {language === 'zh' ? '选择功能：拍照或扫码' : language === 'en' ? 'Select Function: Take Photo or Scan Code' : 'လုပ်ဆောင်ချက်ရွေးချယ်ပါ: ဓာတ်ပုံရိုက်ရန် သို့မဟုတ် ကုဒ်စကင်'}
               </Text>
               
               <View style={styles.cameraOptions}>
                 <TouchableOpacity style={styles.cameraButton} onPress={handleOpenCamera}>
-                  <Text style={styles.cameraButtonText}>📷 拍照</Text>
+                  <Text style={styles.cameraButtonText}>
+                    📷 {language === 'zh' ? '拍照' : language === 'en' ? 'Take Photo' : 'ဓာတ်ပုံရိုက်'}
+                  </Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.cameraButton} onPress={() => {
                   setShowCameraModal(false);
                   setShowScanModal(true);
                 }}>
-                  <Text style={styles.cameraButtonText}>📱 扫码</Text>
+                  <Text style={styles.cameraButtonText}>
+                    📱 {language === 'zh' ? '扫码' : language === 'en' ? 'Scan Code' : 'ကုဒ်စကင်'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1099,23 +1144,27 @@ const MyTasksScreen: React.FC = () => {
                       <View style={[styles.scanCorner, styles.scanCornerBottomRight]} />
                     </View>
                     <Text style={styles.scanInstruction}>
-                      将二维码/条形码对准扫描框
+                      {language === 'zh' ? '将二维码/条形码对准扫描框' : language === 'en' ? 'Align QR code/barcode with the scan frame' : 'QR ကုဒ်/ဘားကုဒ်ကို စကင်ဘောင်၌ ညှိပါ'}
                     </Text>
                   </View>
                 </View>
               ) : (
                 <View style={styles.scanStartContent}>
                   <Text style={styles.scanInstruction}>
-                    点击开始扫码，扫描包裹二维码或条形码
+                    {language === 'zh' ? '点击开始扫码，扫描包裹二维码或条形码' : language === 'en' ? 'Tap to start scanning, scan package QR code or barcode' : 'စကင်စတင်ရန် နှိပ်ပါ၊ ပက်ကေ့ဂျ် QR ကုဒ် သို့မဟုတ် ဘားကုဒ်ကို စကင်ပါ'}
                   </Text>
                   
                   <TouchableOpacity style={styles.scanStartButton} onPress={handleStartScan}>
-                    <Text style={styles.scanStartButtonText}>📱 开始扫码</Text>
+                    <Text style={styles.scanStartButtonText}>
+                      📱 {language === 'zh' ? '开始扫码' : language === 'en' ? 'Start Scanning' : 'စကင်စတင်ရန်'}
+                    </Text>
                   </TouchableOpacity>
                   
                   {scannedData && (
                     <View style={styles.scanResult}>
-                      <Text style={styles.scanResultLabel}>扫描结果：</Text>
+                      <Text style={styles.scanResultLabel}>
+                        {language === 'zh' ? '扫描结果：' : language === 'en' ? 'Scan Result: ' : 'စကင်ရလဒ်: '}
+                      </Text>
                       <Text style={styles.scanResultText}>{scannedData}</Text>
                     </View>
                   )}
@@ -1152,7 +1201,7 @@ const MyTasksScreen: React.FC = () => {
                 <>
                   <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
                   <Text style={styles.photoInstruction}>
-                    确认上传此照片作为配送证明？
+                    {language === 'zh' ? '确认上传此照片作为配送证明？' : language === 'en' ? 'Confirm upload this photo as delivery proof?' : 'ဤဓာတ်ပုံကို ပို့ဆောင်မှုအတည်ပြုချက်အဖြစ် တင်ရန် အတည်ပြုပါမည်လား?'}
                   </Text>
                   
                   <View style={styles.photoActions}>
@@ -1160,7 +1209,9 @@ const MyTasksScreen: React.FC = () => {
                       style={styles.photoActionButton} 
                       onPress={() => setCapturedPhoto(null)}
                     >
-                      <Text style={styles.photoActionText}>重新拍照</Text>
+                      <Text style={styles.photoActionText}>
+                        {language === 'zh' ? '重新拍照' : language === 'en' ? 'Retake Photo' : 'ဓာတ်ပုံပြန်ရိုက်'}
+                      </Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity 
@@ -1171,7 +1222,9 @@ const MyTasksScreen: React.FC = () => {
                       {uploadingPhoto ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text style={styles.uploadButtonText}>确认上传</Text>
+                        <Text style={styles.uploadButtonText}>
+                          {language === 'zh' ? '确认上传' : language === 'en' ? 'Confirm Upload' : 'တင်ရန် အတည်ပြု'}
+                        </Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -1179,7 +1232,7 @@ const MyTasksScreen: React.FC = () => {
               ) : (
                 <>
                   <Text style={styles.photoInstruction}>
-                    请先拍照，然后上传作为配送证明
+                    {language === 'zh' ? '请先拍照，然后上传作为配送证明' : language === 'en' ? 'Please take a photo first, then upload as delivery proof' : 'ကျေးဇူးပြု၍ ဓာတ်ပုံရိုက်ပြီး ပို့ဆောင်မှုအတည်ပြုချက်အဖြစ် တင်ပါ'}
                   </Text>
                   
                   <TouchableOpacity 
@@ -1189,7 +1242,9 @@ const MyTasksScreen: React.FC = () => {
                       setShowCameraModal(true);
                     }}
                   >
-                    <Text style={styles.cameraButtonText}>📷 去拍照</Text>
+                    <Text style={styles.cameraButtonText}>
+                      📷 {language === 'zh' ? '去拍照' : language === 'en' ? 'Take Photo' : 'ဓာတ်ပုံရိုက်ရန်'}
+                    </Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -1304,14 +1359,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    flexWrap: 'nowrap',
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,
