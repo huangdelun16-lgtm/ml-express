@@ -474,7 +474,6 @@ const ServicesPage: React.FC = () => {
             )}
           </div>
         </div>
-        </div>
       </nav>
 
       {/* 主要内容区域 */}
