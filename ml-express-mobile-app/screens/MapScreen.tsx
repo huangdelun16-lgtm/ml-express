@@ -2621,7 +2621,7 @@ export default function MapScreen({ navigation }: any) {
           <View style={styles.locationInfo}>
             {language !== 'my' && (
               <>
-                <Text style={styles.locationTitle}>
+                <Text style={styles.locationTitle} numberOfLines={1}>
                   {language === 'zh' ? '我的位置' : 'My Location'}
                 </Text>
                 <Text style={styles.locationCoords}>
@@ -4129,7 +4129,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -4142,11 +4142,14 @@ const styles = StyleSheet.create({
   },
   locationInfo: {
     flex: 1,
+    minWidth: 0, // 允许flex收缩
+    marginRight: 8, // 添加右边距，避免与按钮重叠
   },
   locationTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
+    flexShrink: 1, // 允许收缩但保持在一行
   },
   locationCoords: {
     fontSize: 12,
