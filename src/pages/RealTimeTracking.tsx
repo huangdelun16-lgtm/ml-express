@@ -953,7 +953,19 @@ const [packages, setPackages] = useState<Package[]>([]);
                           💳 转账
                         </span>
                       )}
-                      {(!(pkg as any).payment_method || (pkg as any).payment_method === 'qr') && (
+                      {(pkg as any).payment_method === 'qr' && (
+                        <span style={{
+                          background: '#dbeafe',
+                          color: '#1e40af',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}>
+                          📱 二维码
+                        </span>
+                      )}
+                      {(!(pkg as any).payment_method) && (
                         <span style={{
                           background: '#dbeafe',
                           color: '#1e40af',
@@ -1210,7 +1222,19 @@ const [packages, setPackages] = useState<Package[]>([]);
                             💳 转账
                           </span>
                         )}
-                        {(!pkg.payment_method || pkg.payment_method === 'qr') && (
+                        {pkg.payment_method === 'qr' && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 二维码
+                          </span>
+                        )}
+                        {(!pkg.payment_method) && (
                           <span style={{
                             background: '#dbeafe',
                             color: '#1e40af',
