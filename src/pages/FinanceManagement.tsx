@@ -23,7 +23,7 @@ import {
   ComposedChart
 } from 'recharts';
 
-type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records';
+type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
 
@@ -912,7 +912,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             flexWrap: 'wrap'
           }}
         >
-          {(['overview', 'records', 'analytics', 'package_records', 'courier_records'] as TabKey[]).map((key) => (
+          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection'] as TabKey[]).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -932,6 +932,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {key === 'analytics' && '📈 数据分析'}
               {key === 'package_records' && '📦 包裹收支记录'}
               {key === 'courier_records' && '🚚 骑手收支记录'}
+              {key === 'cash_collection' && '💵 现金收款管理'}
             </button>
           ))}
           <button
@@ -3805,6 +3806,228 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'cash_collection' && (
+          <div>
+            {/* 顶部标题和统计 */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: isMobile ? '16px' : '24px',
+              marginBottom: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.18)'
+            }}>
+              <h3 style={{ margin: '0 0 20px 0', color: 'white', fontSize: '1.5rem' }}>
+                💵 现金收款管理
+              </h3>
+              
+              {/* 统计卡片 */}
+              {(() => {
+                const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
+                const totalCash = cashPackages.reduce((sum, pkg) => {
+                  const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                  return sum + price;
+                }, 0);
+                const courierGroups: Record<string, { packages: Package[], total: number }> = {};
+                
+                cashPackages.forEach(pkg => {
+                  const courier = pkg.courier || '未分配';
+                  if (!courierGroups[courier]) {
+                    courierGroups[courier] = { packages: [], total: 0 };
+                  }
+                  courierGroups[courier].packages.push(pkg);
+                  const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                  courierGroups[courier].total += price;
+                });
+
+                return (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '16px'
+                  }}>
+                    <div style={{
+                      background: 'rgba(254, 243, 199, 0.2)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid rgba(254, 243, 199, 0.3)'
+                    }}>
+                      <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '8px' }}>总现金收款</div>
+                      <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                        {totalCash.toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                        {cashPackages.length} 个包裹
+                      </div>
+                    </div>
+                    <div style={{
+                      background: 'rgba(219, 234, 254, 0.2)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid rgba(219, 234, 254, 0.3)'
+                    }}>
+                      <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>涉及骑手</div>
+                      <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                        {Object.keys(courierGroups).length}
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                        位骑手
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 按骑手分组的现金收款列表 */}
+            {(() => {
+              const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
+              const courierGroups: Record<string, { packages: Package[], total: number }> = {};
+              
+              cashPackages.forEach(pkg => {
+                const courier = pkg.courier || '未分配';
+                if (!courierGroups[courier]) {
+                  courierGroups[courier] = { packages: [], total: 0 };
+                }
+                courierGroups[courier].packages.push(pkg);
+                const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                courierGroups[courier].total += price;
+              });
+
+              const sortedCouriers = Object.entries(courierGroups).sort((a, b) => b[1].total - a[1].total);
+
+              if (sortedCouriers.length === 0) {
+                return (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    borderRadius: '16px',
+                    padding: '60px 20px',
+                    textAlign: 'center',
+                    border: '1px solid rgba(255, 255, 255, 0.18)'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>💵</div>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
+                      暂无现金收款记录
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {sortedCouriers.map(([courier, { packages: courierPackages, total }]) => (
+                    <div
+                      key={courier}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.12)',
+                        borderRadius: '16px',
+                        padding: isMobile ? '16px' : '24px',
+                        border: '1px solid rgba(255, 255, 255, 0.18)'
+                      }}
+                    >
+                      {/* 骑手头部信息 */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '20px',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}>
+                        <div>
+                          <h4 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 'bold' }}>
+                            🚚 {courier}
+                          </h4>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', marginTop: '4px' }}>
+                            {courierPackages.length} 个包裹
+                          </div>
+                        </div>
+                        <div style={{
+                          background: 'rgba(254, 243, 199, 0.2)',
+                          borderRadius: '12px',
+                          padding: '16px 24px',
+                          border: '1px solid rgba(254, 243, 199, 0.3)'
+                        }}>
+                          <div style={{ color: '#fef3c7', fontSize: '0.85rem', marginBottom: '4px' }}>总收款</div>
+                          <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                            {total.toLocaleString()} MMK
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 包裹列表 */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+                        gap: '12px'
+                      }}>
+                        {courierPackages.map(pkg => {
+                          const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                          return (
+                            <div
+                              key={pkg.id}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                borderRadius: '10px',
+                                padding: '16px',
+                                border: '1px solid rgba(255, 255, 255, 0.15)'
+                              }}
+                            >
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                marginBottom: '8px'
+                              }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '4px' }}>
+                                    {pkg.id}
+                                  </div>
+                                  <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem' }}>
+                                    {pkg.receiver_name} - {pkg.receiver_phone}
+                                  </div>
+                                </div>
+                                <div style={{
+                                  background: '#fef3c7',
+                                  color: '#92400e',
+                                  padding: '4px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.9rem',
+                                  fontWeight: 'bold',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {price.toLocaleString()} MMK
+                                </div>
+                              </div>
+                              <div style={{
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                fontSize: '0.8rem',
+                                marginTop: '8px',
+                                paddingTop: '8px',
+                                borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                              }}>
+                                📍 {pkg.receiver_address}
+                              </div>
+                              {pkg.delivery_time && (
+                                <div style={{
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  fontSize: '0.75rem',
+                                  marginTop: '4px'
+                                }}>
+                                  送达时间: {pkg.delivery_time}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
