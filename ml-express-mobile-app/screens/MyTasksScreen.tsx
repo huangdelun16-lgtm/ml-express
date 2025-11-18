@@ -709,11 +709,6 @@ const MyTasksScreen: React.FC = () => {
                       💵 {language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}
                     </Text>
                   )}
-                  {selectedPackage.payment_method === 'transfer' && (
-                    <Text style={[styles.detailValue, { color: '#9c27b0', fontWeight: 'bold' }]}>
-                      💳 {language === 'zh' ? '转账支付' : language === 'en' ? 'Transfer Payment' : 'လွှဲပြောင်းပေးချေမှု'}
-                    </Text>
-                  )}
                   {(!selectedPackage.payment_method || selectedPackage.payment_method === 'qr') && (
                     <Text style={[styles.detailValue, { color: '#3b82f6', fontWeight: 'bold' }]}>
                       📱 {language === 'zh' ? '二维码支付（已支付）' : language === 'en' ? 'QR Payment (Paid)' : 'QR ပေးချေမှု (ပေးချေပြီး)'}
@@ -808,7 +803,7 @@ const MyTasksScreen: React.FC = () => {
             </View>
             
             {/* 确认收款按钮（仅当状态为"待收款"时显示） */}
-            {(selectedPackage.status === '待收款' && (selectedPackage.payment_method === 'cash' || selectedPackage.payment_method === 'transfer')) && (
+            {(selectedPackage.status === '待收款' && selectedPackage.payment_method === 'cash') && (
               <View style={styles.confirmPaymentContainer}>
                 <TouchableOpacity 
                   style={styles.confirmPaymentButton}
@@ -949,12 +944,10 @@ const MyTasksScreen: React.FC = () => {
                       <Text style={styles.packageId}>{item.id}</Text>
                       <View style={styles.badgeContainer}>
                         {/* 支付方式标识 */}
-                        {(item.payment_method === 'cash' || item.payment_method === 'transfer') && (
+                        {item.payment_method === 'cash' && (
                           <View style={[styles.paymentBadge, { backgroundColor: '#f59e0b' }]}>
                             <Text style={styles.paymentBadgeText}>
-                              {item.payment_method === 'cash' 
-                                ? (language === 'zh' ? '💵 现金' : language === 'en' ? '💵 Cash' : '💵 ငွေသား')
-                                : (language === 'zh' ? '💳 转账' : language === 'en' ? '💳 Transfer' : '💳 လွှဲပြောင်း')}
+                              {language === 'zh' ? '💵 现金' : language === 'en' ? '💵 Cash' : '💵 ငွေသား'}
                             </Text>
                           </View>
                         )}

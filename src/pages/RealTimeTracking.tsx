@@ -941,18 +941,6 @@ const [packages, setPackages] = useState<Package[]>([]);
                           💵 现金
                         </span>
                       )}
-                      {(pkg as any).payment_method === 'transfer' && (
-                        <span style={{
-                          background: '#f3e5f5',
-                          color: '#7b1fa2',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          💳 转账
-                        </span>
-                      )}
                       {(pkg as any).payment_method === 'qr' && (
                         <span style={{
                           background: '#dbeafe',
@@ -1208,18 +1196,6 @@ const [packages, setPackages] = useState<Package[]>([]);
                             fontWeight: 'bold'
                           }}>
                             💵 现金
-                          </span>
-                        )}
-                        {pkg.payment_method === 'transfer' && (
-                          <span style={{
-                            background: '#f3e5f5',
-                            color: '#7b1fa2',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}>
-                            💳 转账
                           </span>
                         )}
                         {pkg.payment_method === 'qr' && (

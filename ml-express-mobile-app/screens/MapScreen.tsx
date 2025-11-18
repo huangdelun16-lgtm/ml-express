@@ -2204,7 +2204,58 @@ export default function MapScreen({ navigation }: any) {
           
           {/* 取货点信息 */}
           <View style={styles.pickupSection}>
-            <Text style={styles.sectionTitle}>📦 取货点</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+              <Text style={styles.sectionTitle}>📦 取货点</Text>
+              {/* 支付方式标识 */}
+              {item.payment_method === 'cash' && (
+                <View style={{
+                  backgroundColor: '#f59e0b',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                  }}>
+                    💵 {language === 'zh' ? '现金' : language === 'en' ? 'Cash' : 'ငွေသား'}
+                  </Text>
+                </View>
+              )}
+              {item.payment_method === 'qr' && (
+                <View style={{
+                  backgroundColor: '#3b82f6',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                  }}>
+                    📱 {language === 'zh' ? '二维码' : language === 'en' ? 'QR Code' : 'QR Code'}
+                  </Text>
+                </View>
+              )}
+              {!item.payment_method && (
+                <View style={{
+                  backgroundColor: '#6b7280',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                  }}>
+                    💰 {language === 'zh' ? '已支付' : language === 'en' ? 'Paid' : 'ပေးချေပြီး'}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.senderName}>{item.sender_name}</Text>
             <Text style={styles.address} numberOfLines={2}>{item.sender_address}</Text>
             {item.pickupCoords && (
@@ -3307,22 +3358,6 @@ export default function MapScreen({ navigation }: any) {
                               fontWeight: 'bold',
                             }}>
                               💵 {language === 'zh' ? '现金' : language === 'en' ? 'Cash' : 'ငွေသား'}
-                            </Text>
-                          </View>
-                        )}
-                        {pkg.payment_method === 'transfer' && (
-                          <View style={{
-                            backgroundColor: '#9c27b0',
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 8,
-                          }}>
-                            <Text style={{
-                              color: '#fff',
-                              fontSize: 11,
-                              fontWeight: 'bold',
-                            }}>
-                              💳 {language === 'zh' ? '转账' : language === 'en' ? 'Transfer' : 'လွှဲပြောင်း'}
                             </Text>
                           </View>
                         )}

@@ -57,7 +57,7 @@ export interface Package {
   store_receive_code?: string;
   sender_code?: string;
   transfer_code?: string;
-  payment_method?: 'qr' | 'cash' | 'transfer'; // 支付方式：qr=二维码支付，cash=现金支付，transfer=转账支付
+  payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
 }
 
 // 客户端包裹服务（只包含客户端需要的功能）

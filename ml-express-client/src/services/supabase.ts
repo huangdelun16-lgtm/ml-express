@@ -60,7 +60,7 @@ export interface Package {
   customer_rating?: number;
   customer_comment?: string;
   rating_time?: string;
-  payment_method?: 'qr' | 'cash' | 'transfer'; // 支付方式：qr=二维码支付，cash=现金支付，transfer=转账支付
+  payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
 }
 
 // 客户服务（使用users表）
