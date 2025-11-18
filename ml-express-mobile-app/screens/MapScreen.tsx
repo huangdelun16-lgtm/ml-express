@@ -2616,31 +2616,7 @@ export default function MapScreen({ navigation }: any) {
       </Modal>
 
       {location && (
-        <View style={styles.locationCard}>
-          <Text style={styles.locationIcon}>📍</Text>
-          <View style={styles.locationInfo}>
-            {language !== 'my' && (
-              <>
-                <Text style={styles.locationTitle} numberOfLines={1}>
-                  {language === 'zh' ? '我的位置' : 'My Location'}
-                </Text>
-                <Text style={styles.locationCoords}>
-                  {location?.latitude?.toFixed(4) || 'N/A'}, {location?.longitude?.toFixed(4) || 'N/A'}
-                </Text>
-                <View style={styles.trackingStatus}>
-                  <Text style={styles.trackingIcon}>
-                    {isLocationTracking ? '🟢' : '🔴'}
-                  </Text>
-                  <Text style={styles.trackingText}>
-                    {isLocationTracking 
-                      ? (language === 'zh' ? '实时追踪中' : language === 'en' ? 'Live Tracking' : 'တကယ့်အချိန်ခြေရာခံနေသည်')
-                      : (language === 'zh' ? '追踪已停止' : language === 'en' ? 'Tracking Stopped' : 'ခြေရာခံမှုရပ်ဆိုင်းထားသည်')
-                    }
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
+        <View style={styles.planRouteContainer}>
           <TouchableOpacity 
             style={[styles.navigateAllButton, packages.length === 0 && styles.navigateAllButtonDisabled]}
             onPress={handleNavigateAll}
@@ -4122,48 +4098,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  locationCard: {
-    backgroundColor: '#fff',
+  planRouteContainer: {
     margin: 16,
     marginBottom: 8,
-    padding: 16,
-    borderRadius: 12,
+    alignItems: 'flex-end', // 按钮靠右对齐
+  },
+  navigateAllButton: {
+    backgroundColor: '#3182ce',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  locationIcon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  locationInfo: {
-    flex: 1,
-    minWidth: 0, // 允许flex收缩
-    marginRight: 8, // 添加右边距，避免与按钮重叠
-  },
-  locationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    flexShrink: 1, // 允许收缩但保持在一行
-  },
-  locationCoords: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
-  navigateAllButton: {
-    backgroundColor: '#3182ce',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   navigateAllButtonDisabled: {
     backgroundColor: '#cbd5e0',
