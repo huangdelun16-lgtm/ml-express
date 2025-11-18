@@ -721,15 +721,58 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       创建时间: {pkg.create_time}
                     </p>
                   </div>
-                  <div style={{
-                    background: getStatusColor(pkg.status),
-                    color: 'white',
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{
+                      background: getStatusColor(pkg.status),
+                      color: 'white',
                       padding: '4px 12px',
                       borderRadius: '15px',
                       fontSize: '0.8rem',
-                    fontWeight: 'bold'
-                  }}>
-                    {getStatusText(pkg.status)}
+                      fontWeight: 'bold'
+                    }}>
+                      {getStatusText(pkg.status)}
+                    </div>
+                    {/* 支付方式标识（仅在待取件状态时显示） */}
+                    {pkg.status === '待取件' && (
+                      <>
+                        {pkg.payment_method === 'cash' && (
+                          <span style={{
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            💵 现金
+                          </span>
+                        )}
+                        {pkg.payment_method === 'qr' && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 二维码
+                          </span>
+                        )}
+                        {!pkg.payment_method && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 已支付
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
