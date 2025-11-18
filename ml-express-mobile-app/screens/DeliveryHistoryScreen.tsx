@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, Package } from '../services/supabase';
+import { useApp } from '../contexts/AppContext';
 
 export default function DeliveryHistoryScreen({ navigation }: any) {
+  const { language } = useApp();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,6 +49,22 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case '已取件':
+        return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
+      case '配送中':
+      case '配送进行中':
+        return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
+      case '已送达':
+        return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
+      case '已取消':
+        return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
+      default:
+        return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
+    }
+  };
+
   const filteredPackages = packages.filter(pkg => {
     if (filter === 'completed') return pkg.status === '已送达';
     if (filter === 'cancelled') return pkg.status === '已取消';
@@ -62,22 +80,28 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
         <View>
           <Text style={styles.packageId}>{item.id}</Text>
           <Text style={styles.date}>
-            {item.status === '已送达' ? `送达: ${item.delivery_time}` : `取消: ${item.create_time}`}
+            {item.status === '已送达' 
+              ? `${language === 'zh' ? '送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး'}: ${item.delivery_time}` 
+              : `${language === 'zh' ? '取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး'}: ${item.create_time}`}
           </Text>
         </View>
         <View style={[styles.statusBadge, { 
           backgroundColor: item.status === '已送达' ? '#27ae60' : '#e74c3c'
         }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
         </View>
       </View>
       
       <View style={styles.cardBody}>
-        <Text style={styles.receiver}>收件人: {item.receiver_name}</Text>
-        <Text style={styles.address} numberOfLines={1}>
-          地址: {item.receiver_address}
+        <Text style={styles.receiver}>
+          {language === 'zh' ? '收件人' : language === 'en' ? 'Receiver' : 'လက်ခံသူ'}: {item.receiver_name}
         </Text>
-        <Text style={styles.price}>价格: {item.price}</Text>
+        <Text style={styles.address} numberOfLines={1}>
+          {language === 'zh' ? '地址' : language === 'en' ? 'Address' : 'လိပ်စာ'}: {item.receiver_address}
+        </Text>
+        <Text style={styles.price}>
+          {language === 'zh' ? '价格' : language === 'en' ? 'Price' : 'စျေးနှုန်း'}: {item.price}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -92,7 +116,9 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>配送历史</Text>
+        <Text style={styles.headerTitle}>
+          {language === 'zh' ? '配送历史' : language === 'en' ? 'Delivery History' : 'ပို့ဆောင်မှုမှတ်တမ်း'}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -100,17 +126,23 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryNumber}>{completedCount}</Text>
-          <Text style={styles.summaryLabel}>已完成</Text>
+          <Text style={styles.summaryLabel}>
+            {language === 'zh' ? '已完成' : language === 'en' ? 'Completed' : 'ပြီးစီးပြီး'}
+          </Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryNumber}>{cancelledCount}</Text>
-          <Text style={styles.summaryLabel}>已取消</Text>
+          <Text style={styles.summaryLabel}>
+            {language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး'}
+          </Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryNumber}>{packages.length}</Text>
-          <Text style={styles.summaryLabel}>总计</Text>
+          <Text style={styles.summaryLabel}>
+            {language === 'zh' ? '总计' : language === 'en' ? 'Total' : 'စုစုပေါင်း'}
+          </Text>
         </View>
       </View>
 
@@ -121,7 +153,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           onPress={() => setFilter('all')}
         >
           <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            全部
+            {language === 'zh' ? '全部' : language === 'en' ? 'All' : 'အားလုံး'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -129,7 +161,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           onPress={() => setFilter('completed')}
         >
           <Text style={[styles.filterText, filter === 'completed' && styles.filterTextActive]}>
-            已完成
+            {language === 'zh' ? '已完成' : language === 'en' ? 'Completed' : 'ပြီးစီးပြီး'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -137,7 +169,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           onPress={() => setFilter('cancelled')}
         >
           <Text style={[styles.filterText, filter === 'cancelled' && styles.filterTextActive]}>
-            已取消
+            {language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -150,7 +182,9 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       ) : filteredPackages.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyText}>暂无历史记录</Text>
+          <Text style={styles.emptyText}>
+            {language === 'zh' ? '暂无历史记录' : language === 'en' ? 'No History Records' : 'မှတ်တမ်းမရှိပါ'}
+          </Text>
         </View>
       ) : (
         <FlatList
