@@ -279,6 +279,62 @@ const MyTasksScreen: React.FC = () => {
     setShowAddressModal(true);
   };
 
+  // 确认收款功能
+  const handleConfirmPayment = async () => {
+    if (!selectedPackage) return;
+    
+    Alert.alert(
+      language === 'zh' ? '确认收款' : language === 'en' ? 'Confirm Payment' : 'ငွေကောက်ခံမှုအတည်ပြုရန်',
+      `${language === 'zh' ? '确认已收到' : language === 'en' ? 'Confirm received' : 'လက်ခံရရှိပြီးဖြစ်ကြောင်း အတည်ပြုရန်'} ${selectedPackage.price} ${language === 'zh' ? '吗？' : language === 'en' ? '?' : '?'}`,
+      [
+        {
+          text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်',
+          style: 'cancel'
+        },
+        {
+          text: language === 'zh' ? '确认' : language === 'en' ? 'Confirm' : 'အတည်ပြု',
+          onPress: async () => {
+            try {
+              // 更新订单状态：从"待收款"改为"待取件"
+              const success = await packageService.updatePackageStatus(
+                selectedPackage.id,
+                '待取件',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined
+              );
+              
+              if (success) {
+                Alert.alert(
+                  language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
+                  language === 'zh' ? '收款确认成功！订单状态已更新为"待取件"。' : language === 'en' ? 'Payment confirmed! Order status updated to "Pending Pickup".' : 'ငွေကောက်ခံမှု အတည်ပြုပြီးပါပြီ! အော်ဒါအခြေအနေ "ယူရန်စောင့်ဆိုင်း" သို့ အပ်ဒိတ်လုပ်ပြီးပါပြီ။',
+                  [{ text: 'OK', onPress: () => {
+                    setShowDetailModal(false);
+                    loadMyPackages(); // 重新加载包裹列表
+                  }}]
+                );
+              } else {
+                Alert.alert(
+                  language === 'zh' ? '失败' : language === 'en' ? 'Failed' : 'မအောင်မြင်ပါ',
+                  language === 'zh' ? '更新失败，请重试。' : language === 'en' ? 'Update failed, please try again.' : 'အပ်ဒိတ်လုပ်ခြင်း မအောင်မြင်ပါ၊ ထပ်မံကြိုးစားပါ။'
+                );
+              }
+            } catch (error) {
+              console.error('确认收款失败:', error);
+              Alert.alert(
+                language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား',
+                language === 'zh' ? '操作失败，请检查网络连接。' : language === 'en' ? 'Operation failed, please check your network connection.' : 'လုပ်ဆောင်ချက် မအောင်မြင်ပါ၊ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပါ။'
+              );
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleOpenCamera = async () => {
     try {
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
@@ -643,6 +699,28 @@ const MyTasksScreen: React.FC = () => {
                 </Text>
                 <Text style={styles.detailValue}>¥{selectedPackage.estimated_cost}</Text>
               </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>
+                  {language === 'zh' ? '支付方式：' : language === 'en' ? 'Payment Method: ' : 'ပေးချေမှုနည်းလမ်း: '}
+                </Text>
+                <View style={styles.paymentMethodDisplay}>
+                  {selectedPackage.payment_method === 'cash' && (
+                    <Text style={[styles.detailValue, { color: '#f59e0b', fontWeight: 'bold' }]}>
+                      💵 {language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}
+                    </Text>
+                  )}
+                  {selectedPackage.payment_method === 'transfer' && (
+                    <Text style={[styles.detailValue, { color: '#9c27b0', fontWeight: 'bold' }]}>
+                      💳 {language === 'zh' ? '转账支付' : language === 'en' ? 'Transfer Payment' : 'လွှဲပြောင်းပေးချေမှု'}
+                    </Text>
+                  )}
+                  {(!selectedPackage.payment_method || selectedPackage.payment_method === 'qr') && (
+                    <Text style={[styles.detailValue, { color: '#3b82f6', fontWeight: 'bold' }]}>
+                      📱 {language === 'zh' ? '二维码支付（已支付）' : language === 'en' ? 'QR Payment (Paid)' : 'QR ပေးချေမှု (ပေးချေပြီး)'}
+                    </Text>
+                  )}
+                </View>
+              </View>
             </View>
             
             <View style={styles.detailSection}>
@@ -728,6 +806,20 @@ const MyTasksScreen: React.FC = () => {
                 </View>
               )}
             </View>
+            
+            {/* 确认收款按钮（仅当状态为"待收款"时显示） */}
+            {(selectedPackage.status === '待收款' && (selectedPackage.payment_method === 'cash' || selectedPackage.payment_method === 'transfer')) && (
+              <View style={styles.confirmPaymentContainer}>
+                <TouchableOpacity 
+                  style={styles.confirmPaymentButton}
+                  onPress={handleConfirmPayment}
+                >
+                  <Text style={styles.confirmPaymentButtonText}>
+                    💵 {language === 'zh' ? '确认收款' : language === 'en' ? 'Confirm Payment' : 'ငွေကောက်ခံမှုအတည်ပြုရန်'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
             {/* 新增功能按钮 */}
             <View style={styles.newActionsContainer}>
@@ -855,8 +947,27 @@ const MyTasksScreen: React.FC = () => {
                   >
                     <View style={styles.packageHeader}>
                       <Text style={styles.packageId}>{item.id}</Text>
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                        <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+                      <View style={styles.badgeContainer}>
+                        {/* 支付方式标识 */}
+                        {(item.payment_method === 'cash' || item.payment_method === 'transfer') && (
+                          <View style={[styles.paymentBadge, { backgroundColor: '#f59e0b' }]}>
+                            <Text style={styles.paymentBadgeText}>
+                              {item.payment_method === 'cash' 
+                                ? (language === 'zh' ? '💵 现金' : language === 'en' ? '💵 Cash' : '💵 ငွေသား')
+                                : (language === 'zh' ? '💳 转账' : language === 'en' ? '💳 Transfer' : '💳 လွှဲပြောင်း')}
+                            </Text>
+                          </View>
+                        )}
+                        {item.payment_method === 'qr' && (
+                          <View style={[styles.paymentBadge, { backgroundColor: '#3b82f6' }]}>
+                            <Text style={styles.paymentBadgeText}>
+                              {language === 'zh' ? '📱 已支付' : language === 'en' ? '📱 Paid' : '📱 ပေးချေပြီး'}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+                        </View>
                       </View>
                     </View>
                     
@@ -1420,6 +1531,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  paymentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  paymentBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  paymentMethodDisplay: {
+    flex: 1,
+  },
+  confirmPaymentContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  confirmPaymentButton: {
+    backgroundColor: '#f59e0b',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  confirmPaymentButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   packageId: {
     fontSize: 16,

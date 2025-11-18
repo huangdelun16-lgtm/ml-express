@@ -93,7 +93,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [qrOrderPrice, setQrOrderPrice] = useState('');
   
   // 支付方式
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash' | 'transfer'>('qr');
   
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
@@ -780,7 +780,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
-        status: paymentMethod === 'cash' ? '待收款' : '待取件', // 现金支付：状态设为"待收款"，骑手代收
+        status: (paymentMethod === 'cash' || paymentMethod === 'transfer') ? '待收款' : '待取件', // 现金/转账支付：状态设为"待收款"，骑手代收
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',
@@ -802,19 +802,22 @@ export default function PlaceOrderScreen({ navigation }: any) {
           setQrOrderPrice(isCalculated ? calculatedPrice : price);
           setShowQRCodeModal(true);
         } else {
-          // 现金支付：显示成功提示，不显示QR码
+          // 现金/转账支付：显示成功提示，不显示QR码
+          const paymentMethodText = paymentMethod === 'cash' 
+            ? (language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု')
+            : (language === 'zh' ? '转账支付' : language === 'en' ? 'Transfer Payment' : 'လွှဲပြောင်းပေးချေမှု');
           Alert.alert(
             currentT.orderSuccess,
-            `订单创建成功！\n订单号：${orderId}\n总金额：${isCalculated ? calculatedPrice : price} MMK\n\n骑手将在取件时代收费用。`,
+            `${language === 'zh' ? '订单创建成功！' : language === 'en' ? 'Order created successfully!' : 'အော်ဒါဖန်တီးခြင်းအောင်မြင်ပါသည်!'}\n${language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}：${orderId}\n${language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}：${isCalculated ? calculatedPrice : price} MMK\n${language === 'zh' ? '支付方式' : language === 'en' ? 'Payment Method' : 'ပေးချေမှုနည်းလမ်း'}：${paymentMethodText}\n\n${language === 'zh' ? '骑手将在取件时代收费用。' : language === 'en' ? 'The courier will collect payment upon pickup.' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်။'}`,
             [
               {
-                text: '查看订单',
+                text: language === 'zh' ? '查看订单' : language === 'en' ? 'View Orders' : 'အော်ဒါများကြည့်ရှုရန်',
                 onPress: () => {
                   navigation.navigate('MyOrders');
                 }
               },
               {
-                text: '继续下单',
+                text: language === 'zh' ? '继续下单' : language === 'en' ? 'Continue Ordering' : 'ဆက်လက်အော်ဒါပေးရန်',
                 onPress: () => {
                   resetForm();
                 }
@@ -1285,10 +1288,35 @@ export default function PlaceOrderScreen({ navigation }: any) {
                     styles.paymentMethodLabel,
                     paymentMethod === 'cash' && styles.paymentMethodLabelActive
                   ]}>
-                    💵 现金支付
+                    💵 {language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}
                   </Text>
                   <Text style={styles.paymentMethodDesc}>
-                    骑手将在取件时代收费用
+                    {language === 'zh' ? '骑手将在取件时代收费用' : language === 'en' ? 'Courier will collect payment upon pickup' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* 转账支付 */}
+              <TouchableOpacity
+                style={[
+                  styles.paymentMethodOption,
+                  paymentMethod === 'transfer' && styles.paymentMethodOptionActive
+                ]}
+                onPress={() => setPaymentMethod('transfer')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.paymentMethodRadio}>
+                  {paymentMethod === 'transfer' && <View style={styles.paymentMethodRadioInner} />}
+                </View>
+                <View style={styles.paymentMethodContent}>
+                  <Text style={[
+                    styles.paymentMethodLabel,
+                    paymentMethod === 'transfer' && styles.paymentMethodLabelActive
+                  ]}>
+                    💳 {language === 'zh' ? '转账支付' : language === 'en' ? 'Transfer Payment' : 'လွှဲပြောင်းပေးချေမှု'}
+                  </Text>
+                  <Text style={styles.paymentMethodDesc}>
+                    {language === 'zh' ? '骑手将在取件时确认转账' : language === 'en' ? 'Courier will confirm transfer upon pickup' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ လွှဲပြောင်းမှုကို အတည်ပြုမည်'}
                   </Text>
                 </View>
               </TouchableOpacity>

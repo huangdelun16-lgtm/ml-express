@@ -118,7 +118,7 @@ const HomePage: React.FC = () => {
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr'); // 支付方式：二维码或现金
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash' | 'transfer'>('qr'); // 支付方式：二维码、现金或转账
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   // const [orderData, setOrderData] = useState<any>(null);
   
@@ -3159,10 +3159,73 @@ const HomePage: React.FC = () => {
                   <div style={{ fontSize: '2rem' }}>💵</div>
                   <div style={{ fontWeight: 'bold', color: '#27ae60' }}>{t.ui.cashPayment}</div>
                 </button>
+                
+                {/* 转账支付选项 */}
+                <button
+                  onClick={async () => {
+                    setPaymentMethod('transfer');
+                    setPaymentQRCode(''); // 清除二维码
+                    // 更新数据库中的支付方式
+                    if (tempOrderId) {
+                      try {
+                        const dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(tempOrderId);
+                        if (dbPendingOrder) {
+                          // 更新数据库中的支付方式
+                          const { error } = await supabase
+                            .from('pending_orders')
+                            .update({ payment_method: 'transfer' })
+                            .eq('temp_order_id', tempOrderId);
+                          if (error) {
+                            console.error('更新支付方式失败:', error);
+                          }
+                        }
+                      } catch (err) {
+                        console.error('更新支付方式异常:', err);
+                      }
+                    }
+                    // 同时更新localStorage（向后兼容）
+                    const pendingOrder = localStorage.getItem('pendingOrder');
+                    if (pendingOrder) {
+                      const orderInfo = JSON.parse(pendingOrder);
+                      orderInfo.paymentMethod = 'transfer';
+                      localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    borderRadius: '10px',
+                    border: paymentMethod === 'transfer' ? '3px solid #9c27b0' : '2px solid #dee2e6',
+                    background: paymentMethod === 'transfer' ? '#f3e5f5' : 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseOver={(e) => {
+                    if (paymentMethod !== 'transfer') {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.borderColor = '#9c27b0';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (paymentMethod !== 'transfer') {
+                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.borderColor = '#dee2e6';
+                    }
+                  }}
+                >
+                  <div style={{ fontSize: '2rem' }}>💳</div>
+                  <div style={{ fontWeight: 'bold', color: '#9c27b0' }}>
+                    {language === 'zh' ? '转账支付' : language === 'en' ? 'Transfer Payment' : 'လွှဲပြောင်းပေးချေမှု'}
+                  </div>
+                </button>
               </div>
               
-              {/* 现金支付说明 */}
-              {paymentMethod === 'cash' && (
+              {/* 现金/转账支付说明 */}
+              {(paymentMethod === 'cash' || paymentMethod === 'transfer') && (
                 <div style={{
                   background: '#fff3cd',
                   padding: '0.75rem',
@@ -3172,7 +3235,9 @@ const HomePage: React.FC = () => {
                   color: '#856404',
                   textAlign: 'center'
                 }}>
-                  💡 {t.ui.cashPaymentDesc}
+                  💡 {paymentMethod === 'cash' 
+                    ? t.ui.cashPaymentDesc 
+                    : (language === 'zh' ? '选择转账支付，骑手将在取件时确认转账' : language === 'en' ? 'Select transfer payment, courier will confirm transfer upon pickup' : 'လွှဲပြောင်းပေးချေမှုကို ရွေးချယ်ပါ၊ ကူရီယာသည် ပစ္စည်းယူသောအခါ လွှဲပြောင်းမှုကို အတည်ပြုမည်')}
                 </div>
               )}
             </div>
@@ -3304,9 +3369,9 @@ const HomePage: React.FC = () => {
                       : (orderInfo.weight || '1'); // 默认重量为 1kg
                     
                     // 根据支付方式设置订单状态
-                    // 现金支付：状态设为"待收款"，骑手代收
+                    // 现金/转账支付：状态设为"待收款"，骑手代收
                     // 二维码支付：状态设为"待取件"，已支付
-                    const orderStatus = currentPaymentMethod === 'cash' ? '待收款' : '待取件';
+                    const orderStatus = (currentPaymentMethod === 'cash' || currentPaymentMethod === 'transfer') ? '待收款' : '待取件';
                     
                     const packageData = {
                       id: packageId,
@@ -3330,7 +3395,8 @@ const HomePage: React.FC = () => {
                       pickup_time: '',
                       delivery_time: '',
                       courier: '待分配',
-                      price: `${orderInfo.price || calculatedPrice} MMK`
+                      price: `${orderInfo.price || calculatedPrice} MMK`,
+                      payment_method: currentPaymentMethod // 添加支付方式字段
                     };
                     
                     // 保存到数据库

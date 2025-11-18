@@ -39,6 +39,8 @@ export interface Package {
   // 新增配送相关字段
   delivery_speed?: string; // 配送速度
   scheduled_delivery_time?: string; // 定时配送时间
+  // 新增支付方式字段
+  payment_method?: 'qr' | 'cash' | 'transfer'; // 支付方式：qr=二维码支付，cash=现金支付，transfer=转账支付
 }
 
 export interface AdminAccount {
