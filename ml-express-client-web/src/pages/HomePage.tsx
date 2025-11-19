@@ -1812,78 +1812,7 @@ const HomePage: React.FC = () => {
             justifyContent: window.innerWidth < 1024 ? 'flex-start' : 'flex-end',
             rowGap: '0.5rem'
           }}>
-            <div style={{ position: 'relative' }} data-language-dropdown>
-            <button
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              padding: '0.5rem',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-                backdropFilter: 'blur(10px)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                minWidth: '120px',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span>{language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'}</span>
-              <span style={{ fontSize: '0.8rem' }}>▼</span>
-            </button>
-            
-            {showLanguageDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                background: 'rgba(0,0,0,0.8)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '5px',
-                marginTop: '2px',
-                zIndex: 1000,
-                overflow: 'hidden'
-              }}>
-                {[
-                  { value: 'zh', label: '中文' },
-                  { value: 'en', label: 'English' },
-                  { value: 'my', label: 'မြန်မာ' }
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      console.log('Language changed to:', option.value);
-                      handleLanguageChange(option.value);
-                      setShowLanguageDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.5rem',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-                      transition: 'background 0.2s ease'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* 注册/登录按钮（放在语言选择器右侧） */}
+          {/* 注册/登录按钮（放在语言选择器左侧） */}
           {currentUser ? (
             <div style={{
               display: 'flex',
@@ -1994,6 +1923,78 @@ const HomePage: React.FC = () => {
               </button>
             </div>
           )}
+          
+          {/* 语言选择器（放在注册/登录按钮右侧） */}
+          <div style={{ position: 'relative' }} data-language-dropdown>
+            <button
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                padding: '0.5rem',
+                borderRadius: '5px',
+                fontWeight: 'bold',
+                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                backdropFilter: 'blur(10px)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                minWidth: '120px',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span>{language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'}</span>
+              <span style={{ fontSize: '0.8rem' }}>▼</span>
+            </button>
+            
+            {showLanguageDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: 'rgba(0,0,0,0.8)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '5px',
+                marginTop: '2px',
+                zIndex: 1000,
+                overflow: 'hidden'
+              }}>
+                {[
+                  { value: 'zh', label: '中文' },
+                  { value: 'en', label: 'English' },
+                  { value: 'my', label: 'မြန်မာ' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      console.log('Language changed to:', option.value);
+                      handleLanguageChange(option.value);
+                      setShowLanguageDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.5rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                      transition: 'background 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         </div>
       </nav>
