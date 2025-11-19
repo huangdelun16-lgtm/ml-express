@@ -13,6 +13,7 @@ import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import NetInfo from '@react-native-community/netinfo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -25,6 +26,8 @@ export default function ScanScreen({ navigation }: any) {
   const [currentCourierId, setCurrentCourierId] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   const scannedDataRef = useRef<string | null>(null);
   const lastScanTimeRef = useRef<number>(0);
   
@@ -36,6 +39,28 @@ export default function ScanScreen({ navigation }: any) {
   useEffect(() => {
     loadCurrentCourierInfo();
   }, []);
+
+  // 监听网络状态
+  useEffect(() => {
+    // 初始检查
+    NetInfo.fetch().then(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+
+    // 监听网络状态变化
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const isNowOnline = state.isConnected ?? false;
+      setIsOnline(isNowOnline);
+      if (isNowOnline && networkError) {
+        // 网络恢复时清除错误
+        setNetworkError(null);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [networkError]);
 
   // 启动扫描线动画
   useEffect(() => {
@@ -177,6 +202,18 @@ export default function ScanScreen({ navigation }: any) {
 
   const searchPackage = async (packageId: string) => {
     try {
+      // 检查网络状态
+      if (!isOnline) {
+        Alert.alert(
+          '网络未连接',
+          '请检查网络连接后重试',
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+        return;
+      }
+
       // 检查是否是店长收件码
       if (packageId.startsWith('STORE_')) {
         await handleStoreReceiveCode(packageId);
@@ -189,7 +226,42 @@ export default function ScanScreen({ navigation }: any) {
         return;
       }
 
-      const packages = await packageService.getAllPackages();
+      let packages: any[] = [];
+      try {
+        packages = await packageService.getAllPackages();
+      } catch (error: any) {
+        console.error('获取包裹列表失败:', error);
+        const errorMessage = error?.message || '未知错误';
+        
+        // 检查是否是网络错误
+        if (
+          errorMessage.includes('Network') || 
+          errorMessage.includes('connection') ||
+          errorMessage.includes('gateway') ||
+          errorMessage.includes('Network connection lost')
+        ) {
+          setNetworkError('网络连接失败，请检查网络后重试');
+          Alert.alert(
+            '网络错误',
+            '无法连接到服务器，请检查网络连接后重试',
+            [
+              { text: '确定', onPress: resetScanState }
+            ]
+          );
+          return;
+        }
+        
+        // 其他错误
+        Alert.alert(
+          '查询失败',
+          '无法获取包裹列表，请稍后重试',
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+        return;
+      }
+
       const foundPackage = packages.find(p => p.id === packageId);
 
       if (foundPackage) {
@@ -246,10 +318,30 @@ export default function ScanScreen({ navigation }: any) {
           { text: '确定', onPress: resetScanState }
         ]);
       }
-    } catch (error) {
-      Alert.alert('错误', '查询包裹失败', [
-        { text: '确定', onPress: resetScanState }
-      ]);
+    } catch (error: any) {
+      console.error('查询包裹失败:', error);
+      const errorMessage = error?.message || '未知错误';
+      
+      // 检查是否是网络错误
+      if (
+        errorMessage.includes('Network') || 
+        errorMessage.includes('connection') ||
+        errorMessage.includes('gateway') ||
+        errorMessage.includes('Network connection lost')
+      ) {
+        setNetworkError('网络连接失败，请检查网络后重试');
+        Alert.alert(
+          '网络错误',
+          '无法连接到服务器，请检查网络连接后重试',
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+      } else {
+        Alert.alert('错误', '查询包裹失败，请稍后重试', [
+          { text: '确定', onPress: resetScanState }
+        ]);
+      }
     }
   };
 
@@ -257,8 +349,53 @@ export default function ScanScreen({ navigation }: any) {
     try {
       console.log('处理中转码:', transferCode);
       
+      // 检查网络状态
+      if (!isOnline) {
+        Alert.alert(
+          '网络未连接',
+          '请检查网络连接后重试',
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+        return;
+      }
+
       // 查找具有此中转码的包裹
-      const packages = await packageService.getAllPackages();
+      let packages: any[] = [];
+      try {
+        packages = await packageService.getAllPackages();
+      } catch (error: any) {
+        console.error('获取包裹列表失败:', error);
+        const errorMessage = error?.message || '未知错误';
+        
+        if (
+          errorMessage.includes('Network') || 
+          errorMessage.includes('connection') ||
+          errorMessage.includes('gateway') ||
+          errorMessage.includes('Network connection lost')
+        ) {
+          setNetworkError('网络连接失败，请检查网络后重试');
+          Alert.alert(
+            '网络错误',
+            '无法连接到服务器，请检查网络连接后重试',
+            [
+              { text: '确定', onPress: resetScanState }
+            ]
+          );
+          return;
+        }
+        
+        Alert.alert(
+          '查询失败',
+          '无法获取包裹列表，请稍后重试',
+          [
+            { text: '确定', onPress: resetScanState }
+          ]
+        );
+        return;
+      }
+      
       const foundPackage = packages.find(p => p.transfer_code === transferCode);
       
       if (!foundPackage) {
@@ -428,6 +565,11 @@ export default function ScanScreen({ navigation }: any) {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>📦 智能扫码</Text>
           <Text style={styles.headerSubtitle}>快速扫描包裹 · 中转码</Text>
+          {!isOnline && (
+            <View style={styles.networkStatusBadge}>
+              <Text style={styles.networkStatusText}>⚠️ 网络未连接</Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity 
           onPress={() => setShowManualInput(!showManualInput)}
@@ -1039,5 +1181,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  networkStatusBadge: {
+    marginTop: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+  },
+  networkStatusText: {
+    color: '#fef2f2',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

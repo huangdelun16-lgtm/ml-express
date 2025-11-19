@@ -152,23 +152,59 @@ export const adminAccountService = {
 
 // 包裹服务
 export const packageService = {
-  async getAllPackages(): Promise<Package[]> {
-    try {
-      const { data, error } = await supabase
-        .from('packages')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('获取包裹列表失败:', error);
-        return [];
+  async getAllPackages(retryCount = 2): Promise<Package[]> {
+    let lastError: any = null;
+    
+    for (let attempt = 0; attempt <= retryCount; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('packages')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          lastError = error;
+          // 如果是网络错误且还有重试次数，等待后重试
+          if (attempt < retryCount && (
+            error.message?.includes('Network') || 
+            error.message?.includes('connection') ||
+            error.message?.includes('gateway')
+          )) {
+            console.warn(`获取包裹列表失败 (尝试 ${attempt + 1}/${retryCount + 1}):`, error.message);
+            // 等待时间递增：1秒、2秒
+            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+            continue;
+          }
+          console.error('获取包裹列表失败:', error);
+          throw error;
+        }
+        
+        return data || [];
+      } catch (err: any) {
+        lastError = err;
+        // 如果是网络错误且还有重试次数，等待后重试
+        if (attempt < retryCount && (
+          err?.message?.includes('Network') || 
+          err?.message?.includes('connection') ||
+          err?.message?.includes('gateway') ||
+          err?.message?.includes('Network connection lost')
+        )) {
+          console.warn(`获取包裹列表异常 (尝试 ${attempt + 1}/${retryCount + 1}):`, err?.message);
+          // 等待时间递增：1秒、2秒
+          await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+          continue;
+        }
+        // 最后一次尝试失败，抛出错误
+        if (attempt === retryCount) {
+          console.error('获取包裹列表异常 (所有重试失败):', err);
+          throw err;
+        }
       }
-      
-      return data || [];
-    } catch (err) {
-      console.error('获取包裹列表异常:', err);
-      return [];
     }
+    
+    // 如果所有重试都失败，返回空数组（保持向后兼容）
+    console.error('获取包裹列表失败，所有重试已用尽');
+    return [];
   },
 
   async createPackage(packageData: Package): Promise<Package | null> {
