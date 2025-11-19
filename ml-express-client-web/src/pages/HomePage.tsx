@@ -1812,8 +1812,8 @@ const HomePage: React.FC = () => {
             justifyContent: window.innerWidth < 1024 ? 'flex-start' : 'flex-end',
             rowGap: '0.5rem'
           }}>
-          {/* 注册/登录按钮（放在语言选择器左侧） */}
-          {currentUser ? (
+            {/* 注册/登录按钮（放在语言选择器左侧） */}
+            {currentUser ? (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1924,18 +1924,18 @@ const HomePage: React.FC = () => {
             </div>
           )}
           
-          {/* 语言选择器（放在注册/登录按钮右侧） */}
-          <div style={{ position: 'relative' }} data-language-dropdown>
+            {/* 语言选择器（放在用户卡片右侧） */}
+            <div style={{ position: 'relative' }} data-language-dropdown>
             <button
               onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '0.5rem',
-                borderRadius: '5px',
-                fontWeight: 'bold',
-                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '0.5rem',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
                 backdropFilter: 'blur(10px)',
                 cursor: 'pointer',
                 display: 'flex',
