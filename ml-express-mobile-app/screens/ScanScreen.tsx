@@ -9,7 +9,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -101,7 +101,9 @@ export default function ScanScreen({ navigation }: any) {
       if (!permission.granted) {
         setCameraError('相机权限未授予');
       } else {
+        // 权限已授予，清除之前的错误
         setCameraError(null);
+        console.log('相机权限已授予，准备初始化相机');
       }
     }
   }, [permission]);
@@ -133,21 +135,7 @@ export default function ScanScreen({ navigation }: any) {
     );
   }
 
-  // 如果相机有错误，显示错误信息
-  if (cameraError) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>❌</Text>
-          <Text style={styles.permissionTitle}>相机错误</Text>
-          <Text style={styles.permissionDesc}>{cameraError}</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={() => setCameraError(null)}>
-            <Text style={styles.permissionButtonText}>重试</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  // 注意：相机错误现在在扫码界面中显示，而不是阻止整个页面
 
   const handleBarCodeScanned = async ({ data }: any) => {
     const currentTime = Date.now();
@@ -454,32 +442,11 @@ export default function ScanScreen({ navigation }: any) {
       {/* 扫码界面 */}
       {!showManualInput ? (
         <View style={styles.scanContainer}>
-          {cameraError ? (
-            <View style={styles.cameraErrorContainer}>
-              <View style={styles.errorIconContainer}>
-                <Text style={styles.cameraErrorIcon}>📷</Text>
-              </View>
-              <Text style={styles.cameraErrorTitle}>相机启动失败</Text>
-              <Text style={styles.cameraErrorDesc}>{cameraError}</Text>
-              <TouchableOpacity 
-                style={styles.retryButton}
-                onPress={() => {
-                  setCameraError(null);
-                  requestPermission();
-                }}
-              >
-                <LinearGradient
-                  colors={['#3498db', '#2980b9']}
-                  style={styles.retryButtonGradient}
-                >
-                  <Text style={styles.retryButtonText}>重试</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          ) : (
+          {permission?.granted ? (
             <View style={styles.cameraContainer}>
               <CameraView
                 style={styles.camera}
+                facing="back"
                 onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                 barcodeScannerSettings={{
                   barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
@@ -490,7 +457,7 @@ export default function ScanScreen({ navigation }: any) {
                 }}
                 onMountError={(error) => {
                   console.error('相机挂载错误:', error);
-                  setCameraError('相机无法启动，请检查设备权限');
+                  setCameraError('相机无法启动，请检查设备权限或重启应用');
                 }}
               >
                 {/* 遮罩层 */}
@@ -532,6 +499,49 @@ export default function ScanScreen({ navigation }: any) {
                   </View>
                 </View>
               </CameraView>
+              {cameraError && (
+                <View style={styles.cameraErrorOverlay}>
+                  <View style={styles.cameraErrorCard}>
+                    <Text style={styles.cameraErrorIcon}>⚠️</Text>
+                    <Text style={styles.cameraErrorTitle}>相机错误</Text>
+                    <Text style={styles.cameraErrorDesc}>{cameraError}</Text>
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={() => {
+                        setCameraError(null);
+                        // 重新请求权限
+                        requestPermission();
+                      }}
+                    >
+                      <LinearGradient
+                        colors={['#3498db', '#2980b9']}
+                        style={styles.retryButtonGradient}
+                      >
+                        <Text style={styles.retryButtonText}>重试</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.cameraErrorContainer}>
+              <View style={styles.errorIconContainer}>
+                <Text style={styles.cameraErrorIcon}>📷</Text>
+              </View>
+              <Text style={styles.cameraErrorTitle}>相机权限未授予</Text>
+              <Text style={styles.cameraErrorDesc}>请授予相机权限以使用扫码功能</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={requestPermission}
+              >
+                <LinearGradient
+                  colors={['#3498db', '#2980b9']}
+                  style={styles.retryButtonGradient}
+                >
+                  <Text style={styles.retryButtonText}>授予权限</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -650,9 +660,13 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     flex: 1,
+    backgroundColor: '#000',
+    overflow: 'hidden',
   },
   camera: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   maskContainer: {
     flex: 1,
@@ -734,6 +748,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#000',
     padding: 40,
+  },
+  cameraErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  cameraErrorCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: SCREEN_WIDTH - 80,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   errorIconContainer: {
     width: 120,
@@ -965,5 +1002,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2c5282',
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 40,
+  },
+  permissionText: {
+    fontSize: 64,
+    marginBottom: 24,
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  permissionDesc: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
+    maxWidth: 280,
+  },
+  permissionButton: {
+    backgroundColor: '#2c5282',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
