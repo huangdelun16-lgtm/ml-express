@@ -907,26 +907,28 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
                       </button>
                     </div>
-                  </div>
-                </div>
-
-                <div style={{
-                  display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: '6px',
-                    marginTop: '2px'
-                }}>
-                  <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.8rem' }}>寄件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
-                      {pkg.sender_name} - {pkg.sender_phone}
-                    </p>
-                  </div>
-                  <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.8rem' }}>收件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
-                      {pkg.receiver_name} - {pkg.receiver_phone}
-                    </p>
+                    
+                    {/* 寄件人和收件人信息 - 移动到按钮下方 */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: '4px',
+                      marginTop: '4px'
+                    }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.75rem' }}>寄件人</h4>
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.75rem' }}>
+                          {pkg.sender_name} - {pkg.sender_phone}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.75rem' }}>收件人</h4>
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.75rem' }}>
+                          {pkg.receiver_name} - {pkg.receiver_phone}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
