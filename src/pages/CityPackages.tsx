@@ -721,8 +721,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       创建时间: {pkg.create_time}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                    {/* 状态和付款方式 */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <div style={{
                         background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
                         color: 'white',
@@ -775,138 +776,138 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         </>
                       )}
                     </div>
+                    
+                    {/* 按钮区域 - 在状态和付款方式下方，右对齐 */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      justifyContent: 'flex-end'
+                    }}>
+                      {/* 状态操作按钮 */}
+                      {pkg.status === '待取件' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '已取件')}
+                          style={{
+                            background: '#3498db',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            minHeight: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
+                        </button>
+                      )}
+                      {pkg.status === '已取件' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '配送中')}
+                          style={{
+                            background: '#9b59b6',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            minHeight: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
+                        </button>
+                      )}
+                      {pkg.status === '配送中' && (
+                        <button
+                          onClick={() => updatePackageStatus(pkg.id, '已送达')}
+                          style={{
+                            background: '#27ae60',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            minHeight: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
+                        </button>
+                      )}
+                      
+                      {/* 功能按钮 */}
+                      <button
+                        onClick={() => showPickupCode(pkg)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          minHeight: '28px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '3px',
+                          backdropFilter: 'blur(10px)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                      >
+                        📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
+                      </button>
+                      
+                      <button
+                        onClick={() => handleViewDetail(pkg)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          minHeight: '28px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                      >
+                        {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                {/* 按钮区域 - 移动到状态和付款方式下面 */}
-                <div style={{
-                  display: 'flex',
-                  gap: '6px',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  marginBottom: '6px'
-                }}>
-                  {/* 状态操作按钮 */}
-                  {pkg.status === '待取件' && (
-                    <button
-                      onClick={() => updatePackageStatus(pkg.id, '已取件')}
-                      style={{
-                        background: '#3498db',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        minHeight: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
-                    </button>
-                  )}
-                  {pkg.status === '已取件' && (
-                    <button
-                      onClick={() => updatePackageStatus(pkg.id, '配送中')}
-                      style={{
-                        background: '#9b59b6',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        minHeight: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
-                    </button>
-                  )}
-                  {pkg.status === '配送中' && (
-                    <button
-                      onClick={() => updatePackageStatus(pkg.id, '已送达')}
-                      style={{
-                        background: '#27ae60',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        minHeight: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
-                    </button>
-                  )}
-                  
-                  {/* 功能按钮 */}
-                  <button
-                    onClick={() => showPickupCode(pkg)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '6px 12px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      minHeight: '28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '3px',
-                      backdropFilter: 'blur(10px)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    }}
-                  >
-                    📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
-                  </button>
-                  
-                  <button
-                    onClick={() => handleViewDetail(pkg)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '6px 12px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      minHeight: '28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    }}
-                  >
-                    {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
-                  </button>
                 </div>
 
                 <div style={{
