@@ -309,3 +309,35 @@ textarea::placeholder {
   animation: slideIn var(--transition-base);
 }
 
+/* ========== 缅语字体缩小2号 ========== */
+/* 当语言为缅语时，所有文本字体缩小2px */
+body[data-language="my"] *,
+body[data-language="my"],
+[lang="my"],
+*[lang="my"],
+[data-lang="my"],
+.myanmar-text {
+  font-size: calc(100% - 2px) !important;
+}
+
+/* 针对特定元素的缅语字体缩小 */
+body[data-language="my"] h1,
+body[data-language="my"] h2,
+body[data-language="my"] h3,
+body[data-language="my"] h4,
+body[data-language="my"] h5,
+body[data-language="my"] h6,
+body[data-language="my"] p,
+body[data-language="my"] span,
+body[data-language="my"] div,
+body[data-language="my"] button,
+body[data-language="my"] input,
+body[data-language="my"] textarea,
+body[data-language="my"] label,
+body[data-language="my"] a,
+body[data-language="my"] li,
+body[data-language="my"] td,
+body[data-language="my"] th {
+  font-size: calc(100% - 2px) !important;
+}
+

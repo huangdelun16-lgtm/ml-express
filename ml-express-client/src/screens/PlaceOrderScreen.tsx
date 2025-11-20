@@ -23,12 +23,14 @@ import { useLoading } from '../contexts/LoadingContext';
 import { packageService, systemSettingsService } from '../services/supabase';
 import { FadeInView, ScaleInView } from '../components/Animations';
 import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
+import { useLanguageStyles } from '../hooks/useLanguageStyles';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PlaceOrderScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
+  const styles = useLanguageStyles(baseStyles);
   
   // 用户信息
   const [userId, setUserId] = useState('');
@@ -1698,7 +1700,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',

@@ -14,10 +14,13 @@ import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
+import { useApp } from '../contexts/AppContext';
+import { useLanguageStyles } from '../hooks/useLanguageStyles';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ScanScreen({ navigation }: any) {
+  const { language } = useApp();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [manualInput, setManualInput] = useState('');
@@ -34,6 +37,103 @@ export default function ScanScreen({ navigation }: any) {
   // 扫描动画
   const scanAnimation = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
+
+  // 翻译文本
+  const translations = {
+    zh: {
+      headerTitle: '📦 智能扫码',
+      headerSubtitle: '快速扫描包裹 · 中转码',
+      scanButton: '📷 扫码',
+      inputButton: '⌨️ 输入',
+      checkingPermission: '正在检查相机权限...',
+      pleaseWait: '请稍候',
+      needPermission: '需要相机权限',
+      permissionDesc: '扫描包裹二维码、中转码需要使用相机',
+      grantPermission: '授予权限',
+      networkNotConnected: '网络未连接',
+      checkNetwork: '请检查网络连接后重试',
+      ok: '确定',
+      cameraError: '相机错误',
+      cameraNotGranted: '相机权限未授予',
+      grantCameraPermission: '请授予相机权限以使用扫码功能',
+      alignFrame: '对准扫描框',
+      alignFrameDesc: '将二维码或条形码对准扫描框',
+      qrCode: 'QR码',
+      barcode: '条形码',
+      transferCode: '中转码',
+      processing: '处理中...',
+      processingDesc: '正在查询包裹信息',
+      scanSuccess: '扫描成功',
+      rescan: '🔄 重新扫描',
+      manualInputTitle: '手动输入包裹编号或中转码',
+      inputPlaceholder: '例如：PKG001 或 TCABC1234',
+      searchPackage: '查询包裹',
+    },
+    en: {
+      headerTitle: '📦 Smart Scan',
+      headerSubtitle: 'Quick scan packages · Transfer codes',
+      scanButton: '📷 Scan',
+      inputButton: '⌨️ Input',
+      checkingPermission: 'Checking camera permission...',
+      pleaseWait: 'Please wait',
+      needPermission: 'Camera permission required',
+      permissionDesc: 'Scanning package QR codes and transfer codes requires camera access',
+      grantPermission: 'Grant Permission',
+      networkNotConnected: 'Network not connected',
+      checkNetwork: 'Please check your network connection and try again',
+      ok: 'OK',
+      cameraError: 'Camera Error',
+      cameraNotGranted: 'Camera permission not granted',
+      grantCameraPermission: 'Please grant camera permission to use scan feature',
+      alignFrame: 'Align with frame',
+      alignFrameDesc: 'Align QR code or barcode with the scanning frame',
+      qrCode: 'QR Code',
+      barcode: 'Barcode',
+      transferCode: 'Transfer Code',
+      processing: 'Processing...',
+      processingDesc: 'Querying package information',
+      scanSuccess: 'Scan Success',
+      rescan: '🔄 Rescan',
+      manualInputTitle: 'Manually enter package ID or transfer code',
+      inputPlaceholder: 'e.g.: PKG001 or TCABC1234',
+      searchPackage: 'Search Package',
+    },
+    my: {
+      // 缅文版使用英文，但字体会缩小2号
+      headerTitle: '📦 Smart Scan',
+      headerSubtitle: 'Quick scan packages · Transfer codes',
+      scanButton: '📷 Scan',
+      inputButton: '⌨️ Input',
+      checkingPermission: 'Checking camera permission...',
+      pleaseWait: 'Please wait',
+      needPermission: 'Camera permission required',
+      permissionDesc: 'Scanning package QR codes and transfer codes requires camera access',
+      grantPermission: 'Grant Permission',
+      networkNotConnected: 'Network not connected',
+      checkNetwork: 'Please check your network connection and try again',
+      ok: 'OK',
+      cameraError: 'Camera Error',
+      cameraNotGranted: 'Camera permission not granted',
+      grantCameraPermission: 'Please grant camera permission to use scan feature',
+      alignFrame: 'Align with frame',
+      alignFrameDesc: 'Align QR code or barcode with the scanning frame',
+      qrCode: 'QR Code',
+      barcode: 'Barcode',
+      transferCode: 'Transfer Code',
+      processing: 'Processing...',
+      processingDesc: 'Querying package information',
+      scanSuccess: 'Scan Success',
+      rescan: '🔄 Rescan',
+      manualInputTitle: 'Manually enter package ID or transfer code',
+      inputPlaceholder: 'e.g.: PKG001 or TCABC1234',
+      searchPackage: 'Search Package',
+    },
+  };
+
+  const t = translations[language] || translations.zh;
+
+  // 应用语言样式（缅语字体缩小2号）- 必须在所有使用styles之前
+  const styles = useLanguageStyles(baseStyles);
 
   // 加载当前骑手信息 - 必须在所有条件渲染之前
   useEffect(() => {
@@ -138,8 +238,8 @@ export default function ScanScreen({ navigation }: any) {
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>📷</Text>
-          <Text style={styles.permissionTitle}>正在检查相机权限...</Text>
-          <Text style={styles.permissionDesc}>请稍候</Text>
+          <Text style={styles.permissionTitle}>{t.checkingPermission}</Text>
+          <Text style={styles.permissionDesc}>{t.pleaseWait}</Text>
         </View>
       </View>
     );
@@ -150,10 +250,10 @@ export default function ScanScreen({ navigation }: any) {
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>📷</Text>
-          <Text style={styles.permissionTitle}>需要相机权限</Text>
-          <Text style={styles.permissionDesc}>扫描包裹二维码、中转码需要使用相机</Text>
+          <Text style={styles.permissionTitle}>{t.needPermission}</Text>
+          <Text style={styles.permissionDesc}>{t.permissionDesc}</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>授予权限</Text>
+            <Text style={styles.permissionButtonText}>{t.grantPermission}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -563,11 +663,11 @@ export default function ScanScreen({ navigation }: any) {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>📦 智能扫码</Text>
-          <Text style={styles.headerSubtitle}>快速扫描包裹 · 中转码</Text>
+          <Text style={styles.headerTitle}>{t.headerTitle}</Text>
+          <Text style={styles.headerSubtitle}>{t.headerSubtitle}</Text>
           {!isOnline && (
             <View style={styles.networkStatusBadge}>
-              <Text style={styles.networkStatusText}>⚠️ 网络未连接</Text>
+              <Text style={styles.networkStatusText}>⚠️ {t.networkNotConnected}</Text>
             </View>
           )}
         </View>
@@ -576,7 +676,7 @@ export default function ScanScreen({ navigation }: any) {
           style={styles.manualButton}
         >
           <Text style={styles.manualButtonText}>
-            {showManualInput ? '📷 扫码' : '⌨️ 输入'}
+            {showManualInput ? t.scanButton : t.inputButton}
           </Text>
         </TouchableOpacity>
       </LinearGradient>
@@ -645,7 +745,7 @@ export default function ScanScreen({ navigation }: any) {
                 <View style={styles.cameraErrorOverlay}>
                   <View style={styles.cameraErrorCard}>
                     <Text style={styles.cameraErrorIcon}>⚠️</Text>
-                    <Text style={styles.cameraErrorTitle}>相机错误</Text>
+                    <Text style={styles.cameraErrorTitle}>{t.cameraError}</Text>
                     <Text style={styles.cameraErrorDesc}>{cameraError}</Text>
                     <TouchableOpacity 
                       style={styles.retryButton}
@@ -659,7 +759,7 @@ export default function ScanScreen({ navigation }: any) {
                         colors={['#3498db', '#2980b9']}
                         style={styles.retryButtonGradient}
                       >
-                        <Text style={styles.retryButtonText}>重试</Text>
+                        <Text style={styles.retryButtonText}>{t.ok}</Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -671,8 +771,8 @@ export default function ScanScreen({ navigation }: any) {
               <View style={styles.errorIconContainer}>
                 <Text style={styles.cameraErrorIcon}>📷</Text>
               </View>
-              <Text style={styles.cameraErrorTitle}>相机权限未授予</Text>
-              <Text style={styles.cameraErrorDesc}>请授予相机权限以使用扫码功能</Text>
+              <Text style={styles.cameraErrorTitle}>{t.cameraNotGranted}</Text>
+              <Text style={styles.cameraErrorDesc}>{t.grantCameraPermission}</Text>
               <TouchableOpacity 
                 style={styles.retryButton}
                 onPress={requestPermission}
@@ -681,7 +781,7 @@ export default function ScanScreen({ navigation }: any) {
                   colors={['#3498db', '#2980b9']}
                   style={styles.retryButtonGradient}
                 >
-                  <Text style={styles.retryButtonText}>授予权限</Text>
+                  <Text style={styles.retryButtonText}>{t.grantPermission}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -693,28 +793,28 @@ export default function ScanScreen({ navigation }: any) {
               {!scanned && !isProcessing ? (
                 <>
                   <Text style={styles.instructionEmoji}>🎯</Text>
-                  <Text style={styles.instructionTitle}>对准扫描框</Text>
+                  <Text style={styles.instructionTitle}>{t.alignFrame}</Text>
                   <Text style={styles.instructionText}>
-                    将二维码或条形码对准扫描框
+                    {t.alignFrameDesc}
                   </Text>
                   <View style={styles.supportedFormats}>
-                    <Text style={styles.formatBadge}>QR码</Text>
-                    <Text style={styles.formatBadge}>条形码</Text>
-                    <Text style={styles.formatBadge}>中转码</Text>
+                    <Text style={styles.formatBadge}>{t.qrCode}</Text>
+                    <Text style={styles.formatBadge}>{t.barcode}</Text>
+                    <Text style={styles.formatBadge}>{t.transferCode}</Text>
                   </View>
                 </>
               ) : isProcessing ? (
                 <>
                   <Text style={styles.instructionEmoji}>⏳</Text>
-                  <Text style={styles.instructionTitle}>处理中...</Text>
+                  <Text style={styles.instructionTitle}>{t.processing}</Text>
                   <Text style={styles.instructionText}>
-                    正在查询包裹信息
+                    {t.processingDesc}
                   </Text>
                 </>
               ) : (
                 <>
                   <Text style={styles.instructionEmoji}>✅</Text>
-                  <Text style={styles.instructionTitle}>扫描成功</Text>
+                  <Text style={styles.instructionTitle}>{t.scanSuccess}</Text>
                   <TouchableOpacity 
                     style={styles.rescanButton}
                     onPress={resetScanState}
@@ -723,7 +823,7 @@ export default function ScanScreen({ navigation }: any) {
                       colors={['#10b981', '#059669']}
                       style={styles.rescanButtonGradient}
                     >
-                      <Text style={styles.rescanText}>🔄 重新扫描</Text>
+                      <Text style={styles.rescanText}>{t.rescan}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -735,10 +835,10 @@ export default function ScanScreen({ navigation }: any) {
         /* 手动输入界面 */
         <View style={styles.manualContainer}>
           <View style={styles.manualContent}>
-            <Text style={styles.manualTitle}>手动输入包裹编号或中转码</Text>
+            <Text style={styles.manualTitle}>{t.manualInputTitle}</Text>
             <TextInput
               style={styles.input}
-              placeholder="例如：PKG001 或 TCABC1234"
+              placeholder={t.inputPlaceholder}
               value={manualInput}
               onChangeText={setManualInput}
               autoCapitalize="characters"
@@ -748,7 +848,7 @@ export default function ScanScreen({ navigation }: any) {
               style={styles.searchButton}
               onPress={handleManualSearch}
             >
-              <Text style={styles.searchButtonText}>查询包裹</Text>
+              <Text style={styles.searchButtonText}>{t.searchPackage}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -757,7 +857,7 @@ export default function ScanScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',

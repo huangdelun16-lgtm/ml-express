@@ -154,6 +154,7 @@ export default function LoginScreen({ navigation }: any) {
             resizeMode="contain"
           />
           <Text style={styles.title}>MARKET LINK EXPRESS</Text>
+          <Text style={styles.staffText}>STAFF</Text>
           <Text style={styles.subtitle}>快递管理系统</Text>
         </View>
 
@@ -229,6 +230,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
+  },
+  staffText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 8,
+    letterSpacing: 2,
   },
   subtitle: {
     fontSize: 14,

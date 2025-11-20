@@ -101,12 +101,16 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     const savedLang = localStorage.getItem('ml-express-language');
     if (savedLang && (savedLang === 'zh' || savedLang === 'en' || savedLang === 'my')) {
       setLanguageState(savedLang);
+      // 设置body的data-language属性，用于CSS选择器
+      document.body.setAttribute('data-language', savedLang);
     }
   }, []);
 
   const setLanguage = (lang: string) => {
     setLanguageState(lang);
     localStorage.setItem('ml-express-language', lang);
+    // 设置body的data-language属性，用于CSS选择器
+    document.body.setAttribute('data-language', lang);
   };
 
   const t = translations[language as keyof typeof translations] || translations.zh;

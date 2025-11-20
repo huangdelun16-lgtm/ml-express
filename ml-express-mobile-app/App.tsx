@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AppProvider, useApp } from './contexts/AppContext';
 
 // 引入所有页面
@@ -37,16 +38,26 @@ function AdminTabs() {
         tabBarActiveTintColor: '#2c5282',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
+          height: Platform.OS === 'ios' ? 85 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
           backgroundColor: '#fff',
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
+          marginTop: 2,
+          marginBottom: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}
     >
@@ -55,8 +66,12 @@ function AdminTabs() {
         component={DashboardScreen}
         options={{
           tabBarLabel: language === 'zh' ? '首页' : language === 'en' ? 'Home' : 'ပင်မ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🏠</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'home' : 'home-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -65,8 +80,12 @@ function AdminTabs() {
         component={MapScreen}
         options={{
           tabBarLabel: language === 'zh' ? '地图' : language === 'en' ? 'Map' : 'မြေပုံ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🗺️</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'map' : 'map-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -75,8 +94,12 @@ function AdminTabs() {
         component={ScanScreen}
         options={{
           tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🖼️</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'scan' : 'scan-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -85,8 +108,12 @@ function AdminTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>👤</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'person' : 'person-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -105,15 +132,26 @@ function CourierTabs() {
         tabBarActiveTintColor: '#2c5282',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
+          height: Platform.OS === 'ios' ? 85 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
+          backgroundColor: '#fff',
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
+          marginTop: 2,
+          marginBottom: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}
     >
@@ -122,8 +160,12 @@ function CourierTabs() {
         component={MyTasksScreen}
         options={{
           tabBarLabel: language === 'zh' ? '我的任务' : language === 'en' ? 'My Tasks' : 'ကျွန်ုပ်၏တာဝန်',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>📦</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'cube' : 'cube-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -132,8 +174,12 @@ function CourierTabs() {
         component={MapScreen}
         options={{
           tabBarLabel: language === 'zh' ? '地图' : language === 'en' ? 'Map' : 'မြေပုံ',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🗺️</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'map' : 'map-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -142,8 +188,12 @@ function CourierTabs() {
         component={ScanScreen}
         options={{
           tabBarLabel: language === 'zh' ? '扫码' : language === 'en' ? 'Scan' : 'စကင်န်',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>🖼️</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'scan' : 'scan-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -152,8 +202,12 @@ function CourierTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24 }}>👤</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'person' : 'person-outline'} 
+              size={22} 
+              color={color} 
+            />
           ),
         }}
       />

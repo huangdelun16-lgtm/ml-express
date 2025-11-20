@@ -1,6 +1,6 @@
 {
   "name": "market-link-express-mobile",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MARKET LINK EXPRESS - 缅甸专业快递服务移动端",
   "main": "index.ts",
   "scripts": {

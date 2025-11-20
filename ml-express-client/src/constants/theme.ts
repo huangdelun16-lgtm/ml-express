@@ -118,6 +118,25 @@ export const typography = {
   }
 };
 
+// 根据语言调整字体大小（缅语缩小2px）
+export const getFontSize = (baseSize: number, language?: string): number => {
+  if (language === 'my') {
+    return Math.max(baseSize - 2, 10); // 最小字体大小为10px
+  }
+  return baseSize;
+};
+
+// 根据语言调整字体大小的工具函数（支持对象）
+export const adjustFontSizeForLanguage = (style: any, language?: string): any => {
+  if (language === 'my' && style.fontSize) {
+    return {
+      ...style,
+      fontSize: Math.max(style.fontSize - 2, 10)
+    };
+  }
+  return style;
+};
+
 // 间距配置
 export const spacing = {
   xs: 4,

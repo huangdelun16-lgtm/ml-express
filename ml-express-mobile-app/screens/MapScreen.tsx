@@ -3027,11 +3027,11 @@ export default function MapScreen({ navigation }: any) {
           )}
 
           {/* 地图视图 */}
-          {location && optimizedPackagesWithCoords.length > 0 && (
+          {location ? (
             <MapView
               ref={mapRef}
               provider={PROVIDER_GOOGLE}
-              style={styles.map}
+              style={styles.mapModalMap}
               mapType={mapType}
               initialRegion={{
                 latitude: location.latitude,
@@ -3039,10 +3039,23 @@ export default function MapScreen({ navigation }: any) {
                 latitudeDelta: 0.1,
                 longitudeDelta: 0.1,
               }}
+              region={location ? {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              } : undefined}
               showsUserLocation={true}
               showsMyLocationButton={true}
               showsCompass={true}
               showsScale={true}
+              loadingEnabled={true}
+              onMapReady={() => {
+                console.log('地图已准备就绪');
+              }}
+              onError={(error) => {
+                console.error('地图加载错误:', error);
+              }}
             >
               {/* 骑手当前位置标记（绿色圆点） */}
               <Marker
@@ -3304,6 +3317,13 @@ export default function MapScreen({ navigation }: any) {
                 </>
               )}
             </MapView>
+          ) : (
+            <View style={styles.mapLoadingContainer}>
+              <ActivityIndicator size="large" color="#2c5282" />
+              <Text style={styles.mapLoadingText}>
+                {language === 'zh' ? '正在加载地图...' : language === 'en' ? 'Loading map...' : 'မြေပုံကိုဖွင့်နေသည်...'}
+              </Text>
+            </View>
           )}
 
           {/* 底部操作按钮 */}
@@ -4624,6 +4644,21 @@ const styles = StyleSheet.create({
   map: {
     width: width,
     height: height * 0.5,
+  },
+  mapModalMap: {
+    flex: 1,
+    width: '100%',
+  },
+  mapLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  mapLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
   },
   courierMarker: {
     width: 40,

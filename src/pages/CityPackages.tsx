@@ -703,21 +703,21 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
               getFilteredPackages().map((pkg) => (
               <div key={pkg.id} style={{
                 background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  padding: '12px',
+                  borderRadius: '6px',
+                  padding: '8px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                    marginBottom: '10px'
+                    marginBottom: '6px'
                 }}>
                   <div>
-                      <h3 style={{ color: 'white', margin: '0 0 3px 0', fontSize: '1.1rem' }}>
+                      <h3 style={{ color: 'white', margin: '0 0 2px 0', fontSize: '0.95rem' }}>
                       {pkg.id} - {pkg.package_type}
                     </h3>
-                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
+                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.75rem' }}>
                       创建时间: {pkg.create_time}
                     </p>
                   </div>
@@ -726,9 +726,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       <div style={{
                         background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
                         color: 'white',
-                        padding: '4px 12px',
-                        borderRadius: '15px',
-                        fontSize: '0.8rem',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
                         fontWeight: 'bold'
                       }}>
                         {pkg.status === '待收款' ? '待取件' : getStatusText(pkg.status)}
@@ -740,9 +740,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                             <span style={{
                               background: '#fef3c7',
                               color: '#92400e',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.75rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
                               fontWeight: 'bold'
                             }}>
                               💵 现金
@@ -752,9 +752,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                             <span style={{
                               background: '#dbeafe',
                               color: '#1e40af',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.75rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
                               fontWeight: 'bold'
                             }}>
                               📱 二维码
@@ -764,9 +764,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                             <span style={{
                               background: '#dbeafe',
                               color: '#1e40af',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.75rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
                               fontWeight: 'bold'
                             }}>
                               📱 已支付
@@ -778,36 +778,15 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   </div>
                 </div>
 
-                <div style={{
-                  display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '10px',
-                    marginBottom: '10px'
-                }}>
-                  <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>寄件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
-                      {pkg.sender_name} - {pkg.sender_phone}
-                    </p>
-                  </div>
-                  <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 3px 0', fontSize: '0.9rem' }}>收件人</h4>
-                      <p style={{ color: 'white', margin: 0, fontSize: '0.85rem' }}>
-                      {pkg.receiver_name} - {pkg.receiver_phone}
-                    </p>
-                  </div>
-                </div>
-
+                {/* 按钮区域 - 移动到状态和付款方式下面 */}
                 <div style={{
                   display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                  gap: '10px',
-                    flexWrap: 'wrap',
-                    marginTop: '8px'
+                  gap: '6px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  marginBottom: '6px'
                 }}>
-                    {/* 左侧状态操作按钮 */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {/* 状态操作按钮 */}
                   {pkg.status === '待取件' && (
                     <button
                       onClick={() => updatePackageStatus(pkg.id, '已取件')}
@@ -815,18 +794,18 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         background: '#3498db',
                         color: 'white',
                         border: 'none',
-                            padding: '8px 14px',
-                        borderRadius: '5px',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: '500',
-                            minHeight: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
                     </button>
                   )}
                   {pkg.status === '已取件' && (
@@ -836,18 +815,18 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         background: '#9b59b6',
                         color: 'white',
                         border: 'none',
-                            padding: '10px 18px',
-                            borderRadius: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: '500',
-                            minHeight: '40px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
                     </button>
                   )}
                   {pkg.status === '配送中' && (
@@ -857,87 +836,97 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         background: '#27ae60',
                         color: 'white',
                         border: 'none',
-                            padding: '10px 18px',
-                            borderRadius: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: '500',
-                            minHeight: '40px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
                     </button>
                   )}
-                    </div>
-                    
-                    {/* 右侧功能按钮 */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => showPickupCode(pkg)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '8px 14px',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          fontWeight: '500',
-                          minHeight: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 255, 255, 0.2)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      >
-                        📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
-                      </button>
-                      
+                  
+                  {/* 功能按钮 */}
+                  <button
+                    onClick={() => showPickupCode(pkg)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      minHeight: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '3px',
+                      backdropFilter: 'blur(10px)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
+                  </button>
+                  
                   <button
                     onClick={() => handleViewDetail(pkg)}
                     style={{
                       background: 'rgba(255, 255, 255, 0.2)',
                       color: 'white',
                       border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '8px 14px',
-                      borderRadius: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
                       cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          fontWeight: '500',
-                          minHeight: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }}
-                      >
-                        {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      minHeight: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
                   </button>
-                      
-                    </div>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '8px',
+                    marginTop: '6px'
+                }}>
+                  <div>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.8rem' }}>寄件人</h4>
+                      <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                      {pkg.sender_name} - {pkg.sender_phone}
+                    </p>
+                  </div>
+                  <div>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.8rem' }}>收件人</h4>
+                      <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                      {pkg.receiver_name} - {pkg.receiver_phone}
+                    </p>
+                  </div>
                 </div>
               </div>
                 ))

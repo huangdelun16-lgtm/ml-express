@@ -240,11 +240,11 @@ const ServicesPage: React.FC = () => {
         background: 'transparent',
         padding: 0,
         marginBottom: window.innerWidth < 768 ? '24px' : '40px',
-        display: 'flex',
-        justifyContent: 'space-between',
+          display: 'flex',
+          justifyContent: 'space-between',
         alignItems: 'center',
         boxShadow: 'none'
-      }}>
+        }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img 
             src="/logo.png" 
@@ -472,7 +472,7 @@ const ServicesPage: React.FC = () => {
                 ))}
               </div>
             )}
-          </div>
+        </div>
         </div>
       </nav>
 
