@@ -711,7 +711,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                 }}>
                   <div>
                       <h3 style={{ color: 'white', margin: '0 0 2px 0', fontSize: '0.95rem' }}>
@@ -913,17 +913,17 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                 <div style={{
                   display: 'grid',
                     gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: '8px',
-                    marginTop: '6px'
+                    gap: '6px',
+                    marginTop: '2px'
                 }}>
                   <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.8rem' }}>寄件人</h4>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.8rem' }}>寄件人</h4>
                       <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
                       {pkg.sender_name} - {pkg.sender_phone}
                     </p>
                   </div>
                   <div>
-                      <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.8rem' }}>收件人</h4>
+                      <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.8rem' }}>收件人</h4>
                       <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
                       {pkg.receiver_name} - {pkg.receiver_phone}
                     </p>
