@@ -707,13 +707,14 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   padding: '8px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
+                {/* 第一行：包裹信息和状态 */}
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                    marginBottom: '4px'
+                    marginBottom: '6px'
                 }}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                       <h3 style={{ color: 'white', margin: '0 0 2px 0', fontSize: '0.95rem' }}>
                       {pkg.id} - {pkg.package_type}
                     </h3>
@@ -721,214 +722,212 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       创建时间: {pkg.create_time}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                    {/* 状态和付款方式 */}
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <div style={{
-                        background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{
+                      background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
+                      color: 'white',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {pkg.status === '待收款' ? '待取件' : getStatusText(pkg.status)}
+                    </div>
+                    {/* 支付方式标识（在待取件或待收款状态时显示） */}
+                    {(pkg.status === '待取件' || pkg.status === '待收款') && (
+                      <>
+                        {pkg.payment_method === 'cash' && (
+                          <span style={{
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold'
+                          }}>
+                            💵 现金
+                          </span>
+                        )}
+                        {pkg.payment_method === 'qr' && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 二维码
+                          </span>
+                        )}
+                        {!pkg.payment_method && (
+                          <span style={{
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📱 已支付
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* 第二行：操作按钮 */}
+                <div style={{
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end',
+                  marginBottom: '6px'
+                }}>
+                  {/* 状态操作按钮 */}
+                  {pkg.status === '待取件' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '已取件')}
+                      style={{
+                        background: '#3498db',
                         color: 'white',
-                        padding: '3px 10px',
-                        borderRadius: '12px',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
                         fontSize: '0.75rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {pkg.status === '待收款' ? '待取件' : getStatusText(pkg.status)}
-                      </div>
-                      {/* 支付方式标识（在待取件或待收款状态时显示） */}
-                      {(pkg.status === '待取件' || pkg.status === '待收款') && (
-                        <>
-                          {pkg.payment_method === 'cash' && (
-                            <span style={{
-                              background: '#fef3c7',
-                              color: '#92400e',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold'
-                            }}>
-                              💵 现金
-                            </span>
-                          )}
-                          {pkg.payment_method === 'qr' && (
-                            <span style={{
-                              background: '#dbeafe',
-                              color: '#1e40af',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold'
-                            }}>
-                              📱 二维码
-                            </span>
-                          )}
-                          {!pkg.payment_method && (
-                            <span style={{
-                              background: '#dbeafe',
-                              color: '#1e40af',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold'
-                            }}>
-                              📱 已支付
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* 按钮区域 - 在状态和付款方式下方，右对齐 */}
-                    <div style={{
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
+                    </button>
+                  )}
+                  {pkg.status === '已取件' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '配送中')}
+                      style={{
+                        background: '#9b59b6',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
+                    </button>
+                  )}
+                  {pkg.status === '配送中' && (
+                    <button
+                      onClick={() => updatePackageStatus(pkg.id, '已送达')}
+                      style={{
+                        background: '#27ae60',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        minHeight: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
+                    </button>
+                  )}
+                  
+                  {/* 功能按钮 */}
+                  <button
+                    onClick={() => showPickupCode(pkg)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      minHeight: '28px',
                       display: 'flex',
-                      gap: '6px',
                       alignItems: 'center',
-                      flexWrap: 'wrap',
-                      justifyContent: 'flex-end'
-                    }}>
-                      {/* 状态操作按钮 */}
-                      {pkg.status === '待取件' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '已取件')}
-                          style={{
-                            background: '#3498db',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            minHeight: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '标记已取件' : language === 'en' ? 'Mark Picked Up' : 'ကောက်ယူပြီး မှတ်သားပါ'}
-                        </button>
-                      )}
-                      {pkg.status === '已取件' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '配送中')}
-                          style={{
-                            background: '#9b59b6',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            minHeight: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှု စတင်ပါ'}
-                        </button>
-                      )}
-                      {pkg.status === '配送中' && (
-                        <button
-                          onClick={() => updatePackageStatus(pkg.id, '已送达')}
-                          style={{
-                            background: '#27ae60',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            minHeight: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          {language === 'zh' ? '标记已送达' : language === 'en' ? 'Mark Delivered' : 'ပို့ဆောင်ပြီး မှတ်သားပါ'}
-                        </button>
-                      )}
-                      
-                      {/* 功能按钮 */}
-                      <button
-                        onClick={() => showPickupCode(pkg)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          minHeight: '28px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '3px',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }}
-                      >
-                        📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
-                      </button>
-                      
-                      <button
-                        onClick={() => handleViewDetail(pkg)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          minHeight: '28px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }}
-                      >
-                        {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
-                      </button>
-                    </div>
-                    
-                    {/* 寄件人和收件人信息 - 移动到按钮下方 */}
-                    <div style={{
+                      justifyContent: 'center',
+                      gap: '3px',
+                      backdropFilter: 'blur(10px)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    📱 {language === 'zh' ? '寄件码' : language === 'en' ? 'Pickup Code' : 'ကောက်ယူမည့်ကုဒ်'}
+                  </button>
+                  
+                  <button
+                    onClick={() => handleViewDetail(pkg)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      minHeight: '28px',
                       display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: '4px',
-                      marginTop: '4px'
-                    }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.75rem' }}>寄件人</h4>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.75rem' }}>
-                          {pkg.sender_name} - {pkg.sender_phone}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <h4 style={{ color: '#C0C0C0', margin: '0 0 1px 0', fontSize: '0.75rem' }}>收件人</h4>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.75rem' }}>
-                          {pkg.receiver_name} - {pkg.receiver_phone}
-                        </p>
-                      </div>
-                    </div>
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    {language === 'zh' ? '查看详情' : language === 'en' ? 'View Details' : 'အသေးစိတ်ကြည့်ရန်'}
+                  </button>
+                </div>
+
+                {/* 第三行：寄件人和收件人信息 - 横跨整个宽度 */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '8px',
+                  paddingTop: '6px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div>
+                    <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.75rem' }}>寄件人</h4>
+                    <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                      {pkg.sender_name} - {pkg.sender_phone}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.75rem' }}>收件人</h4>
+                    <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                      {pkg.receiver_name} - {pkg.receiver_phone}
+                    </p>
                   </div>
                 </div>
               </div>
