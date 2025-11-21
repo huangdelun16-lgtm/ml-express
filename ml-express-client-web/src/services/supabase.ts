@@ -182,8 +182,11 @@ export const packageService = {
   async getPackagesByUser(email?: string, phone?: string): Promise<Package[]> {
     try {
       if (!email && !phone) {
+        console.log('getPackagesByUser: 没有邮箱和手机号，返回空数组');
         return [];
       }
+
+      console.log('getPackagesByUser: 开始查询，email:', email, 'phone:', phone);
 
       // 构建查询条件：根据邮箱或手机号查询
       // 查询条件：customer_email 匹配 OR sender_phone 匹配 OR receiver_phone 匹配
@@ -192,17 +195,25 @@ export const packageService = {
       const conditions: string[] = [];
       
       if (email) {
+        // 使用 customer_email 查询
         conditions.push(`customer_email.eq.${email}`);
+        console.log('添加查询条件: customer_email =', email);
       }
       
       if (phone) {
+        // 同时查询 sender_phone 和 receiver_phone
         conditions.push(`sender_phone.eq.${phone}`);
         conditions.push(`receiver_phone.eq.${phone}`);
+        console.log('添加查询条件: sender_phone =', phone, '和 receiver_phone =', phone);
       }
 
       if (conditions.length > 0) {
-        query = query.or(conditions.join(','));
+        // 使用 OR 连接所有条件
+        const orCondition = conditions.join(',');
+        console.log('最终查询条件:', orCondition);
+        query = query.or(orCondition);
       } else {
+        console.log('没有查询条件，返回空数组');
         return [];
       }
 
@@ -210,11 +221,20 @@ export const packageService = {
       
       if (error) {
         console.error('获取用户包裹列表失败:', error);
+        console.error('错误详情:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         console.error('查询条件:', conditions);
         return [];
       }
       
-      console.log('查询到的包裹数量:', data?.length || 0);
+      console.log('查询成功，包裹数量:', data?.length || 0);
+      if (data && data.length > 0) {
+        console.log('包裹ID列表:', data.map(p => p.id));
+      }
       return data || [];
     } catch (err) {
       console.error('获取用户包裹列表异常:', err);

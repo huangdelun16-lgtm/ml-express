@@ -3353,7 +3353,9 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
-                      payment_method: currentPaymentMethod // 添加支付方式字段
+                      payment_method: currentPaymentMethod, // 添加支付方式字段
+                      customer_email: currentUser?.email || orderInfo.customerEmail || null, // 添加客户邮箱
+                      customer_name: currentUser?.name || orderInfo.customerName || orderInfo.senderName || null // 添加客户姓名
                     };
                     
                     // 保存到数据库

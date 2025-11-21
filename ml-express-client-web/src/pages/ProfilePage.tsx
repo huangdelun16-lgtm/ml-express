@@ -43,10 +43,20 @@ const ProfilePage: React.FC = () => {
     
     setLoading(true);
     try {
+      console.log('开始加载用户包裹，用户信息:', {
+        email: currentUser.email,
+        phone: currentUser.phone,
+        name: currentUser.name
+      });
+      
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone
       );
+      
+      console.log('查询到的包裹数量:', packages.length);
+      console.log('包裹列表:', packages);
+      
       setUserPackages(packages);
     } catch (error) {
       console.error('加载包裹列表失败:', error);
