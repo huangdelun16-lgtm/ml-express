@@ -534,7 +534,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
   // 处理地图地址输入变化，触发自动完成
   const handleMapAddressInputChange = async (input: string) => {
-    if (!input.trim() || input.length < 2) {
+    if (!input.trim() || input.length < 1) {
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -552,7 +552,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
       const data = await response.json();
       
       if (data.status === 'OK' && data.predictions) {
-        const suggestions = data.predictions.slice(0, 5).map((prediction: any) => ({
+        // 显示更多结果（最多10个），像Google Maps一样
+        const suggestions = data.predictions.slice(0, 10).map((prediction: any) => ({
           place_id: prediction.place_id,
           main_text: prediction.structured_formatting.main_text,
           secondary_text: prediction.structured_formatting.secondary_text,
@@ -1519,18 +1520,33 @@ export default function PlaceOrderScreen({ navigation }: any) {
             {/* 自动完成建议列表 */}
             {showSuggestions && autocompleteSuggestions.length > 0 && (
               <View style={styles.suggestionsContainer}>
-                <ScrollView style={styles.suggestionsList} keyboardShouldPersistTaps="handled">
+                <ScrollView 
+                  style={styles.suggestionsList} 
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled={true}
+                >
                   {autocompleteSuggestions.map((suggestion, index) => (
                     <TouchableOpacity
                       key={index}
-                      onPress={() => handleSelectSuggestion(suggestion)}
+                      onPress={() => {
+                        handleSelectSuggestion(suggestion);
+                        setShowSuggestions(false);
+                      }}
+                      activeOpacity={0.7}
                       style={[
                         styles.suggestionItem,
                         index < autocompleteSuggestions.length - 1 && styles.suggestionItemBorder
                       ]}
                     >
-                      <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
-                      <Text style={styles.suggestionSecondaryText}>{suggestion.secondary_text}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
+                        {suggestion.secondary_text && (
+                          <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                            {suggestion.secondary_text}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 20, color: '#9ca3af', marginLeft: 8 }}>›</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -2225,9 +2241,11 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+    position: 'relative',
+    zIndex: 1000,
   },
   mapAddressInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 8,
@@ -2235,41 +2253,53 @@ const baseStyles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1e293b',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   suggestionsContainer: {
-    marginTop: 8,
+    position: 'absolute',
+    top: 60, // 输入框下方
+    left: 20,
+    right: 20,
     backgroundColor: '#ffffff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    maxHeight: 200,
+    maxHeight: 400, // 增加最大高度，显示更多结果
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1001,
   },
   suggestionsList: {
-    maxHeight: 200,
+    maxHeight: 400,
   },
   suggestionItem: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   suggestionItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e5e7eb',
   },
   suggestionMainText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1e293b',
-    marginBottom: 4,
+    fontWeight: '400',
+    color: '#1f2937',
+    flex: 1,
   },
   suggestionSecondaryText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#6b7280',
+    marginTop: 2,
   },
   // 包裹类型说明模态框样式
   infoModalOverlay: {
