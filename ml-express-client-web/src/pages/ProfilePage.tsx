@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase } from '../services/supabase';
+import { packageService } from '../services/supabase';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -13,21 +13,8 @@ const ProfilePage: React.FC = () => {
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setIsVisible(true);
-    loadUserFromStorage();
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      loadUserPackages();
-    } else {
-      setLoading(false);
-    }
-  }, [currentUser]);
-
   // 从本地存储加载用户信息
-  const loadUserFromStorage = () => {
+  const loadUserFromStorage = useCallback(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
       try {
@@ -41,11 +28,14 @@ const ProfilePage: React.FC = () => {
       // 如果未登录，重定向到首页
       navigate('/');
     }
-  };
+  }, [navigate]);
 
   // 加载用户的包裹列表
-  const loadUserPackages = async () => {
-    if (!currentUser) return;
+  const loadUserPackages = useCallback(async () => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -60,7 +50,16 @@ const ProfilePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    setIsVisible(true);
+    loadUserFromStorage();
+  }, [loadUserFromStorage]);
+
+  useEffect(() => {
+    loadUserPackages();
+  }, [loadUserPackages]);
 
   // 退出登录
   const handleLogout = () => {
