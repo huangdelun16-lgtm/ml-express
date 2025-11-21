@@ -13,10 +13,6 @@ const ProfilePage: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTrackingNumber, setSearchTrackingNumber] = useState('');
-  const [searchResult, setSearchResult] = useState<any>(null);
-  const [searching, setSearching] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [packagesPerPage] = useState(5); // 每页显示5个包裹
   const [selectedPackage, setSelectedPackage] = useState<any>(null); // 选中的包裹详情
@@ -100,29 +96,6 @@ const ProfilePage: React.FC = () => {
     localStorage.setItem('ml-express-language', newLanguage);
   };
 
-  // 搜索包裹
-  const handleSearchPackage = async () => {
-    if (!searchTrackingNumber.trim()) {
-      alert(language === 'zh' ? '请输入订单号' : language === 'en' ? 'Please enter tracking number' : 'အော်ဒါနံပါတ်ထည့်ပါ');
-      return;
-    }
-
-    setSearching(true);
-    try {
-      const result = await packageService.searchPackage(searchTrackingNumber.trim());
-      if (result) {
-        setSearchResult(result);
-        setShowSearchModal(true);
-      } else {
-        alert(language === 'zh' ? '未找到该订单' : language === 'en' ? 'Package not found' : 'အော်ဒါမတွေ့ရှိပါ');
-      }
-    } catch (error) {
-      console.error('搜索包裹失败:', error);
-      alert(language === 'zh' ? '搜索失败，请稍后重试' : language === 'en' ? 'Search failed, please try again' : 'ရှာဖွေမှုမအောင်မြင်ပါ');
-    } finally {
-      setSearching(false);
-    }
-  };
 
   // 点击外部关闭下拉框
   useEffect(() => {
@@ -848,86 +821,6 @@ const ProfilePage: React.FC = () => {
                 {currentUser.address || '-'}
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* 搜索包裹功能 */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          padding: '2rem',
-          marginBottom: '2rem',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'all 0.6s ease 0.3s'
-        }}>
-          <h2 style={{
-            color: 'white',
-            fontSize: '1.5rem',
-            marginBottom: '1.5rem',
-            borderBottom: '2px solid rgba(255,255,255,0.3)',
-            paddingBottom: '0.5rem'
-          }}>
-            {t.searchPackage}
-          </h2>
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            flexWrap: 'wrap'
-          }}>
-            <input
-              type="text"
-              value={searchTrackingNumber}
-              onChange={(e) => setSearchTrackingNumber(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearchPackage();
-                }
-              }}
-              placeholder={t.searchPlaceholder}
-              style={{
-                flex: 1,
-                minWidth: '200px',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                background: 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                fontSize: '1rem',
-                backdropFilter: 'blur(10px)'
-              }}
-            />
-            <button
-              onClick={handleSearchPackage}
-              disabled={searching}
-              style={{
-                background: 'rgba(59, 130, 246, 0.5)',
-                color: 'white',
-                border: '1px solid rgba(59, 130, 246, 0.7)',
-                padding: '0.75rem 2rem',
-                borderRadius: '8px',
-                cursor: searching ? 'not-allowed' : 'pointer',
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                transition: 'all 0.3s ease',
-                opacity: searching ? 0.6 : 1
-              }}
-              onMouseOver={(e) => {
-                if (!searching) {
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!searching) {
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                }
-              }}
-            >
-              {searching ? (language === 'zh' ? '搜索中...' : language === 'en' ? 'Searching...' : 'ရှာဖွေနေသည်...') : t.search}
-            </button>
           </div>
         </div>
 
