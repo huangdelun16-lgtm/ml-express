@@ -148,7 +148,14 @@ const ProfilePage: React.FC = () => {
       email: '邮箱',
       phone: '电话',
       address: '地址',
-      name: '姓名'
+      name: '姓名',
+      searchPackage: '搜索包裹',
+      searchPlaceholder: '请输入订单号',
+      search: '搜索',
+      packageDetails: '包裹详情',
+      sender: '寄件人',
+      receiver: '收件人',
+      close: '关闭'
     },
     en: {
       nav: {
