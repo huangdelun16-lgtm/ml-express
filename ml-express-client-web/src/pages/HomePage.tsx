@@ -1648,6 +1648,93 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // 处理地址输入变化，触发自动完成
+  const handleAddressInputChange = (input: string) => {
+    if (!input.trim() || !autocompleteService) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // 使用Google Places Autocomplete API
+    autocompleteService.getPlacePredictions(
+      {
+        input: input,
+        location: new window.google.maps.LatLng(mapCenter.lat, mapCenter.lng),
+        radius: 50000, // 50公里范围
+        componentRestrictions: { country: 'mm' } // 限制在缅甸
+      },
+      (predictions: any[], status: any) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          const suggestions = predictions.slice(0, 5).map((prediction) => ({
+            place_id: prediction.place_id,
+            main_text: prediction.structured_formatting.main_text,
+            secondary_text: prediction.structured_formatting.secondary_text,
+            description: prediction.description
+          }));
+          setAutocompleteSuggestions(suggestions);
+          setShowSuggestions(true);
+        } else {
+          setAutocompleteSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }
+    );
+  };
+
+  // 处理选择建议
+  const handleSelectSuggestion = (suggestion: any) => {
+    if (!placesService) return;
+
+    const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+    if (addressInput) {
+      addressInput.value = suggestion.description;
+    }
+
+    // 获取地点的详细信息（包括坐标）
+    placesService.getDetails(
+      {
+        placeId: suggestion.place_id,
+        fields: ['geometry', 'formatted_address', 'name']
+      },
+      (place: any, status: any) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+          const location = place.geometry.location;
+          const coords = {
+            lat: location.lat(),
+            lng: location.lng()
+          };
+
+          // 更新地图中心
+          setMapCenter(coords);
+          
+          // 设置选中位置
+          setSelectedLocation({
+            lat: coords.lat,
+            lng: coords.lng,
+            address: place.formatted_address || suggestion.description
+          });
+
+          // 设置POI信息
+          if (place.name) {
+            setSelectedPOI({
+              name: place.name,
+              types: place.types || []
+            });
+          }
+
+          // 更新地址输入框
+          if (addressInput) {
+            addressInput.value = place.formatted_address || suggestion.description;
+          }
+        }
+      }
+    );
+
+    setShowSuggestions(false);
+    setAutocompleteSuggestions([]);
+  };
+
   return (
     <div className="homepage" style={{ 
       fontFamily: 'var(--font-family-base)', 
