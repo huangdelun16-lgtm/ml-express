@@ -18,6 +18,8 @@ const ProfilePage: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [packagesPerPage] = useState(5); // 每页显示5个包裹
+  const [selectedPackage, setSelectedPackage] = useState<any>(null); // 选中的包裹详情
+  const [showPackageDetailModal, setShowPackageDetailModal] = useState(false); // 显示包裹详情模态框
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = useCallback(() => {
@@ -1040,7 +1042,10 @@ const ProfilePage: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => navigate(`/tracking?trackingNumber=${pkg.id}`)}
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      setShowPackageDetailModal(true);
+                    }}
                     style={{
                       background: 'rgba(59, 130, 246, 0.3)',
                       color: 'white',
@@ -1431,6 +1436,316 @@ const ProfilePage: React.FC = () => {
               >
                 {t.viewDetails}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 包裹详情模态框 */}
+      {showPackageDetailModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem'
+        }}
+        onClick={() => setShowPackageDetailModal(false)}
+        >
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '2rem',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              borderBottom: '2px solid rgba(255,255,255,0.3)',
+              paddingBottom: '1rem'
+            }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '1.5rem',
+                margin: 0
+              }}>
+                {t.packageDetails}
+              </h2>
+              <button
+                onClick={() => setShowPackageDetailModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                {t.close}
+              </button>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gap: '1.5rem'
+            }}>
+              {/* 订单号和状态 */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                    {t.packageId}
+                  </label>
+                  <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                    {selectedPackage.id}
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{
+                    background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}
+                  </div>
+                  {selectedPackage.payment_method && (
+                    <div style={{
+                      background: getPaymentMethodColor(selectedPackage.payment_method),
+                      color: 'white',
+                      border: `1px solid ${getPaymentMethodBorderColor(selectedPackage.payment_method)}`,
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {getPaymentMethodText(selectedPackage.payment_method)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 基本信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                  {language === 'zh' ? '基本信息' : language === 'en' ? 'Basic Information' : 'အခြေခံအချက်အလက်'}
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.createTime}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.create_time || selectedPackage.created_at || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.price}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem', fontWeight: 'bold' }}>
+                      {selectedPackage.price || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.package_type || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {language === 'zh' ? '重量' : language === 'en' ? 'Weight' : 'အလေးချိန်'}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.weight || '-'}
+                    </div>
+                  </div>
+                  {selectedPackage.delivery_speed && (
+                    <div>
+                      <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                        {language === 'zh' ? '配送速度' : language === 'en' ? 'Delivery Speed' : 'ပို့ဆောင်မှုအမြန်နှုန်း'}
+                      </label>
+                      <div style={{ color: 'white', fontSize: '1rem' }}>
+                        {selectedPackage.delivery_speed || '-'}
+                      </div>
+                    </div>
+                  )}
+                  {selectedPackage.courier && (
+                    <div>
+                      <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                        {language === 'zh' ? '配送员' : language === 'en' ? 'Courier' : 'ပို့ဆောင်သူ'}
+                      </label>
+                      <div style={{ color: 'white', fontSize: '1rem' }}>
+                        {selectedPackage.courier || '-'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 寄件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                  {t.sender}
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.name}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.sender_name || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.phone}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.sender_phone || '-'}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.address}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.sender_address || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 收件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                  {t.receiver}
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.name}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.receiver_name || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.phone}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.receiver_phone || '-'}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.address}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {selectedPackage.receiver_address || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 时间信息 */}
+              {(selectedPackage.pickup_time || selectedPackage.delivery_time) && (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '1.5rem'
+                }}>
+                  <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                    {language === 'zh' ? '时间信息' : language === 'en' ? 'Time Information' : 'အချိန်အချက်အလက်'}
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                    gap: '1rem'
+                  }}>
+                    {selectedPackage.pickup_time && (
+                      <div>
+                        <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                          {language === 'zh' ? '取件时间' : language === 'en' ? 'Pickup Time' : 'ကောက်ယူသောအချိန်'}
+                        </label>
+                        <div style={{ color: 'white', fontSize: '1rem' }}>
+                          {selectedPackage.pickup_time}
+                        </div>
+                      </div>
+                    )}
+                    {selectedPackage.delivery_time && (
+                      <div>
+                        <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                          {language === 'zh' ? '送达时间' : language === 'en' ? 'Delivery Time' : 'ပို့ဆောင်သောအချိန်'}
+                        </label>
+                        <div style={{ color: 'white', fontSize: '1rem' }}>
+                          {selectedPackage.delivery_time}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
