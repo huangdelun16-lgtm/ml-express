@@ -58,6 +58,8 @@ export interface Package {
   sender_code?: string;
   transfer_code?: string;
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  customer_email?: string; // 客户邮箱
+  customer_name?: string; // 客户姓名
 }
 
 // 客户端包裹服务（只包含客户端需要的功能）
@@ -184,26 +186,35 @@ export const packageService = {
       }
 
       // 构建查询条件：根据邮箱或手机号查询
+      // 查询条件：customer_email 匹配 OR sender_phone 匹配 OR receiver_phone 匹配
       let query = supabase.from('packages').select('*');
 
-      if (email && phone) {
-        // 如果同时有邮箱和手机号，查询匹配任一条件的包裹
-        query = query.or(`customer_email.eq.${email},sender_phone.eq.${phone}`);
-      } else if (email) {
-        // 只根据邮箱查询
-        query = query.eq('customer_email', email);
-      } else if (phone) {
-        // 只根据手机号查询
-        query = query.eq('sender_phone', phone);
+      const conditions: string[] = [];
+      
+      if (email) {
+        conditions.push(`customer_email.eq.${email}`);
+      }
+      
+      if (phone) {
+        conditions.push(`sender_phone.eq.${phone}`);
+        conditions.push(`receiver_phone.eq.${phone}`);
+      }
+
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        return [];
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         console.error('获取用户包裹列表失败:', error);
+        console.error('查询条件:', conditions);
         return [];
       }
       
+      console.log('查询到的包裹数量:', data?.length || 0);
       return data || [];
     } catch (err) {
       console.error('获取用户包裹列表异常:', err);
