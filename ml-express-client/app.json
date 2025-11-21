@@ -3,24 +3,12 @@
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
     "version": "1.0.0",
-    "expo": "~54.0.12",
+    "sdkVersion": "54.0.12",
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "MARKET LINK EXPRESS - 专业的快递配送服务平台，提供快速、安全、可靠的包裹配送服务。支持实时追踪、多语言界面和智能路线规划。",
-    "keywords": [
-      "快递",
-      "配送",
-      "包裹",
-      "追踪",
-      "物流",
-      "delivery",
-      "express",
-      "shipping",
-      "tracking"
-    ],
-    "privacy": "public",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -102,14 +90,7 @@
           "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
       ],
-      "expo-sqlite",
-      [
-        "sentry-expo",
-        {
-          "organization": "your-org",
-          "project": "ml-express"
-        }
-      ]
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {
