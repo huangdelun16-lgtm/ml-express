@@ -834,6 +834,248 @@ const ProfilePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 搜索结果显示模态框 */}
+      {showSearchModal && searchResult && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem'
+        }}
+        onClick={() => setShowSearchModal(false)}
+        >
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '2rem',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              borderBottom: '2px solid rgba(255,255,255,0.3)',
+              paddingBottom: '1rem'
+            }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '1.5rem',
+                margin: 0
+              }}>
+                {t.packageDetails}
+              </h2>
+              <button
+                onClick={() => setShowSearchModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                {t.close}
+              </button>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gap: '1.5rem'
+            }}>
+              {/* 订单号 */}
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                  {t.packageId}
+                </label>
+                <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                  {searchResult.id}
+                </div>
+              </div>
+
+              {/* 状态 */}
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                  {t.status}
+                </label>
+                <div style={{
+                  display: 'inline-block',
+                  background: getStatusColor(searchResult.status === '待收款' ? '待取件' : searchResult.status),
+                  color: 'white',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold'
+                }}>
+                  {searchResult.status === '待收款' ? getStatusText(searchResult.status) : searchResult.status}
+                </div>
+              </div>
+
+              {/* 寄件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                  {t.sender}
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.name}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.sender_name || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.phone}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.sender_phone || '-'}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.address}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.sender_address || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 收件人信息 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
+                  {t.receiver}
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.name}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.receiver_name || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.phone}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.receiver_phone || '-'}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                      {t.address}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem' }}>
+                      {searchResult.receiver_address || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 包裹信息 */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                gap: '1rem'
+              }}>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                    {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
+                  </label>
+                  <div style={{ color: 'white', fontSize: '1rem' }}>
+                    {searchResult.package_type || '-'}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                    {language === 'zh' ? '重量' : language === 'en' ? 'Weight' : 'အလေးချိန်'}
+                  </label>
+                  <div style={{ color: 'white', fontSize: '1rem' }}>
+                    {searchResult.weight || '-'}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                    {t.price}
+                  </label>
+                  <div style={{ color: 'white', fontSize: '1rem', fontWeight: 'bold' }}>
+                    {searchResult.price || '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* 查看详情按钮 */}
+              <button
+                onClick={() => {
+                  setShowSearchModal(false);
+                  navigate(`/tracking?trackingNumber=${searchResult.id}`);
+                }}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.5)',
+                  color: 'white',
+                  border: '1px solid rgba(59, 130, 246, 0.7)',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease',
+                  width: '100%'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
+                }}
+              >
+                {t.viewDetails}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
