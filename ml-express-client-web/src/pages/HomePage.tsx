@@ -96,6 +96,9 @@ const HomePage: React.FC = () => {
   const [placesService, setPlacesService] = useState<any>(null);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const autocompleteDebounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastSearchQueryRef = React.useRef<string>('');
   type OrderConfirmationStatus = 'idle' | 'success' | 'failed';
   type OrderSubmitStatus = 'idle' | 'processing' | 'success' | 'failed';
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
@@ -1648,48 +1651,108 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 处理地址输入变化，触发自动完成
-  const handleAddressInputChange = (input: string) => {
-    if (!input.trim() || !autocompleteService) {
+  // 实际执行API请求的函数
+  const performAutocompleteSearch = (input: string) => {
+    if (!input.trim() || !autocompleteService || input.trim().length < 2) {
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
       return;
     }
+
+    // 如果查询相同，不重复请求
+    if (lastSearchQueryRef.current === input.trim()) {
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    lastSearchQueryRef.current = input.trim();
 
     // 使用Google Places Autocomplete API
     autocompleteService.getPlacePredictions(
       {
-        input: input,
+        input: input.trim(),
         location: new window.google.maps.LatLng(mapCenter.lat, mapCenter.lng),
         radius: 50000, // 50公里范围
-        componentRestrictions: { country: 'mm' } // 限制在缅甸
+        componentRestrictions: { country: 'mm' }, // 限制在缅甸
+        language: language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'
       },
       (predictions: any[], status: any) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-          const suggestions = predictions.slice(0, 5).map((prediction) => ({
-            place_id: prediction.place_id,
-            main_text: prediction.structured_formatting.main_text,
-            secondary_text: prediction.structured_formatting.secondary_text,
-            description: prediction.description
-          }));
-          setAutocompleteSuggestions(suggestions);
-          setShowSuggestions(true);
-        } else {
-          setAutocompleteSuggestions([]);
-          setShowSuggestions(false);
+        // 确保这是最新的查询结果
+        if (lastSearchQueryRef.current === input.trim()) {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+            // 显示更多结果（最多10个），像Google Maps一样
+            const suggestions = predictions.slice(0, 10).map((prediction) => ({
+              place_id: prediction.place_id,
+              main_text: prediction.structured_formatting.main_text,
+              secondary_text: prediction.structured_formatting.secondary_text,
+              description: prediction.description
+            }));
+            setAutocompleteSuggestions(suggestions);
+            setShowSuggestions(true);
+          } else {
+            setAutocompleteSuggestions([]);
+            setShowSuggestions(false);
+          }
+          setIsLoadingSuggestions(false);
         }
       }
     );
   };
+
+  // 处理地址输入变化，触发自动完成（带防抖）
+  const handleAddressInputChange = (input: string) => {
+    // 清除之前的定时器
+    if (autocompleteDebounceTimerRef.current) {
+      clearTimeout(autocompleteDebounceTimerRef.current);
+    }
+
+    // 如果输入为空，立即清除结果
+    if (!input.trim() || input.length < 1) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      lastSearchQueryRef.current = '';
+      return;
+    }
+
+    // 如果输入长度小于2，不搜索（减少不必要的请求）
+    if (input.trim().length < 2) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      return;
+    }
+
+    // 设置防抖定时器（300ms延迟，平衡响应速度和API调用次数）
+    autocompleteDebounceTimerRef.current = setTimeout(() => {
+      performAutocompleteSearch(input);
+    }, 300);
+  };
+
+  // 清理定时器
+  React.useEffect(() => {
+    return () => {
+      if (autocompleteDebounceTimerRef.current) {
+        clearTimeout(autocompleteDebounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // 处理选择建议
   const handleSelectSuggestion = (suggestion: any) => {
     if (!placesService) return;
 
     const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+    
+    // 立即更新输入框，提供即时反馈
     if (addressInput) {
       addressInput.value = suggestion.description;
     }
+    
+    setShowSuggestions(false);
+    setIsLoadingSuggestions(true);
+    lastSearchQueryRef.current = '';
 
     // 获取地点的详细信息（包括坐标）
     placesService.getDetails(
@@ -1698,6 +1761,8 @@ const HomePage: React.FC = () => {
         fields: ['geometry', 'formatted_address', 'name']
       },
       (place: any, status: any) => {
+        setIsLoadingSuggestions(false);
+        
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           const location = place.geometry.location;
           const coords = {
@@ -1723,15 +1788,17 @@ const HomePage: React.FC = () => {
             });
           }
 
-          // 更新地址输入框
+          // 更新地址输入框（使用格式化地址）
           if (addressInput) {
             addressInput.value = place.formatted_address || suggestion.description;
           }
+        } else {
+          // 如果获取详情失败，至少保留用户选择的描述
+          console.warn('获取地点详情失败，使用描述信息');
         }
       }
     );
 
-    setShowSuggestions(false);
     setAutocompleteSuggestions([]);
   };
 
@@ -4473,50 +4540,110 @@ const HomePage: React.FC = () => {
                   onChange={(e) => handleAddressInputChange(e.target.value)}
                 />
                 
+                {/* 加载指示器 */}
+                {isLoadingSuggestions && (
+                  <div style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '12px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    zIndex: 1001
+                  }}>
+                    🔍 {language === 'zh' ? '搜索中...' : language === 'en' ? 'Searching...' : 'ရှာဖွေနေသည်...'}
+                  </div>
+                )}
+
                 {/* 自动完成建议列表 */}
-                {showSuggestions && autocompleteSuggestions.length > 0 && (
+                {showSuggestions && (
                   <div style={{
                     position: 'absolute',
                     top: '100%',
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    background: 'rgba(255, 255, 255, 0.95)',
+                    background: 'rgba(255, 255, 255, 0.98)',
                     backdropFilter: 'blur(10px)',
                     borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    maxHeight: '300px',
+                    maxHeight: '400px',
                     overflowY: 'auto',
                     zIndex: 1000
                   }}>
-                    {autocompleteSuggestions.map((suggestion, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleSelectSuggestion(suggestion)}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          cursor: 'pointer',
-                          borderBottom: index < autocompleteSuggestions.length - 1 ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-                          color: '#1f2937',
-                          fontSize: '0.9rem',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
-                          {suggestion.main_text}
-                        </div>
-                        <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
-                          {suggestion.secondary_text}
-                        </div>
+                    {isLoadingSuggestions ? (
+                      <div style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '0.9rem'
+                      }}>
+                        🔍 {language === 'zh' ? '搜索中...' : language === 'en' ? 'Searching...' : 'ရှာဖွေနေသည်...'}
                       </div>
-                    ))}
+                    ) : autocompleteSuggestions.length > 0 ? (
+                      autocompleteSuggestions.map((suggestion, index) => (
+                        <div
+                          key={`${suggestion.place_id}-${index}`}
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                          style={{
+                            padding: '0.875rem 1rem',
+                            cursor: 'pointer',
+                            borderBottom: index < autocompleteSuggestions.length - 1 ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                            color: '#1f2937',
+                            fontSize: '0.9rem',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '16px',
+                            background: '#f3f4f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '16px',
+                            flexShrink: 0
+                          }}>
+                            📍
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: '400', marginBottom: '0.25rem', fontSize: '0.95rem' }}>
+                              {suggestion.main_text}
+                            </div>
+                            {suggestion.secondary_text && (
+                              <div style={{ color: '#6b7280', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {suggestion.secondary_text}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '20px', color: '#9ca3af', marginLeft: '8px', flexShrink: 0 }}>
+                            ›
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '0.9rem'
+                      }}>
+                        {language === 'zh' ? '未找到相关位置' : language === 'en' ? 'No results found' : 'ရလဒ်မတွေ့ရှိပါ'}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
