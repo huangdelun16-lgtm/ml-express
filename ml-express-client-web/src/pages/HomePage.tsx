@@ -92,6 +92,10 @@ const HomePage: React.FC = () => {
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [autocompleteService, setAutocompleteService] = useState<any>(null);
+  const [placesService, setPlacesService] = useState<any>(null);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   type OrderConfirmationStatus = 'idle' | 'success' | 'failed';
   type OrderSubmitStatus = 'idle' | 'processing' | 'success' | 'failed';
   const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false);
@@ -4036,6 +4040,14 @@ const HomePage: React.FC = () => {
                         // 地图加载完成后的提示
                         console.log('地图加载完成，可以开始定位');
                         
+                        // 初始化Places服务
+                        if (window.google && window.google.maps) {
+                          const autocomplete = new window.google.maps.places.AutocompleteService();
+                          const places = new window.google.maps.places.PlacesService(map);
+                          setAutocompleteService(autocomplete);
+                          setPlacesService(places);
+                        }
+                        
                         // 添加地图点击事件监听（支持普通点击和POI点击）
                         map.addListener('click', async (e: any) => {
                           // 如果点击的是POI（店铺、地点等）
@@ -4344,24 +4356,83 @@ const HomePage: React.FC = () => {
               <div style={{ marginBottom: '0.5rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
                 📍 点击地图、右键选择位置或点击店铺图标选择位置
               </div>
-              <input
-                type="text"
-                id="map-address-input"
-                placeholder={t.order.mapPlaceholder}
-                style={{
-                  width: '100%',
-                  padding: '1rem',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  transition: 'all 0.3s ease'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)'}
-                onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  id="map-address-input"
+                  placeholder={t.order.mapPlaceholder}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    color: 'white',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                    if (e.currentTarget.value.trim()) {
+                      handleAddressInputChange(e.currentTarget.value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    // 延迟隐藏建议列表，以便点击建议项
+                    setTimeout(() => setShowSuggestions(false), 200);
+                  }}
+                  onChange={(e) => handleAddressInputChange(e.target.value)}
+                />
+                
+                {/* 自动完成建议列表 */}
+                {showSuggestions && autocompleteSuggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    zIndex: 1000
+                  }}>
+                    {autocompleteSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          cursor: 'pointer',
+                          borderBottom: index < autocompleteSuggestions.length - 1 ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+                          color: '#1f2937',
+                          fontSize: '0.9rem',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
+                          {suggestion.main_text}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                          {suggestion.secondary_text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               
               {/* 选中POI信息显示 */}
               {selectedPOI && (
