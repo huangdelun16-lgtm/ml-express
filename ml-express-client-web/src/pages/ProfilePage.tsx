@@ -175,7 +175,9 @@ const ProfilePage: React.FC = () => {
       close: '关闭',
       paymentMethod: '支付方式',
       qrPayment: '二维码支付',
-      cashPayment: '现金支付'
+      cashPayment: '现金支付',
+      totalOrders: '全部订单',
+      accountDate: '开户日期'
     },
     en: {
       nav: {
@@ -209,7 +211,9 @@ const ProfilePage: React.FC = () => {
       close: 'Close',
       paymentMethod: 'Payment Method',
       qrPayment: 'QR Code',
-      cashPayment: 'Cash'
+      cashPayment: 'Cash',
+      totalOrders: 'Total Orders',
+      accountDate: 'Account Created'
     },
     my: {
       nav: {
@@ -243,7 +247,9 @@ const ProfilePage: React.FC = () => {
       close: 'ပိတ်ရန်',
       paymentMethod: 'ငွေပေးချေမှုနည်းလမ်း',
       qrPayment: 'QR Code',
-      cashPayment: 'ငွေသား'
+      cashPayment: 'ငွေသား',
+      totalOrders: 'စုစုပေါင်းအော်ဒါ',
+      accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ'
     }
   };
 
@@ -622,7 +628,7 @@ const ProfilePage: React.FC = () => {
           </h1>
         </div>
 
-        {/* 用户信息卡片 */}
+        {/* 用户信息卡片 - 参考客户端app样式 */}
         <div style={{
           background: 'rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(20px)',
@@ -635,15 +641,48 @@ const ProfilePage: React.FC = () => {
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease 0.2s'
         }}>
-          <h2 style={{
-            color: 'white',
-            fontSize: '1.5rem',
-            marginBottom: '1.5rem',
-            borderBottom: '2px solid rgba(255,255,255,0.3)',
-            paddingBottom: '0.5rem'
+          {/* 用户头像和基本信息 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.5rem',
+            marginBottom: '2rem',
+            paddingBottom: '1.5rem',
+            borderBottom: '2px solid rgba(255,255,255,0.3)'
           }}>
-            {t.userInfo}
-          </h2>
+            {/* 头像 */}
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '3px solid rgba(255, 255, 255, 0.5)',
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              color: 'white',
+              flexShrink: 0
+            }}>
+              {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            
+            {/* 用户基本信息 */}
+            <div style={{ flex: 1 }}>
+              <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {currentUser.name || '-'}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+                {currentUser.email || '-'}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem' }}>
+                {currentUser.phone || '-'}
+              </div>
+            </div>
+          </div>
+
+          {/* 详细信息网格 */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
@@ -651,34 +690,32 @@ const ProfilePage: React.FC = () => {
           }}>
             <div>
               <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.name}
-              </label>
-              <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                {currentUser.name || '-'}
-              </div>
-            </div>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.email}
-              </label>
-              <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                {currentUser.email || '-'}
-              </div>
-            </div>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.phone}
-              </label>
-              <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                {currentUser.phone || '-'}
-              </div>
-            </div>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
                 {t.address}
               </label>
-              <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
+              <div style={{ color: 'white', fontSize: '1rem' }}>
                 {currentUser.address || '-'}
+              </div>
+            </div>
+            <div>
+              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                {t.totalOrders}
+              </label>
+              <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                {userPackages.length}
+              </div>
+            </div>
+            <div>
+              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                {t.accountDate}
+              </label>
+              <div style={{ color: 'white', fontSize: '1rem' }}>
+                {currentUser.created_at 
+                  ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                  : '-'}
               </div>
             </div>
           </div>
