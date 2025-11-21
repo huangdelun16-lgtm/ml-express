@@ -823,93 +823,102 @@ const ProfilePage: React.FC = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  {/* 顶部：订单号、状态、支付方式 */}
+                  {/* 顶部：订单号、创建时间、价格、包裹类型 - 一行显示 */}
                   <div style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
                     flexWrap: 'wrap',
-                    gap: '0.75rem',
+                    gap: '1rem',
+                    alignItems: 'center',
+                    marginBottom: '1rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    {/* 订单号 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
+                        {t.packageId}:
+                      </span>
+                      <span style={{ color: 'white', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                        {pkg.id}
+                      </span>
+                    </div>
+
+                    {/* 分隔符 */}
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
+
+                    {/* 创建时间 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
+                        {t.createTime}:
+                      </span>
+                      <span style={{ color: 'white', fontSize: '0.95rem' }}>
+                        {pkg.create_time || pkg.created_at || '-'}
+                      </span>
+                    </div>
+
+                    {/* 分隔符 */}
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
+
+                    {/* 价格 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
+                        {t.price}:
+                      </span>
+                      <span style={{ color: 'white', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                        {pkg.price ? `${pkg.price} MMK` : '-'}
+                      </span>
+                    </div>
+
+                    {/* 分隔符 */}
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
+
+                    {/* 包裹类型 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
+                        {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}:
+                      </span>
+                      <span style={{ color: 'white', fontSize: '0.95rem' }}>
+                        {pkg.package_type || '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 状态和支付方式按钮 */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
                     marginBottom: '1rem'
                   }}>
-                    {/* 订单号 - 移到左侧 */}
-                    <div style={{ flex: '1', minWidth: '200px' }}>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                        {t.packageId}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                        {pkg.id}
-                      </div>
+                    {/* 状态按钮 */}
+                    <div style={{
+                      background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
+                      color: 'white',
+                      padding: '0.4rem 0.9rem',
+                      borderRadius: '20px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {pkg.status === '待收款' ? getStatusText(pkg.status) : pkg.status}
                     </div>
                     
-                    {/* 右侧：状态和支付方式按钮 */}
-                    <div style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      alignItems: 'flex-start',
-                      flexWrap: 'wrap'
-                    }}>
-                      {/* 状态按钮 */}
+                    {/* 支付方式按钮 */}
+                    {pkg.payment_method && (
                       <div style={{
-                        background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
+                        background: getPaymentMethodColor(pkg.payment_method),
                         color: 'white',
+                        border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
                         padding: '0.4rem 0.9rem',
                         borderRadius: '20px',
                         fontSize: '0.85rem',
                         fontWeight: 'bold',
                         whiteSpace: 'nowrap'
                       }}>
-                        {pkg.status === '待收款' ? getStatusText(pkg.status) : pkg.status}
+                        {getPaymentMethodText(pkg.payment_method)}
                       </div>
-                      
-                      {/* 支付方式按钮 */}
-                      {pkg.payment_method && (
-                        <div style={{
-                          background: getPaymentMethodColor(pkg.payment_method),
-                          color: 'white',
-                          border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
-                          padding: '0.4rem 0.9rem',
-                          borderRadius: '20px',
-                          fontSize: '0.85rem',
-                          fontWeight: 'bold',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {getPaymentMethodText(pkg.payment_method)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
-                    gap: '1rem',
-                    marginBottom: '1rem'
-                  }}>
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        {t.createTime}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '1rem' }}>
-                        {pkg.create_time || pkg.created_at || '-'}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        {t.price}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '1rem', fontWeight: 'bold' }}>
-                        {pkg.price ? `${pkg.price} MMK` : '-'}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '1rem' }}>
-                        {pkg.package_type || '-'}
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   <button
