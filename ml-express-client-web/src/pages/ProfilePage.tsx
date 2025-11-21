@@ -172,7 +172,10 @@ const ProfilePage: React.FC = () => {
       packageDetails: '包裹详情',
       sender: '寄件人',
       receiver: '收件人',
-      close: '关闭'
+      close: '关闭',
+      paymentMethod: '支付方式',
+      qrPayment: '二维码支付',
+      cashPayment: '现金支付'
     },
     en: {
       nav: {
@@ -203,7 +206,10 @@ const ProfilePage: React.FC = () => {
       packageDetails: 'Package Details',
       sender: 'Sender',
       receiver: 'Receiver',
-      close: 'Close'
+      close: 'Close',
+      paymentMethod: 'Payment Method',
+      qrPayment: 'QR Code',
+      cashPayment: 'Cash'
     },
     my: {
       nav: {
@@ -234,7 +240,10 @@ const ProfilePage: React.FC = () => {
       packageDetails: 'ပက်ကေ့ဂျ်အသေးစိတ်',
       sender: 'ပို့ဆောင်သူ',
       receiver: 'လက်ခံသူ',
-      close: 'ပိတ်ရန်'
+      close: 'ပိတ်ရန်',
+      paymentMethod: 'ငွေပေးချေမှုနည်းလမ်း',
+      qrPayment: 'QR Code',
+      cashPayment: 'ငွေသား'
     }
   };
 
@@ -257,6 +266,36 @@ const ProfilePage: React.FC = () => {
   const getStatusText = (status: string) => {
     if (status === '待收款') return language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်';
     return status;
+  };
+
+  // 获取支付方式文本
+  const getPaymentMethodText = (paymentMethod?: string) => {
+    if (paymentMethod === 'qr') {
+      return language === 'zh' ? '二维码支付' : language === 'en' ? 'QR Code' : 'QR Code';
+    } else if (paymentMethod === 'cash') {
+      return language === 'zh' ? '现金支付' : language === 'en' ? 'Cash' : 'ငွေသား';
+    }
+    return language === 'zh' ? '未知' : language === 'en' ? 'Unknown' : 'မသိရှိရ';
+  };
+
+  // 获取支付方式颜色
+  const getPaymentMethodColor = (paymentMethod?: string) => {
+    if (paymentMethod === 'qr') {
+      return 'rgba(34, 197, 94, 0.3)'; // 绿色
+    } else if (paymentMethod === 'cash') {
+      return 'rgba(251, 191, 36, 0.3)'; // 黄色
+    }
+    return 'rgba(156, 163, 175, 0.3)'; // 灰色
+  };
+
+  // 获取支付方式边框颜色
+  const getPaymentMethodBorderColor = (paymentMethod?: string) => {
+    if (paymentMethod === 'qr') {
+      return 'rgba(34, 197, 94, 0.5)';
+    } else if (paymentMethod === 'cash') {
+      return 'rgba(251, 191, 36, 0.5)';
+    }
+    return 'rgba(156, 163, 175, 0.5)';
   };
 
   return (
@@ -784,31 +823,60 @@ const ProfilePage: React.FC = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
+                  {/* 顶部：订单号、状态、支付方式 */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
                     flexWrap: 'wrap',
-                    gap: '1rem',
+                    gap: '0.75rem',
                     marginBottom: '1rem'
                   }}>
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                    {/* 订单号 - 移到左侧 */}
+                    <div style={{ flex: '1', minWidth: '200px' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
                         {t.packageId}
                       </div>
-                      <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                      <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                         {pkg.id}
                       </div>
                     </div>
+                    
+                    {/* 右侧：状态和支付方式按钮 */}
                     <div style={{
-                      background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '20px',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold'
+                      display: 'flex',
+                      gap: '0.5rem',
+                      alignItems: 'flex-start',
+                      flexWrap: 'wrap'
                     }}>
-                      {pkg.status === '待收款' ? getStatusText(pkg.status) : pkg.status}
+                      {/* 状态按钮 */}
+                      <div style={{
+                        background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
+                        color: 'white',
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {pkg.status === '待收款' ? getStatusText(pkg.status) : pkg.status}
+                      </div>
+                      
+                      {/* 支付方式按钮 */}
+                      {pkg.payment_method && (
+                        <div style={{
+                          background: getPaymentMethodColor(pkg.payment_method),
+                          color: 'white',
+                          border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
+                          padding: '0.4rem 0.9rem',
+                          borderRadius: '20px',
+                          fontSize: '0.85rem',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {getPaymentMethodText(pkg.payment_method)}
+                        </div>
+                      )}
                     </div>
                   </div>
 
