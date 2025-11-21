@@ -3,7 +3,7 @@
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
     "version": "1.0.0",
-    "sdkVersion": "54.0.12",
+    "sdkVersion": "51.0.0",
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -84,7 +84,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-dev-client",
       [
         "expo-location",
         {
