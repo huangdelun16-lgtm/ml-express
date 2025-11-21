@@ -89,11 +89,39 @@ export const packageService = {
     try {
       console.log('尝试创建包裹:', packageData);
       
-      const { data, error } = await supabase
+      // 如果 customer_email 或 customer_name 字段不存在，从数据中移除它们
+      // 这样可以避免数据库列不存在的错误
+      const dataToInsert: any = { ...packageData };
+      
+      // 检查并处理可能不存在的字段
+      // 如果数据库表中没有这些字段，尝试插入时会失败
+      // 所以我们先尝试插入，如果失败则移除这些字段重试
+      let { data, error } = await supabase
         .from('packages')
-        .insert([packageData])
+        .insert([dataToInsert])
         .select()
         .single();
+      
+      // 如果错误是因为列不存在，移除这些字段后重试
+      if (error && (error.message.includes('customer_email') || error.message.includes('customer_name') || error.code === 'PGRST204')) {
+        console.warn('检测到 customer_email 或 customer_name 列不存在，移除这些字段后重试');
+        delete dataToInsert.customer_email;
+        delete dataToInsert.customer_name;
+        
+        // 重试插入
+        const retryResult = await supabase
+          .from('packages')
+          .insert([dataToInsert])
+          .select()
+          .single();
+        
+        if (retryResult.error) {
+          error = retryResult.error;
+        } else {
+          data = retryResult.data;
+          error = null;
+        }
+      }
       
       if (error) {
         console.error('【Supabase错误】创建包裹失败:', {

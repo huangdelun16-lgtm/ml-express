@@ -3330,7 +3330,8 @@ const HomePage: React.FC = () => {
                     // 二维码支付：状态设为"待取件"，已支付
                     const orderStatus = currentPaymentMethod === 'cash' ? '待收款' : '待取件';
                     
-                    const packageData = {
+                    // 构建包裹数据，只包含数据库表中存在的字段
+                    const packageData: any = {
                       id: packageId,
                       sender_name: orderInfo.senderName,
                       sender_phone: orderInfo.senderPhone,
@@ -3353,10 +3354,24 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
-                      payment_method: currentPaymentMethod, // 添加支付方式字段
-                      customer_email: currentUser?.email || orderInfo.customerEmail || null, // 添加客户邮箱
-                      customer_name: currentUser?.name || orderInfo.customerName || orderInfo.senderName || null // 添加客户姓名
+                      payment_method: currentPaymentMethod // 添加支付方式字段
                     };
+
+                    // 只有在用户登录时才添加 customer_email 和 customer_name
+                    // 如果数据库表中没有这些字段，这些值会被忽略
+                    if (currentUser?.email) {
+                      packageData.customer_email = currentUser.email;
+                    } else if (orderInfo.customerEmail) {
+                      packageData.customer_email = orderInfo.customerEmail;
+                    }
+
+                    if (currentUser?.name) {
+                      packageData.customer_name = currentUser.name;
+                    } else if (orderInfo.customerName) {
+                      packageData.customer_name = orderInfo.customerName;
+                    } else if (orderInfo.senderName) {
+                      packageData.customer_name = orderInfo.senderName;
+                    }
                     
                     // 保存到数据库
                     console.log('准备保存包裹数据:', packageData);
