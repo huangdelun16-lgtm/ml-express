@@ -1539,6 +1539,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             }}
+            region={{
+              latitude: selectedLocation.latitude,
+              longitude: selectedLocation.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            showsUserLocation={true}
+            showsMyLocationButton={false}
+            showsCompass={true}
+            showsScale={true}
+            loadingEnabled={true}
             onPress={(e) => {
               setSelectedLocation(e.nativeEvent.coordinate);
               setSelectedPlace(null); // 清除POI选择
@@ -1550,6 +1561,20 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 name: e.nativeEvent.name || '选中位置',
                 address: e.nativeEvent.name || '未知地址'
               });
+            }}
+            onMapReady={() => {
+              console.log('地图已准备就绪');
+            }}
+            onError={(error) => {
+              console.error('地图加载错误:', error);
+              Alert.alert(
+                language === 'zh' ? '地图加载失败' : language === 'en' ? 'Map Loading Failed' : 'မြေပုံဖွင့်ရန်မအောင်မြင်ပါ',
+                language === 'zh' 
+                  ? '请检查网络连接或Google Maps API配置' 
+                  : language === 'en' 
+                  ? 'Please check your network connection or Google Maps API configuration'
+                  : 'ကျေးဇူးပြု၍ ကွန်ရက်ချိတ်ဆက်မှု သို့မဟုတ် Google Maps API ကိုစစ်ဆေးပါ'
+              );
             }}
           >
             {/* 主标记 - 用户选择的位置 */}
@@ -2292,6 +2317,8 @@ const baseStyles = StyleSheet.create({
   },
   map: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   mapFooter: {
     backgroundColor: '#ffffff',
