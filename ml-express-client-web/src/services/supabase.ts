@@ -174,6 +174,41 @@ export const packageService = {
       console.error('搜索包裹异常:', err);
       return null;
     }
+  },
+
+  // 根据用户邮箱或手机号获取该用户的所有包裹
+  async getPackagesByUser(email?: string, phone?: string): Promise<Package[]> {
+    try {
+      if (!email && !phone) {
+        return [];
+      }
+
+      // 构建查询条件：根据邮箱或手机号查询
+      let query = supabase.from('packages').select('*');
+
+      if (email && phone) {
+        // 如果同时有邮箱和手机号，查询匹配任一条件的包裹
+        query = query.or(`customer_email.eq.${email},sender_phone.eq.${phone}`);
+      } else if (email) {
+        // 只根据邮箱查询
+        query = query.eq('customer_email', email);
+      } else if (phone) {
+        // 只根据手机号查询
+        query = query.eq('sender_phone', phone);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取用户包裹列表失败:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error('获取用户包裹列表异常:', err);
+      return [];
+    }
   }
 };
 

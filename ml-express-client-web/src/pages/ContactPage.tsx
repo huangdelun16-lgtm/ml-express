@@ -302,6 +302,28 @@ const ContactPage: React.FC = () => {
               borderRadius: '10px',
               backdropFilter: 'blur(10px)'
             }}>
+              <button
+                onClick={() => navigate('/profile')}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.3)',
+                  color: 'white',
+                  border: '1px solid rgba(59, 130, 246, 0.5)',
+                  padding: '0.3rem 0.8rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
+                }}
+              >
+                {language === 'zh' ? '我的账户' : language === 'en' ? 'My Account' : 'ကျွန်ုပ်၏အကောင့်'}
+              </button>
               <span style={{ 
                 color: 'white',
                 fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
