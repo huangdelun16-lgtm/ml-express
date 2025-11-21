@@ -222,12 +222,7 @@ export const packageService = {
 
       const conditions: string[] = [];
       
-      if (email) {
-        // 使用 customer_email 查询
-        conditions.push(`customer_email.eq.${email}`);
-        console.log('添加查询条件: customer_email =', email);
-      }
-      
+      // 优先使用手机号查询（因为 customer_email 字段可能不存在）
       if (phone) {
         // 同时查询 sender_phone 和 receiver_phone
         conditions.push(`sender_phone.eq.${phone}`);
@@ -245,7 +240,24 @@ export const packageService = {
         return [];
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      let { data, error } = await query.order('created_at', { ascending: false });
+      
+      // 如果查询失败且是因为 customer_email 字段不存在，只使用手机号查询
+      if (error && (error.message.includes('customer_email') || error.code === 'PGRST204')) {
+        console.warn('customer_email 字段不存在，只使用手机号查询');
+        // 重新构建查询，只使用手机号
+        if (phone) {
+          query = supabase.from('packages').select('*');
+          query = query.or(`sender_phone.eq.${phone},receiver_phone.eq.${phone}`);
+          const retryResult = await query.order('created_at', { ascending: false });
+          if (retryResult.error) {
+            error = retryResult.error;
+          } else {
+            data = retryResult.data;
+            error = null;
+          }
+        }
+      }
       
       if (error) {
         console.error('获取用户包裹列表失败:', error);
@@ -257,6 +269,18 @@ export const packageService = {
         });
         console.error('查询条件:', conditions);
         return [];
+      }
+      
+      // 如果邮箱存在，在结果中进一步过滤（客户端过滤，避免数据库查询错误）
+      if (email && data) {
+        console.log('使用邮箱过滤结果，邮箱:', email);
+        data = data.filter((pkg: any) => {
+          // 如果包裹有 customer_email 字段且匹配，或者通过手机号匹配
+          return pkg.customer_email === email || 
+                 pkg.sender_phone === phone || 
+                 pkg.receiver_phone === phone;
+        });
+        console.log('过滤后的包裹数量:', data.length);
       }
       
       console.log('查询成功，包裹数量:', data?.length || 0);
