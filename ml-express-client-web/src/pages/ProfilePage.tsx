@@ -16,6 +16,8 @@ const ProfilePage: React.FC = () => {
   const [searchResult, setSearchResult] = useState<any>(null);
   const [searching, setSearching] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [packagesPerPage] = useState(5); // 每页显示5个包裹
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = useCallback(() => {
@@ -74,6 +76,11 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     loadUserPackages();
   }, [loadUserPackages]);
+
+  // 当包裹列表变化时，重置到第一页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [userPackages.length]);
 
   // 退出登录
   const handleLogout = () => {
@@ -291,27 +298,46 @@ const ProfilePage: React.FC = () => {
           gap: '2rem',
           flexWrap: 'wrap'
         }}>
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px',
               cursor: 'pointer',
-              padding: '0.5rem',
-              transition: 'all 0.3s ease'
+              transition: 'opacity 0.3s ease'
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
+            onClick={() => navigate('/')}
+            onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+            onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
           >
-            🚚 MARKET LINK EXPRESS
-          </button>
+            {/* LOGO图片 */}
+            <img 
+              src="/logo.png" 
+              alt="ML Express Logo"
+              style={{
+                width: window.innerWidth < 768 ? '40px' : '50px',
+                height: window.innerWidth < 768 ? '40px' : '50px',
+                objectFit: 'contain'
+              }}
+            />
+            
+            {/* 公司名称 - 与其他页面一致的单行显示 */}
+            <span style={{
+              color: 'white',
+              fontSize: window.innerWidth < 768 ? '1.6rem' : '2.2rem',
+              fontWeight: '800',
+              textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
+              background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              letterSpacing: '-1px',
+              lineHeight: '1.1',
+              whiteSpace: 'nowrap'
+            }}>
+              MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+            </span>
+          </div>
 
           <div style={{
             display: 'flex',
@@ -732,11 +758,14 @@ const ProfilePage: React.FC = () => {
               <div style={{ fontSize: '1.2rem' }}>{t.noPackages}</div>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gap: '1rem'
-            }}>
-              {userPackages.map((pkg) => (
+            <>
+              <div style={{
+                display: 'grid',
+                gap: '1rem'
+              }}>
+                {userPackages
+                  .slice((currentPage - 1) * packagesPerPage, currentPage * packagesPerPage)
+                  .map((pkg) => (
                 <div
                   key={pkg.id}
                   style={{
@@ -840,7 +869,132 @@ const ProfilePage: React.FC = () => {
                   </button>
                 </div>
               ))}
-            </div>
+              </div>
+
+              {/* 分页控件 */}
+              {userPackages.length > packagesPerPage && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginTop: '2rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                      background: currentPage === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold',
+                      transition: 'all 0.3s ease',
+                      opacity: currentPage === 1 ? 0.5 : 1
+                    }}
+                    onMouseOver={(e) => {
+                      if (currentPage !== 1) {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (currentPage !== 1) {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
+                      }
+                    }}
+                  >
+                    {language === 'zh' ? '上一页' : language === 'en' ? 'Previous' : 'ယခင်စာမျက်နှာ'}
+                  </button>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center'
+                  }}>
+                    {Array.from({ length: Math.ceil(userPackages.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        style={{
+                          background: currentPage === page ? 'rgba(59, 130, 246, 0.7)' : 'rgba(255, 255, 255, 0.1)',
+                          color: 'white',
+                          border: `1px solid ${currentPage === page ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.3)'}`,
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: currentPage === page ? 'bold' : 'normal',
+                          transition: 'all 0.3s ease',
+                          minWidth: '40px'
+                        }}
+                        onMouseOver={(e) => {
+                          if (currentPage !== page) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (currentPage !== page) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          }
+                        }}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(userPackages.length / packagesPerPage), prev + 1))}
+                    disabled={currentPage === Math.ceil(userPackages.length / packagesPerPage)}
+                    style={{
+                      background: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      cursor: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'not-allowed' : 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold',
+                      transition: 'all 0.3s ease',
+                      opacity: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 0.5 : 1
+                    }}
+                    onMouseOver={(e) => {
+                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
+                      }
+                    }}
+                  >
+                    {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာမျက်နှာ'}
+                  </button>
+                </div>
+              )}
+
+              {/* 显示当前页信息 */}
+              <div style={{
+                textAlign: 'center',
+                marginTop: '1rem',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '0.9rem'
+              }}>
+                {language === 'zh' 
+                  ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
+                  : language === 'en'
+                  ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} of ${userPackages.length}`
+                  : `${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} ကို ပြသထားသည်၊ စုစုပေါင်း ${userPackages.length}`
+                }
+              </div>
+            </>
           )}
         </div>
       </div>
