@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { packageService } from '../services/supabase';
+import QRCode from 'qrcode';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ const ProfilePage: React.FC = () => {
   const [packagesPerPage] = useState(5); // 每页显示5个包裹
   const [selectedPackage, setSelectedPackage] = useState<any>(null); // 选中的包裹详情
   const [showPackageDetailModal, setShowPackageDetailModal] = useState(false); // 显示包裹详情模态框
+  const [showPickupCodeModal, setShowPickupCodeModal] = useState(false); // 显示寄件码模态框
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(''); // 二维码数据URL
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = useCallback(() => {
@@ -182,7 +185,8 @@ const ProfilePage: React.FC = () => {
       accountDate: '开户日期',
       pendingPickup: '待取件',
       inTransit: '配送中',
-      completed: '已完成'
+      completed: '已完成',
+      pickupCode: '寄件码'
     },
     en: {
       nav: {
@@ -221,7 +225,8 @@ const ProfilePage: React.FC = () => {
       accountDate: 'Account Created',
       pendingPickup: 'Pending Pickup',
       inTransit: 'In Transit',
-      completed: 'Completed'
+      completed: 'Completed',
+      pickupCode: 'Pickup Code'
     },
     my: {
       nav: {
@@ -260,7 +265,8 @@ const ProfilePage: React.FC = () => {
       accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ',
       pendingPickup: 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်',
       inTransit: 'ပို့ဆောင်နေသည်',
-      completed: 'ပြီးစီးပြီး'
+      completed: 'ပြီးစီးပြီး',
+      pickupCode: 'ကောက်ယူမည့်ကုဒ်'
     }
   };
 
@@ -321,6 +327,47 @@ const ProfilePage: React.FC = () => {
     pendingPickup: userPackages.filter(pkg => pkg.status === '待取件' || pkg.status === '待收款').length,
     inTransit: userPackages.filter(pkg => pkg.status === '运输中' || pkg.status === '已取件').length,
     completed: userPackages.filter(pkg => pkg.status === '已送达' || pkg.status === '已完成').length
+  };
+
+  // 生成二维码
+  const generateQRCode = async (orderId: string) => {
+    try {
+      const qrCodeUrl = await QRCode.toDataURL(orderId, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#2c5282',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataUrl(qrCodeUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+    }
+  };
+
+  // 显示寄件码
+  const showPickupCode = async (pkg: any) => {
+    await generateQRCode(pkg.id);
+    setShowPickupCodeModal(true);
+  };
+
+  // 关闭寄件码模态框
+  const closePickupCodeModal = () => {
+    setShowPickupCodeModal(false);
+    setQrCodeDataUrl('');
+  };
+
+  // 保存二维码
+  const saveQRCode = () => {
+    if (qrCodeDataUrl && selectedPackage) {
+      const link = document.createElement('a');
+      link.download = `寄件码_${selectedPackage.id}.png`;
+      link.href = qrCodeDataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -1488,21 +1535,45 @@ const ProfilePage: React.FC = () => {
               }}>
                 {t.packageDetails}
               </h2>
-              <button
-                onClick={() => setShowPackageDetailModal(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 'bold'
-                }}
-              >
-                {t.close}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => showPickupCode(selectedPackage)}
+                  style={{
+                    background: 'rgba(34, 197, 94, 0.3)',
+                    color: 'white',
+                    border: '1px solid rgba(34, 197, 94, 0.5)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(34, 197, 94, 0.5)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(34, 197, 94, 0.3)';
+                  }}
+                >
+                  📱 {t.pickupCode}
+                </button>
+                <button
+                  onClick={() => setShowPackageDetailModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {t.close}
+                </button>
+              </div>
             </div>
 
             <div style={{
@@ -1746,6 +1817,216 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 寄件码模态框 */}
+      {showPickupCodeModal && selectedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 1001,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '2rem'
+        }}
+        onClick={closePickupCodeModal}
+        >
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '25px'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                📱 {t.pickupCode}
+              </h2>
+              <button
+                onClick={closePickupCodeModal}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✕ {t.close}
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              borderRadius: '15px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ color: 'white', margin: '0 0 15px 0', fontSize: '1.1rem' }}>
+                📦 {language === 'zh' ? '包裹信息' : language === 'en' ? 'Package Information' : 'ပက်ကေ့ဂျ်အချက်အလက်'}
+              </h3>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', marginBottom: '15px' }}>
+                <p style={{ margin: '5px 0' }}><strong>{language === 'zh' ? '包裹编号' : language === 'en' ? 'Package ID' : 'ပက်ကေ့ဂျ်နံပါတ်'}:</strong> {selectedPackage.id}</p>
+                <p style={{ margin: '5px 0' }}><strong>{language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}:</strong> {selectedPackage.package_type || '-'}</p>
+                <p style={{ margin: '5px 0' }}><strong>{t.sender}:</strong> {selectedPackage.sender_name || '-'}</p>
+                <p style={{ margin: '5px 0' }}><strong>{t.receiver}:</strong> {selectedPackage.receiver_name || '-'}</p>
+              </div>
+              
+              <div style={{
+                background: 'white',
+                padding: '25px',
+                borderRadius: '15px',
+                marginBottom: '20px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                border: '2px solid rgba(255, 255, 255, 0.2)',
+                position: 'relative'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: 'rgba(0, 0, 0, 0.1)',
+                  color: '#666',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.7rem',
+                  fontWeight: '500'
+                }}>
+                  {selectedPackage.id}
+                </div>
+                
+                {qrCodeDataUrl ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <img 
+                      src={qrCodeDataUrl} 
+                      alt={t.pickupCode}
+                      style={{
+                        width: '220px',
+                        height: '220px',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <p style={{
+                      color: '#666',
+                      fontSize: '0.8rem',
+                      margin: 0,
+                      textAlign: 'center'
+                    }}>
+                      {language === 'zh' ? '扫描此二维码完成取件' : language === 'en' ? 'Scan this QR code to complete pickup' : 'ဤ QR code ကို စကင်န်ဖတ်၍ ကောက်ယူမှု ပြီးစီးပါ'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    width: '220px', 
+                    height: '220px', 
+                    background: 'linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    margin: '0 auto',
+                    borderRadius: '8px',
+                    border: '2px dashed #ccc'
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        fontSize: '2rem',
+                        marginBottom: '10px'
+                      }}>⏳</div>
+                      <p style={{ color: '#666', margin: 0, fontSize: '0.9rem' }}>
+                        {language === 'zh' ? '生成中...' : language === 'en' ? 'Generating...' : 'ထုတ်လုပ်နေသည်...'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                padding: '15px',
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <h4 style={{ color: '#A5C7FF', margin: '0 0 10px 0', fontSize: '0.9rem' }}>
+                  💡 {language === 'zh' ? '使用说明' : language === 'en' ? 'Instructions' : 'အသုံးပြုမှုညွှန်ကြားချက်'}
+                </h4>
+                <ul style={{ 
+                  color: 'rgba(255,255,255,0.9)', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'left',
+                  margin: 0,
+                  paddingLeft: '20px',
+                  lineHeight: '1.6'
+                }}>
+                  <li>{language === 'zh' ? '配送员扫描此二维码完成取件' : language === 'en' ? 'Courier scans this QR code to complete pickup' : 'ပို့ဆောင်သူသည် ဤ QR code ကို စကင်န်ဖတ်၍ ကောက်ယူမှု ပြီးစီးပါ'}</li>
+                  <li>{language === 'zh' ? '您也可以保存二维码图片备用' : language === 'en' ? 'You can also save the QR code image as backup' : 'သင်သည် QR code ပုံကို သိမ်းဆည်းထားနိုင်သည်'}</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={saveQRCode}
+                disabled={!qrCodeDataUrl}
+                style={{
+                  background: qrCodeDataUrl ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: qrCodeDataUrl ? 'pointer' : 'not-allowed',
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease',
+                  opacity: qrCodeDataUrl ? 1 : 0.5
+                }}
+                onMouseOver={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (qrCodeDataUrl) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }
+                }}
+              >
+                💾 {language === 'zh' ? '保存二维码' : language === 'en' ? 'Save QR Code' : 'QR code သိမ်းဆည်းရန်'}
+              </button>
             </div>
           </div>
         </div>
