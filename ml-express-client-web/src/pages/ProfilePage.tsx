@@ -1349,12 +1349,9 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 查看详情按钮 */}
+              {/* 关闭按钮 */}
               <button
-                onClick={() => {
-                  setShowSearchModal(false);
-                  navigate(`/tracking?trackingNumber=${searchResult.id}`);
-                }}
+                onClick={() => setShowPackageDetailModal(false)}
                 style={{
                   background: 'rgba(59, 130, 246, 0.5)',
                   color: 'white',
