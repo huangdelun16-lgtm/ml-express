@@ -1139,8 +1139,8 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* 搜索结果显示模态框 */}
-      {showSearchModal && searchResult && (
+      {/* 包裹详情模态框 */}
+      {showPackageDetailModal && selectedPackage && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -1155,7 +1155,7 @@ const ProfilePage: React.FC = () => {
           justifyContent: 'center',
           padding: '2rem'
         }}
-        onClick={() => setShowSearchModal(false)}
+        onClick={() => setShowPackageDetailModal(false)}
         >
           <div style={{
             background: 'rgba(255, 255, 255, 0.15)',
@@ -1187,7 +1187,7 @@ const ProfilePage: React.FC = () => {
                 {t.packageDetails}
               </h2>
               <button
-                onClick={() => setShowSearchModal(false)}
+                onClick={() => setShowPackageDetailModal(false)}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
                   color: 'white',
@@ -1213,7 +1213,7 @@ const ProfilePage: React.FC = () => {
                   {t.packageId}
                 </label>
                 <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                  {searchResult.id}
+                  {selectedPackage.id}
                 </div>
               </div>
 
@@ -1224,14 +1224,14 @@ const ProfilePage: React.FC = () => {
                 </label>
                 <div style={{
                   display: 'inline-block',
-                  background: getStatusColor(searchResult.status === '待收款' ? '待取件' : searchResult.status),
+                  background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
                   color: 'white',
                   padding: '0.5rem 1rem',
                   borderRadius: '20px',
                   fontSize: '0.9rem',
                   fontWeight: 'bold'
                 }}>
-                  {searchResult.status === '待收款' ? getStatusText(searchResult.status) : searchResult.status}
+                  {selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}
                 </div>
               </div>
 
@@ -1254,7 +1254,7 @@ const ProfilePage: React.FC = () => {
                       {t.name}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.sender_name || '-'}
+                      {selectedPackage.sender_name || '-'}
                     </div>
                   </div>
                   <div>
@@ -1262,7 +1262,7 @@ const ProfilePage: React.FC = () => {
                       {t.phone}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.sender_phone || '-'}
+                      {selectedPackage.sender_phone || '-'}
                     </div>
                   </div>
                   <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
@@ -1270,7 +1270,7 @@ const ProfilePage: React.FC = () => {
                       {t.address}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.sender_address || '-'}
+                      {selectedPackage.sender_address || '-'}
                     </div>
                   </div>
                 </div>
@@ -1295,7 +1295,7 @@ const ProfilePage: React.FC = () => {
                       {t.name}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.receiver_name || '-'}
+                      {selectedPackage.receiver_name || '-'}
                     </div>
                   </div>
                   <div>
@@ -1303,7 +1303,7 @@ const ProfilePage: React.FC = () => {
                       {t.phone}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.receiver_phone || '-'}
+                      {selectedPackage.receiver_phone || '-'}
                     </div>
                   </div>
                   <div style={{ gridColumn: window.innerWidth < 768 ? '1' : '1 / -1' }}>
@@ -1311,7 +1311,7 @@ const ProfilePage: React.FC = () => {
                       {t.address}
                     </label>
                     <div style={{ color: 'white', fontSize: '1rem' }}>
-                      {searchResult.receiver_address || '-'}
+                      {selectedPackage.receiver_address || '-'}
                     </div>
                   </div>
                 </div>
@@ -1328,7 +1328,7 @@ const ProfilePage: React.FC = () => {
                     {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
                   </label>
                   <div style={{ color: 'white', fontSize: '1rem' }}>
-                    {searchResult.package_type || '-'}
+                    {selectedPackage.package_type || '-'}
                   </div>
                 </div>
                 <div>
@@ -1336,7 +1336,7 @@ const ProfilePage: React.FC = () => {
                     {language === 'zh' ? '重量' : language === 'en' ? 'Weight' : 'အလေးချိန်'}
                   </label>
                   <div style={{ color: 'white', fontSize: '1rem' }}>
-                    {searchResult.weight || '-'}
+                    {selectedPackage.weight || '-'}
                   </div>
                 </div>
                 <div>
@@ -1344,7 +1344,7 @@ const ProfilePage: React.FC = () => {
                     {t.price}
                   </label>
                   <div style={{ color: 'white', fontSize: '1rem', fontWeight: 'bold' }}>
-                    {searchResult.price || '-'}
+                    {selectedPackage.price || '-'}
                   </div>
                 </div>
               </div>
@@ -1374,7 +1374,7 @@ const ProfilePage: React.FC = () => {
                   e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
                 }}
               >
-                {t.viewDetails}
+                {t.close}
               </button>
             </div>
           </div>
