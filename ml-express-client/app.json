@@ -102,12 +102,6 @@
           "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
       ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
-        }
-      ],
       "expo-sqlite",
       [
         "sentry-expo",
