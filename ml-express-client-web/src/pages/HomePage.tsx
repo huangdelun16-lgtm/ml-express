@@ -1932,21 +1932,21 @@ const HomePage: React.FC = () => {
               background: 'rgba(255,255,255,0.1)',
               color: 'white',
               border: '1px solid rgba(255,255,255,0.3)',
-              padding: '0.5rem',
+              padding: '0.35rem 0.6rem',
               borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+              fontWeight: '600',
+              fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem',
                 backdropFilter: 'blur(10px)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
-                minWidth: '120px',
+                gap: '0.4rem',
+                minWidth: '90px',
                 justifyContent: 'space-between'
               }}
             >
               <span>{language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'}</span>
-              <span style={{ fontSize: '0.8rem' }}>▼</span>
+              <span style={{ fontSize: '0.7rem' }}>▼</span>
             </button>
             
             {showLanguageDropdown && (
@@ -1955,13 +1955,14 @@ const HomePage: React.FC = () => {
                 top: '100%',
                 left: 0,
                 right: 0,
-                background: 'rgba(0,0,0,0.8)',
+                background: 'rgba(0,0,0,0.85)',
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255,255,255,0.3)',
                 borderRadius: '5px',
                 marginTop: '2px',
                 zIndex: 1000,
-                overflow: 'hidden'
+                overflow: 'hidden',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
               }}>
                 {[
                   { value: 'zh', label: '中文' },
@@ -1977,17 +1978,28 @@ const HomePage: React.FC = () => {
                     }}
                     style={{
                       width: '100%',
-                      background: 'transparent',
+                      background: language === option.value ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
                       color: 'white',
                       border: 'none',
-                      padding: '0.5rem',
+                      padding: '0.4rem 0.5rem',
                       textAlign: 'left',
                       cursor: 'pointer',
-                      fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-                      transition: 'background 0.2s ease'
+                      fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem',
+                      transition: 'all 0.2s ease',
+                      fontWeight: language === option.value ? '600' : '400'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                    onMouseOver={(e) => {
+                      if (language !== option.value) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (language !== option.value) {
+                        e.currentTarget.style.background = 'transparent';
+                      } else {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
+                      }
+                    }}
                   >
                     {option.label}
                   </button>
