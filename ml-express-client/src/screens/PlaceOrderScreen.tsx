@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -81,6 +81,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [mapAddressInput, setMapAddressInput] = useState('');
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const autocompleteDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSearchQueryRef = useRef<string>('');
   
   // 包裹类型说明
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
@@ -532,55 +535,115 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
-  // 处理地图地址输入变化，触发自动完成
-  const handleMapAddressInputChange = async (input: string) => {
+  // 实际执行API请求的函数
+  const performAutocompleteSearch = async (input: string) => {
     if (!input.trim() || input.length < 1) {
       setAutocompleteSuggestions([]);
       setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
       return;
     }
 
+    // 如果查询相同，不重复请求
+    if (lastSearchQueryRef.current === input.trim()) {
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    lastSearchQueryRef.current = input.trim();
+
     try {
       // 使用Google Places API进行自动完成
-      // 使用与web端相同的Google Maps API Key（支持Places API）
       const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
 
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${GOOGLE_MAPS_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input.trim())}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${GOOGLE_MAPS_API_KEY}&language=${language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'}`
       );
       
       const data = await response.json();
       
-      if (data.status === 'OK' && data.predictions) {
-        // 显示更多结果（最多10个），像Google Maps一样
-        const suggestions = data.predictions.slice(0, 10).map((prediction: any) => ({
-          place_id: prediction.place_id,
-          main_text: prediction.structured_formatting.main_text,
-          secondary_text: prediction.structured_formatting.secondary_text,
-          description: prediction.description
-        }));
-        setAutocompleteSuggestions(suggestions);
-        setShowSuggestions(true);
-      } else {
-        setAutocompleteSuggestions([]);
-        setShowSuggestions(false);
+      // 确保这是最新的查询结果
+      if (lastSearchQueryRef.current === input.trim()) {
+        if (data.status === 'OK' && data.predictions && data.predictions.length > 0) {
+          // 显示更多结果（最多10个），像Google Maps一样
+          const suggestions = data.predictions.slice(0, 10).map((prediction: any) => ({
+            place_id: prediction.place_id,
+            main_text: prediction.structured_formatting.main_text,
+            secondary_text: prediction.structured_formatting.secondary_text,
+            description: prediction.description
+          }));
+          setAutocompleteSuggestions(suggestions);
+          setShowSuggestions(true);
+        } else {
+          setAutocompleteSuggestions([]);
+          setShowSuggestions(false);
+        }
       }
     } catch (error) {
       console.error('自动完成请求失败:', error);
-      setAutocompleteSuggestions([]);
-      setShowSuggestions(false);
+      if (lastSearchQueryRef.current === input.trim()) {
+        setAutocompleteSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } finally {
+      if (lastSearchQueryRef.current === input.trim()) {
+        setIsLoadingSuggestions(false);
+      }
     }
   };
 
+  // 处理地图地址输入变化，触发自动完成（带防抖）
+  const handleMapAddressInputChange = (input: string) => {
+    // 清除之前的定时器
+    if (autocompleteDebounceTimerRef.current) {
+      clearTimeout(autocompleteDebounceTimerRef.current);
+    }
+
+    // 如果输入为空，立即清除结果
+    if (!input.trim() || input.length < 1) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      lastSearchQueryRef.current = '';
+      return;
+    }
+
+    // 如果输入长度小于2，不搜索（减少不必要的请求）
+    if (input.trim().length < 2) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoadingSuggestions(false);
+      return;
+    }
+
+    // 设置防抖定时器（300ms延迟，平衡响应速度和API调用次数）
+    autocompleteDebounceTimerRef.current = setTimeout(() => {
+      performAutocompleteSearch(input);
+    }, 300);
+  };
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (autocompleteDebounceTimerRef.current) {
+        clearTimeout(autocompleteDebounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // 处理选择建议
   const handleSelectSuggestion = async (suggestion: any) => {
+    // 立即更新输入框，提供即时反馈
+    setMapAddressInput(suggestion.description);
+    setShowSuggestions(false);
+    setIsLoadingSuggestions(true);
+    
     try {
       // 获取地点的详细信息（包括坐标）
-      // 使用与web端相同的Google Maps API Key（支持Places API）
       const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
 
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}&language=${language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'}`
       );
       
       const data = await response.json();
@@ -603,15 +666,22 @@ export default function PlaceOrderScreen({ navigation }: any) {
           });
         }
         
-        // 更新地址输入框
+        // 更新地址输入框（使用格式化地址）
         setMapAddressInput(place.formatted_address || suggestion.description);
+        
+        // 清除搜索查询缓存，以便下次可以重新搜索
+        lastSearchQueryRef.current = '';
+      } else {
+        // 如果获取详情失败，至少保留用户选择的描述
+        console.warn('获取地点详情失败，使用描述信息');
       }
     } catch (error) {
       console.error('获取地点详情失败:', error);
+      // 即使出错也保留用户选择的描述
+    } finally {
+      setIsLoadingSuggestions(false);
+      setAutocompleteSuggestions([]);
     }
-    
-    setShowSuggestions(false);
-    setAutocompleteSuggestions([]);
   };
 
   // 确认地图位置
@@ -2290,6 +2360,14 @@ const baseStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  suggestionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   suggestionMainText: {
     fontSize: 16,
     fontWeight: '400',
@@ -2299,7 +2377,35 @@ const baseStyles = StyleSheet.create({
   suggestionSecondaryText: {
     fontSize: 14,
     color: '#6b7280',
-    marginTop: 2,
+    marginTop: 4,
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResultsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
   },
   // 包裹类型说明模态框样式
   infoModalOverlay: {
