@@ -1531,7 +1531,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
 
           <MapView
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
               latitude: selectedLocation.latitude,
@@ -1571,10 +1571,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
               Alert.alert(
                 language === 'zh' ? '地图加载失败' : language === 'en' ? 'Map Loading Failed' : 'မြေပုံဖွင့်ရန်မအောင်မြင်ပါ',
                 language === 'zh' 
-                  ? '请检查网络连接或Google Maps API配置。iOS模拟器可能需要使用Apple Maps。' 
+                  ? '请检查网络连接或Google Maps API配置。' 
                   : language === 'en' 
-                  ? 'Please check your network connection or Google Maps API configuration. iOS simulator may need to use Apple Maps.'
-                  : 'ကျေးဇူးပြု၍ ကွန်ရက်ချိတ်ဆက်မှု သို့မဟုတ် Google Maps API ကိုစစ်ဆေးပါ။ iOS simulator သည် Apple Maps ကိုအသုံးပြုရန်လိုအပ်နိုင်သည်။'
+                  ? 'Please check your network connection or Google Maps API configuration.'
+                  : 'ကျေးဇူးပြု၍ ကွန်ရက်ချိတ်ဆက်မှု သို့မဟုတ် Google Maps API ကိုစစ်ဆေးပါ။'
               );
             }}
           >
