@@ -177,7 +177,10 @@ const ProfilePage: React.FC = () => {
       qrPayment: '二维码支付',
       cashPayment: '现金支付',
       totalOrders: '全部订单',
-      accountDate: '开户日期'
+      accountDate: '开户日期',
+      pendingPickup: '待取件',
+      inTransit: '配送中',
+      completed: '已完成'
     },
     en: {
       nav: {
@@ -213,7 +216,10 @@ const ProfilePage: React.FC = () => {
       qrPayment: 'QR Code',
       cashPayment: 'Cash',
       totalOrders: 'Total Orders',
-      accountDate: 'Account Created'
+      accountDate: 'Account Created',
+      pendingPickup: 'Pending Pickup',
+      inTransit: 'In Transit',
+      completed: 'Completed'
     },
     my: {
       nav: {
@@ -249,7 +255,10 @@ const ProfilePage: React.FC = () => {
       qrPayment: 'QR Code',
       cashPayment: 'ငွေသား',
       totalOrders: 'စုစုပေါင်းအော်ဒါ',
-      accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ'
+      accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ',
+      pendingPickup: 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်',
+      inTransit: 'ပို့ဆောင်နေသည်',
+      completed: 'ပြီးစီးပြီး'
     }
   };
 
@@ -302,6 +311,14 @@ const ProfilePage: React.FC = () => {
       return 'rgba(251, 191, 36, 0.5)';
     }
     return 'rgba(156, 163, 175, 0.5)';
+  };
+
+  // 计算订单统计
+  const orderStats = {
+    total: userPackages.length,
+    pendingPickup: userPackages.filter(pkg => pkg.status === '待取件' || pkg.status === '待收款').length,
+    inTransit: userPackages.filter(pkg => pkg.status === '运输中' || pkg.status === '已取件').length,
+    completed: userPackages.filter(pkg => pkg.status === '已送达' || pkg.status === '已完成').length
   };
 
   return (
@@ -682,28 +699,84 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
+          {/* 订单统计卡片 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            {/* 全部订单 */}
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.2)',
+              borderRadius: '12px',
+              padding: '1rem',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                {t.totalOrders}
+              </div>
+              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                {orderStats.total}
+              </div>
+            </div>
+
+            {/* 待取件 */}
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.2)',
+              borderRadius: '12px',
+              padding: '1rem',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                {t.pendingPickup}
+              </div>
+              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                {orderStats.pendingPickup}
+              </div>
+            </div>
+
+            {/* 配送中 */}
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.2)',
+              borderRadius: '12px',
+              padding: '1rem',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                {t.inTransit}
+              </div>
+              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                {orderStats.inTransit}
+              </div>
+            </div>
+
+            {/* 已完成 */}
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.2)',
+              borderRadius: '12px',
+              padding: '1rem',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                {t.completed}
+              </div>
+              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                {orderStats.completed}
+              </div>
+            </div>
+          </div>
+
           {/* 详细信息网格 */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
             gap: '1.5rem'
           }}>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.address}
-              </label>
-              <div style={{ color: 'white', fontSize: '1rem' }}>
-                {currentUser.address || '-'}
-              </div>
-            </div>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.totalOrders}
-              </label>
-              <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                {userPackages.length}
-              </div>
-            </div>
             <div>
               <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
                 {t.accountDate}
@@ -716,6 +789,14 @@ const ProfilePage: React.FC = () => {
                       day: 'numeric'
                     })
                   : '-'}
+              </div>
+            </div>
+            <div>
+              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
+                {t.address}
+              </label>
+              <div style={{ color: 'white', fontSize: '1rem' }}>
+                {currentUser.address || '-'}
               </div>
             </div>
           </div>
