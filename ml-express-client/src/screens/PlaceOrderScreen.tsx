@@ -1531,7 +1531,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
 
           <MapView
-            provider={Platform.OS === 'ios' ? undefined : PROVIDER_GOOGLE}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             style={styles.map}
             initialRegion={{
               latitude: selectedLocation.latitude,
