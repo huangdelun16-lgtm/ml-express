@@ -89,8 +89,7 @@
         {
           "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
-      ],
-      "expo-sqlite"
+      ]
     ],
     "extra": {
       "eas": {
