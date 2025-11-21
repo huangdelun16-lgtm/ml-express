@@ -542,21 +542,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
     try {
       // 使用Google Places API进行自动完成
-      // 注意：需要在Supabase中配置Google Places API Key，或使用环境变量
-      // 这里使用一个通用的方法：通过后端API代理调用（避免在前端暴露API Key）
-      // 或者直接从系统设置中获取API Key
-      const settings = await systemSettingsService.getSettings();
-      const googlePlacesApiKey = settings?.google_places_api_key || process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-      
-      if (!googlePlacesApiKey) {
-        console.warn('Google Places API Key未配置，自动完成功能不可用');
-        setAutocompleteSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
+      // 使用与web端相同的Google Maps API Key（支持Places API）
+      const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
 
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${googlePlacesApiKey}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${GOOGLE_MAPS_API_KEY}`
       );
       
       const data = await response.json();
@@ -585,16 +575,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const handleSelectSuggestion = async (suggestion: any) => {
     try {
       // 获取地点的详细信息（包括坐标）
-      const settings = await systemSettingsService.getSettings();
-      const googlePlacesApiKey = settings?.google_places_api_key || process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-      
-      if (!googlePlacesApiKey) {
-        console.warn('Google Places API Key未配置');
-        return;
-      }
+      // 使用与web端相同的Google Maps API Key（支持Places API）
+      const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
 
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${googlePlacesApiKey}`
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}`
       );
       
       const data = await response.json();
