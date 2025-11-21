@@ -77,6 +77,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [senderCoordinates, setSenderCoordinates] = useState<{lat: number, lng: number} | null>(null);
   const [receiverCoordinates, setReceiverCoordinates] = useState<{lat: number, lng: number} | null>(null);
   
+  // 地图地址输入和自动完成
+  const [mapAddressInput, setMapAddressInput] = useState('');
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
   // 包裹类型说明
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
@@ -506,6 +511,20 @@ export default function PlaceOrderScreen({ navigation }: any) {
       };
       setSelectedLocation(currentLocation);
       setMapType(type);
+      
+      // 如果已有地址，填充到输入框
+      if (type === 'sender' && senderAddress) {
+        const addressLines = senderAddress.split('\n');
+        const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
+        setMapAddressInput(addressWithoutCoords);
+      } else if (type === 'receiver' && receiverAddress) {
+        const addressLines = receiverAddress.split('\n');
+        const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
+        setMapAddressInput(addressWithoutCoords);
+      } else {
+        setMapAddressInput('');
+      }
+      
       setShowMapModal(true);
     } catch (error) {
       console.error('打开地图失败:', error);
@@ -513,42 +532,150 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
+  // 处理地图地址输入变化，触发自动完成
+  const handleMapAddressInputChange = async (input: string) => {
+    if (!input.trim() || input.length < 2) {
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      // 使用Google Places API进行自动完成
+      // 注意：需要在Supabase中配置Google Places API Key，或使用环境变量
+      // 这里使用一个通用的方法：通过后端API代理调用（避免在前端暴露API Key）
+      // 或者直接从系统设置中获取API Key
+      const settings = await systemSettingsService.getSettings();
+      const googlePlacesApiKey = settings?.google_places_api_key || process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+      
+      if (!googlePlacesApiKey) {
+        console.warn('Google Places API Key未配置，自动完成功能不可用');
+        setAutocompleteSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${googlePlacesApiKey}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.predictions) {
+        const suggestions = data.predictions.slice(0, 5).map((prediction: any) => ({
+          place_id: prediction.place_id,
+          main_text: prediction.structured_formatting.main_text,
+          secondary_text: prediction.structured_formatting.secondary_text,
+          description: prediction.description
+        }));
+        setAutocompleteSuggestions(suggestions);
+        setShowSuggestions(true);
+      } else {
+        setAutocompleteSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error('自动完成请求失败:', error);
+      setAutocompleteSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // 处理选择建议
+  const handleSelectSuggestion = async (suggestion: any) => {
+    try {
+      // 获取地点的详细信息（包括坐标）
+      const settings = await systemSettingsService.getSettings();
+      const googlePlacesApiKey = settings?.google_places_api_key || process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+      
+      if (!googlePlacesApiKey) {
+        console.warn('Google Places API Key未配置');
+        return;
+      }
+
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${googlePlacesApiKey}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.result) {
+        const place = data.result;
+        const location = place.geometry.location;
+        
+        // 更新选中位置
+        setSelectedLocation({
+          latitude: location.lat,
+          longitude: location.lng
+        });
+        
+        // 设置POI信息
+        if (place.name) {
+          setSelectedPlace({
+            name: place.name,
+            address: place.formatted_address || suggestion.description
+          });
+        }
+        
+        // 更新地址输入框
+        setMapAddressInput(place.formatted_address || suggestion.description);
+      }
+    } catch (error) {
+      console.error('获取地点详情失败:', error);
+    }
+    
+    setShowSuggestions(false);
+    setAutocompleteSuggestions([]);
+  };
+
   // 确认地图位置
   const confirmMapLocation = async () => {
     try {
       showLoading('获取地址中...');
       
-      const address = await Location.reverseGeocodeAsync({
-        latitude: selectedLocation.latitude,
-        longitude: selectedLocation.longitude,
-      });
+      // 优先使用输入框中的地址
+      let finalAddress = mapAddressInput.trim();
+      
+      // 如果没有输入地址，则使用反向地理编码
+      if (!finalAddress) {
+        const address = await Location.reverseGeocodeAsync({
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+        });
 
-      if (address && address[0]) {
-        const addr = address[0];
-        const fullAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
-        const finalAddress = fullAddress || `${selectedLocation.latitude}, ${selectedLocation.longitude}`;
-        
-        // 保存坐标和地址
-        const coords = {
-          lat: selectedLocation.latitude,
-          lng: selectedLocation.longitude
-        };
-        
-        if (mapType === 'sender') {
-          // 将地址和坐标一起添加到输入框
-          const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-          setSenderAddress(addressWithCoords);
-          setSenderCoordinates(coords);
-          console.log('✅ 寄件地址坐标已保存:', coords);
-        } else {
-          // 将地址和坐标一起添加到输入框
-          const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-          setReceiverAddress(addressWithCoords);
-          setReceiverCoordinates(coords);
-          console.log('✅ 收件地址坐标已保存:', coords);
+        if (address && address[0]) {
+          const addr = address[0];
+          finalAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
         }
       }
       
+      // 如果还是没有地址，使用坐标
+      if (!finalAddress) {
+        finalAddress = `${selectedLocation.latitude}, ${selectedLocation.longitude}`;
+      }
+      
+      // 保存坐标和地址
+      const coords = {
+        lat: selectedLocation.latitude,
+        lng: selectedLocation.longitude
+      };
+      
+      if (mapType === 'sender') {
+        // 将地址和坐标一起添加到输入框
+        const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+        setSenderAddress(addressWithCoords);
+        setSenderCoordinates(coords);
+        console.log('✅ 寄件地址坐标已保存:', coords);
+      } else {
+        // 将地址和坐标一起添加到输入框
+        const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+        setReceiverAddress(addressWithCoords);
+        setReceiverCoordinates(coords);
+        console.log('✅ 收件地址坐标已保存:', coords);
+      }
+      
+      // 清空地图地址输入框
+      setMapAddressInput('');
       setShowMapModal(false);
       hideLoading();
     } catch (error) {
@@ -1382,6 +1509,50 @@ export default function PlaceOrderScreen({ navigation }: any) {
             />
           </MapView>
 
+          {/* 地址输入框 */}
+          <View style={styles.mapAddressInputContainer}>
+            <TextInput
+              style={styles.mapAddressInput}
+              value={mapAddressInput}
+              onChangeText={(text) => {
+                setMapAddressInput(text);
+                handleMapAddressInputChange(text);
+              }}
+              placeholder={language === 'zh' ? '输入详细地址或在地图上点击选择位置' : language === 'en' ? 'Enter detailed address or click on map to select location' : 'အသေးစိတ်လိပ်စာထည့်ပါ သို့မဟုတ် မြေပုံတွင် နေရာရွေးချယ်ရန် နှိပ်ပါ'}
+              placeholderTextColor="#9ca3af"
+              onFocus={() => {
+                if (mapAddressInput.trim()) {
+                  handleMapAddressInputChange(mapAddressInput);
+                }
+              }}
+              onBlur={() => {
+                // 延迟隐藏建议列表，以便点击建议项
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
+            />
+            
+            {/* 自动完成建议列表 */}
+            {showSuggestions && autocompleteSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsList} keyboardShouldPersistTaps="handled">
+                  {autocompleteSuggestions.map((suggestion, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => handleSelectSuggestion(suggestion)}
+                      style={[
+                        styles.suggestionItem,
+                        index < autocompleteSuggestions.length - 1 && styles.suggestionItemBorder
+                      ]}
+                    >
+                      <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
+                      <Text style={styles.suggestionSecondaryText}>{suggestion.secondary_text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
           <View style={styles.mapFooter}>
             <Text style={styles.mapInstructions}>
               📍 点击地图、拖动标记或点击店铺图标选择位置
@@ -2062,6 +2233,58 @@ const baseStyles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
+  },
+  mapAddressInputContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  mapAddressInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  suggestionsContainer: {
+    marginTop: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  suggestionsList: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  suggestionItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  suggestionMainText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  suggestionSecondaryText: {
+    fontSize: 14,
+    color: '#64748b',
   },
   // 包裹类型说明模态框样式
   infoModalOverlay: {
