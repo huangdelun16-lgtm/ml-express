@@ -3,7 +3,6 @@
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
     "version": "1.1.0",
-    "sdkVersion": "54.0.12",
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,13 +12,6 @@
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#2E86AB"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/80b0873d-1d76-429e-8c79-738a817d8a15",
-      "fallbackToCacheTimeout": 0
     },
     "assetBundlePatterns": [
       "**/*"
@@ -77,9 +69,7 @@
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "config": {
         "googleMaps": {

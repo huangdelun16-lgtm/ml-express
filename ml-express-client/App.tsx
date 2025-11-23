@@ -6,6 +6,9 @@ import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation'
 import NotificationService from './src/services/notificationService';
 import { AppProvider } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
+import { ErrorBoundary } from './src/components/ErrorHandler';
+import NetworkStatus from './src/components/NetworkStatus';
+import { sentryService } from './src/services/SentryService';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -44,9 +47,27 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    checkLoginStatus();
-    initializeNotificationService();
+    initializeApp();
   }, []);
+
+  const initializeApp = async () => {
+    try {
+      // 初始化Sentry错误监控（生产环境）
+      if (!__DEV__) {
+        sentryService.init();
+      }
+
+      // 初始化通知服务
+      await initializeNotificationService();
+
+      // 检查登录状态
+      await checkLoginStatus();
+    } catch (error) {
+      console.error('应用初始化失败:', error);
+      // 即使初始化失败，也允许应用继续运行
+      await checkLoginStatus();
+    }
+  };
 
   // 初始化通知服务
   const initializeNotificationService = async () => {
@@ -75,17 +96,33 @@ export default function App() {
   }
 
   return (
-    <AppProvider>
-      <LoadingProvider>
-        <NavigationContainer linking={linking}>
-          <Stack.Navigator
-            initialRouteName={isLoggedIn ? "Main" : "Login"}
-            screenOptions={{
-              headerShown: false,
-              animation: 'slide_from_right',
-              animationDuration: 300,
+    <ErrorBoundary>
+      <AppProvider>
+        <LoadingProvider>
+          <NetworkStatus />
+          <NavigationContainer 
+            linking={linking}
+            onReady={() => {
+              // 导航容器准备就绪时的回调
+              console.log('Navigation container ready');
+            }}
+            onStateChange={(state) => {
+              // 可以在这里添加导航状态变化监听
+              // 例如：页面访问统计
             }}
           >
+            <Stack.Navigator
+              initialRouteName={isLoggedIn ? "Main" : "Login"}
+              screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 300,
+                // 优化性能：禁用不必要的动画
+                animationEnabled: true,
+                // 优化内存：启用懒加载
+                lazy: true,
+              }}
+            >
             {/* 登录注册页面 */}
             <Stack.Screen 
               name="Login" 
@@ -163,10 +200,11 @@ export default function App() {
                 animation: 'slide_from_right',
               }}
             />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </LoadingProvider>
-    </AppProvider>
+            </Stack.Navigator>
+          </NavigationContainer>
+        </LoadingProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

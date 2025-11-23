@@ -9,7 +9,8 @@ import {
   Alert,
   Modal,
   TextInput,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -49,6 +50,9 @@ export default function ProfileScreen({ navigation }: any) {
     phone: '',
     address: '',
   });
+
+  // 关于我们模态框
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // 通知设置状态
   const [notificationSettings, setNotificationSettings] = useState({
@@ -101,6 +105,17 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: '资料更新失败',
       pleaseLogin: '请先登录',
       comingSoon: '功能开发中，敬请期待',
+      // 关于我们相关翻译
+      aboutApp: '关于应用',
+      appDescription: 'MARKET LINK EXPRESS 是一款专业的快递配送服务平台，为用户提供快速、安全、可靠的包裹配送服务。',
+      version: '版本',
+      privacyPolicy: '隐私政策',
+      termsOfService: '用户协议',
+      contactUs: '联系我们',
+      email: '邮箱',
+      phone: '电话',
+      website: '网站',
+      openLink: '打开链接',
       // 通知设置相关翻译
       notificationSettings: '通知设置',
       orderUpdates: '订单状态更新',
@@ -147,6 +162,17 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: 'Failed to update profile',
       pleaseLogin: 'Please login first',
       comingSoon: 'Coming Soon',
+      // About Us translations
+      aboutApp: 'About App',
+      appDescription: 'MARKET LINK EXPRESS is a professional express delivery service platform that provides fast, secure, and reliable package delivery services.',
+      version: 'Version',
+      privacyPolicy: 'Privacy Policy',
+      termsOfService: 'Terms of Service',
+      contactUs: 'Contact Us',
+      email: 'Email',
+      phone: 'Phone',
+      website: 'Website',
+      openLink: 'Open Link',
       // Notification settings translations
       notificationSettings: 'Notification Settings',
       orderUpdates: 'Order Updates',
@@ -193,6 +219,17 @@ export default function ProfileScreen({ navigation }: any) {
       updateFailed: 'အချက်အလက်ပြင်ဆင်မှုမအောင်မြင်ပါ',
       pleaseLogin: 'ကျေးဇူးပြု၍အရင်လော့ဂ်အင်ဝင်ပါ',
       comingSoon: 'မကြာမီလာမည်',
+      // အကြောင်းအရာဆက်တင်များ
+      aboutApp: 'အက်ပ်အကြောင်း',
+      appDescription: 'MARKET LINK EXPRESS သည် အမြန်နှင့်လုံခြုံသော ပါဆယ်ပို့ဆောင်ရေးဝန်ဆောင်မှုများကို ပေးအပ်သော ပရော်ဖက်ရှင်နယ် ပို့ဆောင်ရေးဝန်ဆောင်မှုပလက်ဖောင်းဖြစ်သည်။',
+      version: 'ဗားရှင်း',
+      privacyPolicy: 'ကိုယ်ရေးလုံခြုံမှုမူဝါဒ',
+      termsOfService: 'အသုံးပြုသူစည်းမျဉ်းများ',
+      contactUs: 'ဆက်သွယ်ရန်',
+      email: 'အီးမေးလ်',
+      phone: 'ဖုန်း',
+      website: 'ဝက်ဘ်ဆိုဒ်',
+      openLink: 'လင့်ခ်ဖွင့်ရန်',
       // အသိပေးချက်ဆက်တင်များ
       notificationSettings: 'အသိပေးချက်ဆက်တင်များ',
       orderUpdates: 'အော်ဒါအခြေအနေအသိပေးချက်',
@@ -555,7 +592,7 @@ export default function ProfileScreen({ navigation }: any) {
 
         <TouchableOpacity 
           style={styles.settingItem}
-          onPress={() => showToast(t.comingSoon, 'info')}
+          onPress={() => setShowAboutModal(true)}
         >
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>ℹ️</Text>
@@ -663,6 +700,106 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 关于我们模态框 */}
+      <Modal
+        visible={showAboutModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAboutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t.aboutApp}</Text>
+            
+            <ScrollView style={styles.aboutScrollView} showsVerticalScrollIndicator={false}>
+              <Text style={styles.aboutDescription}>{t.appDescription}</Text>
+              
+              <View style={styles.aboutSection}>
+                <Text style={styles.aboutSectionTitle}>{t.version}</Text>
+                <Text style={styles.aboutSectionValue}>v{appVersion}</Text>
+              </View>
+
+              <View style={styles.aboutSection}>
+                <Text style={styles.aboutSectionTitle}>{t.contactUs}</Text>
+                <TouchableOpacity 
+                  style={styles.aboutLink}
+                  onPress={() => Linking.openURL('mailto:marketlink982@gmail.com')}
+                >
+                  <Text style={styles.aboutLinkText}>📧 {t.email}: marketlink982@gmail.com</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.aboutLink}
+                  onPress={() => Linking.openURL('tel:+9512345678')}
+                >
+                  <Text style={styles.aboutLinkText}>📞 {t.phone}: +95-1-234-5678</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.aboutLink}
+                  onPress={() => Linking.openURL('https://mlexpress.com')}
+                >
+                  <Text style={styles.aboutLinkText}>🌐 {t.website}: mlexpress.com</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.aboutSection}>
+                <Text style={styles.aboutSectionTitle}>{t.privacyPolicy}</Text>
+                <TouchableOpacity 
+                  style={styles.aboutLink}
+                  onPress={() => {
+                    const privacyUrl = 'https://mlexpress.com/privacy';
+                    Linking.openURL(privacyUrl).catch(() => {
+                      Alert.alert(
+                        language === 'zh' ? '无法打开链接' : language === 'en' ? 'Cannot open link' : 'လင့်ခ်ဖွင့်ရန်မအောင်မြင်ပါ',
+                        language === 'zh' 
+                          ? '请稍后访问: ' + privacyUrl
+                          : language === 'en'
+                          ? 'Please visit later: ' + privacyUrl
+                          : 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + privacyUrl
+                      );
+                    });
+                  }}
+                >
+                  <Text style={styles.aboutLinkText}>🔒 {t.privacyPolicy}</Text>
+                  <Text style={styles.aboutLinkArrow}>›</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.aboutSection}>
+                <Text style={styles.aboutSectionTitle}>{t.termsOfService}</Text>
+                <TouchableOpacity 
+                  style={styles.aboutLink}
+                  onPress={() => {
+                    const termsUrl = 'https://mlexpress.com/terms';
+                    Linking.openURL(termsUrl).catch(() => {
+                      Alert.alert(
+                        language === 'zh' ? '无法打开链接' : language === 'en' ? 'Cannot open link' : 'လင့်ခ်ဖွင့်ရန်မအောင်မြင်ပါ',
+                        language === 'zh' 
+                          ? '请稍后访问: ' + termsUrl
+                          : language === 'en'
+                          ? 'Please visit later: ' + termsUrl
+                          : 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + termsUrl
+                      );
+                    });
+                  }}
+                >
+                  <Text style={styles.aboutLinkText}>📄 {t.termsOfService}</Text>
+                  <Text style={styles.aboutLinkArrow}>›</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonConfirm]}
+              onPress={() => setShowAboutModal(false)}
+            >
+              <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                {t.confirm}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1007,6 +1144,53 @@ const styles = StyleSheet.create({
   },
   modalButtonTextConfirm: {
     color: '#ffffff',
+  },
+  aboutScrollView: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  aboutDescription: {
+    fontSize: 15,
+    color: '#4b5563',
+    lineHeight: 22,
+    marginBottom: 20,
+    textAlign: 'left',
+  },
+  aboutSection: {
+    marginBottom: 20,
+  },
+  aboutSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  aboutSectionValue: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  aboutLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  aboutLinkText: {
+    fontSize: 14,
+    color: '#2E86AB',
+    fontWeight: '500',
+    flex: 1,
+  },
+  aboutLinkArrow: {
+    fontSize: 20,
+    color: '#9ca3af',
+    marginLeft: 8,
   },
 });
 

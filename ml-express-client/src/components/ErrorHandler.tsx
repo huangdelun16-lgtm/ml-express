@@ -106,17 +106,90 @@ export class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    // 报告错误到Sentry（如果已初始化）
+    try {
+      const { sentryService } = require('../services/SentryService');
+      sentryService.captureException(error, {
+        errorInfo,
+        componentStack: errorInfo.componentStack,
+      });
+    } catch (sentryError) {
+      // Sentry未初始化或导入失败，忽略
+      console.warn('Sentry error reporting failed:', sentryError);
+    }
+  }
+
+  async getErrorMessage() {
+    // 尝试从AsyncStorage获取语言设置
+    let language = 'zh';
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const lang = await AsyncStorage.getItem('ml-express-language');
+      if (lang && ['zh', 'en', 'my'].includes(lang)) {
+        language = lang;
+      }
+    } catch (e) {
+      // 忽略错误，使用默认语言
+    }
+
+    const messages: Record<string, { title: string; message: string; retry: string }> = {
+      zh: {
+        title: '应用出现错误',
+        message: '很抱歉，应用遇到了一个错误。请重启应用或联系技术支持。',
+        retry: '重试',
+      },
+      en: {
+        title: 'Application Error',
+        message: 'Sorry, the app encountered an error. Please restart the app or contact support.',
+        retry: 'Retry',
+      },
+      my: {
+        title: 'အက်ပ်အမှားအယွင်း',
+        message: 'ဝမ်းနည်းပါတယ်၊ အက်ပ်တွင် အမှားအယွင်းတစ်ခု ဖြစ်ပွားခဲ့သည်။ ကျေးဇူးပြု၍ အက်ပ်ကို ပြန်လည်စတင်ပါ သို့မဟုတ် အထောက်အပံ့ကို ဆက်သွယ်ပါ။',
+        retry: 'ပြန်လုပ်ရန်',
+      },
+    };
+
+    return messages[language] || messages.zh;
   }
 
   render() {
     if (this.state.hasError) {
+      // 使用同步方式获取错误消息（简化版本）
+      const errorMessages = {
+        zh: {
+          title: '应用出现错误',
+          message: '很抱歉，应用遇到了一个错误。请重启应用或联系技术支持。',
+          retry: '重试',
+        },
+        en: {
+          title: 'Application Error',
+          message: 'Sorry, the app encountered an error. Please restart the app or contact support.',
+          retry: 'Retry',
+        },
+        my: {
+          title: 'အက်ပ်အမှားအယွင်း',
+          message: 'ဝမ်းနည်းပါတယ်၊ အက်ပ်တွင် အမှားအယွင်းတစ်ခု ဖြစ်ပွားခဲ့သည်။ ကျေးဇူးပြု၍ အက်ပ်ကို ပြန်လည်စတင်ပါ သို့မဟုတ် အထောက်အပံ့ကို ဆက်သွယ်ပါ။',
+          retry: 'ပြန်လုပ်ရန်',
+        },
+      };
+      
+      // 默认使用中文，实际应用中可以通过Context获取
+      const messages = errorMessages.zh;
+      
       return this.props.fallback || (
         <View style={styles.errorBoundaryContainer}>
           <Text style={styles.errorBoundaryIcon}>💥</Text>
-          <Text style={styles.errorBoundaryTitle}>应用出现错误</Text>
+          <Text style={styles.errorBoundaryTitle}>{messages.title}</Text>
           <Text style={styles.errorBoundaryMessage}>
-            很抱歉，应用遇到了一个错误。请重启应用或联系技术支持。
+            {messages.message}
           </Text>
+          {this.state.error && __DEV__ && (
+            <Text style={styles.errorBoundaryDebug}>
+              {this.state.error.toString()}
+            </Text>
+          )}
           <TouchableOpacity
             style={styles.errorBoundaryButton}
             onPress={() => this.setState({ hasError: false, error: undefined })}
@@ -125,7 +198,7 @@ export class ErrorBoundary extends React.Component<
               colors={['#2E86AB', '#4CA1CF']}
               style={styles.errorBoundaryButtonGradient}
             >
-              <Text style={styles.errorBoundaryButtonText}>重试</Text>
+              <Text style={styles.errorBoundaryButtonText}>{messages.retry}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -328,6 +401,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  errorBoundaryDebug: {
+    fontSize: 11,
+    color: '#ef4444',
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#fee2e2',
+    borderRadius: 4,
+    fontFamily: 'monospace',
+    maxWidth: '90%',
   },
 });
 

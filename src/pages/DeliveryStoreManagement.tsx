@@ -74,7 +74,8 @@ const DeliveryStoreManagement: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<DeliveryStore | null>(null);
-  const [mapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 缅甸中心
+  const [mapCenter, setMapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 默认曼德勒
+  const [selectedCity, setSelectedCity] = useState<'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse'>('mandalay'); // 默认曼德勒
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -1168,12 +1169,123 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
+          
+          {/* 城市选择器 */}
+          <div style={{
+            marginBottom: '20px',
+            background: 'linear-gradient(135deg, rgba(176, 211, 232, 0.3) 0%, rgba(162, 195, 214, 0.2) 100%)',
+            borderRadius: '12px',
+            padding: '16px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              {[
+                { key: 'mandalay', name: '曼德勒', nameEn: 'Mandalay', lat: 21.9588, lng: 96.0891 },
+                { key: 'pyinoolwin', name: '眉苗', nameEn: 'Pyin Oo Lwin', lat: 22.0333, lng: 96.4667 },
+                { key: 'yangon', name: '仰光', nameEn: 'Yangon', lat: 16.8661, lng: 96.1951 },
+                { key: 'naypyidaw', name: '内比都', nameEn: 'Naypyidaw', lat: 19.7633, lng: 96.0785 },
+                { key: 'taunggyi', name: '东枝', nameEn: 'Taunggyi', lat: 20.7892, lng: 97.0378 },
+                { key: 'lashio', name: '腊戌', nameEn: 'Lashio', lat: 22.9333, lng: 97.7500 },
+                { key: 'muse', name: '木姐', nameEn: 'Muse', lat: 23.9833, lng: 97.9000 }
+              ].map((city) => {
+                const isSelected = selectedCity === city.key;
+                return (
+                  <div
+                    key={city.key}
+                    onClick={() => {
+                      setSelectedCity(city.key as typeof selectedCity);
+                      setMapCenter({ lat: city.lat, lng: city.lng });
+                      setSelectedStore(null); // 清除选中的店铺
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: isSelected 
+                        ? 'rgba(46, 134, 171, 0.25)' 
+                        : 'rgba(255, 255, 255, 0.05)',
+                      border: isSelected 
+                        ? '1px solid rgba(46, 134, 171, 0.6)' 
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                      }
+                    }}
+                  >
+                    {/* 地图图标 - 红色 */}
+                    <span style={{
+                      fontSize: '16px',
+                      marginRight: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
+                    }}>
+                      📍
+                    </span>
+                    
+                    {/* 城市名称 */}
+                    <span style={{
+                      flex: 1,
+                      fontSize: '15px',
+                      fontWeight: isSelected ? '600' : '400',
+                      color: 'white',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                    }}>
+                      {city.name} ({city.nameEn})
+                    </span>
+                    
+                    {/* 选中标记 - 黑色勾选 */}
+                    {isSelected && (
+                      <span style={{
+                        fontSize: '18px',
+                        color: '#1a1a1a',
+                        fontWeight: 'bold',
+                        marginLeft: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '20px',
+                        height: '20px'
+                      }}>
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <ErrorBoundary>
           <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}>
               <GoogleMap
+                key={selectedCity} // 添加key确保城市切换时地图重新渲染
                 mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
                 center={mapCenter}
                 zoom={12}
+                options={{
+                  disableDefaultUI: false,
+                  zoomControl: true,
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                  fullscreenControl: true,
+                }}
               >
                 {stores.map((store) => (
                   <Marker

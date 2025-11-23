@@ -1456,6 +1456,71 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
           </View>
 
+          {/* 地址输入框 - 移动到标题下方 */}
+          <View style={styles.mapAddressInputContainer}>
+            <TextInput
+              style={styles.mapAddressInput}
+              value={mapAddressInput}
+              onChangeText={(text) => {
+                setMapAddressInput(text);
+                handleMapAddressInputChange(text);
+              }}
+              placeholder={language === 'zh' ? '搜索店铺名称或输入详细地址' : language === 'en' ? 'Search store name or enter detailed address' : 'ဆိုင်အမည် ရှာဖွေရန် သို့မဟုတ် အသေးစိတ်လိပ်စာထည့်ပါ'}
+              placeholderTextColor="#9ca3af"
+              onFocus={() => {
+                if (mapAddressInput.trim()) {
+                  handleMapAddressInputChange(mapAddressInput);
+                }
+              }}
+              onBlur={() => {
+                // 延迟隐藏建议列表，以便点击建议项
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
+            />
+            
+            {/* 自动完成建议列表 */}
+            {showSuggestions && autocompleteSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView 
+                  style={styles.suggestionsList} 
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled={true}
+                >
+                  {autocompleteSuggestions.map((suggestion, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => {
+                        handleSelectSuggestion(suggestion);
+                        setShowSuggestions(false);
+                      }}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.suggestionItem,
+                        index < autocompleteSuggestions.length - 1 && styles.suggestionItemBorder
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        {/* 店铺类型图标 */}
+                        <Text style={{ fontSize: 20, marginRight: 12 }}>
+                          {suggestion.typeIcon || '📍'}
+                        </Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
+                          {suggestion.secondary_text && (
+                            <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                              {suggestion.secondary_text}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 20, color: '#9ca3af', marginLeft: 8 }}>›</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
           <MapView
             provider={PROVIDER_GOOGLE}
             style={styles.map}
@@ -1517,76 +1582,25 @@ export default function PlaceOrderScreen({ navigation }: any) {
             />
           </MapView>
 
-          {/* 地址输入框 */}
-          <View style={styles.mapAddressInputContainer}>
-            <TextInput
-              style={styles.mapAddressInput}
-              value={mapAddressInput}
-              onChangeText={(text) => {
-                setMapAddressInput(text);
-                handleMapAddressInputChange(text);
-              }}
-              placeholder={language === 'zh' ? '输入详细地址或在地图上点击选择位置' : language === 'en' ? 'Enter detailed address or click on map to select location' : 'အသေးစိတ်လိပ်စာထည့်ပါ သို့မဟုတ် မြေပုံတွင် နေရာရွေးချယ်ရန် နှိပ်ပါ'}
-              placeholderTextColor="#9ca3af"
-              onFocus={() => {
-                if (mapAddressInput.trim()) {
-                  handleMapAddressInputChange(mapAddressInput);
-                }
-              }}
-              onBlur={() => {
-                // 延迟隐藏建议列表，以便点击建议项
-                setTimeout(() => setShowSuggestions(false), 200);
-              }}
-            />
-            
-            {/* 自动完成建议列表 */}
-            {showSuggestions && autocompleteSuggestions.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <ScrollView 
-                  style={styles.suggestionsList} 
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled={true}
-                >
-                  {autocompleteSuggestions.map((suggestion, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        handleSelectSuggestion(suggestion);
-                        setShowSuggestions(false);
-                      }}
-                      activeOpacity={0.7}
-                      style={[
-                        styles.suggestionItem,
-                        index < autocompleteSuggestions.length - 1 && styles.suggestionItemBorder
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
-                        {suggestion.secondary_text && (
-                          <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
-                            {suggestion.secondary_text}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={{ fontSize: 20, color: '#9ca3af', marginLeft: 8 }}>›</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+          {/* 已选择地点信息 - 显示在地图下方 */}
+          {selectedPlace && (
+            <View style={styles.selectedPlaceInfo}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 18, marginRight: 8 }}>✅</Text>
+                <Text style={styles.selectedPlaceName}>
+                  {selectedPlace.name || (language === 'zh' ? '已选择位置' : language === 'en' ? 'Selected Location' : 'ရွေးချယ်ထားသောနေရာ')}
+                </Text>
+                {selectedPlace.rating && (
+                  <Text style={{ fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>
+                    ⭐ {selectedPlace.rating.toFixed(1)}
+                  </Text>
+                )}
               </View>
-            )}
-          </View>
-
-          <View style={styles.mapFooter}>
-            <Text style={styles.mapInstructions}>
-              📍 点击地图、拖动标记或点击店铺图标选择位置
-            </Text>
-            {selectedPlace && (
-              <View style={styles.selectedPlaceInfo}>
-                <Text style={styles.selectedPlaceName}>✅ 已选择: {selectedPlace.name}</Text>
+              {selectedPlace.address && (
                 <Text style={styles.selectedPlaceAddress}>{selectedPlace.address}</Text>
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          )}
         </View>
       </Modal>
 

@@ -100,6 +100,16 @@ delivery, express, shipping, tracking, logistics, transport, package, parcel, re
 
 ### 发布说明 (Release Notes)
 
+#### 版本 1.1.0
+🎉 MARKET LINK EXPRESS 更新版本！
+
+**修复和改进：**
+- ✨ 优化地图功能和地址选择
+- 🔒 添加隐私政策和用户协议链接
+- 🌍 改进多语言支持
+- 📱 优化用户体验
+- 🐛 修复已知问题
+
 #### 版本 1.0.0
 🎉 MARKET LINK EXPRESS 首次发布！
 
@@ -120,4 +130,16 @@ delivery, express, shipping, tracking, logistics, transport, package, parcel, re
 - 📊 智能数据分析
 
 立即下载，体验专业的快递配送服务！
+
+---
+
+#### 版本 1.1.0
+🎉 MARKET LINK EXPRESS 更新版本！
+
+**修复和改进：**
+- ✨ 优化地图功能和地址选择
+- 🔒 添加隐私政策和用户协议链接
+- 🌍 改进多语言支持
+- 📱 优化用户体验
+- 🐛 修复已知问题
 

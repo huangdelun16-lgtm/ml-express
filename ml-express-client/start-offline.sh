@@ -12,7 +12,8 @@ export EXPO_OFFLINE=1
 export EXPO_NO_DOTENV=1
 export EXPO_SKIP_DEPENDENCY_VALIDATION=1
 
-# 启动Expo（离线模式）
+# 启动Expo（离线模式，跳过依赖验证）
 echo "启动Expo开发服务器（离线模式）..."
-npx expo start --offline --port 8081
+export EXPO_SKIP_DEPENDENCY_VALIDATION=1
+npx expo start --offline --port 8081 --no-dev
 
