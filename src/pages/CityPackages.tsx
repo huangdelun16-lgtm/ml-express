@@ -43,6 +43,12 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   
   // 寄件码功能状态
   const [selectedPackageForPickup, setSelectedPackageForPickup] = useState<Package | null>(null);
+  
+  // 批量删除功能状态
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -185,6 +191,97 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const clearAllFilters = () => {
     setSelectedStatus(null);
     setSelectedDate(null);
+  };
+
+  // 切换批量模式
+  const toggleBatchMode = () => {
+    setBatchMode(!batchMode);
+    setSelectedPackages(new Set());
+  };
+
+  // 切换包裹选择
+  const togglePackageSelection = (packageId: string) => {
+    const newSelected = new Set(selectedPackages);
+    if (newSelected.has(packageId)) {
+      newSelected.delete(packageId);
+    } else {
+      newSelected.add(packageId);
+    }
+    setSelectedPackages(newSelected);
+  };
+
+  // 全选/取消全选
+  const toggleSelectAll = () => {
+    const filtered = getFilteredPackages();
+    if (selectedPackages.size === filtered.length) {
+      setSelectedPackages(new Set());
+    } else {
+      setSelectedPackages(new Set(filtered.map(pkg => pkg.id)));
+    }
+  };
+
+  // 批量删除包裹
+  const handleBatchDelete = async () => {
+    if (selectedPackages.size === 0) {
+      alert(language === 'zh' ? '请先选择要删除的包裹' : language === 'en' ? 'Please select packages to delete' : 'ဖျက်ရန်ပက်ကေ့ဂျ်များကို ရွေးချယ်ပါ');
+      return;
+    }
+
+    setShowDeleteConfirm(true);
+  };
+
+  // 确认批量删除
+  const confirmBatchDelete = async () => {
+    if (selectedPackages.size === 0) return;
+
+    setDeleting(true);
+    try {
+      const packageIds = Array.from(selectedPackages);
+      const result = await packageService.deletePackages(packageIds);
+
+      // 记录审计日志
+      const currentUser = localStorage.getItem('currentUser') || 'unknown';
+      await auditLogService.logAction({
+        action_type: 'delete',
+        action_name: '批量删除包裹',
+        user: currentUser,
+        target_type: 'packages',
+        target_id: packageIds.join(', '),
+        target_name: `批量删除 ${packageIds.length} 个包裹`,
+        details: JSON.stringify({
+          success: result.success,
+          failed: result.failed,
+          errors: result.errors
+        })
+      });
+
+      if (result.failed === 0) {
+        alert(language === 'zh' 
+          ? `成功删除 ${result.success} 个包裹` 
+          : language === 'en' 
+          ? `Successfully deleted ${result.success} packages`
+          : `ပက်ကေ့ဂျ် ${result.success} ခု ဖျက်ပြီးပါပြီ`);
+      } else {
+        alert(language === 'zh' 
+          ? `删除完成：成功 ${result.success} 个，失败 ${result.failed} 个` 
+          : language === 'en' 
+          ? `Delete completed: ${result.success} succeeded, ${result.failed} failed`
+          : `ဖျက်ပြီး: ${result.success} ခု အောင်မြင်, ${result.failed} ခု မအောင်မြင်`);
+      }
+
+      // 重新加载包裹列表
+      await loadPackages();
+      
+      // 退出批量模式
+      setBatchMode(false);
+      setSelectedPackages(new Set());
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('批量删除失败:', error);
+      alert(language === 'zh' ? '批量删除失败，请重试' : language === 'en' ? 'Batch delete failed, please try again' : 'ဖျက်ရန် မအောင်မြင်၊ ထပ်စမ်းကြည့်ပါ');
+    } finally {
+      setDeleting(false);
+    }
   };
   
   // 显示寄件码
@@ -460,27 +557,122 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setShowSearchModal(true)}
-              style={{
-                background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '500',
+            {batchMode ? (
+              <>
+                <button
+                  onClick={toggleSelectAll}
+                  style={{
+                    background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(155, 89, 182, 0.3)',
+                    transition: 'all 0.3s ease',
+                    textShadow: 'none'
+                  }}
+                >
+                  {selectedPackages.size === getFilteredPackages().length ? '☐' : '☑'} {language === 'zh' ? '全选' : language === 'en' ? 'Select All' : 'အားလုံးရွေးချယ်ရန်'}
+                </button>
+                <button
+                  onClick={handleBatchDelete}
+                  disabled={selectedPackages.size === 0}
+                  style={{
+                    background: selectedPackages.size === 0 
+                      ? 'rgba(231, 76, 60, 0.3)' 
+                      : 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    cursor: selectedPackages.size === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: selectedPackages.size === 0 ? 'none' : '0 4px 12px rgba(231, 76, 60, 0.3)',
+                    transition: 'all 0.3s ease',
+                    textShadow: 'none',
+                    opacity: selectedPackages.size === 0 ? 0.5 : 1
+                  }}
+                >
+                  🗑️ {language === 'zh' ? `批量删除 (${selectedPackages.size})` : language === 'en' ? `Batch Delete (${selectedPackages.size})` : `ဖျက်ရန် (${selectedPackages.size})`}
+                </button>
+                <button
+                  onClick={toggleBatchMode}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease',
+                    textShadow: 'none'
+                  }}
+                >
+                  ✕ {language === 'zh' ? '取消批量' : language === 'en' ? 'Cancel Batch' : 'ဖျက်သိမ်းရန်'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={toggleBatchMode}
+                  style={{
+                    background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(243, 156, 18, 0.3)',
+                    transition: 'all 0.3s ease',
+                    textShadow: 'none'
+                  }}
+                >
+                  ☑️ {language === 'zh' ? '批量操作' : language === 'en' ? 'Batch Mode' : 'အစုလိုက်လုပ်ဆောင်ရန်'}
+                </button>
+                <button
+                  onClick={() => setShowSearchModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
         display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)',
-                transition: 'all 0.3s ease',
-                textShadow: 'none'
-              }}
-            >
-              🔍 {language === 'zh' ? '查询单号' : language === 'en' ? 'Search Package' : 'ပါဆယ်ရှာဖွေရန်'}
-            </button>
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)',
+                    transition: 'all 0.3s ease',
+                    textShadow: 'none'
+                  }}
+                >
+                  🔍 {language === 'zh' ? '查询单号' : language === 'en' ? 'Search Package' : 'ပါဆယ်ရှာဖွေရန်'}
+                </button>
+              </>
+            )}
             
         <button
               onClick={() => setShowDatePicker(true)}
@@ -702,10 +894,15 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
               ) : (
               getFilteredPackages().map((pkg) => (
               <div key={pkg.id} style={{
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: batchMode && selectedPackages.has(pkg.id) 
+                  ? 'rgba(155, 89, 182, 0.3)' 
+                  : 'rgba(255, 255, 255, 0.1)',
                   borderRadius: '6px',
                   padding: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                border: batchMode && selectedPackages.has(pkg.id)
+                  ? '2px solid rgba(155, 89, 182, 0.6)'
+                  : '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'all 0.3s ease'
               }}>
                 {/* 第一行：包裹信息和状态 */}
                 <div style={{
@@ -714,13 +911,29 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   alignItems: 'flex-start',
                     marginBottom: '6px'
                 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    {batchMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPackages.has(pkg.id)}
+                        onChange={() => togglePackageSelection(pkg.id)}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          cursor: 'pointer',
+                          marginTop: '2px',
+                          accentColor: '#9b59b6'
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
                       <h3 style={{ color: 'white', margin: '0 0 2px 0', fontSize: '0.95rem' }}>
                       {pkg.id} - {pkg.package_type}
                     </h3>
                       <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.75rem' }}>
                       创建时间: {pkg.create_time}
                     </p>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <div style={{
@@ -2254,6 +2467,85 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
           </div>
         </div>
       </div>
+      )}
+
+      {/* 批量删除确认对话框 */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+            borderRadius: '15px',
+            padding: '30px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 600, color: 'white', textAlign: 'center' }}>
+              ⚠️ {language === 'zh' ? '确认删除' : language === 'en' ? 'Confirm Delete' : 'ဖျက်ရန် အတည်ပြုရန်'}
+            </h2>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', marginBottom: '25px', textAlign: 'center', lineHeight: '1.6' }}>
+              {language === 'zh' 
+                ? `确定要删除选中的 ${selectedPackages.size} 个包裹吗？此操作不可恢复。`
+                : language === 'en'
+                ? `Are you sure you want to delete ${selectedPackages.size} selected packages? This action cannot be undone.`
+                : `ရွေးချယ်ထားသော ပက်ကေ့ဂျ် ${selectedPackages.size} ခုကို ဖျက်ရန် သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်လည်ရယူ၍မရပါ။`}
+            </p>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  transition: 'all 0.3s ease',
+                  opacity: deleting ? 0.5 : 1
+                }}
+              >
+                {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ဖျက်သိမ်းရန်'}
+              </button>
+              <button
+                onClick={confirmBatchDelete}
+                disabled={deleting}
+                style={{
+                  background: deleting 
+                    ? 'rgba(231, 76, 60, 0.5)' 
+                    : 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  boxShadow: deleting ? 'none' : '0 4px 12px rgba(231, 76, 60, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {deleting 
+                  ? (language === 'zh' ? '删除中...' : language === 'en' ? 'Deleting...' : 'ဖျက်နေသည်...')
+                  : (language === 'zh' ? '确认删除' : language === 'en' ? 'Confirm Delete' : 'ဖျက်ရန် အတည်ပြုရန်')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

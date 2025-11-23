@@ -12,6 +12,7 @@ import {
   Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { customerService, packageService } from '../services/supabase';
@@ -21,6 +22,7 @@ const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
   const { language, setLanguage } = useApp();
+  const appVersion = Constants.expoConfig?.version ?? '1.1.0';
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string>('');
   const [userName, setUserName] = useState<string>('访客用户');
@@ -594,7 +596,7 @@ export default function ProfileScreen({ navigation }: any) {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>MARKET LINK EXPRESS</Text>
-          <Text style={styles.footerVersion}>v1.0.0</Text>
+          <Text style={styles.footerVersion}>v{appVersion}</Text>
         </View>
       </ScrollView>
 

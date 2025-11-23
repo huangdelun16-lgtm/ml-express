@@ -2,8 +2,8 @@
   "expo": {
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
-    "version": "1.0.0",
-    "sdkVersion": "51.0.0",
+    "version": "1.1.0",
+    "sdkVersion": "54.0.12",
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,13 +14,20 @@
       "resizeMode": "contain",
       "backgroundColor": "#2E86AB"
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/80b0873d-1d76-429e-8c79-738a817d8a15",
+      "fallbackToCacheTimeout": 0
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.client",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS需要访问您的位置信息以提供准确的配送服务和包裹追踪功能。",
@@ -31,8 +38,8 @@
         "NSContactsUsageDescription": "MARKET LINK EXPRESS需要访问您的通讯录以快速选择收件人信息。",
         "CFBundleDisplayName": "MARKET LINK EXPRESS",
         "CFBundleName": "MARKET LINK EXPRESS",
-        "CFBundleShortVersionString": "1.0.0",
-        "CFBundleVersion": "1",
+        "CFBundleShortVersionString": "1.1.0",
+        "CFBundleVersion": "2",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -49,9 +56,9 @@
           "UIInterfaceOrientationLandscapeRight"
         ]
       },
-      "config": {
+        "config": {
         "usesNonExemptEncryption": false,
-        "googleMapsApiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+        "googleMapsApiKey": ""
       },
       "associatedDomains": [
         "applinks:mlexpress.com",
@@ -64,7 +71,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -76,7 +83,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c"
+          "apiKey": ""
         }
       }
     },

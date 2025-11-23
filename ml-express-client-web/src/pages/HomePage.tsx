@@ -8,6 +8,38 @@ import QRCode from 'qrcode';
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM";
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
+const MYANMAR_CITIES = {
+  mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 },
+  pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', nameMm: 'ပင်းတလဲ', lat: 22.0333, lng: 96.4667 },
+  yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 },
+  naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 },
+  taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 },
+  lashio: { name: '腊戌', nameEn: 'Lashio', nameMm: 'လားရှိုး', lat: 22.9333, lng: 97.75 },
+  muse: { name: '木姐', nameEn: 'Muse', nameMm: 'မူဆယ်', lat: 23.9833, lng: 97.9 }
+} as const;
+
+type CityKey = keyof typeof MYANMAR_CITIES;
+const DEFAULT_CITY_KEY: CityKey = 'mandalay';
+const DEFAULT_CITY_CENTER = {
+  lat: MYANMAR_CITIES[DEFAULT_CITY_KEY].lat,
+  lng: MYANMAR_CITIES[DEFAULT_CITY_KEY].lng
+};
+
+const getNearestCityKey = (lat: number, lng: number): CityKey => {
+  let nearestKey: CityKey = DEFAULT_CITY_KEY;
+  let minDistance = Number.MAX_VALUE;
+
+  (Object.entries(MYANMAR_CITIES) as [CityKey, typeof MYANMAR_CITIES[CityKey]][]).forEach(([key, city]) => {
+    const distance = Math.hypot(city.lat - lat, city.lng - lng);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestKey = key;
+    }
+  });
+
+  return nearestKey;
+};
+
 // 错误边界组件
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -91,7 +123,7 @@ const HomePage: React.FC = () => {
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
-  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CITY_CENTER);
   const [autocompleteService, setAutocompleteService] = useState<any>(null);
   const [placesService, setPlacesService] = useState<any>(null);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
@@ -111,7 +143,7 @@ const HomePage: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [orderConfirmationMessage, setOrderConfirmationMessage] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('yangon');
+  const [selectedCity, setSelectedCity] = useState<CityKey>(DEFAULT_CITY_KEY);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLongPressing, setIsLongPressing] = useState(false);
@@ -163,17 +195,6 @@ const HomePage: React.FC = () => {
     foodBeverageSurcharge: 300,
     freeKmThreshold: 3
   });
-
-  // 缅甸主要城市数据（以曼德勒为中心）
-  const myanmarCities = {
-    mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 }, // 总部
-    pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', nameMm: 'ပင်းတလဲ', lat: 22.0333, lng: 96.4667 }, // 眉苗
-    yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 }, // 开发中
-    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 }, // 开发中
-    taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 }, // 开发中
-    lashio: { name: '腊戌', nameEn: 'Lashio', nameMm: 'လားရှိုး', lat: 22.9333, lng: 97.7500 }, // 开发中
-    muse: { name: '木姐', nameEn: 'Muse', nameMm: 'မူဆယ်', lat: 23.9833, lng: 97.9000 } // 开发中
-  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -541,11 +562,75 @@ const HomePage: React.FC = () => {
 
   // 城市切换函数
   const handleCityChange = (cityKey: string) => {
-    setSelectedCity(cityKey);
-    const city = myanmarCities[cityKey as keyof typeof myanmarCities];
+    const normalizedKey = (cityKey as CityKey) || DEFAULT_CITY_KEY;
+    setSelectedCity(normalizedKey);
+    const city = MYANMAR_CITIES[normalizedKey];
     if (city) {
       setMapCenter({ lat: city.lat, lng: city.lng });
     }
+  };
+
+  // 根据位置判断最接近的城市
+  const detectCityFromLocation = (lat: number, lng: number): CityKey => {
+    let closestCity: CityKey = DEFAULT_CITY_KEY;
+    let minDistance = Infinity;
+
+    Object.entries(MYANMAR_CITIES).forEach(([key, city]) => {
+      const distance = Math.sqrt(
+        Math.pow(city.lat - lat, 2) + Math.pow(city.lng - lng, 2)
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestCity = key as CityKey;
+      }
+    });
+
+    return closestCity;
+  };
+
+  // 打开地图模态框时自动定位
+  const handleOpenMapModal = async (type: 'sender' | 'receiver') => {
+    setMapSelectionType(type);
+    
+    // 尝试获取用户位置
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000 // 5分钟缓存
+            }
+          );
+        });
+
+        const { latitude, longitude } = position.coords;
+        
+        // 根据位置判断城市
+        const detectedCity = detectCityFromLocation(latitude, longitude);
+        setSelectedCity(detectedCity);
+        setMapCenter({ lat: latitude, lng: longitude });
+        
+        console.log(`📍 已根据定位自动选择城市: ${MYANMAR_CITIES[detectedCity].name}`);
+      } catch (error) {
+        // 定位失败，使用默认城市（曼德勒）
+        console.log('⚠️ 无法获取位置，使用默认城市（曼德勒）');
+        const defaultCity = MYANMAR_CITIES[DEFAULT_CITY_KEY];
+        setSelectedCity(DEFAULT_CITY_KEY);
+        setMapCenter({ lat: defaultCity.lat, lng: defaultCity.lng });
+      }
+    } else {
+      // 浏览器不支持定位，使用默认城市（曼德勒）
+      console.log('⚠️ 浏览器不支持定位，使用默认城市（曼德勒）');
+      const defaultCity = MYANMAR_CITIES[DEFAULT_CITY_KEY];
+      setSelectedCity(DEFAULT_CITY_KEY);
+      setMapCenter({ lat: defaultCity.lat, lng: defaultCity.lng });
+    }
+
+    setShowMapModal(true);
   };
 
   // 长按处理函数
@@ -555,7 +640,8 @@ const HomePage: React.FC = () => {
     const y = e.clientY - rect.top;
     
     // 根据选择的城市动态调整坐标转换
-    const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+    const currentCity =
+      MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
     const lat = currentCity.lat + (0.5 - y / rect.height) * 0.1;
     const lng = currentCity.lng + (x / rect.width - 0.5) * 0.1;
     
@@ -573,7 +659,8 @@ const HomePage: React.FC = () => {
         fullAddress = response.results[0].formatted_address;
       } else {
         // 如果无法获取地址，使用城市名称和坐标
-        const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+        const currentCity =
+          MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
         fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       }
       
@@ -592,7 +679,8 @@ const HomePage: React.FC = () => {
     } catch (error) {
       console.error('地址获取失败:', error);
       // 出错时使用城市名称和坐标
-      const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+      const currentCity =
+        MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
       const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       
       const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
@@ -2559,10 +2647,7 @@ const HomePage: React.FC = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      setMapSelectionType('sender');
-                      setShowMapModal(true);
-                    }}
+                    onClick={() => handleOpenMapModal('sender')}
                     style={{
                       position: 'absolute',
                       bottom: '8px',
@@ -2684,10 +2769,7 @@ const HomePage: React.FC = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      setMapSelectionType('receiver');
-                      setShowMapModal(true);
-                    }}
+                    onClick={() => handleOpenMapModal('receiver')}
                     style={{
                       position: 'absolute',
                       bottom: '8px',
@@ -4086,7 +4168,7 @@ const HomePage: React.FC = () => {
                     minWidth: '120px'
                   }}
                 >
-                  {Object.entries(myanmarCities).map(([key, city]) => (
+                  {Object.entries(MYANMAR_CITIES).map(([key, city]) => (
                     <option key={key} value={key}>
                       {language === 'zh' ? city.name : language === 'en' ? city.nameEn : city.nameMm}
                     </option>
@@ -4261,7 +4343,8 @@ const HomePage: React.FC = () => {
                               if (response.results && response.results[0]) {
                                 fullAddress = response.results[0].formatted_address;
                               } else {
-                                const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                                const currentCity =
+                                  MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
                                 fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                               }
                               
@@ -4279,7 +4362,8 @@ const HomePage: React.FC = () => {
                               console.log('✅ 已选择位置:', fullAddress);
                             } catch (error) {
                               console.error('地址获取失败:', error);
-                              const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                              const currentCity =
+                                MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
                               const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                               
                               const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
@@ -4311,7 +4395,8 @@ const HomePage: React.FC = () => {
                             if (response.results && response.results[0]) {
                               fullAddress = response.results[0].formatted_address;
                             } else {
-                              const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                              const currentCity =
+                                MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
                               fullAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             }
                       
@@ -4327,7 +4412,8 @@ const HomePage: React.FC = () => {
                       setSelectedLocation({ lat, lng, address: fullAddress });
                     } catch (error) {
                       console.error('地址获取失败:', error);
-                            const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
+                            const currentCity =
+                              MYANMAR_CITIES[selectedCity] || MYANMAR_CITIES[DEFAULT_CITY_KEY];
                             const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             
                             const addressInput = document.getElementById('map-address-input') as HTMLInputElement;

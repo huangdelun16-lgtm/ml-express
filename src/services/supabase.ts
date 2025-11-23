@@ -376,6 +376,56 @@ export const packageService = {
       console.error(`获取店铺 ${storeId} 包裹异常:`, err);
       return [];
     }
+  },
+
+  // 删除单个包裹
+  async deletePackage(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('packages')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除包裹失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除包裹异常:', err);
+      return false;
+    }
+  },
+
+  // 批量删除包裹
+  async deletePackages(ids: string[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const { error } = await supabase
+          .from('packages')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error(`删除包裹 ${id} 失败:`, error);
+          failed++;
+          errors.push(`${id}: ${error.message}`);
+        } else {
+          success++;
+        }
+      } catch (err: any) {
+        console.error(`删除包裹 ${id} 异常:`, err);
+        failed++;
+        errors.push(`${id}: ${err.message || '未知错误'}`);
+      }
+    }
+
+    return { success, failed, errors };
   }
 };
 

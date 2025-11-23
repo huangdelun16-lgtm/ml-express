@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { packageService, systemSettingsService } from '../services/supabase';
+import { databaseService } from '../services/DatabaseService';
+import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
 import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
@@ -77,14 +79,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [senderCoordinates, setSenderCoordinates] = useState<{lat: number, lng: number} | null>(null);
   const [receiverCoordinates, setReceiverCoordinates] = useState<{lat: number, lng: number} | null>(null);
   
-  // 地图地址输入和自动完成
-  const [mapAddressInput, setMapAddressInput] = useState('');
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const autocompleteDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSearchQueryRef = useRef<string>('');
-  
   // 包裹类型说明
   const [showPackageTypeInfo, setShowPackageTypeInfo] = useState(false);
   const [selectedPackageTypeInfo, setSelectedPackageTypeInfo] = useState('');
@@ -96,6 +90,22 @@ export default function PlaceOrderScreen({ navigation }: any) {
   
   // 地图POI相关
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
+  const {
+    mapAddressInput,
+    setMapAddressInput,
+    autocompleteSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    isLoadingSuggestions,
+    handleMapAddressInputChange,
+    handleSelectSuggestion,
+  } = usePlaceAutocomplete({
+    language: language as 'zh' | 'en' | 'my',
+    selectedLocation,
+    onLocationChange: setSelectedLocation,
+    onPlaceChange: setSelectedPlace,
+  });
   
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
@@ -165,6 +175,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       viewOrders: '查看订单',
       continueOrder: '继续下单',
       kgUnit: '公斤',
+      orderSavedOfflineTitle: '网络不稳定，已离线保存订单',
+      orderSavedOfflineDescription: '我们会在网络恢复后自动同步，请勿重复提交。',
+      orderSavedOfflineAction: '好的',
       placeholders: {
         name: '请输入姓名',
         phone: '请输入电话号码',
@@ -246,6 +259,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       viewOrders: 'View Orders',
       continueOrder: 'Continue Ordering',
       kgUnit: 'kg',
+      orderSavedOfflineTitle: 'Order saved offline',
+      orderSavedOfflineDescription: 'We stored this order locally and will sync it automatically once the network recovers. Please do not submit again.',
+      orderSavedOfflineAction: 'Got it',
       placeholders: {
         name: 'Enter name',
         phone: 'Enter phone number',
@@ -327,6 +343,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       viewOrders: 'အမှာစာများကြည့်ရန်',
       continueOrder: 'ဆက်လက်မှာယူမည်',
       kgUnit: 'ကီလိုဂရမ်',
+      orderSavedOfflineTitle: 'အင်တာနက် မတော်တဆ ချိတ်ဆက်မရှိသဖြင့် အော်ဒါကို အော့ဖ်လိုင်း သိမ်းဆည်းထားပါသည်',
+      orderSavedOfflineDescription: 'အင်တာနက် ပြန်လည်ရလာပါက အော်ဒါကို အလိုအလျောက် ပို့စ်ပေးမည်ဖြစ်ပြီး ထပ်မံတင်သွင်းရန် မလိုအပ်ပါ။',
+      orderSavedOfflineAction: 'အိုကေ',
       placeholders: {
         name: 'အမည်ထည့်ပါ',
         phone: 'ဖုန်းနံပါတ်ထည့်ပါ',
@@ -382,6 +401,62 @@ export default function PlaceOrderScreen({ navigation }: any) {
     { value: '急送达', label: currentT.speedExpress, extra: pricingSettings.urgent_surcharge },
     { value: '定时达', label: currentT.speedScheduled, extra: pricingSettings.scheduled_surcharge },
   ];
+
+  const persistOrderLocally = useCallback(
+    async (payload: any, syncStatus: 'pending' | 'synced', errorMessage?: string) => {
+      if (!payload) return;
+      try {
+        await databaseService.saveOrder(payload, { syncStatus, errorMessage });
+      } catch (dbError) {
+        console.error('保存离线订单失败:', dbError);
+      }
+    },
+    []
+  );
+
+  const syncPendingOrders = useCallback(async () => {
+    try {
+      const pendingOrders = await databaseService.getPendingOrders();
+      if (!pendingOrders.length) return;
+
+      for (const record of pendingOrders) {
+        try {
+          const payload = JSON.parse(record.data);
+          const result = await packageService.createPackage(payload);
+
+          if (result?.success || result?.error?.code === '23505') {
+            await databaseService.markOrderSynced(record.id);
+          } else {
+            console.warn('离线订单同步失败:', record.id, result?.error);
+          }
+        } catch (syncError: any) {
+          if (syncError?.code === '23505') {
+            await databaseService.markOrderSynced(record.id);
+          } else {
+            console.warn('离线订单同步失败:', record.id, syncError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('读取离线订单失败:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncPendingOrders();
+  }, [syncPendingOrders]);
+
+  const showOfflineSavedAlert = () => {
+    Alert.alert(
+      currentT.orderSavedOfflineTitle,
+      currentT.orderSavedOfflineDescription,
+      [
+        {
+          text: currentT.orderSavedOfflineAction,
+        },
+      ]
+    );
+  };
 
   // 加载用户信息和计费规则
   useEffect(() => {
@@ -532,155 +607,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
     } catch (error) {
       console.error('打开地图失败:', error);
       Alert.alert('错误', '打开地图失败');
-    }
-  };
-
-  // 实际执行API请求的函数
-  const performAutocompleteSearch = async (input: string) => {
-    if (!input.trim() || input.length < 1) {
-      setAutocompleteSuggestions([]);
-      setShowSuggestions(false);
-      setIsLoadingSuggestions(false);
-      return;
-    }
-
-    // 如果查询相同，不重复请求
-    if (lastSearchQueryRef.current === input.trim()) {
-      return;
-    }
-
-    setIsLoadingSuggestions(true);
-    lastSearchQueryRef.current = input.trim();
-
-    try {
-      // 使用Google Places API进行自动完成
-      const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
-
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input.trim())}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${GOOGLE_MAPS_API_KEY}&language=${language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'}`
-      );
-      
-      const data = await response.json();
-      
-      // 确保这是最新的查询结果
-      if (lastSearchQueryRef.current === input.trim()) {
-        if (data.status === 'OK' && data.predictions && data.predictions.length > 0) {
-          // 显示更多结果（最多10个），像Google Maps一样
-          const suggestions = data.predictions.slice(0, 10).map((prediction: any) => ({
-            place_id: prediction.place_id,
-            main_text: prediction.structured_formatting.main_text,
-            secondary_text: prediction.structured_formatting.secondary_text,
-            description: prediction.description
-          }));
-          setAutocompleteSuggestions(suggestions);
-          setShowSuggestions(true);
-        } else {
-          setAutocompleteSuggestions([]);
-          setShowSuggestions(false);
-        }
-      }
-    } catch (error) {
-      console.error('自动完成请求失败:', error);
-      if (lastSearchQueryRef.current === input.trim()) {
-        setAutocompleteSuggestions([]);
-        setShowSuggestions(false);
-      }
-    } finally {
-      if (lastSearchQueryRef.current === input.trim()) {
-        setIsLoadingSuggestions(false);
-      }
-    }
-  };
-
-  // 处理地图地址输入变化，触发自动完成（带防抖）
-  const handleMapAddressInputChange = (input: string) => {
-    // 清除之前的定时器
-    if (autocompleteDebounceTimerRef.current) {
-      clearTimeout(autocompleteDebounceTimerRef.current);
-    }
-
-    // 如果输入为空，立即清除结果
-    if (!input.trim() || input.length < 1) {
-      setAutocompleteSuggestions([]);
-      setShowSuggestions(false);
-      setIsLoadingSuggestions(false);
-      lastSearchQueryRef.current = '';
-      return;
-    }
-
-    // 如果输入长度小于2，不搜索（减少不必要的请求）
-    if (input.trim().length < 2) {
-      setAutocompleteSuggestions([]);
-      setShowSuggestions(false);
-      setIsLoadingSuggestions(false);
-      return;
-    }
-
-    // 设置防抖定时器（300ms延迟，平衡响应速度和API调用次数）
-    autocompleteDebounceTimerRef.current = setTimeout(() => {
-      performAutocompleteSearch(input);
-    }, 300);
-  };
-
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (autocompleteDebounceTimerRef.current) {
-        clearTimeout(autocompleteDebounceTimerRef.current);
-      }
-    };
-  }, []);
-
-  // 处理选择建议
-  const handleSelectSuggestion = async (suggestion: any) => {
-    // 立即更新输入框，提供即时反馈
-    setMapAddressInput(suggestion.description);
-    setShowSuggestions(false);
-    setIsLoadingSuggestions(true);
-    
-    try {
-      // 获取地点的详细信息（包括坐标）
-      const GOOGLE_MAPS_API_KEY = 'AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM';
-
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}&language=${language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'}`
-      );
-      
-      const data = await response.json();
-      
-      if (data.status === 'OK' && data.result) {
-        const place = data.result;
-        const location = place.geometry.location;
-        
-        // 更新选中位置
-        setSelectedLocation({
-          latitude: location.lat,
-          longitude: location.lng
-        });
-        
-        // 设置POI信息
-        if (place.name) {
-          setSelectedPlace({
-            name: place.name,
-            address: place.formatted_address || suggestion.description
-          });
-        }
-        
-        // 更新地址输入框（使用格式化地址）
-        setMapAddressInput(place.formatted_address || suggestion.description);
-        
-        // 清除搜索查询缓存，以便下次可以重新搜索
-        lastSearchQueryRef.current = '';
-      } else {
-        // 如果获取详情失败，至少保留用户选择的描述
-        console.warn('获取地点详情失败，使用描述信息');
-      }
-    } catch (error) {
-      console.error('获取地点详情失败:', error);
-      // 即使出错也保留用户选择的描述
-    } finally {
-      setIsLoadingSuggestions(false);
-      setAutocompleteSuggestions([]);
     }
   };
 
@@ -861,6 +787,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
       return;
     }
 
+    let offlinePayload: any = null;
+
     try {
       showLoading(currentT.creating, 'package');
 
@@ -974,12 +902,16 @@ export default function PlaceOrderScreen({ navigation }: any) {
         payment_method: paymentMethod, // 添加支付方式字段
       };
 
+      offlinePayload = { ...orderData };
+
       // 调用API创建订单
       const result = await packageService.createPackage(orderData);
       
       hideLoading();
 
-      if (result) { // 假设成功时 result 不为 null
+      if (result?.success) {
+        await persistOrderLocally(offlinePayload, 'synced');
+        syncPendingOrders();
         // 根据支付方式决定是否显示QR码
         if (paymentMethod === 'qr') {
           // 二维码支付：显示QR码模态框
@@ -1010,21 +942,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
         // 重置表单
         resetForm();
       } else {
-        // 由于没有统一的错误对象，我们直接在服务层打印错误
-        // 这里只给用户通用提示
-        Alert.alert(
-          currentT.orderFailed, 
-          '创建失败，请检查网络连接或联系客服。\n错误信息已记录在控制台。'
-        );
+        await persistOrderLocally(offlinePayload, 'pending', result?.error?.message);
+        showOfflineSavedAlert();
+        return;
       }
     } catch (error: any) {
       hideLoading();
-      // 在这里捕获并打印完整的错误信息
       console.error('【订单创建失败】捕获到异常:', error);
-      Alert.alert(
-        currentT.orderFailed, 
-        `创建失败，请检查网络连接或联系客服。\n错误信息：${error?.message || '未知错误'}`
-      );
+      await persistOrderLocally(offlinePayload, 'pending', error?.message);
+      showOfflineSavedAlert();
     }
   };
 

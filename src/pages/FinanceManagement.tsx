@@ -56,12 +56,14 @@ const defaultForm: FinanceForm = {
   notes: ''
 };
 
-const currencyOptions = ['MMK', 'USD', 'THB'];
+const currencyOptions = ['MMK', 'USD', 'THB', 'RMB'];
 const paymentOptions = [
   { value: 'cash', label: '现金' },
   { value: 'kbz_pay', label: 'KBZ Pay' },
   { value: 'wave_pay', label: 'Wave Pay' },
   { value: 'aya_pay', label: 'AYA Pay' },
+  { value: 'uab_pay', label: 'UAB Pay' },
+  { value: 'alipay', label: '支付宝' },
   { value: 'bank_transfer', label: '银行转账' }
 ];
 
