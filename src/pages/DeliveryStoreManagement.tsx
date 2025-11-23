@@ -1228,13 +1228,19 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
-          <div style={{ position: 'relative' }}>
-            {/* 漂浮的城市下拉选择器（与实时跟踪页面风格一致） */}
+          <div style={{ 
+            position: 'relative',
+            width: '100%',
+            height: '400px',
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }}>
+            {/* 城市选择器 - 与实时跟踪页面完全一致 */}
             <div style={{
               position: 'absolute',
               top: '10px',
               right: '10px',
-              zIndex: 10,
+              zIndex: 1000,
               background: 'rgba(255, 255, 255, 0.95)',
               borderRadius: '8px',
               padding: '8px',
@@ -1259,7 +1265,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   fontSize: '0.9rem',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  minWidth: '180px',
+                  minWidth: '150px',
                   outline: 'none'
                 }}
               >
@@ -1274,8 +1280,8 @@ const DeliveryStoreManagement: React.FC = () => {
             <ErrorBoundary>
             <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}>
                 <GoogleMap
-                  key={selectedCity} // 添加key确保城市切换时地图重新渲染
-                  mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
+                  key={selectedCity}
+                  mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '12px' }}
                   center={mapCenter}
                   zoom={12}
                   options={{
