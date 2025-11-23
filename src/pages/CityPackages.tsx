@@ -241,14 +241,16 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
 
       // 记录审计日志
       const currentUser = localStorage.getItem('currentUser') || 'unknown';
-      await auditLogService.logAction({
+      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
+      await auditLogService.log({
+        user_id: currentUser,
+        user_name: currentUserName,
         action_type: 'delete',
-        action_name: '批量删除包裹',
-        user: currentUser,
-        target_type: 'packages',
+        module: 'packages',
         target_id: packageIds.join(', '),
         target_name: `批量删除 ${packageIds.length} 个包裹`,
-        details: JSON.stringify({
+        action_description: `批量删除包裹，成功：${result.success} 个，失败：${result.failed} 个`,
+        new_value: JSON.stringify({
           success: result.success,
           failed: result.failed,
           errors: result.errors
