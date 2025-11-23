@@ -897,14 +897,15 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
               getFilteredPackages().map((pkg) => (
               <div key={pkg.id} style={{
                 background: batchMode && selectedPackages.has(pkg.id) 
-                  ? 'rgba(155, 89, 182, 0.3)' 
-                  : 'rgba(255, 255, 255, 0.1)',
+                  ? 'rgba(155, 89, 182, 0.15)' 
+                  : 'rgba(255, 255, 255, 0.95)',
                   borderRadius: '6px',
                   padding: '8px',
                 border: batchMode && selectedPackages.has(pkg.id)
                   ? '2px solid rgba(155, 89, 182, 0.6)'
-                  : '1px solid rgba(255, 255, 255, 0.2)',
-                transition: 'all 0.3s ease'
+                  : '1px solid rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
               }}>
                 {/* 第一行：包裹信息和状态 */}
                 <div style={{
@@ -929,10 +930,10 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       />
                     )}
                     <div style={{ flex: 1 }}>
-                      <h3 style={{ color: 'white', margin: '0 0 2px 0', fontSize: '0.95rem' }}>
+                      <h3 style={{ color: '#1a1a1a', margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: '600' }}>
                       {pkg.id} - {pkg.package_type}
                     </h3>
-                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.75rem' }}>
+                      <p style={{ color: '#555', margin: 0, fontSize: '0.75rem' }}>
                       创建时间: {pkg.create_time}
                     </p>
                     </div>
@@ -1133,14 +1134,14 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   borderTop: '1px solid rgba(255, 255, 255, 0.1)'
                 }}>
                   <div>
-                    <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.75rem' }}>寄件人</h4>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                    <h4 style={{ color: '#666', margin: '0 0 2px 0', fontSize: '0.75rem', fontWeight: '500' }}>寄件人</h4>
+                    <p style={{ color: '#1a1a1a', margin: 0, fontSize: '0.8rem', fontWeight: '500' }}>
                       {pkg.sender_name} - {pkg.sender_phone}
                     </p>
                   </div>
                   <div>
-                    <h4 style={{ color: '#C0C0C0', margin: '0 0 2px 0', fontSize: '0.75rem' }}>收件人</h4>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.8rem' }}>
+                    <h4 style={{ color: '#666', margin: '0 0 2px 0', fontSize: '0.75rem', fontWeight: '500' }}>收件人</h4>
+                    <p style={{ color: '#1a1a1a', margin: 0, fontSize: '0.8rem', fontWeight: '500' }}>
                       {pkg.receiver_name} - {pkg.receiver_phone}
                     </p>
                   </div>
