@@ -1387,6 +1387,7 @@ const DeliveryStoreManagement: React.FC = () => {
           </ErrorBoundary>
         </div>
       </div>
+      </div>
 
       {/* 店长收件码二维码模态框 */}
       {showQRModal && currentStoreQR && (
