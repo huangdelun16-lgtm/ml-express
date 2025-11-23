@@ -68,7 +68,6 @@ class ErrorBoundary extends React.Component<
 
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -76,6 +75,57 @@ const DeliveryStoreManagement: React.FC = () => {
   const [selectedStore, setSelectedStore] = useState<DeliveryStore | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 默认曼德勒
   const [selectedCity, setSelectedCity] = useState<'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse'>('mandalay'); // 默认曼德勒
+  const [allStores, setAllStores] = useState<DeliveryStore[]>([]); // 存储所有快递店
+  
+  // 缅甸主要城市数据
+  const myanmarCities = {
+    mandalay: { name: '曼德勒', nameEn: 'Mandalay', lat: 21.9588, lng: 96.0891, radius: 0.5 },
+    pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', lat: 22.0333, lng: 96.4667, radius: 0.3 },
+    yangon: { name: '仰光', nameEn: 'Yangon', lat: 16.8661, lng: 96.1951, radius: 0.8 },
+    naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', lat: 19.7633, lng: 96.0785, radius: 0.5 },
+    taunggyi: { name: '东枝', nameEn: 'Taunggyi', lat: 20.7892, lng: 97.0378, radius: 0.3 },
+    lashio: { name: '腊戌', nameEn: 'Lashio', lat: 22.9333, lng: 97.7500, radius: 0.3 },
+    muse: { name: '木姐', nameEn: 'Muse', lat: 23.9833, lng: 97.9000, radius: 0.3 }
+  };
+
+  // 根据坐标判断快递店属于哪个城市
+  const getStoreCity = (store: DeliveryStore): string | null => {
+    // 计算两点之间的距离（公里）
+    const distance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371; // 地球半径（公里）
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    let closestCity: string | null = null;
+    let minDistance = Infinity;
+
+    // 遍历所有城市，找到距离最近的城市
+    for (const [cityKey, cityData] of Object.entries(myanmarCities)) {
+      const dist = distance(store.latitude, store.longitude, cityData.lat, cityData.lng);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestCity = cityKey;
+      }
+    }
+
+    // 如果距离在合理范围内（50公里），则返回该城市，否则返回null
+    return minDistance <= 50 ? closestCity : null;
+  };
+
+  // 根据选择的城市过滤快递店
+  const filteredStores = allStores.filter(store => {
+    const storeCity = getStoreCity(store);
+    return storeCity === selectedCity;
+  });
+
+  // 使用过滤后的快递店列表
+  const stores = filteredStores;
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -339,12 +389,12 @@ const DeliveryStoreManagement: React.FC = () => {
         setErrorMessage(null); // 清除之前的错误信息
       }
       const data = await deliveryStoreService.getAllStores();
-      setStores(data);
+      setAllStores(data); // 存储所有快递店
       setRetryCount(0); // 重置重试计数
     } catch (error) {
       console.error('加载快递店列表失败:', error);
       setErrorMessage('加载快递店列表失败，请刷新页面重试');
-      setStores([]); // 设置空数组避免undefined
+      setAllStores([]); // 设置空数组避免undefined
       if (!isRetry) {
         setRetryCount(prev => prev + 1);
       }
@@ -928,11 +978,20 @@ const DeliveryStoreManagement: React.FC = () => {
             color: 'white'
           }}
         >
-          <h2 style={{ marginBottom: '20px' }}>快递店列表</h2>
+          <h2 style={{ marginBottom: '20px' }}>
+            快递店列表 
+            <span style={{ fontSize: '0.9rem', fontWeight: 'normal', opacity: 0.8, marginLeft: '8px' }}>
+              ({myanmarCities[selectedCity].name}: {stores.length} 个)
+            </span>
+          </h2>
           {loading ? (
             <p>加载中...</p>
           ) : stores.length === 0 ? (
-            <p style={{ opacity: 0.7 }}>暂无快递店数据</p>
+            <p style={{ opacity: 0.7 }}>
+              {allStores.length === 0 
+                ? '暂无快递店数据' 
+                : `${myanmarCities[selectedCity].name}地区暂无快递店`}
+            </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {stores.map((store) => (
@@ -1169,124 +1228,64 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
-          
-          {/* 城市选择器 */}
-          <div style={{
-            marginBottom: '20px',
-            background: 'linear-gradient(135deg, rgba(176, 211, 232, 0.3) 0%, rgba(162, 195, 214, 0.2) 100%)',
-            borderRadius: '12px',
-            padding: '16px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div style={{ position: 'relative' }}>
+            {/* 漂浮的城市下拉选择器（与实时跟踪页面风格一致） */}
             <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 10,
+              background: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '8px',
+              padding: '8px',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+              backdropFilter: 'blur(10px)'
             }}>
-              {[
-                { key: 'mandalay', name: '曼德勒', nameEn: 'Mandalay', lat: 21.9588, lng: 96.0891 },
-                { key: 'pyinoolwin', name: '眉苗', nameEn: 'Pyin Oo Lwin', lat: 22.0333, lng: 96.4667 },
-                { key: 'yangon', name: '仰光', nameEn: 'Yangon', lat: 16.8661, lng: 96.1951 },
-                { key: 'naypyidaw', name: '内比都', nameEn: 'Naypyidaw', lat: 19.7633, lng: 96.0785 },
-                { key: 'taunggyi', name: '东枝', nameEn: 'Taunggyi', lat: 20.7892, lng: 97.0378 },
-                { key: 'lashio', name: '腊戌', nameEn: 'Lashio', lat: 22.9333, lng: 97.7500 },
-                { key: 'muse', name: '木姐', nameEn: 'Muse', lat: 23.9833, lng: 97.9000 }
-              ].map((city) => {
-                const isSelected = selectedCity === city.key;
-                return (
-                  <div
-                    key={city.key}
-                    onClick={() => {
-                      setSelectedCity(city.key as typeof selectedCity);
-                      setMapCenter({ lat: city.lat, lng: city.lng });
-                      setSelectedStore(null); // 清除选中的店铺
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 14px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      background: isSelected 
-                        ? 'rgba(46, 134, 171, 0.25)' 
-                        : 'rgba(255, 255, 255, 0.05)',
-                      border: isSelected 
-                        ? '1px solid rgba(46, 134, 171, 0.6)' 
-                        : '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                      }
-                    }}
-                  >
-                    {/* 地图图标 - 红色 */}
-                    <span style={{
-                      fontSize: '16px',
-                      marginRight: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
-                    }}>
-                      📍
-                    </span>
-                    
-                    {/* 城市名称 */}
-                    <span style={{
-                      flex: 1,
-                      fontSize: '15px',
-                      fontWeight: isSelected ? '600' : '400',
-                      color: 'white',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                    }}>
-                      {city.name} ({city.nameEn})
-                    </span>
-                    
-                    {/* 选中标记 - 黑色勾选 */}
-                    {isSelected && (
-                      <span style={{
-                        fontSize: '18px',
-                        color: '#1a1a1a',
-                        fontWeight: 'bold',
-                        marginLeft: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '20px',
-                        height: '20px'
-                      }}>
-                        ✓
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <ErrorBoundary>
-          <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}>
-              <GoogleMap
-                key={selectedCity} // 添加key确保城市切换时地图重新渲染
-                mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
-                center={mapCenter}
-                zoom={12}
-                options={{
-                  disableDefaultUI: false,
-                  zoomControl: true,
-                  streetViewControl: false,
-                  mapTypeControl: false,
-                  fullscreenControl: true,
+              <select
+                value={selectedCity}
+                onChange={(e) => {
+                  const selectedKey = e.target.value as typeof selectedCity;
+                  setSelectedCity(selectedKey);
+                  const city = myanmarCities[selectedKey];
+                  setMapCenter({ lat: city.lat, lng: city.lng });
+                  setSelectedStore(null);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '2px solid #e5e7eb',
+                  background: 'white',
+                  color: '#1f2937',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  minWidth: '180px',
+                  outline: 'none'
                 }}
               >
+                {Object.entries(myanmarCities).map(([key, city]) => (
+                  <option key={key} value={key}>
+                    📍 {city.name} ({city.nameEn})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <ErrorBoundary>
+            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}>
+                <GoogleMap
+                  key={selectedCity} // 添加key确保城市切换时地图重新渲染
+                  mapContainerStyle={{ width: '100%', height: '400px', borderRadius: '12px' }}
+                  center={mapCenter}
+                  zoom={12}
+                  options={{
+                    disableDefaultUI: false,
+                    zoomControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                    fullscreenControl: true,
+                  }}
+                >
                 {stores.map((store) => (
                   <Marker
                     key={store.id}
