@@ -109,11 +109,12 @@ export class ErrorBoundary extends React.Component<
     
     // 报告错误到Sentry（如果已初始化）
     try {
-      const { sentryService } = require('../services/SentryService');
-      sentryService.captureException(error, {
-        errorInfo,
-        componentStack: errorInfo.componentStack,
-      });
+      // Sentry 已暂时禁用
+      // const { sentryService } = require('../services/SentryService');
+      // sentryService.captureException(error, {
+      //   errorInfo,
+      //   componentStack: errorInfo.componentStack,
+      // });
     } catch (sentryError) {
       // Sentry未初始化或导入失败，忽略
       console.warn('Sentry error reporting failed:', sentryError);
