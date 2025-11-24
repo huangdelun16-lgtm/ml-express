@@ -315,12 +315,18 @@ const HomePage: React.FC = () => {
       // 检查用户是否已注册（根据验证方式检查）
       let existingUser;
       if (verificationType === 'email') {
-        // 邮箱验证：根据邮箱查找用户
-        const { data } = await supabase
+        // 邮箱验证：根据邮箱查找用户（只查找客户类型）
+        const { data, error } = await supabase
           .from('users')
           .select('*')
           .eq('email', registerForm.email)
-          .single();
+          .eq('user_type', 'customer')
+          .maybeSingle();
+        
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 = no rows returned (正常情况)
+          console.error('查询用户失败:', error);
+        }
         existingUser = data;
       } else {
         // 短信验证：根据手机号查找用户
