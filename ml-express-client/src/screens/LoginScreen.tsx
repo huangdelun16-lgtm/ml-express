@@ -36,7 +36,7 @@ export default function LoginScreen({ navigation }: any) {
       loginButton: '登录',
       noAccount: '还没有账号？',
       register: '立即注册',
-      emailPlaceholder: '请输入邮箱或手机号',
+      emailPlaceholder: '请输入注册时的邮箱或手机号',
       passwordPlaceholder: '请输入密码',
       loginSuccess: '登录成功',
       loginFailed: '登录失败',
@@ -56,7 +56,7 @@ export default function LoginScreen({ navigation }: any) {
       loginButton: 'Login',
       noAccount: "Don't have an account?",
       register: 'Register Now',
-      emailPlaceholder: 'Enter email or phone number',
+      emailPlaceholder: 'Enter registered email or phone',
       passwordPlaceholder: 'Enter password',
       loginSuccess: 'Login successful',
       loginFailed: 'Login failed',
@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }: any) {
       loginButton: 'ဝင်ရောက်',
       noAccount: 'အကောင့်မရှိသေးဘူးလား?',
       register: 'စာရင်းသွင်း',
-      emailPlaceholder: 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ',
+      emailPlaceholder: 'မှတ်ပုံတင်ထားသော အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ',
       passwordPlaceholder: 'စကားဝှက်ထည့်ပါ',
       loginSuccess: 'အောင်မြင်စွာဝင်ရောက်ပြီး',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
@@ -169,7 +169,7 @@ export default function LoginScreen({ navigation }: any) {
                 placeholder={currentT.emailPlaceholder}
                 value={email}
                 onChangeText={setEmail}
-                keyboardType="email-address"
+                keyboardType="default"
                 autoCapitalize="none"
                 placeholderTextColor="#9ca3af"
               />

@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
   },
   contactCard: {
     flex: 1,
-    height: 140,
+    height: 180,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1116,18 +1116,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 32,
+    fontSize: 36,
     marginBottom: 12,
   },
   contactLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 6,
+    marginBottom: 8,
+    fontWeight: '600',
   },
   contactValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
