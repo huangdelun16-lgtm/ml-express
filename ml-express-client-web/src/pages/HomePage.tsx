@@ -362,9 +362,29 @@ const HomePage: React.FC = () => {
         }
 
         if (!existingUser) {
+          console.error('登录失败：未找到用户', {
+            email: registerForm.email,
+            emailTrimmed: registerForm.email.trim().toLowerCase(),
+            verificationType,
+            error: '用户不存在或查询失败'
+          });
+          
+          // 尝试直接查询（不区分大小写，不限制类型）用于调试
+          const debugResult = await supabase
+            .from('users')
+            .select('id, email, user_type, name')
+            .ilike('email', `%${registerForm.email.trim()}%`)
+            .limit(5);
+          console.log('调试查询结果（相似邮箱）:', debugResult.data);
+          
           alert(language === 'zh' ? '该邮箱未注册，请先注册' : language === 'en' ? 'Email not registered, please register first' : 'အီးမေးလ်မှတ်ပုံမတင်ရသေးပါ');
           setIsLoginMode(false);
           return;
+        }
+        
+        // 检查用户类型，如果不是客户类型，给出提示（但不阻止登录，兼容旧数据）
+        if (existingUser.user_type && existingUser.user_type !== 'customer') {
+          console.warn('用户类型不匹配:', existingUser.user_type, '但允许登录（兼容模式）');
         }
 
         // 验证密码
