@@ -8,7 +8,8 @@ import { AppProvider } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
-import { sentryService } from './src/services/SentryService';
+// Sentry 已暂时禁用以避免依赖问题
+// import { sentryService } from './src/services/SentryService';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -52,10 +53,10 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      // 初始化Sentry错误监控（生产环境）
-      if (!__DEV__) {
-        sentryService.init();
-      }
+      // Sentry 已暂时禁用以避免依赖问题
+      // if (!__DEV__) {
+      //   sentryService.init();
+      // }
 
       // 初始化通知服务
       await initializeNotificationService();
