@@ -123,7 +123,7 @@ const HomePage: React.FC = () => {
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
-  const [mapCenter, setMapCenter] = useState(DEFAULT_CITY_CENTER);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CITY_CENTER);
   const [autocompleteService, setAutocompleteService] = useState<any>(null);
   const [placesService, setPlacesService] = useState<any>(null);
   const mapRef = React.useRef<google.maps.Map | null>(null);
@@ -567,7 +567,7 @@ const HomePage: React.FC = () => {
     setSelectedCity(normalizedKey);
     const city = MYANMAR_CITIES[normalizedKey];
     if (city) {
-      setMapCenter({ lat: city.lat, lng: city.lng });
+      setMapCenter({ lat: Number(city.lat), lng: Number(city.lng) });
     }
   };
 
