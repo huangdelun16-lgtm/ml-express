@@ -25,6 +25,7 @@ const DEFAULT_CITY_CENTER = {
   lng: MYANMAR_CITIES[DEFAULT_CITY_KEY].lng
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getNearestCityKey = (lat: number, lng: number): CityKey => {
   let nearestKey: CityKey = DEFAULT_CITY_KEY;
   let minDistance = Number.MAX_VALUE;
@@ -567,7 +568,10 @@ const HomePage: React.FC = () => {
     setSelectedCity(normalizedKey);
     const city = MYANMAR_CITIES[normalizedKey];
     if (city) {
-      setMapCenter({ lat: Number(city.lat), lng: Number(city.lng) });
+      setMapCenter({ 
+        lat: city.lat as number, 
+        lng: city.lng as number 
+      });
     }
   };
 
