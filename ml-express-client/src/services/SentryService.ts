@@ -1,61 +1,53 @@
-// Sentry 服务（可选，如果未安装 sentry-expo 则禁用）
-let Sentry: any = null;
-let SentryAvailable = false;
-
-try {
-  Sentry = require('sentry-expo');
-  SentryAvailable = true;
-} catch (error) {
-  console.warn('⚠️ sentry-expo 未安装，Sentry 错误监控已禁用');
-  SentryAvailable = false;
-}
+// Sentry 服务（暂时禁用以避免依赖问题）
+// 如果需要启用 Sentry，请确保安装了所有必要的依赖包
 
 import Constants from 'expo-constants';
 
 class SentryService {
   private initialized = false;
+  private enabled = false; // 暂时禁用 Sentry
 
   init() {
-    if (!SentryAvailable) {
-      console.log('Sentry 不可用（sentry-expo 未安装）');
+    // 暂时禁用 Sentry，避免依赖问题
+    if (__DEV__) {
+      console.log('Sentry 已禁用（开发模式）');
       return;
     }
 
-    if (this.initialized || __DEV__) {
-      console.log('Sentry initialized (dev mode)');
-      return;
-    }
-
+    // 如果需要启用 Sentry，取消下面的注释并确保安装了所有依赖
+    /*
     try {
+      const Sentry = require('sentry-expo');
       Sentry.init({
         dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || 'YOUR_SENTRY_DSN_HERE',
         enableInExpoDevelopment: false,
         environment: __DEV__ ? 'development' : 'production',
         release: Constants.expoConfig?.version,
       });
-
       this.initialized = true;
+      this.enabled = true;
     } catch (error) {
       console.warn('Sentry 初始化失败:', error);
     }
+    */
+    
+    console.log('Sentry 已禁用（暂时关闭以避免依赖问题）');
   }
 
   captureException(error: Error, context?: Record<string, any>) {
-    if (!SentryAvailable || !this.initialized) return;
-    try {
-      Sentry.Native.captureException(error, { extra: context });
-    } catch (e) {
-      console.warn('Sentry 捕获异常失败:', e);
+    if (!this.enabled || !this.initialized) {
+      // 在开发模式下，至少打印错误到控制台
+      if (__DEV__) {
+        console.error('错误:', error, context);
+      }
+      return;
     }
+    // Sentry 代码已禁用
   }
 
   setUser(userId: string, userInfo?: Record<string, any>) {
-    if (!SentryAvailable || !this.initialized) return;
-    try {
-      Sentry.Native.setUser({ id: userId, ...userInfo });
-    } catch (e) {
-      console.warn('Sentry 设置用户失败:', e);
-    }
+    if (!this.enabled || !this.initialized) return;
+    // Sentry 代码已禁用
   }
 }
 
