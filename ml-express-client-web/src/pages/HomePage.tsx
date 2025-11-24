@@ -4445,20 +4445,23 @@ const HomePage: React.FC = () => {
                         }
                       }}
                     >
-                {mapClickPosition && (
+                {(mapClickPosition || selectedLocation) && (
                         <Marker
-                          position={{ lat: mapClickPosition.lat, lng: mapClickPosition.lng }}
-                          title="选择的位置"
+                          position={mapClickPosition ? { lat: mapClickPosition.lat, lng: mapClickPosition.lng } : { lat: selectedLocation!.lat, lng: selectedLocation!.lng }}
+                          title={selectedLocation?.address || "选择的位置"}
                           icon={{
                             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="12" cy="12" r="8" fill="#38a169" stroke="white" stroke-width="2"/>
-                                <circle cx="12" cy="12" r="3" fill="white"/>
+                              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" r="12" fill="#ef4444" stroke="white" stroke-width="3"/>
+                                <circle cx="20" cy="20" r="5" fill="white"/>
+                                <circle cx="20" cy="20" r="2" fill="#ef4444"/>
                               </svg>
                             `),
-                            scaledSize: new window.google.maps.Size(32, 32),
-                            anchor: new window.google.maps.Point(16, 16)
+                            scaledSize: new window.google.maps.Size(40, 40),
+                            anchor: new window.google.maps.Point(20, 20)
                           }}
+                          animation={window.google?.maps?.Animation?.DROP}
+                          zIndex={1000}
                         />
                       )}
                     </GoogleMap>
