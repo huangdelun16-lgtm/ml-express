@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试用户查询</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Supabase 用户查询测试工具</h1>
+        
+        <div class="input-group">
+            <label>Supabase URL:</label>
+            <input type="text" id="supabaseUrl" value="https://uopkyuluxnrewvlmutam.supabase.co" placeholder="Supabase URL">
+        </div>
+        
+        <div class="input-group">
+            <label>Supabase Anon Key:</label>
+            <input type="text" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY" placeholder="Supabase Anon Key">
+        </div>
+        
+        <div class="input-group">
+            <label>测试邮箱:</label>
+            <input type="email" id="testEmail" value="aungmyatthu259369349@gmail.com" placeholder="输入要查询的邮箱">
+        </div>
+        
+        <button onclick="testConnection()">1. 测试连接</button>
+        <button onclick="queryAllUsers()">2. 查询所有用户</button>
+        <button onclick="queryByEmail()">3. 按邮箱查询</button>
+        <button onclick="checkTableStructure()">4. 检查表结构</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+
+        function initSupabase() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            
+            if (!url || !key) {
+                showResult('错误：请填写 Supabase URL 和 Key', 'error');
+                return false;
+            }
+            
+            supabaseClient = supabase.createClient(url, key);
+            return true;
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+        }
+
+        async function testConnection() {
+            if (!initSupabase()) return;
+            
+            showResult('正在测试连接...', 'info');
+            
+            try {
+                // 测试基本连接
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    showResult(`连接失败:\n${JSON.stringify(error, null, 2)}`, 'error');
+                } else {
+                    showResult('✅ 连接成功！可以访问 users 表', 'success');
+                }
+            } catch (err) {
+                showResult(`连接异常:\n${err.message}`, 'error');
+            }
+        }
+
+        async function queryAllUsers() {
+            if (!initSupabase()) return;
+            
+            showResult('正在查询所有用户...', 'info');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('id, name, email, phone, user_type, created_at')
+                    .limit(20)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    showResult(`查询失败:\n${JSON.stringify(error, null, 2)}`, 'error');
+                } else {
+                    const count = data ? data.length : 0;
+                    showResult(`✅ 找到 ${count} 个用户:\n\n${JSON.stringify(data, null, 2)}`, 'success');
+                }
+            } catch (err) {
+                showResult(`查询异常:\n${err.message}`, 'error');
+            }
+        }
+
+        async function queryByEmail() {
+            if (!initSupabase()) return;
+            
+            const email = document.getElementById('testEmail').value.trim().toLowerCase();
+            if (!email) {
+                showResult('错误：请输入邮箱', 'error');
+                return;
+            }
+            
+            showResult(`正在查询邮箱: ${email}...`, 'info');
+            
+            try {
+                // 方法1: 精确匹配
+                let { data: exactData, error: exactError } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('email', email)
+                    .maybeSingle();
+                
+                console.log('精确匹配结果:', { data: exactData, error: exactError });
+                
+                // 方法2: 不区分大小写
+                let { data: ilikeData, error: ilikeError } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .ilike('email', email)
+                    .maybeSingle();
+                
+                console.log('ilike匹配结果:', { data: ilikeData, error: ilikeError });
+                
+                // 方法3: 模糊匹配
+                let { data: likeData, error: likeError } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .like('email', `%${email}%`)
+                    .limit(5);
+                
+                console.log('模糊匹配结果:', { data: likeData, error: likeError });
+                
+                // 方法4: 查找所有类型
+                let { data: allData, error: allError } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .ilike('email', email);
+                
+                console.log('所有类型结果:', { data: allData, error: allError });
+                
+                let result = `查询邮箱: ${email}\n\n`;
+                result += `1. 精确匹配 (.eq): ${exactData ? '✅ 找到' : '❌ 未找到'}\n`;
+                if (exactError) result += `   错误: ${exactError.code} - ${exactError.message}\n`;
+                if (exactData) result += `   用户: ${JSON.stringify(exactData, null, 2)}\n\n`;
+                
+                result += `2. 不区分大小写 (.ilike): ${ilikeData ? '✅ 找到' : '❌ 未找到'}\n`;
+                if (ilikeError) result += `   错误: ${ilikeError.code} - ${ilikeError.message}\n`;
+                if (ilikeData) result += `   用户: ${JSON.stringify(ilikeData, null, 2)}\n\n`;
+                
+                result += `3. 模糊匹配 (.like): ${likeData && likeData.length > 0 ? `✅ 找到 ${likeData.length} 个` : '❌ 未找到'}\n`;
+                if (likeError) result += `   错误: ${likeError.code} - ${likeError.message}\n`;
+                if (likeData && likeData.length > 0) result += `   用户: ${JSON.stringify(likeData, null, 2)}\n\n`;
+                
+                result += `4. 所有类型查询: ${allData && allData.length > 0 ? `✅ 找到 ${allData.length} 个` : '❌ 未找到'}\n`;
+                if (allError) result += `   错误: ${allError.code} - ${allError.message}\n`;
+                if (allData && allData.length > 0) result += `   用户: ${JSON.stringify(allData, null, 2)}\n`;
+                
+                if (exactData || ilikeData || (likeData && likeData.length > 0) || (allData && allData.length > 0)) {
+                    showResult(result, 'success');
+                } else {
+                    showResult(result + '\n\n❌ 所有查询方法都未找到用户！\n\n可能的原因：\n1. 用户确实不存在\n2. RLS策略阻止了查询\n3. 邮箱字段名称不同\n4. 数据在其他表中', 'error');
+                }
+            } catch (err) {
+                showResult(`查询异常:\n${err.message}\n${err.stack}`, 'error');
+            }
+        }
+
+        async function checkTableStructure() {
+            if (!initSupabase()) return;
+            
+            showResult('正在检查表结构...', 'info');
+            
+            try {
+                // 尝试查询一个用户，看看返回的字段
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    showResult(`查询失败:\n${JSON.stringify(error, null, 2)}`, 'error');
+                } else if (data && data.length > 0) {
+                    const fields = Object.keys(data[0]);
+                    showResult(`✅ 表结构检查:\n\n字段列表:\n${fields.join(', ')}\n\n示例数据:\n${JSON.stringify(data[0], null, 2)}`, 'success');
+                } else {
+                    showResult('⚠️ 表中没有数据，无法检查结构', 'info');
+                }
+            } catch (err) {
+                showResult(`检查异常:\n${err.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
+
