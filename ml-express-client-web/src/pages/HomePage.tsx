@@ -316,24 +316,49 @@ const HomePage: React.FC = () => {
       let existingUser;
       if (verificationType === 'email') {
         // 邮箱验证：根据邮箱查找用户
-        // 先尝试查找客户类型，如果没有找到，再查找所有类型（兼容旧数据）
+        const emailToSearch = registerForm.email.trim().toLowerCase();
+        console.log('开始查询用户，邮箱:', emailToSearch);
+        
+        // 先尝试精确匹配（不区分大小写）
         let { data, error } = await supabase
           .from('users')
           .select('*')
-          .eq('email', registerForm.email.trim().toLowerCase())
-          .eq('user_type', 'customer')
+          .ilike('email', emailToSearch)  // 使用 ilike 进行不区分大小写的匹配
           .maybeSingle();
         
-        // 如果没有找到客户类型，尝试查找所有类型（兼容旧数据）
-        if (!data && error?.code === 'PGRST116') {
-          console.log('未找到客户类型用户，尝试查找所有类型用户...');
-          const result = await supabase
+        console.log('第一次查询结果:', { data: data ? '找到' : '未找到', error: error?.code });
+        
+        // 如果没找到，尝试查找客户类型
+        if (!data) {
+          console.log('尝试查找客户类型用户...');
+          const customerResult = await supabase
             .from('users')
             .select('*')
-            .eq('email', registerForm.email.trim().toLowerCase())
+            .ilike('email', emailToSearch)
+            .eq('user_type', 'customer')
             .maybeSingle();
-          data = result.data;
-          error = result.error;
+          
+          if (customerResult.data) {
+            data = customerResult.data;
+            error = customerResult.error;
+            console.log('找到客户类型用户');
+          }
+        }
+        
+        // 如果还是没找到，尝试查找所有用户（不限制类型）
+        if (!data) {
+          console.log('尝试查找所有类型用户...');
+          const allResult = await supabase
+            .from('users')
+            .select('*')
+            .ilike('email', emailToSearch)
+            .maybeSingle();
+          
+          if (allResult.data) {
+            data = allResult.data;
+            error = allResult.error;
+            console.log('找到用户（所有类型）:', allResult.data.user_type);
+          }
         }
         
         if (error && error.code !== 'PGRST116') {
@@ -342,7 +367,7 @@ const HomePage: React.FC = () => {
         }
         
         existingUser = data;
-        console.log('查询到的用户:', existingUser ? '找到用户' : '未找到用户', existingUser?.email, existingUser?.user_type);
+        console.log('最终查询结果:', existingUser ? `找到用户: ${existingUser.email} (类型: ${existingUser.user_type || '未设置'})` : '未找到用户');
       } else {
         // 短信验证：根据手机号查找用户
         existingUser = await userService.getUserByPhone(normalizedPhone);
