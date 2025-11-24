@@ -31,7 +31,7 @@
         ]
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+        "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""
       }
     },
     "android": {
@@ -53,7 +53,7 @@
       "enableProguardInReleaseBuilds": true,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+          "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""
         }
       }
     },

@@ -21,7 +21,7 @@ Google Maps API密钥无效或未正确配置
 - 确认以下变量存在且正确：
 
 ```
-REACT_APP_GOOGLE_MAPS_API_KEY = AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+REACT_APP_GOOGLE_MAPS_API_KEY = YOUR_GOOGLE_MAPS_API_KEY
 SECRETS_SCAN_SMART_DETECTION_ENABLED = false
 ```
 
@@ -58,7 +58,7 @@ localhost:*
 console.log('API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
 
 // 测试API密钥
-fetch(`https://maps.googleapis.com/maps/api/js?key=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY&libraries=places`)
+fetch(`https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places`)
   .then(response => console.log('API Key test:', response.ok))
   .catch(error => console.error('API Key error:', error));
 ```

@@ -1,11 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-// 使用环境变量，如果不存在则回退到硬编码（仅用于开发环境）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
+// 使用环境变量配置 Supabase
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
-  console.warn('⚠️ 警告：使用硬编码的 Supabase 密钥。生产环境应使用环境变量。');
+  console.error('❌ 严重错误：缺少 Supabase 环境变量配置！');
+  console.error('请设置以下环境变量：');
+  console.error('  - REACT_APP_SUPABASE_URL');
+  console.error('  - REACT_APP_SUPABASE_ANON_KEY');
+}
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ 错误：Supabase 配置不完整，应用可能无法正常工作！');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

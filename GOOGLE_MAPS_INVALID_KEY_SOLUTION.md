@@ -5,7 +5,7 @@
 Google Maps JavaScript API warning: InvalidKey
 ```
 
-这说明API密钥 `AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY` 无效。
+这说明API密钥 `YOUR_GOOGLE_MAPS_API_KEY` 无效。
 
 ## ✅ 解决方案
 
@@ -53,7 +53,7 @@ Google Maps JavaScript API warning: InvalidKey
 #### 检查API密钥状态
 1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
 2. 进入 **APIs & Services** > **Credentials**
-3. 找到API密钥：`AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`
+3. 找到API密钥：`YOUR_GOOGLE_MAPS_API_KEY`
 4. 检查：
    - ✅ 密钥是否启用
    - ✅ 是否有计费问题
@@ -75,7 +75,7 @@ Google Maps JavaScript API warning: InvalidKey
 ### 测试API密钥是否有效
 在浏览器控制台运行：
 ```javascript
-fetch('https://maps.googleapis.com/maps/api/js?key=AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY')
+fetch('https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY')
   .then(response => {
     if (response.ok) {
       console.log('✅ API密钥有效');

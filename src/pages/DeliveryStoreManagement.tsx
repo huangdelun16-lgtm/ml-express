@@ -1278,7 +1278,7 @@ const DeliveryStoreManagement: React.FC = () => {
             </div>
 
             <ErrorBoundary>
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}>
+            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ""}>
                 <GoogleMap
                   key={selectedCity}
                   mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '12px' }}
@@ -2148,7 +2148,7 @@ const DeliveryStoreManagement: React.FC = () => {
               ) : (
                 <ErrorBoundary>
                   <LoadScript 
-                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM"}
+                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ""}
                     onLoad={onMapLoad}
                     onError={onMapError}
                   >

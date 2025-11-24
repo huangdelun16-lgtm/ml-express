@@ -37,8 +37,8 @@ module.exports = {
         ]
       },
       config: {
-        // 直接使用 API key，避免构建时环境变量问题
-        googleMapsApiKey: "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+        // 使用环境变量配置 Google Maps API Key
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""
       }
     },
     android: {
@@ -58,9 +58,9 @@ module.exports = {
       enableProguardInReleaseBuilds: true, // 启用代码混淆，生成 mapping.txt
       config: {
         googleMaps: {
-          // 直接使用 API key，避免构建时环境变量问题
+          // 使用环境变量配置 Google Maps API Key
           // 注意：生产环境应该使用 EAS Secrets
-          apiKey: "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ""
         }
       }
     },

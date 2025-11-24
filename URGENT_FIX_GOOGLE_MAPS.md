@@ -1,7 +1,7 @@
 # 紧急解决方案：Google Maps API密钥失效
 
 ## 🚨 当前状态
-API密钥 `AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY` 显示 InvalidKey 错误。
+API密钥 `YOUR_GOOGLE_MAPS_API_KEY` 显示 InvalidKey 错误。
 
 ## 🔧 立即解决步骤
 

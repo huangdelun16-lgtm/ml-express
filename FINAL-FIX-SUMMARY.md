@@ -62,7 +62,7 @@
 （从 Supabase Dashboard → Settings → API 复制）
 
 变量名: REACT_APP_SUPABASE_ANON_KEY
-变量值: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+变量值: YOUR_SUPABASE_ANON_KEY
 （从 Supabase Dashboard → Settings → API 复制 anon public key）
 ```
 

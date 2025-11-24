@@ -126,6 +126,7 @@ const HomePage: React.FC = () => {
   const [mapCenter, setMapCenter] = useState(DEFAULT_CITY_CENTER);
   const [autocompleteService, setAutocompleteService] = useState<any>(null);
   const [placesService, setPlacesService] = useState<any>(null);
+  const mapRef = React.useRef<google.maps.Map | null>(null);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -1861,6 +1862,16 @@ const HomePage: React.FC = () => {
           // 更新地图中心
           setMapCenter(coords);
           
+          // 如果地图实例存在，立即移动到新位置（平滑动画）
+          if (mapRef.current) {
+            mapRef.current.panTo(coords);
+            // 可选：设置合适的缩放级别
+            mapRef.current.setZoom(16);
+          }
+          
+          // 设置地图点击位置（显示标记）
+          setMapClickPosition(coords);
+          
           // 设置选中位置
           setSelectedLocation({
             lat: coords.lat,
@@ -1879,6 +1890,9 @@ const HomePage: React.FC = () => {
           // 更新地址输入框（使用格式化地址）
           if (addressInput) {
             addressInput.value = place.formatted_address || suggestion.description;
+            // 添加视觉反馈
+            addressInput.style.borderColor = 'rgba(56, 161, 105, 0.6)';
+            addressInput.style.boxShadow = '0 0 10px rgba(56, 161, 105, 0.3)';
           }
         } else {
           // 如果获取详情失败，至少保留用户选择的描述
@@ -4273,6 +4287,9 @@ const HomePage: React.FC = () => {
                       center={mapCenter}
                       zoom={15}
                       onLoad={(map) => {
+                        // 保存地图实例引用
+                        mapRef.current = map;
+                        
                         // 地图加载完成后的提示
                         console.log('地图加载完成，可以开始定位');
                         

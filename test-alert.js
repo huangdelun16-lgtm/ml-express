@@ -2,7 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
   'https://uopkyuluxnrewvlmutam.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY'
+  'YOUR_SUPABASE_ANON_KEY'
 );
 
 async function createTestAlert() {

@@ -1,7 +1,7 @@
 # Netlify 环境变量设置指南
 
 ## 🎯 API密钥已确认
-您的API密钥：`AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY`
+您的API密钥：`YOUR_GOOGLE_MAPS_API_KEY`
 Google Cloud Console域名限制已正确配置 ✅
 
 ## 🔧 下一步：设置Netlify环境变量
@@ -19,7 +19,7 @@ Google Cloud Console域名限制已正确配置 ✅
 
 #### 必需的环境变量：
 ```
-REACT_APP_GOOGLE_MAPS_API_KEY = AIzaSyBLoZGBfjaywi5Nfr-aMfsOg6dL4VeSetY
+REACT_APP_GOOGLE_MAPS_API_KEY = YOUR_GOOGLE_MAPS_API_KEY
 SECRETS_SCAN_SMART_DETECTION_ENABLED = false
 ```
 

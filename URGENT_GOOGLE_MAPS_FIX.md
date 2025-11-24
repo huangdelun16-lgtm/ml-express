@@ -16,7 +16,7 @@
 
 2. **编辑 API Key**
    - 进入 **APIs & Services** → **Credentials**
-   - 找到您的 API Key: `AIzaSyAlWquo-iUvh_2tQPolCGntA9pN74H9Xgw`
+   - 找到您的 API Key: `YOUR_GOOGLE_MAPS_API_KEY`
    - 点击编辑（铅笔图标）
 
 3. **配置域名限制**
