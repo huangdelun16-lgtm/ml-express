@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase CORS 测试工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #c62828;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #2196F3;
+        }
+        pre {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.success { background: #4CAF50; color: white; }
+        .status.error { background: #f44336; color: white; }
+        .status.warning { background: #ff9800; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Supabase CORS 诊断工具</h1>
+        <p>此工具用于诊断 Supabase CORS 和连接问题。</p>
+
+        <div class="test-section">
+            <h2>测试 1: 基础连接测试</h2>
+            <p>测试 Supabase 服务器是否可访问</p>
+            <button onclick="testBasicConnection()">测试基础连接</button>
+            <div id="test1-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试 2: 使用 Supabase JS 客户端</h2>
+            <p>测试使用 @supabase/supabase-js 库连接</p>
+            <button onclick="testSupabaseClient()">测试 Supabase 客户端</button>
+            <div id="test2-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试 3: 直接 Fetch API（模拟浏览器请求）</h2>
+            <p>测试浏览器直接发送请求（会触发 CORS）</p>
+            <button onclick="testDirectFetch()">测试直接 Fetch</button>
+            <div id="test3-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试 4: 查询用户表</h2>
+            <p>测试查询 users 表（需要 RLS 策略允许）</p>
+            <button onclick="testQueryUsers()">查询用户表</button>
+            <div id="test4-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试 5: 检查 API Key 有效性</h2>
+            <p>测试 API Key 是否有效</p>
+            <button onclick="testApiKey()">检查 API Key</button>
+            <div id="test5-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试 6: 查询特定用户（邮箱）</h2>
+            <input type="email" id="emailInput" placeholder="输入邮箱地址" style="padding: 10px; width: 300px; margin-right: 10px;">
+            <button onclick="testQueryUserByEmail()">查询用户</button>
+            <div id="test6-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
+
+        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(elementId, message, type = 'info') {
+            const div = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            div.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+
+        async function testBasicConnection() {
+            log('test1-result', '⏳ 正在测试基础连接...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+                log('test1-result', `✅ 连接成功！状态码: ${response.status}<br>响应头: <pre>${JSON.stringify([...response.headers.entries()], null, 2)}</pre>`, 'success');
+            } catch (error) {
+                log('test1-result', `❌ 连接失败: ${error.message}<br>错误类型: ${error.name}`, 'error');
+            }
+        }
+
+        async function testSupabaseClient() {
+            log('test2-result', '⏳ 正在测试 Supabase 客户端...', 'info');
+            try {
+                const { data, error } = await supabase.from('users').select('id').limit(1);
+                if (error) {
+                    log('test2-result', `❌ Supabase 客户端错误:<br><pre>${JSON.stringify(error, null, 2)}</pre>`, 'error');
+                } else {
+                    log('test2-result', `✅ Supabase 客户端连接成功！<br>数据: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                }
+            } catch (error) {
+                log('test2-result', `❌ 异常: ${error.message}<br>堆栈: <pre>${error.stack}</pre>`, 'error');
+            }
+        }
+
+        async function testDirectFetch() {
+            log('test3-result', '⏳ 正在测试直接 Fetch（会触发 CORS 检查）...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const text = await response.text();
+                    log('test3-result', `⚠️ 请求失败: 状态码 ${response.status}<br>响应: <pre>${text}</pre>`, 'error');
+                } else {
+                    const data = await response.json();
+                    log('test3-result', `✅ 直接 Fetch 成功！<br>数据: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                }
+            } catch (error) {
+                if (error.message.includes('CORS') || error.message.includes('Cross-Origin')) {
+                    log('test3-result', `❌ CORS 错误！<br>错误: ${error.message}<br><br><strong>解决方案：</strong><br>1. 检查 Supabase Dashboard 中的 CORS 设置<br>2. 确认项目状态正常<br>3. 检查 API Key 是否有效`, 'error');
+                } else {
+                    log('test3-result', `❌ 网络错误: ${error.message}<br>错误类型: ${error.name}`, 'error');
+                }
+            }
+        }
+
+        async function testQueryUsers() {
+            log('test4-result', '⏳ 正在查询用户表...', 'info');
+            try {
+                const { data, error, count } = await supabase
+                    .from('users')
+                    .select('id, email, user_type', { count: 'exact' })
+                    .limit(5);
+                
+                if (error) {
+                    log('test4-result', `❌ 查询失败:<br><pre>${JSON.stringify(error, null, 2)}</pre><br><br><strong>可能的原因：</strong><br>1. RLS 策略不允许查询<br>2. 表不存在<br>3. API Key 权限不足`, 'error');
+                } else {
+                    log('test4-result', `✅ 查询成功！<br>用户总数: ${count || data?.length || 0}<br>数据: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                }
+            } catch (error) {
+                log('test4-result', `❌ 异常: ${error.message}`, 'error');
+            }
+        }
+
+        async function testApiKey() {
+            log('test5-result', '⏳ 正在检查 API Key...', 'info');
+            try {
+                // 尝试访问一个不需要权限的端点
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+                
+                log('test5-result', `✅ API Key 检查完成<br>状态码: ${response.status}<br>响应头: <pre>${JSON.stringify([...response.headers.entries()], null, 2)}</pre>`, 'success');
+            } catch (error) {
+                log('test5-result', `❌ API Key 检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testQueryUserByEmail() {
+            const email = document.getElementById('emailInput').value.trim().toLowerCase();
+            if (!email) {
+                log('test6-result', '⚠️ 请输入邮箱地址', 'error');
+                return;
+            }
+            
+            log('test6-result', `⏳ 正在查询用户: ${email}...`, 'info');
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .ilike('email', email)
+                    .maybeSingle();
+                
+                if (error) {
+                    log('test6-result', `❌ 查询失败:<br><pre>${JSON.stringify(error, null, 2)}</pre>`, 'error');
+                } else if (data) {
+                    log('test6-result', `✅ 找到用户！<br>数据: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    log('test6-result', `⚠️ 未找到用户: ${email}`, 'info');
+                }
+            } catch (error) {
+                log('test6-result', `❌ 异常: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动运行基础测试
+        window.addEventListener('load', () => {
+            console.log('🔍 Supabase CORS 诊断工具已加载');
+            console.log('Supabase URL:', SUPABASE_URL);
+            console.log('API Key:', SUPABASE_ANON_KEY.substring(0, 20) + '...');
+        });
+    </script>
+</body>
+</html>
+
