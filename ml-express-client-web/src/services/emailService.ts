@@ -14,11 +14,21 @@ export async function sendEmailVerificationCode(
 ): Promise<VerificationResult> {
   try {
     // 客户端版本：调用 Netlify Function 发送验证码
-    const response = await fetch('/.netlify/functions/send-email-code', {
+    const functionUrl = process.env.NODE_ENV === 'production' 
+      ? '/.netlify/functions/send-email-code'
+      : 'https://market-link-express.com/.netlify/functions/send-email-code';
+    
+    const response = await fetch(functionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, language })
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ 发送验证码失败:', response.status, errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
     
     const result = await response.json();
     
@@ -38,13 +48,13 @@ export async function sendEmailVerificationCode(
                  'အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ')
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('发送验证码失败:', error);
     return {
       success: false,
-      message: language === 'zh' ? '发送验证码失败，请稍后重试' : 
-               language === 'en' ? 'Failed to send verification code, please try again later' :
-               'အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ၊ နောက်မှ ထပ်စမ်းကြည့်ပါ'
+      message: language === 'zh' ? `发送验证码失败，请稍后重试${error.message ? ': ' + error.message : ''}` : 
+               language === 'en' ? `Failed to send verification code, please try again later${error.message ? ': ' + error.message : ''}` :
+               `အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ၊ နောက်မှ ထပ်စမ်းကြည့်ပါ${error.message ? ': ' + error.message : ''}`
     };
   }
 }
