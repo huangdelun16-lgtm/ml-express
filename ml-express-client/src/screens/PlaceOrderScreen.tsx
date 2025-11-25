@@ -913,10 +913,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
         await persistOrderLocally(offlinePayload, 'synced');
         syncPendingOrders();
         // 显示包裹二维码（无论支付方式，快递员需要扫描取件）
+        // 注意：这是包裹二维码，不是支付二维码
         setQrOrderId(orderId);
         setQrOrderPrice(isCalculated ? calculatedPrice : price);
         setShowQRCodeModal(true);
-            currentT.orderSuccess,
+        // 不再显示Alert，因为二维码模态框已经包含了成功信息
+        // Alert.alert(
+        //   currentT.orderSuccess,
             `${language === 'zh' ? '订单创建成功！' : language === 'en' ? 'Order created successfully!' : 'အော်ဒါဖန်တီးခြင်းအောင်မြင်ပါသည်!'}\n${language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}：${orderId}\n${language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}：${isCalculated ? calculatedPrice : price} MMK\n${language === 'zh' ? '支付方式' : language === 'en' ? 'Payment Method' : 'ပေးချေမှုနည်းလမ်း'}：${language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}\n\n${language === 'zh' ? '骑手将在取件时代收费用。' : language === 'en' ? 'The courier will collect payment upon pickup.' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်။'}`,
             [
               {
@@ -931,10 +934,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
                   resetForm();
                 }
               }
-            ]
-        );
-        // 重置表单
-        resetForm();
+            // ]
+        // );
+        // 重置表单（在关闭二维码模态框时也会重置）
+        // resetForm(); // 移到二维码模态框关闭时重置
       } else {
         await persistOrderLocally(offlinePayload, 'pending', result?.error?.message);
         showOfflineSavedAlert();
