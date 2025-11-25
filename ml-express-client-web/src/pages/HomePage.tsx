@@ -963,7 +963,7 @@ const HomePage: React.FC = () => {
       footer: {
         company: 'MARKET LINK EXPRESS',
         address: '缅甸',
-        phone: '(+95) 09788848928 / (+95) 09259369349',
+        phone: '(+95) 09788848928',
         email: 'marketlink982@gmail.com'
       },
       errors: {
@@ -1095,7 +1095,7 @@ const HomePage: React.FC = () => {
       footer: {
         company: 'MARKET LINK EXPRESS',
         address: 'Myanmar',
-        phone: '(+95) 09788848928 / (+95) 09259369349',
+        phone: '(+95) 09788848928',
         email: 'marketlink982@gmail.com'
       },
       errors: {
@@ -1227,7 +1227,7 @@ const HomePage: React.FC = () => {
       footer: {
         company: 'MARKET LINK EXPRESS',
         address: 'မန္တလေး၊ မြန်မာ',
-        phone: '(+95) 09788848928 / (+95) 09259369349',
+        phone: '(+95) 09788848928',
         email: 'marketlink982@gmail.com'
       },
       errors: {
@@ -3942,10 +3942,10 @@ const HomePage: React.FC = () => {
                   }}>
                     如果问题持续存在，请联系客服：<br />
                     {language === 'zh' 
-                      ? '电话: (+95) 09788848928 / (+95) 09259369349' 
+                      ? '电话: (+95) 09788848928' 
                       : language === 'en'
-                        ? 'Phone: (+95) 09788848928 / (+95) 09259369349'
-                        : 'ဖုန်း: (+95) 09788848928 / (+95) 09259369349'}
+                        ? 'Phone: (+95) 09788848928'
+                        : 'ဖုန်း: (+95) 09788848928'}
                   </p>
                 </div>
               </div>

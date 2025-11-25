@@ -135,7 +135,7 @@ const PrivacyPolicyPage: React.FC = () => {
           title: '11. 联系我们',
           content: '如果您对本隐私政策有任何问题或疑虑，请通过以下方式联系我们：',
           items: [
-            '电话：(+95) 09788848928 / (+95) 09259369349',
+            '电话：(+95) 09788848928',
             '邮箱：marketlink982@gmail.com',
             '地址：ChanMyaThaZi Mandalay'
           ]
@@ -239,7 +239,7 @@ const PrivacyPolicyPage: React.FC = () => {
           title: '11. Contact Us',
           content: 'If you have any questions or concerns about this privacy policy, please contact us through:',
           items: [
-            'Phone: (+95) 09788848928 / (+95) 09259369349',
+            'Phone: (+95) 09788848928',
             'Email: marketlink982@gmail.com',
             'Address: ChanMyaThaZi Mandalay'
           ]
@@ -343,7 +343,7 @@ const PrivacyPolicyPage: React.FC = () => {
           title: '၁၁. ဆက်သွယ်ရန်',
           content: 'ဤကိုယ်ရေးလုံခြုံမှု မူဝါဒအကြောင်း သင်တွင် မေးခွန်းများ သို့မဟုတ် စိုးရိမ်မှုများ ရှိပါက၊ အောက်ပါနည်းလမ်းများမှတဆင့် ကျွန်ုပ်တို့အား ဆက်သွယ်ပါ:',
           items: [
-            'ဖုန်း: (+95) 09788848928 / (+95) 09259369349',
+            'ဖုန်း: (+95) 09788848928',
             'အီးမေးလ်: marketlink982@gmail.com',
             'လိပ်စာ: ChanMyaThaZi Mandalay'
           ]

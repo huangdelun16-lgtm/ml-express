@@ -23,7 +23,6 @@ const { width } = Dimensions.get('window');
 
 const HOTLINE_NUMBERS = [
   { display: '(+95) 09788848928', tel: '+959788848928' },
-  { display: '(+95) 09259369349', tel: '+959259369349' },
 ];
 
 interface OrderStats {
@@ -96,6 +95,10 @@ export default function HomeScreen({ navigation }: any) {
       contact: '联系我们',
       phone: '客服热线',
       email: '商务合作',
+      wechatId: 'WeChat ID',
+      wechatValue: 'AMT349',
+      viber: 'Viber',
+      viberValue: '09259369349',
       features: '为什么选择我们',
       feature1: '7×24小时客服',
       feature2: '覆盖全缅甸主要城市',
@@ -138,7 +141,11 @@ export default function HomeScreen({ navigation }: any) {
       price: 'Price',
       contact: 'Contact Us',
       phone: 'Hotline',
-      email: 'Business',
+      email: 'Business Cooperation',
+      wechatId: 'WeChat ID',
+      wechatValue: 'AMT349',
+      viber: 'Viber',
+      viberValue: '09259369349',
       features: 'Why Choose Us',
       feature1: '24/7 Customer Service',
       feature2: 'Myanmar-wide Coverage',
@@ -181,7 +188,11 @@ export default function HomeScreen({ navigation }: any) {
       price: 'စျေးနှုန်း',
       contact: 'ဆက်သွယ်ရန်',
       phone: 'ဖုန်း',
-      email: 'စီးပွားရေး',
+      email: 'စီးပွားရေးပူးပေါင်းဆောင်ရွက်မှု',
+      wechatId: 'WeChat ID',
+      wechatValue: 'AMT349',
+      viber: 'Viber',
+      viberValue: '09259369349',
       features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
       feature1: '၂၄နာရီဝန်ဆောင်မှု',
       feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
@@ -701,18 +712,26 @@ export default function HomeScreen({ navigation }: any) {
 
             <TouchableOpacity
               style={styles.contactCard}
-              onPress={() => Linking.openURL('mailto:marketlink982@gmail.com')}
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={['#10b981', '#059669']}
+                colors={['#fa709a', '#fee140']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.contactGradient}
               >
-                <Text style={styles.contactIcon}>✉️</Text>
+                <Text style={styles.contactIcon}>🤝</Text>
                 <Text style={styles.contactLabel}>{currentT.email}</Text>
-                <Text style={styles.contactValue}>marketlink982@gmail.com</Text>
+                <View style={{ marginTop: 12, width: '100%' }}>
+                  <View style={{ marginBottom: 10, alignItems: 'flex-start' }}>
+                    <Text style={styles.contactSubLabel}>{currentT.wechatId}</Text>
+                    <Text style={styles.contactSubValue}>{currentT.wechatValue}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-start' }}>
+                    <Text style={styles.contactSubLabel}>{currentT.viber}</Text>
+                    <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
+                  </View>
+                </View>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1113,14 +1132,14 @@ const styles = StyleSheet.create({
   },
   contactCard: {
     flex: 1,
-    height: 180,
-    borderRadius: 16,
+    height: 200,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   contactGradient: {
     padding: 20,
@@ -1129,21 +1148,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 38,
-    marginBottom: 14,
+    fontSize: 42,
+    marginBottom: 12,
   },
   contactLabel: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.95)',
-    marginBottom: 10,
-    fontWeight: '600',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.98)',
+    marginBottom: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   contactValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
     paddingHorizontal: 8,
+  },
+  contactSubLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  contactSubValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.8,
   },
 });

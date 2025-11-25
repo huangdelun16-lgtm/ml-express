@@ -75,10 +75,15 @@ const ContactPage: React.FC = () => {
         email: '邮箱联系',
         address: '公司地址',
         businessHours: '营业时间',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        businessCooperation: '商务合作',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: 'ChanMyaThaZi Mandalay',
-        businessHoursValue: '周一至周日 8:00 - 20:00'
+        businessHoursValue: '周一至周日 8:00 - 20:00',
+        wechatId: 'WeChat ID',
+        wechatValue: 'AMT349',
+        viber: 'Viber',
+        viberValue: '09259369349'
       }
     },
     en: {
@@ -96,10 +101,15 @@ const ContactPage: React.FC = () => {
         email: 'Email Contact',
         address: 'Company Address',
         businessHours: 'Business Hours',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        businessCooperation: 'Business Cooperation',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: 'ChanMyaThaZi Mandalay',
-        businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
+        businessHoursValue: 'Monday to Sunday 8:00 - 20:00',
+        wechatId: 'WeChat ID',
+        wechatValue: 'AMT349',
+        viber: 'Viber',
+        viberValue: '09259369349'
       }
     },
     my: {
@@ -117,10 +127,15 @@ const ContactPage: React.FC = () => {
         email: 'အီးမေးလ်ဆက်သွယ်ရန်',
         address: 'ကုမ္ပဏီလိပ်စာ',
         businessHours: 'အလုပ်ချိန်',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        businessCooperation: 'စီးပွားရေးပူးပေါင်းဆောင်ရွက်မှု',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: 'ChanMyaThaZi Mandalay',
-        businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00'
+        businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00',
+        wechatId: 'WeChat ID',
+        wechatValue: 'AMT349',
+        viber: 'Viber',
+        viberValue: '09259369349'
       }
     }
   };
@@ -136,13 +151,24 @@ const ContactPage: React.FC = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      position: 'relative',
-      overflow: 'hidden',
-      padding: window.innerWidth < 768 ? '12px' : '20px'
-    }}>
+    <>
+      <style>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%) translateY(-100%) rotate(45deg);
+          }
+          100% {
+            transform: translateX(100%) translateY(100%) rotate(45deg);
+          }
+        }
+      `}</style>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
+        position: 'relative',
+        overflow: 'hidden',
+        padding: window.innerWidth < 768 ? '12px' : '20px'
+      }}>
       {/* 背景装饰 */}
       <div style={{
         position: 'absolute',
@@ -479,10 +505,10 @@ const ContactPage: React.FC = () => {
 
         {/* 联系信息卡片 */}
         <div style={{
-          maxWidth: '1000px',
+          maxWidth: '1200px',
           margin: '0 auto',
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
+          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
           gap: 'var(--spacing-8)'
         }}>
           {[
@@ -491,108 +517,179 @@ const ContactPage: React.FC = () => {
               title: t.contact.phone,
               value: t.contact.phoneValue,
               color: '#ff6b6b',
-              bgGradient: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)'
+              bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
             },
             {
               icon: '📧',
               title: t.contact.email,
               value: t.contact.emailValue,
               color: '#4ecdc4',
-              bgGradient: 'linear-gradient(135deg, #4ecdc4, #44a08d)'
+              bgGradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              iconBg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
             },
             {
               icon: '📍',
               title: t.contact.address,
               value: t.contact.addressValue,
               color: '#45b7d1',
-              bgGradient: 'linear-gradient(135deg, #45b7d1, #96c93d)'
+              bgGradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              iconBg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
             },
             {
               icon: '🕒',
               title: t.contact.businessHours,
               value: t.contact.businessHoursValue,
               color: '#f093fb',
-              bgGradient: 'linear-gradient(135deg, #f093fb, #f5576c)'
+              bgGradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              iconBg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+            },
+            {
+              icon: '🤝',
+              title: t.contact.businessCooperation,
+              value: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>💬</span>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', color: '#718096', marginBottom: '0.2rem', fontWeight: '500' }}>
+                        {t.contact.wechatId}
+                      </div>
+                      <div style={{ fontSize: '1.1rem', color: '#2d3748', fontWeight: '700', letterSpacing: '0.5px' }}>
+                        {t.contact.wechatValue}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📱</span>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', color: '#718096', marginBottom: '0.2rem', fontWeight: '500' }}>
+                        {t.contact.viber}
+                      </div>
+                      <div style={{ fontSize: '1.1rem', color: '#2d3748', fontWeight: '700', letterSpacing: '0.5px' }}>
+                        {t.contact.viberValue}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ),
+              color: '#ffa726',
+              bgGradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+              iconBg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+              isBusiness: true
             }
           ].map((contact, index) => (
             <div key={index} style={{
-              background: 'var(--card-bg)',
-              backdropFilter: 'var(--card-backdrop)',
-              borderRadius: 'var(--card-radius-lg)',
-              padding: 'var(--card-padding-lg)',
+              background: 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              padding: '2rem',
               position: 'relative',
               overflow: 'hidden',
-              border: 'var(--card-border)',
-              boxShadow: 'var(--shadow-card)',
-              transition: 'all var(--transition-base)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               cursor: 'pointer',
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`,
               transitionDelay: `${index * 0.1}s`
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)';
+              e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 30px 80px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.6) inset';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`;
-              e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+              e.currentTarget.style.boxShadow = '0 20px 60px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset';
             }}
             >
-              {/* 装饰性背景 */}
+              {/* 高级装饰性背景 */}
               <div style={{
                 position: 'absolute',
-                top: '-30px',
-                right: '-30px',
+                top: '-50px',
+                right: '-50px',
+                width: '150px',
+                height: '150px',
+                background: contact.bgGradient,
+                opacity: '0.08',
+                borderRadius: '50%',
+                filter: 'blur(40px)'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                bottom: '-30px',
+                left: '-30px',
                 width: '100px',
                 height: '100px',
                 background: contact.bgGradient,
-                opacity: '0.1',
-                borderRadius: '50%'
+                opacity: '0.06',
+                borderRadius: '50%',
+                filter: 'blur(30px)'
               }}></div>
 
-              {/* 图标 */}
+              {/* 高级图标容器 */}
               <div style={{
-                width: '70px',
-                height: '70px',
-                background: contact.bgGradient,
-                borderRadius: '18px',
+                width: '80px',
+                height: '80px',
+                background: contact.iconBg || contact.bgGradient,
+                borderRadius: '20px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: '1.5rem',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                boxShadow: `0 10px 30px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.3) inset`,
+                position: 'relative',
+                overflow: 'hidden'
               }}>
-                <span style={{ fontSize: '32px' }}>{contact.icon}</span>
+                <div style={{
+                  position: 'absolute',
+                  top: '-50%',
+                  left: '-50%',
+                  width: '200%',
+                  height: '200%',
+                  background: 'linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%)',
+                  animation: 'shimmer 3s infinite'
+                }}></div>
+                <span style={{ fontSize: '36px', position: 'relative', zIndex: 1 }}>{contact.icon}</span>
               </div>
 
               {/* 标题 */}
               <h3 style={{
-                fontSize: '1.3rem',
-                fontWeight: '700',
-                color: '#2d3748',
-                marginBottom: '1rem',
-                letterSpacing: '-0.5px'
+                fontSize: '1.4rem',
+                fontWeight: '800',
+                background: contact.bgGradient,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                marginBottom: contact.isBusiness ? '1.2rem' : '1rem',
+                letterSpacing: '-0.5px',
+                lineHeight: '1.3'
               }}>
                 {contact.title}
               </h3>
 
               {/* 内容 */}
-              <p style={{
-                fontSize: '1.1rem',
-                color: '#4a5568',
-                lineHeight: '1.6',
-                fontWeight: '500'
-              }}>
-                {contact.value}
-              </p>
+              {typeof contact.value === 'string' ? (
+                <p style={{
+                  fontSize: '1.15rem',
+                  color: '#2d3748',
+                  lineHeight: '1.7',
+                  fontWeight: '600',
+                  letterSpacing: '0.2px'
+                }}>
+                  {contact.value}
+                </p>
+              ) : (
+                contact.value
+              )}
 
-              {/* 底部装饰线 */}
+              {/* 高级底部装饰线 */}
               <div style={{
-                height: '4px',
+                height: '5px',
                 background: contact.bgGradient,
-                borderRadius: '2px',
-                marginTop: '1.5rem'
+                borderRadius: '3px',
+                marginTop: '1.8rem',
+                boxShadow: `0 2px 10px ${contact.bgGradient}`
               }}></div>
             </div>
           ))}
@@ -651,6 +748,7 @@ const ContactPage: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

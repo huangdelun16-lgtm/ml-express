@@ -54,7 +54,7 @@ const ContactPage: React.FC = () => {
         email: '邮箱联系',
         address: '公司地址',
         businessHours: '营业时间',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: '缅甸',
         businessHoursValue: '周一至周日 8:00 - 20:00'
@@ -76,7 +76,7 @@ const ContactPage: React.FC = () => {
         email: 'Email Contact',
         address: 'Company Address',
         businessHours: 'Business Hours',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: 'Myanmar',
         businessHoursValue: 'Monday to Sunday 8:00 - 20:00'
@@ -98,7 +98,7 @@ const ContactPage: React.FC = () => {
         email: 'အီးမေးလ်ဆက်သွယ်ရန်',
         address: 'ကုမ္ပဏီလိပ်စာ',
         businessHours: 'အလုပ်ချိန်',
-        phoneValue: '(+95) 09788848928 / (+95) 09259369349',
+        phoneValue: '(+95) 09788848928',
         emailValue: 'marketlink982@gmail.com',
         addressValue: 'မန္တလေး၊ မြန်မာ',
         businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00'
