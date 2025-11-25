@@ -73,6 +73,15 @@ export default function App() {
   // 初始化通知服务
   const initializeNotificationService = async () => {
     try {
+      // 检查是否在 Expo Go 中运行
+      const Constants = require('expo-constants').default;
+      const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+      
+      if (isExpoGo) {
+        console.log('⚠️ 在 Expo Go 中运行，跳过通知服务初始化以避免警告');
+        return;
+      }
+
       const notificationService = NotificationService.getInstance();
       await notificationService.loadSettings();
       notificationService.setupNotificationHandlers();

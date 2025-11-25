@@ -6,22 +6,32 @@ import Constants from 'expo-constants';
 let Notifications: any = null;
 let NotificationsAvailable = false;
 
-// 检查是否在 Expo Go 中运行
-const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+// 延迟加载函数，只在需要时导入
+function loadNotificationsModule() {
+  if (Notifications !== null) {
+    return Notifications; // 已经加载过
+  }
 
-if (!isExpoGo) {
+  // 检查是否在 Expo Go 中运行
+  const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+  
+  if (isExpoGo) {
+    console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用');
+    NotificationsAvailable = false;
+    return null;
+  }
+
   // 只在非 Expo Go 环境中尝试导入
   try {
     // 使用动态 require 避免在导入时触发错误
-    const notificationsModule = require('expo-notifications');
-    Notifications = notificationsModule;
+    Notifications = require('expo-notifications');
     NotificationsAvailable = true;
+    return Notifications;
   } catch (error) {
     console.warn('⚠️ expo-notifications 导入失败:', error);
     NotificationsAvailable = false;
+    return null;
   }
-} else {
-  console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用。使用开发构建以获得完整功能。');
 }
 
 // 通知类型定义
@@ -63,28 +73,29 @@ class NotificationService {
   // 初始化通知服务
   private async initializeNotifications() {
     try {
-      // 检查通知功能是否可用
-      if (!NotificationsAvailable || !Notifications) {
+      // 延迟加载通知模块
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) {
         console.log('⚠️ 通知功能不可用（Expo Go 或未安装 expo-notifications）');
         return;
       }
 
       // 请求通知权限
-      if (!Notifications || !Notifications.requestPermissionsAsync) {
+      if (!NotificationsModule.requestPermissionsAsync) {
         console.log('⚠️ Notifications API 不可用');
         return;
       }
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status } = await NotificationsModule.requestPermissionsAsync();
       if (status !== 'granted') {
         console.warn('通知权限未授予');
         return;
       }
 
       // 配置通知行为
-      if (!Notifications || !Notifications.setNotificationHandler) {
+      if (!NotificationsModule.setNotificationHandler) {
         return;
       }
-      Notifications.setNotificationHandler({
+      NotificationsModule.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
           shouldPlaySound: true,
@@ -262,7 +273,8 @@ class NotificationService {
   // 发送通知的核心方法
   private async sendNotification(notificationData: NotificationData): Promise<void> {
     try {
-      if (!NotificationsAvailable || !Notifications) {
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) {
         console.log('⚠️ 通知功能不可用，跳过发送');
         return;
       }
@@ -275,13 +287,13 @@ class NotificationService {
         body: notificationData.body,
         data: notificationData.data,
         sound: 'default',
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        priority: NotificationsModule.AndroidNotificationPriority.HIGH,
         vibrate: [0, 250, 250, 250],
       };
 
       if (notificationData.scheduledTime) {
         // 定时通知
-        await Notifications.scheduleNotificationAsync({
+        await NotificationsModule.scheduleNotificationAsync({
           content: notificationContent,
           trigger: {
             date: notificationData.scheduledTime,
@@ -289,7 +301,7 @@ class NotificationService {
         });
       } else {
         // 立即通知
-        await Notifications.scheduleNotificationAsync({
+        await NotificationsModule.scheduleNotificationAsync({
           content: notificationContent,
           trigger: null,
         });
@@ -304,8 +316,9 @@ class NotificationService {
   // 取消通知
   public async cancelNotification(notificationId: string): Promise<void> {
     try {
-      if (!NotificationsAvailable || !Notifications) return;
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return;
+      await NotificationsModule.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
       console.error('取消通知失败:', error);
     }
@@ -314,8 +327,9 @@ class NotificationService {
   // 取消所有通知
   public async cancelAllNotifications(): Promise<void> {
     try {
-      if (!NotificationsAvailable || !Notifications) return;
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return;
+      await NotificationsModule.cancelAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('取消所有通知失败:', error);
     }
@@ -324,8 +338,9 @@ class NotificationService {
   // 获取待发送的通知列表
   public async getScheduledNotifications(): Promise<any[]> {
     try {
-      if (!NotificationsAvailable || !Notifications) return [];
-      return await Notifications.getAllScheduledNotificationsAsync();
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return [];
+      return await NotificationsModule.getAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('获取待发送通知失败:', error);
       return [];
@@ -335,8 +350,9 @@ class NotificationService {
   // 检查通知权限
   public async checkPermissions(): Promise<boolean> {
     try {
-      if (!NotificationsAvailable || !Notifications) return false;
-      const { status } = await Notifications.getPermissionsAsync();
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return false;
+      const { status } = await NotificationsModule.getPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       console.error('检查通知权限失败:', error);
@@ -347,8 +363,9 @@ class NotificationService {
   // 请求通知权限
   public async requestPermissions(): Promise<boolean> {
     try {
-      if (!NotificationsAvailable || !Notifications) return false;
-      const { status } = await Notifications.requestPermissionsAsync();
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return false;
+      const { status } = await NotificationsModule.requestPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       console.error('请求通知权限失败:', error);
@@ -359,17 +376,18 @@ class NotificationService {
   // 获取Expo推送令牌
   public async getExpoPushToken(): Promise<string | null> {
     try {
-      if (!NotificationsAvailable || !Notifications) return null;
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return null;
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
+        await NotificationsModule.setNotificationChannelAsync('default', {
           name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
+          importance: NotificationsModule.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
         });
       }
 
-      const token = await Notifications.getExpoPushTokenAsync();
+      const token = await NotificationsModule.getExpoPushTokenAsync();
       return token.data;
     } catch (error) {
       console.error('获取Expo推送令牌失败:', error);
@@ -379,14 +397,15 @@ class NotificationService {
 
   // 处理通知点击事件
   public setupNotificationHandlers() {
-    if (!NotificationsAvailable || !Notifications) return;
+    const NotificationsModule = loadNotificationsModule();
+    if (!NotificationsModule) return;
     // 处理前台通知点击
-    Notifications.addNotificationReceivedListener(notification => {
+    NotificationsModule.addNotificationReceivedListener(notification => {
       console.log('收到前台通知:', notification);
     });
 
     // 处理通知点击
-    Notifications.addNotificationResponseReceivedListener(response => {
+    NotificationsModule.addNotificationResponseReceivedListener(response => {
       console.log('通知被点击:', response);
       const data = response.notification.request.content.data;
       
