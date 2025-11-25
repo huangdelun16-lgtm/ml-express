@@ -148,6 +148,18 @@ const AdminLogin: React.FC = () => {
         {/* LOGO */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <Logo size="large" />
+          <div style={{
+            color: 'white',
+            fontSize: '0.9rem',
+            fontWeight: '400',
+            fontStyle: 'italic',
+            letterSpacing: '1px',
+            opacity: 0.9,
+            marginTop: '-5px',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+          }}>
+            Delivery Services
+          </div>
         </div>
         
         <h2 style={{ 

@@ -189,13 +189,30 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
         />
         
         {/* 公司名称 */}
-        <div style={{
-          color: 'white',
-          fontSize: textSize,
-          fontWeight: 'bold',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-        }}>
-          MARKET LINK EXPRESS
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            color: 'white',
+            fontSize: textSize,
+            fontWeight: 'bold',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+          }}>
+            MARKET LINK EXPRESS
+          </div>
+          <div style={{
+            color: 'white',
+            fontSize: typeof textSize === 'string' && textSize.includes('rem') 
+              ? `calc(${textSize} - 0.8rem)` 
+              : typeof textSize === 'number' ? textSize - 8 : '0.7rem',
+            fontWeight: '400',
+            fontStyle: 'italic',
+            letterSpacing: '1px',
+            opacity: 0.9,
+            textAlign: 'right',
+            marginTop: '-2px',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+          }}>
+            Delivery Services
+          </div>
         </div>
       </div>
     );
