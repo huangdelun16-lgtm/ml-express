@@ -655,9 +655,11 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <Text style={styles.serviceIcon}>💰</Text>
+                <View style={styles.serviceIconContainer}>
+                  <Text style={styles.serviceIcon}>💰</Text>
+                </View>
                 <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
+                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service4Desc}</Text>
               </LinearGradient>
             </View>
           </View>
