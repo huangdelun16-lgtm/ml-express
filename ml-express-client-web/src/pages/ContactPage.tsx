@@ -548,16 +548,12 @@ const ContactPage: React.FC = () => {
               icon: '🤝',
               title: t.contact.businessCooperation,
               value: (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600', letterSpacing: '0.2px' }}>
-                      {t.contact.wechatId}: {t.contact.wechatValue}
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', width: '100%' }}>
+                  <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600', letterSpacing: '0.2px', textAlign: 'center' }}>
+                    {t.contact.wechatId}: {t.contact.wechatValue}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600', letterSpacing: '0.2px' }}>
-                      {t.contact.viber}: {t.contact.viberValue}
-                    </div>
+                  <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600', letterSpacing: '0.2px', textAlign: 'center' }}>
+                    {t.contact.viber}: {t.contact.viberValue}
                   </div>
                 </div>
               ),
