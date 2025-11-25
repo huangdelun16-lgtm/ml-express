@@ -610,9 +610,11 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <Text style={styles.serviceIcon}>⚡</Text>
+                <View style={styles.serviceIconContainer}>
+                  <Text style={styles.serviceIcon}>⚡</Text>
+                </View>
                 <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
+                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service1Desc}</Text>
               </LinearGradient>
             </View>
 
@@ -623,9 +625,11 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <Text style={styles.serviceIcon}>🛡️</Text>
+                <View style={styles.serviceIconContainer}>
+                  <Text style={styles.serviceIcon}>🛡️</Text>
+                </View>
                 <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
+                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service2Desc}</Text>
               </LinearGradient>
             </View>
 
@@ -636,9 +640,11 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <Text style={styles.serviceIcon}>📍</Text>
+                <View style={styles.serviceIconContainer}>
+                  <Text style={styles.serviceIcon}>📍</Text>
+                </View>
                 <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
+                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service3Desc}</Text>
               </LinearGradient>
             </View>
 
@@ -1029,7 +1035,7 @@ const styles = StyleSheet.create({
   },
   serviceCard: {
     width: (width - 56) / 2,
-    height: 180,
+    height: 200,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1039,24 +1045,29 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   serviceGradient: {
-    padding: 20,
+    padding: 18,
     height: '100%',
     justifyContent: 'flex-start',
   },
-  serviceIcon: {
-    fontSize: 40,
+  serviceIconContainer: {
+    alignItems: 'center',
     marginBottom: 12,
   },
+  serviceIcon: {
+    fontSize: 44,
+  },
   serviceTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   serviceDesc: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 18,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 20,
+    textAlign: 'center',
   },
   whyChooseUsSection: {
     paddingHorizontal: 20,
@@ -1116,13 +1127,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 36,
-    marginBottom: 12,
+    fontSize: 40,
+    marginBottom: 14,
   },
   contactLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 10,
     fontWeight: '600',
   },
   contactValue: {
@@ -1131,5 +1142,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     lineHeight: 20,
+    paddingHorizontal: 8,
   },
 });

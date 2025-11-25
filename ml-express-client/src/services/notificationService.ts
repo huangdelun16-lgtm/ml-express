@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // 通知类型定义
 export interface NotificationSettings {
@@ -41,6 +42,12 @@ class NotificationService {
   // 初始化通知服务
   private async initializeNotifications() {
     try {
+      // 检查是否在 Expo Go 中运行（Expo Go 不支持远程推送通知）
+      if (__DEV__ && !Constants.expoConfig?.extra?.eas?.projectId) {
+        console.log('⚠️ 在 Expo Go 中运行，通知功能受限。建议使用开发构建以获得完整功能。');
+        return;
+      }
+
       // 请求通知权限
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
