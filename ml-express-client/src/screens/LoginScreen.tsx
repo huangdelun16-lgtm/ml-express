@@ -239,9 +239,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoContainer: {
-    width: 85,
-    height: 85,
-    borderRadius: 42.5,
+    width: 83,
+    height: 83,
+    borderRadius: 41.5,
     backgroundColor: '#ffffff',
     padding: 10,
     marginBottom: 16,
