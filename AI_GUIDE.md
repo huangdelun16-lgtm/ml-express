@@ -798,10 +798,84 @@ CI=true npm run build
 
 ---
 
+### 🔧 最新功能更新 (2025年1月31日)
+
+#### 1. 二维码支付功能暂停 ✅
+
+**变更内容**:
+- ✅ 客户端Web：二维码支付选项显示"开发中"，默认使用现金支付
+- ✅ 客户端App：二维码支付选项显示"开发中"，默认使用现金支付
+- ✅ 注释掉未使用的 `generatePaymentQRCode` 函数，修复Netlify部署错误
+- ✅ 保留包裹二维码功能：现金支付下单后仍显示包裹二维码（供快递员扫描取件）
+
+**修改文件**:
+- `ml-express-client-web/src/pages/HomePage.tsx` - 禁用二维码支付选项，注释支付二维码生成函数
+- `ml-express-client/src/screens/PlaceOrderScreen.tsx` - 禁用二维码支付选项，保留包裹二维码显示
+
+**功能说明**:
+- **支付二维码**（已暂停）：用于客户扫码支付费用，显示"开发中"
+- **包裹二维码**（正常）：用于快递员扫描取件，无论支付方式都会显示
+
+#### 2. 客户端App UI/UX优化 ✅
+
+**登录页面优化**:
+- ✅ 支持手机号和邮箱登录（输入框提示更新）
+- ✅ 优化布局：缩小padding、logo尺寸、字体大小
+- ✅ 输入框键盘类型改为 `default` 以支持手机号输入
+
+**联系我们卡片优化**:
+- ✅ "客服热线"和"商务合作"卡片改为长方形（高度140→180）
+- ✅ 优化字体大小和行高，防止文字被截断
+- ✅ 图标和文字大小调整
+
+**整体布局优化**:
+- ✅ 所有页面（HomeScreen、LoginScreen、RegisterScreen）布局更紧凑
+- ✅ 缩小padding、margins、字体大小
+- ✅ 优化卡片尺寸和间距
+
+**图标缩小**:
+- ✅ 所有图标缩小2号（fontSize减少2-4px）
+- ✅ Icon组件默认size从20改为18
+- ✅ 包括服务图标、功能图标、联系图标、快速操作图标等
+
+**修改文件**:
+- `ml-express-client/src/screens/LoginScreen.tsx` - 登录页面优化
+- `ml-express-client/src/screens/HomeScreen.tsx` - 首页优化，联系卡片改为长方形
+- `ml-express-client/src/screens/RegisterScreen.tsx` - 注册页面优化
+- `ml-express-client/src/components/Icon.tsx` - Icon组件默认size调整
+- `ml-express-client/src/screens/MyOrdersScreen.tsx` - 订单列表页面图标优化
+- `ml-express-client/src/screens/OrderDetailScreen.tsx` - 订单详情页面图标优化
+- `ml-express-client/src/screens/TrackOrderScreen.tsx` - 跟踪页面图标优化
+
+#### 3. 通知服务优化 ✅
+
+**Expo Go兼容性**:
+- ✅ 实现条件导入 `expo-notifications`，避免在Expo Go中报错
+- ✅ 添加 `isExpoGo` 检查，动态加载通知模块
+- ✅ 在Expo Go中跳过通知服务初始化
+
+**修改文件**:
+- `ml-express-client/src/services/notificationService.ts` - 条件导入通知模块
+- `ml-express-client/App.tsx` - 条件初始化通知服务
+
+#### 4. 错误修复 ✅
+
+**语法错误修复**:
+- ✅ 修复 `PlaceOrderScreen.tsx` 中Alert.alert代码注释不完整导致的语法错误
+- ✅ 修复 `HomePage.tsx` 中未使用的 `generatePaymentQRCode` 函数导致的ESLint错误
+
+**部署错误修复**:
+- ✅ 修复Netlify部署失败（ESLint未使用变量错误）
+- ✅ 修复客户端App构建错误（语法错误）
+
+**修改文件**:
+- `ml-express-client/src/screens/PlaceOrderScreen.tsx` - 完整注释Alert.alert代码
+- `ml-express-client-web/src/pages/HomePage.tsx` - 注释未使用的函数
+
 ## 📋 版本信息
 
-*最后更新：2025年1月17日*  
-*版本：4.2.0*  
+*最后更新：2025年1月31日*  
+*版本：4.3.0*  
 *状态：生产环境运行中*  
 *架构：完全分离的客户端和后台管理系统*  
-*最新更新：客户端Web UI优化、支付方式功能完善、现金收款管理功能*
+*最新更新：二维码支付暂停、客户端App UI优化、通知服务优化、错误修复*
