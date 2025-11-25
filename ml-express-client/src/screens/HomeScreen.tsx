@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   quickActionIcon: {
-    fontSize: 38,
+    fontSize: 36,
   },
   quickActionText: {
     fontSize: 16,
