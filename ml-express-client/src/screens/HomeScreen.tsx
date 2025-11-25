@@ -99,6 +99,8 @@ export default function HomeScreen({ navigation }: any) {
       wechatValue: 'AMT349',
       viber: 'Viber',
       viberValue: '09259369349',
+      gmail: 'Gmail',
+      gmailValue: 'huangdelun16@gmail.com',
       features: '为什么选择我们',
       feature1: '7×24小时客服',
       feature2: '覆盖全缅甸主要城市',
@@ -745,6 +747,10 @@ export default function HomeScreen({ navigation }: any) {
                     <View style={styles.businessRow}>
                       <Text style={styles.contactSubLabel}>{currentT.viber}: </Text>
                       <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
+                    </View>
+                    <View style={styles.businessRow}>
+                      <Text style={styles.contactSubLabel}>{currentT.gmail}: </Text>
+                      <Text style={styles.contactSubValue}>{currentT.gmailValue}</Text>
                     </View>
                   </View>
                 </View>
