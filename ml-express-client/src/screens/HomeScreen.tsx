@@ -704,9 +704,13 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.contactGradient}
               >
-                <Text style={styles.contactIcon}>📞</Text>
-                <Text style={styles.contactLabel}>{currentT.phone}</Text>
-                <Text style={styles.contactValue}>{hotlineDisplay}</Text>
+                <View style={styles.iconContainer}>
+                  <Text style={styles.contactIcon}>📞</Text>
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.contactLabel}>{currentT.phone}</Text>
+                  <Text style={styles.contactValue}>{hotlineDisplay}</Text>
+                </View>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -720,16 +724,20 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.contactGradient}
               >
-                <Text style={styles.contactIcon}>🤝</Text>
-                <Text style={styles.contactLabel}>{currentT.email}</Text>
-                <View style={{ marginTop: 20, width: '100%', alignItems: 'center' }}>
-                  <View style={{ marginBottom: 16, alignItems: 'center', width: '100%' }}>
-                    <Text style={styles.contactSubLabel}>{currentT.wechatId}</Text>
-                    <Text style={styles.contactSubValue}>{currentT.wechatValue}</Text>
-                  </View>
-                  <View style={{ alignItems: 'center', width: '100%' }}>
-                    <Text style={styles.contactSubLabel}>{currentT.viber}</Text>
-                    <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
+                <View style={styles.iconContainer}>
+                  <Text style={styles.contactIcon}>🤝</Text>
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.contactLabel}>{currentT.email}</Text>
+                  <View style={styles.businessInfoContainer}>
+                    <View style={styles.businessRow}>
+                      <Text style={styles.contactSubLabel}>{currentT.wechatId}: </Text>
+                      <Text style={styles.contactSubValue}>{currentT.wechatValue}</Text>
+                    </View>
+                    <View style={styles.businessRow}>
+                      <Text style={styles.contactSubLabel}>{currentT.viber}: </Text>
+                      <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
+                    </View>
                   </View>
                 </View>
               </LinearGradient>
@@ -1132,52 +1140,67 @@ const styles = StyleSheet.create({
   },
   contactCard: {
     width: '100%',
-    height: 280,
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   contactGradient: {
-    padding: 28,
+    padding: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    height: '100%',
+    justifyContent: 'flex-start',
+  },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   contactIcon: {
-    fontSize: 56,
-    marginBottom: 16,
+    fontSize: 26,
+  },
+  textContainer: {
+    flex: 1,
   },
   contactLabel: {
-    fontSize: 20,
-    color: 'rgba(255, 255, 255, 0.98)',
-    marginBottom: 16,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  contactValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 28,
-    paddingHorizontal: 12,
+    fontSize: 17,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 4,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
+  contactValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  businessInfoContainer: {
+    marginTop: 2,
+  },
+  businessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   contactSubLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 6,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
   },
   contactSubValue: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: 'bold',
     color: '#ffffff',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });
