@@ -1588,33 +1588,33 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 生成收款二维码
-  const generatePaymentQRCode = async (amount: number, orderId: string) => {
-    try {
-      // 生成支付信息（可以根据实际支付方式调整）
-      const paymentInfo = {
-        amount: amount,
-        currency: 'MMK',
-        orderId: orderId,
-        merchant: 'ML Express',
-        description: '快递费用'
-      };
-      
-      const paymentString = JSON.stringify(paymentInfo);
-      const qrDataUrl = await QRCode.toDataURL(paymentString, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#2c5282',
-          light: '#ffffff'
-        }
-      });
-      
-      setPaymentQRCode(qrDataUrl);
-    } catch (error) {
-      console.error('生成收款二维码失败:', error);
-    }
-  };
+  // 生成收款二维码（已暂停，开发中）
+  // const generatePaymentQRCode = async (amount: number, orderId: string) => {
+  //   try {
+  //     // 生成支付信息（可以根据实际支付方式调整）
+  //     const paymentInfo = {
+  //       amount: amount,
+  //       currency: 'MMK',
+  //       orderId: orderId,
+  //       merchant: 'ML Express',
+  //       description: '快递费用'
+  //     };
+  //     
+  //     const paymentString = JSON.stringify(paymentInfo);
+  //     const qrDataUrl = await QRCode.toDataURL(paymentString, {
+  //       width: 300,
+  //       margin: 2,
+  //       color: {
+  //         dark: '#2c5282',
+  //         light: '#ffffff'
+  //       }
+  //     });
+  //     
+  //     setPaymentQRCode(qrDataUrl);
+  //   } catch (error) {
+  //     console.error('生成收款二维码失败:', error);
+  //   }
+  // };
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
