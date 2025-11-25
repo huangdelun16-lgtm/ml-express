@@ -159,7 +159,7 @@ const HomePage: React.FC = () => {
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr'); // 支付方式：二维码或现金
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   // const [orderData, setOrderData] = useState<any>(null);
   
@@ -1024,6 +1024,7 @@ const HomePage: React.FC = () => {
         cashPaymentDesc: '选择现金支付，骑手将在取件时代收费用',
         selectPaymentMethod: '选择支付方式',
         qrPayment: '二维码支付',
+        underDevelopment: '开发中',
         priceBreakdown: '价格明细',
         basePrice: '基础费用',
         distanceFee: '距离费用',
@@ -1156,6 +1157,7 @@ const HomePage: React.FC = () => {
         cashPaymentDesc: 'Select cash payment, courier will collect payment upon pickup',
         selectPaymentMethod: 'Select Payment Method',
         qrPayment: 'QR Code Payment',
+        underDevelopment: 'Under Development',
         basePrice: 'Base Fee',
         distanceFee: 'Distance Fee',
         packageTypeFee: 'Package Type',
@@ -1286,6 +1288,7 @@ const HomePage: React.FC = () => {
         cashPaymentDesc: 'ငွေသားပေးချေမှုကို ရွေးချယ်ပါ၊ ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်',
         selectPaymentMethod: 'ပေးချေမှုနည်းလမ်းရွေးချယ်ရန်',
         qrPayment: 'QR ကုဒ်ပေးချေမှု',
+        underDevelopment: 'ဖွံ့ဖြိုးဆဲ',
         priceBreakdown: 'စျေးနှုန်းအသေးစိတ်',
         basePrice: 'အခြေခံအခကြေး',
         distanceFee: 'အကွာအဝေးအခ',
@@ -1692,11 +1695,11 @@ const HomePage: React.FC = () => {
       const tempOrderId = generateMyanmarPackageId(orderInfo.senderAddress);
       console.log('订单ID:', tempOrderId);
       
-      // 5. 生成收款二维码（仅当选择二维码支付时）
-      console.log('生成收款二维码...');
-      if (paymentMethod === 'qr') {
-        await generatePaymentQRCode(price, tempOrderId);
-      }
+      // 5. 生成收款二维码（仅当选择二维码支付时）- 已暂停，开发中
+      // console.log('生成收款二维码...');
+      // if (paymentMethod === 'qr') {
+      //   await generatePaymentQRCode(price, tempOrderId);
+      // }
       
       // 6. 存储订单信息到Supabase数据库（替代localStorage）
       console.log('保存临时订单到数据库...');
@@ -1747,7 +1750,7 @@ const HomePage: React.FC = () => {
       }
       
       // 7. 读取或设置支付方式
-      const savedPaymentMethod = savedPendingOrder?.payment_method || paymentMethod || 'qr';
+      const savedPaymentMethod = savedPendingOrder?.payment_method || paymentMethod || 'cash';
       setPaymentMethod(savedPaymentMethod);
       
       // 8. 显示支付模态框
@@ -3408,64 +3411,38 @@ const HomePage: React.FC = () => {
                 flexDirection: window.innerWidth < 768 ? 'column' : 'row',
                 marginBottom: '1rem'
               }}>
-                {/* 二维码支付选项 */}
+                {/* 二维码支付选项 - 开发中 */}
                 <button
-                  onClick={async () => {
-                    setPaymentMethod('qr');
-                    // 更新数据库中的支付方式
-                    if (tempOrderId) {
-                      try {
-                        const dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(tempOrderId);
-                        if (dbPendingOrder) {
-                          // 更新数据库中的支付方式
-                          const { error } = await supabase
-                            .from('pending_orders')
-                            .update({ payment_method: 'qr' })
-                            .eq('temp_order_id', tempOrderId);
-                          if (error) {
-                            console.error('更新支付方式失败:', error);
-                          }
-                        }
-                      } catch (err) {
-                        console.error('更新支付方式异常:', err);
-                      }
-                    }
-                    // 同时更新localStorage（向后兼容）
-                    const pendingOrder = localStorage.getItem('pendingOrder');
-                    if (pendingOrder) {
-                      const orderInfo = JSON.parse(pendingOrder);
-                      orderInfo.paymentMethod = 'qr';
-                      localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
-                    }
+                  onClick={() => {
+                    // 禁用点击，显示提示
+                    alert(t.ui.underDevelopment || '开发中');
                   }}
+                  disabled={true}
                   style={{
                     flex: 1,
                     padding: '1rem',
                     borderRadius: '10px',
-                    border: paymentMethod === 'qr' ? '3px solid #2c5282' : '2px solid #dee2e6',
-                    background: paymentMethod === 'qr' ? '#e3f2fd' : 'white',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    border: '2px solid #d1d5db',
+                    background: '#f3f4f6',
+                    cursor: 'not-allowed',
+                    opacity: 0.6,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseOver={(e) => {
-                    if (paymentMethod !== 'qr') {
-                      e.currentTarget.style.background = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#2c5282';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (paymentMethod !== 'qr') {
-                      e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }
+                    gap: '0.5rem',
+                    position: 'relative'
                   }}
                 >
                   <div style={{ fontSize: '2rem' }}>📱</div>
-                  <div style={{ fontWeight: 'bold', color: '#2c5282' }}>{t.ui.qrPayment}</div>
+                  <div style={{ fontWeight: 'bold', color: '#6b7280' }}>{t.ui.qrPayment}</div>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#ef4444', 
+                    fontWeight: 'bold',
+                    marginTop: '0.25rem'
+                  }}>
+                    {t.ui.underDevelopment || '开发中'}
+                  </div>
                 </button>
                 
                 {/* 现金支付选项 */}
@@ -3547,8 +3524,8 @@ const HomePage: React.FC = () => {
               )}
             </div>
 
-            {/* 收款二维码（仅当选择二维码支付时显示） */}
-            {paymentMethod === 'qr' && (
+            {/* 收款二维码（仅当选择二维码支付时显示）- 已暂停，开发中 */}
+            {false && paymentMethod === 'qr' && (
               <div style={{
                 background: '#f8f9fa',
                 padding: '1.5rem',
@@ -3660,7 +3637,7 @@ const HomePage: React.FC = () => {
                     const packageId = orderInfo.tempOrderId || generateMyanmarPackageId(orderInfo.senderAddress);
                     
                     // 获取当前选择的支付方式（优先使用当前状态，如果没有则使用存储的）
-                    const currentPaymentMethod = paymentMethod || orderInfo.paymentMethod || (dbPendingOrder?.payment_method) || 'qr';
+                    const currentPaymentMethod = paymentMethod || orderInfo.paymentMethod || (dbPendingOrder?.payment_method) || 'cash';
                     
                     // 创建包裹数据 - 使用数据库字段名
                     // 确保 weight 字段始终有值（数据库要求非空）

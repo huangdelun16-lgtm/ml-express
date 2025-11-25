@@ -112,8 +112,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [qrOrderId, setQrOrderId] = useState('');
   const [qrOrderPrice, setQrOrderPrice] = useState('');
   
-  // 支付方式
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
+  // 支付方式（默认现金，二维码开发中）
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash');
   
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
@@ -912,13 +912,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
       if (result?.success) {
         await persistOrderLocally(offlinePayload, 'synced');
         syncPendingOrders();
-        // 根据支付方式决定是否显示QR码
-        if (paymentMethod === 'qr') {
-          // 二维码支付：显示QR码模态框
-          setQrOrderId(orderId);
-          setQrOrderPrice(isCalculated ? calculatedPrice : price);
-          setShowQRCodeModal(true);
-        } else {
+        // 根据支付方式决定是否显示QR码（二维码支付已暂停，开发中）
+        // if (paymentMethod === 'qr') {
+        //   // 二维码支付：显示QR码模态框
+        //   setQrOrderId(orderId);
+        //   setQrOrderPrice(isCalculated ? calculatedPrice : price);
+          // setShowQRCodeModal(true); // 二维码支付已暂停，开发中
+        }
+        // 统一显示成功提示（不再区分支付方式）
+        {
           // 现金支付：显示成功提示，不显示QR码
           Alert.alert(
             currentT.orderSuccess,
@@ -1354,27 +1356,35 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
             
             <View style={styles.paymentMethodContainer}>
-              {/* 二维码支付 */}
+              {/* 二维码支付 - 开发中 */}
               <TouchableOpacity
                 style={[
                   styles.paymentMethodOption,
-                  paymentMethod === 'qr' && styles.paymentMethodOptionActive
+                  { opacity: 0.6, backgroundColor: '#f3f4f6' }
                 ]}
-                onPress={() => setPaymentMethod('qr')}
-                activeOpacity={0.7}
+                onPress={() => {
+                  Alert.alert(
+                    language === 'zh' ? '开发中' : language === 'en' ? 'Under Development' : 'ဖွံ့ဖြိုးဆဲ',
+                    language === 'zh' ? '二维码支付功能正在开发中，请选择现金支付' : 
+                    language === 'en' ? 'QR code payment is under development, please use cash payment' :
+                    'QR ကုဒ်ပေးချေမှုသည် ဖွံ့ဖြိုးဆဲဖြစ်ပြီး ငွေသားပေးချေမှုကို ရွေးချယ်ပါ'
+                  );
+                }}
+                activeOpacity={0.5}
+                disabled={true}
               >
-                <View style={styles.paymentMethodRadio}>
-                  {paymentMethod === 'qr' && <View style={styles.paymentMethodRadioInner} />}
+                <View style={[styles.paymentMethodRadio, { borderColor: '#9ca3af' }]}>
+                  {/* 禁用单选按钮 */}
                 </View>
                 <View style={styles.paymentMethodContent}>
                   <Text style={[
                     styles.paymentMethodLabel,
-                    paymentMethod === 'qr' && styles.paymentMethodLabelActive
+                    { color: '#6b7280' }
                   ]}>
-                    📱 二维码支付
+                    📱 {language === 'zh' ? '二维码支付' : language === 'en' ? 'QR Code Payment' : 'QR ကုဒ်ပေးချေမှု'}
                   </Text>
-                  <Text style={styles.paymentMethodDesc}>
-                    扫描二维码完成支付
+                  <Text style={[styles.paymentMethodDesc, { color: '#ef4444', fontWeight: 'bold' }]}>
+                    {language === 'zh' ? '开发中' : language === 'en' ? 'Under Development' : 'ဖွံ့ဖြိုးဆဲ'}
                   </Text>
                 </View>
               </TouchableOpacity>
