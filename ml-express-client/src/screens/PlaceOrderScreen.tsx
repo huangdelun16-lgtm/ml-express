@@ -505,7 +505,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   }, [useMyInfo]);
 
   // 计算价格
-  // 使用当前位置（在地图Modal中）
+  // 使用当前位置（在地图Modal中）- 优化：使用缓存和超时
   const useCurrentLocationInMap = async () => {
     try {
       showLoading('获取位置中...');
@@ -517,7 +517,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      // 设置超时和优化选项
+      const locationPromise = Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
+        maximumAge: 60000, // 接受1分钟内的缓存位置
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('获取位置超时')), 5000) // 5秒超时
+      );
+      
+      const location = await Promise.race([locationPromise, timeoutPromise]) as any;
       setSelectedLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -527,7 +537,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
     } catch (error) {
       hideLoading();
       console.error('获取位置失败:', error);
-      Alert.alert('错误', '获取位置失败');
+      Alert.alert('错误', '获取位置失败，请手动选择位置');
     }
   };
 
@@ -573,21 +583,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
-  // 打开地图选择器
+  // 打开地图选择器 - 优化：先打开地图，异步获取位置
   const openMapSelector = async (type: 'sender' | 'receiver') => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('提示', '需要位置权限才能使用地图');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const currentLocation = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-      setSelectedLocation(currentLocation);
       setMapType(type);
       
       // 如果已有地址，填充到输入框
@@ -595,18 +593,78 @@ export default function PlaceOrderScreen({ navigation }: any) {
         const addressLines = senderAddress.split('\n');
         const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
         setMapAddressInput(addressWithoutCoords);
+        // 如果已有坐标，使用已有坐标
+        if (senderCoordinates && senderCoordinates.lat && senderCoordinates.lng) {
+          setSelectedLocation({
+            latitude: senderCoordinates.lat,
+            longitude: senderCoordinates.lng,
+          });
+          setShowMapModal(true);
+          return; // 直接使用已有坐标，不需要获取当前位置
+        }
       } else if (type === 'receiver' && receiverAddress) {
         const addressLines = receiverAddress.split('\n');
         const addressWithoutCoords = addressLines.filter(line => !line.includes('📍')).join('\n');
         setMapAddressInput(addressWithoutCoords);
+        // 如果已有坐标，使用已有坐标
+        if (receiverCoordinates && receiverCoordinates.lat && receiverCoordinates.lng) {
+          setSelectedLocation({
+            latitude: receiverCoordinates.lat,
+            longitude: receiverCoordinates.lng,
+          });
+          setShowMapModal(true);
+          return; // 直接使用已有坐标，不需要获取当前位置
+        }
       } else {
         setMapAddressInput('');
       }
       
+      // 默认位置：曼德勒（缅甸主要城市）
+      const defaultLocation = {
+        latitude: 21.9588,
+        longitude: 96.0891,
+      };
+      
+      // 先使用默认位置打开地图（立即响应）
+      setSelectedLocation(defaultLocation);
       setShowMapModal(true);
+      
+      // 异步获取当前位置（不阻塞UI）
+      (async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            console.log('位置权限未授予，使用默认位置');
+            return;
+          }
+
+          // 设置超时，避免等待太久
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
+            maximumAge: 60000, // 接受1分钟内的缓存位置
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('获取位置超时')), 3000) // 3秒超时
+          );
+          
+          const location = await Promise.race([locationPromise, timeoutPromise]) as any;
+          const currentLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          
+          // 更新地图位置（如果获取成功）
+          setSelectedLocation(currentLocation);
+        } catch (error) {
+          console.log('获取当前位置失败，使用默认位置:', error);
+          // 使用默认位置，不显示错误提示
+        }
+      })();
     } catch (error) {
       console.error('打开地图失败:', error);
-      Alert.alert('错误', '打开地图失败');
+      // 即使出错也打开地图，使用默认位置
+      setShowMapModal(true);
     }
   };
 
