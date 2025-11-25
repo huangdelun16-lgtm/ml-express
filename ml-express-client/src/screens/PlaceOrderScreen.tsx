@@ -917,12 +917,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
         //   // 二维码支付：显示QR码模态框
         //   setQrOrderId(orderId);
         //   setQrOrderPrice(isCalculated ? calculatedPrice : price);
-          // setShowQRCodeModal(true); // 二维码支付已暂停，开发中
-        }
+        //   setShowQRCodeModal(true); // 二维码支付已暂停，开发中
+        // } else {
+        //   // 现金支付：显示成功提示，不显示QR码
+        // }
         // 统一显示成功提示（不再区分支付方式）
-        {
-          // 现金支付：显示成功提示，不显示QR码
-          Alert.alert(
+        Alert.alert(
             currentT.orderSuccess,
             `${language === 'zh' ? '订单创建成功！' : language === 'en' ? 'Order created successfully!' : 'အော်ဒါဖန်တီးခြင်းအောင်မြင်ပါသည်!'}\n${language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}：${orderId}\n${language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}：${isCalculated ? calculatedPrice : price} MMK\n${language === 'zh' ? '支付方式' : language === 'en' ? 'Payment Method' : 'ပေးချေမှုနည်းလမ်း'}：${language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}\n\n${language === 'zh' ? '骑手将在取件时代收费用。' : language === 'en' ? 'The courier will collect payment upon pickup.' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်။'}`,
             [
@@ -939,8 +939,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 }
               }
             ]
-          );
-        }
+        );
         // 重置表单
         resetForm();
       } else {
