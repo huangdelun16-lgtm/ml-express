@@ -719,7 +719,7 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         {/* Bottom Spacing */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 60 }} />
       </Animated.ScrollView>
     </View>
   );
@@ -786,25 +786,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   statsContainer: {
-    paddingHorizontal: 20,
-    marginTop: -20,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    marginTop: -18,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   statCard: {
-    width: (width - 56) / 2,
-    height: 110,
-    borderRadius: 16,
+    width: (width - 48) / 2,
+    height: 100,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   statGradient: {
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
     height: '100%',
     justifyContent: 'center',
