@@ -6,16 +6,22 @@ import Constants from 'expo-constants';
 let Notifications: any = null;
 let NotificationsAvailable = false;
 
-try {
-  // 检查是否在开发构建中（而不是 Expo Go）
-  if (!__DEV__ || Constants.expoConfig?.extra?.eas?.projectId) {
-    Notifications = require('expo-notifications');
+// 检查是否在 Expo Go 中运行
+const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+
+if (!isExpoGo) {
+  // 只在非 Expo Go 环境中尝试导入
+  try {
+    // 使用动态 require 避免在导入时触发错误
+    const notificationsModule = require('expo-notifications');
+    Notifications = notificationsModule;
     NotificationsAvailable = true;
-  } else {
-    console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用。使用开发构建以获得完整功能。');
+  } catch (error) {
+    console.warn('⚠️ expo-notifications 导入失败:', error);
+    NotificationsAvailable = false;
   }
-} catch (error) {
-  console.warn('⚠️ expo-notifications 不可用:', error);
+} else {
+  console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用。使用开发构建以获得完整功能。');
 }
 
 // 通知类型定义
