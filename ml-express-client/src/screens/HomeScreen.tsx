@@ -722,12 +722,12 @@ export default function HomeScreen({ navigation }: any) {
               >
                 <Text style={styles.contactIcon}>🤝</Text>
                 <Text style={styles.contactLabel}>{currentT.email}</Text>
-                <View style={{ marginTop: 12, width: '100%' }}>
-                  <View style={{ marginBottom: 10, alignItems: 'flex-start' }}>
+                <View style={{ marginTop: 20, width: '100%', alignItems: 'center' }}>
+                  <View style={{ marginBottom: 16, alignItems: 'center', width: '100%' }}>
                     <Text style={styles.contactSubLabel}>{currentT.wechatId}</Text>
                     <Text style={styles.contactSubValue}>{currentT.wechatValue}</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-start' }}>
+                  <View style={{ alignItems: 'center', width: '100%' }}>
                     <Text style={styles.contactSubLabel}>{currentT.viber}</Text>
                     <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
                   </View>
@@ -1127,55 +1127,57 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   contactGrid: {
-    flexDirection: 'row',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 16,
   },
   contactCard: {
-    flex: 1,
-    height: 200,
-    borderRadius: 20,
+    width: '100%',
+    height: 280,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
   },
   contactGradient: {
-    padding: 20,
+    padding: 28,
     alignItems: 'center',
     height: '100%',
     justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 42,
-    marginBottom: 12,
+    fontSize: 56,
+    marginBottom: 16,
   },
   contactLabel: {
-    fontSize: 16,
+    fontSize: 20,
     color: 'rgba(255, 255, 255, 0.98)',
-    marginBottom: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    marginBottom: 16,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   contactValue: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 8,
+    lineHeight: 28,
+    paddingHorizontal: 12,
+    letterSpacing: 0.5,
   },
   contactSubLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginBottom: 4,
-    fontWeight: '500',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   contactSubValue: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
     color: '#ffffff',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
 });
