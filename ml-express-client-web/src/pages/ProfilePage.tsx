@@ -405,22 +405,37 @@ const ProfilePage: React.FC = () => {
               }}
             />
             
-            {/* 公司名称 - 与其他页面一致的单行显示 */}
-            <span style={{
-              color: 'white',
-              fontSize: window.innerWidth < 768 ? '1.6rem' : '2.2rem',
-              fontWeight: '800',
-              textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-              background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              letterSpacing: '-1px',
-              lineHeight: '1.1',
-              whiteSpace: 'nowrap'
-            }}>
-              MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
-            </span>
+            {/* 公司名称 + 副标题 */}
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+              <span style={{
+                color: 'white',
+                fontSize: window.innerWidth < 768 ? '1.6rem' : '2.2rem',
+                fontWeight: '800',
+                textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
+                background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                letterSpacing: '-1px',
+                whiteSpace: 'nowrap'
+              }}>
+                MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+              </span>
+              <span style={{
+                color: 'white',
+                fontSize: window.innerWidth < 768 ? '0.6rem' : '0.8rem',
+                fontStyle: 'italic',
+                fontWeight: '400',
+                letterSpacing: '1px',
+                opacity: 0.9,
+                marginTop: '-2px',
+                textAlign: 'right',
+                paddingRight: '4px',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+              }}>
+                Delivery Services
+              </span>
+            </div>
           </div>
 
           <div style={{
