@@ -621,11 +621,13 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconContainer}>
+                <View style={styles.iconContainer}>
                   <Text style={styles.serviceIcon}>⚡</Text>
                 </View>
-                <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
-                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service1Desc}</Text>
+                <View style={styles.textContainer}>
+                  <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
+                  <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
+                </View>
               </LinearGradient>
             </View>
 
@@ -636,11 +638,13 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconContainer}>
+                <View style={styles.iconContainer}>
                   <Text style={styles.serviceIcon}>🛡️</Text>
                 </View>
-                <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
-                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service2Desc}</Text>
+                <View style={styles.textContainer}>
+                  <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
+                  <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
+                </View>
               </LinearGradient>
             </View>
 
@@ -651,11 +655,13 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconContainer}>
+                <View style={styles.iconContainer}>
                   <Text style={styles.serviceIcon}>📍</Text>
                 </View>
-                <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
-                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service3Desc}</Text>
+                <View style={styles.textContainer}>
+                  <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
+                  <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
+                </View>
               </LinearGradient>
             </View>
 
@@ -666,11 +672,13 @@ export default function HomeScreen({ navigation }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.serviceGradient}
               >
-                <View style={styles.serviceIconContainer}>
+                <View style={styles.iconContainer}>
                   <Text style={styles.serviceIcon}>💰</Text>
                 </View>
-                <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
-                <Text style={styles.serviceDesc} numberOfLines={3}>{currentT.service4Desc}</Text>
+                <View style={styles.textContainer}>
+                  <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
+                  <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
+                </View>
               </LinearGradient>
             </View>
           </View>
@@ -1058,45 +1066,39 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 16,
   },
   serviceCard: {
-    width: (width - 56) / 2,
-    height: 200,
-    borderRadius: 16,
+    width: '100%',
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 6,
   },
   serviceGradient: {
-    padding: 18,
-    height: '100%',
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-start',
   },
-  serviceIconContainer: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   serviceIcon: {
-    fontSize: 42,
+    fontSize: 26,
   },
   serviceTitle: {
     fontSize: 17,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 10,
-    textAlign: 'center',
+    marginBottom: 4,
   },
   serviceDesc: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: 'rgba(255, 255, 255, 0.85)',
     lineHeight: 20,
-    textAlign: 'center',
+    fontWeight: '500',
   },
   whyChooseUsSection: {
     paddingHorizontal: 16,
