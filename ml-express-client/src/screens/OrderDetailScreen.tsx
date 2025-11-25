@@ -938,7 +938,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 16,
@@ -986,7 +986,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   phoneButtonText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#2563eb',
     fontWeight: '600',
   },

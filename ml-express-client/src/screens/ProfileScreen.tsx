@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statIcon: {
-    fontSize: 32,
+    fontSize: 30,
     marginBottom: 8,
   },
   statValue: {
@@ -960,15 +960,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   actionIconText: {
-    fontSize: 28,
+    fontSize: 26,
   },
   actionLabel: {
     fontSize: 12,
@@ -999,7 +999,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    fontSize: 24,
+    fontSize: 22,
     marginRight: 12,
   },
   settingLabel: {
@@ -1007,7 +1007,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   settingArrow: {
-    fontSize: 24,
+    fontSize: 22,
     color: '#9ca3af',
   },
   settingRight: {

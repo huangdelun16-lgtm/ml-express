@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    fontSize: 20,
+    fontSize: 18,
     marginRight: 12,
   },
   searchInput: {
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   notFoundIcon: {
-    fontSize: 80,
+    fontSize: 78,
     marginBottom: 20,
   },
   notFoundText: {
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusIcon: {
-    fontSize: 60,
+    fontSize: 58,
     marginBottom: 16,
   },
   statusText: {
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 16,

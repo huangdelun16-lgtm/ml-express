@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIcon: {
-    fontSize: 80,
+    fontSize: 78,
     marginBottom: 20,
   },
   emptyText: {
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   orderInfoIcon: {
-    fontSize: 16,
+    fontSize: 14,
     marginRight: 8,
   },
   orderInfoLabel: {

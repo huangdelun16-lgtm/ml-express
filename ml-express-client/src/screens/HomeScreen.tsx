@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   quickActionIcon: {
-    fontSize: 40,
+    fontSize: 38,
   },
   quickActionText: {
     fontSize: 16,
@@ -894,7 +894,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   noOrdersIcon: {
-    fontSize: 60,
+    fontSize: 58,
     marginBottom: 16,
   },
   noOrdersText: {
@@ -999,7 +999,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   guestPromptIcon: {
-    fontSize: 60,
+    fontSize: 58,
     marginBottom: 16,
   },
   guestPromptTitle: {
@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   serviceIcon: {
-    fontSize: 44,
+    fontSize: 42,
   },
   serviceTitle: {
     fontSize: 17,
@@ -1093,7 +1093,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   featureIcon: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#10b981',
     marginRight: 12,
     fontWeight: 'bold',
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contactIcon: {
-    fontSize: 40,
+    fontSize: 38,
     marginBottom: 14,
   },
   contactLabel: {

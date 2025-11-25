@@ -1013,7 +1013,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <PackageIcon size={20} color="#1e293b" />
+                <PackageIcon size={18} color="#1e293b" />
                 <Text style={styles.sectionTitle}> {currentT.senderInfo}</Text>
               </View>
               <View style={styles.switchContainer}>
@@ -1087,7 +1087,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         <FadeInView delay={200}>
           <View style={styles.section}>
             <View style={styles.sectionTitleContainer}>
-              <LocationIcon size={20} color="#1e293b" />
+              <LocationIcon size={18} color="#1e293b" />
               <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
             </View>
 
@@ -1151,7 +1151,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         <FadeInView delay={300}>
           <View style={styles.section}>
             <View style={styles.sectionTitleContainer}>
-              <PackageIcon size={20} color="#1e293b" />
+              <PackageIcon size={18} color="#1e293b" />
               <Text style={styles.sectionTitle}> {currentT.packageInfo}</Text>
             </View>
 
@@ -1251,7 +1251,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <MoneyIcon size={20} color="#1e293b" />
+              <MoneyIcon size={18} color="#1e293b" />
               <Text style={styles.sectionTitle}> {currentT.priceEstimate}</Text>
             </View>
             <TouchableOpacity
@@ -1349,7 +1349,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         <ScaleInView delay={450}>
           <View style={styles.section}>
             <View style={styles.sectionTitleContainer}>
-              <MoneyIcon size={20} color="#1e293b" />
+              <MoneyIcon size={18} color="#1e293b" />
               <Text style={styles.sectionTitle}> 选择支付方式</Text>
             </View>
             
@@ -2403,7 +2403,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 20,
   },
   infoModalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
   },
@@ -2632,7 +2632,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
   },
   timePickerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
@@ -2661,7 +2661,7 @@ const baseStyles = StyleSheet.create({
     marginBottom: 24,
   },
   quickSelectTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 12,
