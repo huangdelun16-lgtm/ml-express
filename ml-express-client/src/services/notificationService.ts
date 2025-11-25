@@ -1,7 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+
+// 条件性导入 expo-notifications，避免在 Expo Go 中报错
+let Notifications: any = null;
+let NotificationsAvailable = false;
+
+try {
+  // 检查是否在开发构建中（而不是 Expo Go）
+  if (!__DEV__ || Constants.expoConfig?.extra?.eas?.projectId) {
+    Notifications = require('expo-notifications');
+    NotificationsAvailable = true;
+  } else {
+    console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用。使用开发构建以获得完整功能。');
+  }
+} catch (error) {
+  console.warn('⚠️ expo-notifications 不可用:', error);
+}
 
 // 通知类型定义
 export interface NotificationSettings {
@@ -42,13 +57,17 @@ class NotificationService {
   // 初始化通知服务
   private async initializeNotifications() {
     try {
-      // 检查是否在 Expo Go 中运行（Expo Go 不支持远程推送通知）
-      if (__DEV__ && !Constants.expoConfig?.extra?.eas?.projectId) {
-        console.log('⚠️ 在 Expo Go 中运行，通知功能受限。建议使用开发构建以获得完整功能。');
+      // 检查通知功能是否可用
+      if (!NotificationsAvailable || !Notifications) {
+        console.log('⚠️ 通知功能不可用（Expo Go 或未安装 expo-notifications）');
         return;
       }
 
       // 请求通知权限
+      if (!Notifications || !Notifications.requestPermissionsAsync) {
+        console.log('⚠️ Notifications API 不可用');
+        return;
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
         console.warn('通知权限未授予');
@@ -56,6 +75,9 @@ class NotificationService {
       }
 
       // 配置通知行为
+      if (!Notifications || !Notifications.setNotificationHandler) {
+        return;
+      }
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
@@ -234,6 +256,10 @@ class NotificationService {
   // 发送通知的核心方法
   private async sendNotification(notificationData: NotificationData): Promise<void> {
     try {
+      if (!NotificationsAvailable || !Notifications) {
+        console.log('⚠️ 通知功能不可用，跳过发送');
+        return;
+      }
       if (!this.settings?.pushNotifications) {
         return;
       }
@@ -272,6 +298,7 @@ class NotificationService {
   // 取消通知
   public async cancelNotification(notificationId: string): Promise<void> {
     try {
+      if (!NotificationsAvailable || !Notifications) return;
       await Notifications.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
       console.error('取消通知失败:', error);
@@ -281,6 +308,7 @@ class NotificationService {
   // 取消所有通知
   public async cancelAllNotifications(): Promise<void> {
     try {
+      if (!NotificationsAvailable || !Notifications) return;
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('取消所有通知失败:', error);
@@ -288,8 +316,9 @@ class NotificationService {
   }
 
   // 获取待发送的通知列表
-  public async getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+  public async getScheduledNotifications(): Promise<any[]> {
     try {
+      if (!NotificationsAvailable || !Notifications) return [];
       return await Notifications.getAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('获取待发送通知失败:', error);
@@ -300,6 +329,7 @@ class NotificationService {
   // 检查通知权限
   public async checkPermissions(): Promise<boolean> {
     try {
+      if (!NotificationsAvailable || !Notifications) return false;
       const { status } = await Notifications.getPermissionsAsync();
       return status === 'granted';
     } catch (error) {
@@ -311,6 +341,7 @@ class NotificationService {
   // 请求通知权限
   public async requestPermissions(): Promise<boolean> {
     try {
+      if (!NotificationsAvailable || !Notifications) return false;
       const { status } = await Notifications.requestPermissionsAsync();
       return status === 'granted';
     } catch (error) {
@@ -322,6 +353,7 @@ class NotificationService {
   // 获取Expo推送令牌
   public async getExpoPushToken(): Promise<string | null> {
     try {
+      if (!NotificationsAvailable || !Notifications) return null;
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',
@@ -341,6 +373,7 @@ class NotificationService {
 
   // 处理通知点击事件
   public setupNotificationHandlers() {
+    if (!NotificationsAvailable || !Notifications) return;
     // 处理前台通知点击
     Notifications.addNotificationReceivedListener(notification => {
       console.log('收到前台通知:', notification);
