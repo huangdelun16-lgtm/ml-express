@@ -24,21 +24,21 @@ export default function WelcomeScreen({ navigation }: any) {
   const t = {
     zh: {
       skip: '跳过',
-      welcomeTitle: '欢迎使用 / Welcome / ကြိုဆိုပါတယ်',
+      welcomeTitle: '欢迎使用',
       welcomeSubtitle: 'MARKET LINK EXPRESS',
       description: '快速、安全、可靠的同城配送服务',
       start: '立即体验',
     },
     en: {
       skip: 'Skip',
-      welcomeTitle: 'Welcome / 欢迎使用 / ကြိုဆိုပါတယ်',
+      welcomeTitle: 'Welcome to',
       welcomeSubtitle: 'MARKET LINK EXPRESS',
       description: 'Fast, Safe, and Reliable Same-City Delivery',
       start: 'Get Started',
     },
     my: {
       skip: 'ကျော်သွားမည်',
-      welcomeTitle: 'ကြိုဆိုပါတယ် / Welcome / 欢迎使用',
+      welcomeTitle: 'ကြိုဆိုပါတယ်',
       welcomeSubtitle: 'MARKET LINK EXPRESS',
       description: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်ရသော ပို့ဆောင်ရေး',
       start: 'စတင်လိုက်ပါ',
