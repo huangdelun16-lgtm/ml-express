@@ -3236,6 +3236,40 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                                 发放
                               </button>
                             )}
+
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(`确定要删除骑手 ${salary.courier_id} 的工资记录吗？\n此操作不可恢复！`)) return;
+                                
+                                setLoading(true);
+                                try {
+                                  const success = await courierSalaryService.deleteSalary(salary.id!);
+                                  if (success) {
+                                    window.alert('删除成功！');
+                                    await loadRecords();
+                                  } else {
+                                    window.alert('删除失败！');
+                                  }
+                                } catch (error) {
+                                  console.error('删除工资记录失败:', error);
+                                  window.alert('删除失败！');
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: '600'
+                              }}
+                            >
+                              删除
+                            </button>
                           </div>
                         </td>
                       </tr>
