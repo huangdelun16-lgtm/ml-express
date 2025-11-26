@@ -13,7 +13,8 @@ function loadNotificationsModule() {
   }
 
   // 检查是否在 Expo Go 中运行
-  const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+  // Constants.appOwnership === 'expo' 是判断 Expo Go 的标准方法
+  const isExpoGo = Constants.appOwnership === 'expo' || (__DEV__ && !Constants.expoConfig?.extra?.eas?.projectId);
   
   if (isExpoGo) {
     console.log('⚠️ 在 Expo Go 中运行，通知功能已禁用');
