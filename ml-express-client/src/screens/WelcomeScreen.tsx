@@ -47,6 +47,20 @@ export default function WelcomeScreen({ navigation }: any) {
 
   const currentT = t[language] || t.zh;
 
+  const navigateToNextScreen = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        navigation.replace('Main');
+      } else {
+        navigation.replace('Login');
+      }
+    } catch (error) {
+      console.error('Navigation check failed:', error);
+      navigation.replace('Login');
+    }
+  };
+
   useEffect(() => {
     // 动画效果
     Animated.parallel([
@@ -63,6 +77,7 @@ export default function WelcomeScreen({ navigation }: any) {
       }),
     ]).start();
 
+    // 倒计时逻辑
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -76,24 +91,6 @@ export default function WelcomeScreen({ navigation }: any) {
 
     return () => clearInterval(timer);
   }, []);
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// ...
-
-  const navigateToNextScreen = async () => {
-    try {
-      const userId = await AsyncStorage.getItem('userId');
-      if (userId) {
-        navigation.replace('Main');
-      } else {
-        navigation.replace('Login');
-      }
-    } catch (error) {
-      console.error('Navigation check failed:', error);
-      navigation.replace('Login');
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -287,4 +284,3 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
-
