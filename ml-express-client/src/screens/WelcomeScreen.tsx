@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 
 const { width, height } = Dimensions.get('window');
@@ -62,12 +63,11 @@ export default function WelcomeScreen({ navigation }: any) {
       }),
     ]).start();
 
-    // 倒计时逻辑
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigateToLogin();
+          navigateToNextScreen();
           return 0;
         }
         return prev - 1;
@@ -77,8 +77,22 @@ export default function WelcomeScreen({ navigation }: any) {
     return () => clearInterval(timer);
   }, []);
 
-  const navigateToLogin = () => {
-    navigation.replace('Login');
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ...
+
+  const navigateToNextScreen = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        navigation.replace('Main');
+      } else {
+        navigation.replace('Login');
+      }
+    } catch (error) {
+      console.error('Navigation check failed:', error);
+      navigation.replace('Login');
+    }
   };
 
   return (
@@ -93,7 +107,7 @@ export default function WelcomeScreen({ navigation }: any) {
         {/* 跳过按钮 */}
         <TouchableOpacity
           style={styles.skipButton}
-          onPress={navigateToLogin}
+          onPress={navigateToNextScreen}
           activeOpacity={0.7}
         >
           <Text style={styles.skipText}>
@@ -148,7 +162,7 @@ export default function WelcomeScreen({ navigation }: any) {
         >
           <TouchableOpacity
             style={styles.startButton}
-            onPress={navigateToLogin}
+            onPress={navigateToNextScreen}
             activeOpacity={0.8}
           >
             <LinearGradient

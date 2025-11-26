@@ -124,7 +124,7 @@ export default function App() {
             }}
           >
           <Stack.Navigator
-            initialRouteName={isLoggedIn ? "Main" : "Welcome"}
+            initialRouteName="Welcome"
             screenOptions={{
               headerShown: false,
                 animation: 'slide_from_right',
