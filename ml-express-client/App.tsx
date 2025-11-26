@@ -13,6 +13,7 @@ import NetworkStatus from './src/components/NetworkStatus';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import PlaceOrderScreen from './src/screens/PlaceOrderScreen';
@@ -31,6 +32,7 @@ const linking = {
   config: {
     screens: {
       Login: 'login',
+      Welcome: 'welcome',
       Register: 'register',
       Main: '',
       PlaceOrder: 'place-order',
@@ -121,10 +123,10 @@ export default function App() {
               // 例如：页面访问统计
             }}
           >
-            <Stack.Navigator
-              initialRouteName={isLoggedIn ? "Main" : "Login"}
-              screenOptions={{
-                headerShown: false,
+          <Stack.Navigator
+            initialRouteName={isLoggedIn ? "Main" : "Welcome"}
+            screenOptions={{
+              headerShown: false,
                 animation: 'slide_from_right',
                 animationDuration: 300,
                 // 优化性能：禁用不必要的动画
@@ -133,6 +135,15 @@ export default function App() {
                 lazy: true,
               }}
             >
+            {/* 欢迎页面（广告/通知） */}
+            <Stack.Screen 
+              name="Welcome" 
+              component={WelcomeScreen}
+              options={{
+                animation: 'fade',
+              }}
+            />
+            
             {/* 登录注册页面 */}
             <Stack.Screen 
               name="Login" 
