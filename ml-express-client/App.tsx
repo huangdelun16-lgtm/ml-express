@@ -8,6 +8,7 @@ import { AppProvider } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
+import { GlobalToast } from './src/components/GlobalToast';
 // Sentry 已暂时禁用以避免依赖问题
 // import { sentryService } from './src/services/SentryService';
 
@@ -112,6 +113,7 @@ export default function App() {
       <AppProvider>
         <LoadingProvider>
           <NetworkStatus />
+          <GlobalToast />
           <NavigationContainer 
             linking={linking}
             onReady={() => {

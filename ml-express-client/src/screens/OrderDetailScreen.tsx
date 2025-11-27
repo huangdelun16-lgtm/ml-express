@@ -20,6 +20,7 @@ import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
+import BackToHomeButton from '../components/BackToHomeButton';
 
 const { width } = Dimensions.get('window');
 
@@ -421,8 +422,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     );
   }
 
-  return (
-    <View style={styles.container}>
+    return (
+      <View style={styles.container}>
+        <BackToHomeButton navigation={navigation} position="topRight" />
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

@@ -2911,6 +2911,63 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   >
                     💳 批量发放 ({selectedSalaries.length})
                   </button>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`确定要批量删除 ${selectedSalaries.length} 条工资记录吗？\n此操作不可恢复！`)) return;
+                      
+                      setLoading(true);
+                      try {
+                        let successCount = 0;
+                        let failCount = 0;
+                        
+                        // 逐个删除选中的工资记录
+                        for (const salaryId of selectedSalaries) {
+                          try {
+                            const success = await courierSalaryService.deleteSalary(salaryId);
+                            if (success) {
+                              successCount++;
+                            } else {
+                              failCount++;
+                            }
+                          } catch (error) {
+                            console.error(`删除工资记录 ${salaryId} 失败:`, error);
+                            failCount++;
+                          }
+                        }
+                        
+                        // 显示删除结果
+                        if (failCount === 0) {
+                          window.alert(`批量删除成功！共删除 ${successCount} 条记录。`);
+                        } else {
+                          window.alert(`批量删除完成！成功：${successCount} 条，失败：${failCount} 条。`);
+                        }
+                        
+                        // 重新加载数据并清空选择
+                        await loadRecords();
+                        setSelectedSalaries([]);
+                      } catch (error) {
+                        console.error('批量删除失败:', error);
+                        window.alert('批量删除失败！');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: 'white',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    🗑️ 批量删除 ({selectedSalaries.length})
+                  </button>
                 </>
               )}
             </div>

@@ -49,6 +49,10 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // 分页功能状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -110,7 +114,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
     };
   };
 
-  // 按日期和状态过滤包裹
+  // 按日期和状态过滤包裹（返回所有过滤后的包裹）
   const getFilteredPackages = () => {
     let filteredPackages = [...packages];
     
@@ -143,6 +147,33 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
       return dateB - dateA;
     });
   };
+
+  // 获取分页后的包裹列表
+  const getPaginatedPackages = () => {
+    const filteredPackages = getFilteredPackages();
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredPackages.slice(startIndex, endIndex);
+  };
+
+  // 计算总页数
+  const getTotalPages = () => {
+    const filteredPackages = getFilteredPackages();
+    return Math.ceil(filteredPackages.length / itemsPerPage);
+  };
+
+  // 处理页码变化
+  useEffect(() => {
+    const totalPages = getTotalPages();
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [packages, selectedStatus, selectedDate, itemsPerPage]);
+
+  // 处理过滤变化时重置到第一页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStatus, selectedDate]);
 
   // 获取可用日期列表
   const getAvailableDates = () => {
@@ -894,7 +925,8 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                 )}
                 </div>
               ) : (
-              getFilteredPackages().map((pkg) => (
+              <>
+              {getPaginatedPackages().map((pkg) => (
               <div key={pkg.id} style={{
                 background: batchMode && selectedPackages.has(pkg.id) 
                   ? 'rgba(155, 89, 182, 0.3)' 
@@ -1146,7 +1178,250 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   </div>
                 </div>
               </div>
-                ))
+                ))}
+              
+              {/* 分页控件 */}
+              {getFilteredPackages().length > itemsPerPage && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '20px',
+                  padding: '15px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  flexWrap: 'wrap',
+                  gap: '10px'
+                }}>
+                  {/* 左侧：每页显示数量选择 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: 'white',
+                    fontSize: '0.85rem'
+                  }}>
+                    <span>{language === 'zh' ? '每页显示' : language === 'en' ? 'Items per page' : 'စာမျက်နှာတစ်ခုတွင်'}:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <option value={5} style={{ background: '#2c5282', color: 'white' }}>5</option>
+                      <option value={10} style={{ background: '#2c5282', color: 'white' }}>10</option>
+                      <option value={20} style={{ background: '#2c5282', color: 'white' }}>20</option>
+                      <option value={50} style={{ background: '#2c5282', color: 'white' }}>50</option>
+                    </select>
+                  </div>
+
+                  {/* 中间：页码信息 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: 'white',
+                    fontSize: '0.85rem'
+                  }}>
+                    <span>
+                      {language === 'zh' 
+                        ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${getFilteredPackages().length} 条`
+                        : language === 'en'
+                        ? `Page ${currentPage} / ${getTotalPages()}, Total ${getFilteredPackages().length} items`
+                        : `စာမျက်နှာ ${currentPage} / ${getTotalPages()}၊ စုစုပေါင်း ${getFilteredPackages().length} ခု`
+                      }
+                    </span>
+                  </div>
+
+                  {/* 右侧：分页按钮 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      style={{
+                        background: currentPage === 1 
+                          ? 'rgba(255, 255, 255, 0.1)' 
+                          : 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        opacity: currentPage === 1 ? 0.5 : 1,
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }
+                      }}
+                    >
+                      {language === 'zh' ? '« 首页' : language === 'en' ? '« First' : '« ပထမဆုံး'}
+                    </button>
+                    
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      style={{
+                        background: currentPage === 1 
+                          ? 'rgba(255, 255, 255, 0.1)' 
+                          : 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        opacity: currentPage === 1 ? 0.5 : 1,
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }
+                      }}
+                    >
+                      {language === 'zh' ? '‹ 上一页' : language === 'en' ? '‹ Prev' : '‹ ရှေ့သို့'}
+                    </button>
+
+                    {/* 页码显示（最多显示5个页码） */}
+                    {Array.from({ length: Math.min(5, getTotalPages()) }, (_, i) => {
+                      let pageNum;
+                      if (getTotalPages() <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= getTotalPages() - 2) {
+                        pageNum = getTotalPages() - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          style={{
+                            background: currentPage === pageNum
+                              ? 'rgba(52, 152, 219, 0.5)'
+                              : 'rgba(255, 255, 255, 0.2)',
+                            color: 'white',
+                            border: currentPage === pageNum
+                              ? '1px solid rgba(52, 152, 219, 0.8)'
+                              : '1px solid rgba(255, 255, 255, 0.3)',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            minWidth: '36px',
+                            transition: 'all 0.3s ease',
+                            fontWeight: currentPage === pageNum ? 'bold' : 'normal'
+                          }}
+                          onMouseOver={(e) => {
+                            if (currentPage !== pageNum) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (currentPage !== pageNum) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                            }
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                      disabled={currentPage === getTotalPages()}
+                      style={{
+                        background: currentPage === getTotalPages()
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: currentPage === getTotalPages() ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        opacity: currentPage === getTotalPages() ? 0.5 : 1,
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        if (currentPage !== getTotalPages()) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (currentPage !== getTotalPages()) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }
+                      }}
+                    >
+                      {language === 'zh' ? '下一页 ›' : language === 'en' ? 'Next ›' : 'နောက်သို့ ›'}
+                    </button>
+                    
+                    <button
+                      onClick={() => setCurrentPage(getTotalPages())}
+                      disabled={currentPage === getTotalPages()}
+                      style={{
+                        background: currentPage === getTotalPages()
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: currentPage === getTotalPages() ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        opacity: currentPage === getTotalPages() ? 0.5 : 1,
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        if (currentPage !== getTotalPages()) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (currentPage !== getTotalPages()) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        }
+                      }}
+                    >
+                      {language === 'zh' ? '末页 »' : language === 'en' ? 'Last »' : 'နောက်ဆုံး »'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
               )}
             </div>
           )}

@@ -15,9 +15,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
 import { customerService, packageService } from '../services/supabase';
 import Toast from '../components/Toast';
+import BackToHomeButton from '../components/BackToHomeButton';
+import { theme } from '../config/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -115,6 +118,7 @@ export default function ProfileScreen({ navigation }: any) {
       email: '邮箱',
       phone: '电话',
       website: '网站',
+      wechat: '微信',
       openLink: '打开链接',
       // 通知设置相关翻译
       notificationSettings: '通知设置',
@@ -172,6 +176,7 @@ export default function ProfileScreen({ navigation }: any) {
       email: 'Email',
       phone: 'Phone',
       website: 'Website',
+      wechat: 'WeChat',
       openLink: 'Open Link',
       // Notification settings translations
       notificationSettings: 'Notification Settings',
@@ -229,6 +234,7 @@ export default function ProfileScreen({ navigation }: any) {
       email: 'အီးမေးလ်',
       phone: 'ဖုန်း',
       website: 'ဝက်ဘ်ဆိုဒ်',
+      wechat: 'WeChat',
       openLink: 'လင့်ခ်ဖွင့်ရန်',
       // အသိပေးချက်ဆက်တင်များ
       notificationSettings: 'အသိပေးချက်ဆက်တင်များ',
@@ -448,35 +454,52 @@ export default function ProfileScreen({ navigation }: any) {
 
   const renderUserCard = () => (
     <LinearGradient
-      colors={['#2E86AB', '#1c6a8f', '#4CA1CF']}
+      colors={theme.colors.gradients.blue}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.userCard}
     >
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{userName.charAt(0)}</Text>
+      <View style={styles.userHeaderRow}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{userName}</Text>
+        
+        <View style={styles.userInfo}>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
+            {!isGuest && (
+              <View style={styles.userBadge}>
+                <Text style={styles.userBadgeText}>普通会员</Text>
+              </View>
+            )}
+          </View>
+          
+          {isGuest ? (
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+              <Text style={styles.loginButtonText}>{t.login}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.contactInfoContainer}>
+              <View style={styles.contactRow}>
+                <Ionicons name="call-outline" size={16} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.userContact}>{userPhone || '未绑定电话'}</Text>
+              </View>
+              <View style={styles.contactRow}>
+                <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.userContact}>{userEmail || '未绑定邮箱'}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
         {!isGuest && (
-          <>
-            <Text style={styles.userContact}>{userPhone}</Text>
-            <Text style={styles.userContact}>{userEmail}</Text>
-          </>
-        )}
-        {isGuest && (
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>{t.login}</Text>
+          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+            <Ionicons name="create-outline" size={24} color="#ffffff" />
           </TouchableOpacity>
         )}
       </View>
-      {!isGuest && (
-        <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-          <Text style={styles.editButtonText}>✏️</Text>
-        </TouchableOpacity>
-      )}
     </LinearGradient>
   );
 
@@ -606,6 +629,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      <BackToHomeButton navigation={navigation} position="topRight" />
       <LinearGradient
         colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
         style={styles.header}
@@ -733,15 +757,18 @@ export default function ProfileScreen({ navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.aboutLink}
-                  onPress={() => Linking.openURL('tel:+9512345678')}
+                  onPress={() => Linking.openURL('tel:+9509788848928')}
                 >
-                  <Text style={styles.aboutLinkText}>📞 {t.phone}: +95-1-234-5678</Text>
+                  <Text style={styles.aboutLinkText}>📞 {t.phone}: (+95) 09788848928</Text>
                 </TouchableOpacity>
+                <View style={styles.aboutLink}>
+                  <Text style={styles.aboutLinkText}>💬 {t.wechat}: AMT349</Text>
+                </View>
                 <TouchableOpacity 
                   style={styles.aboutLink}
-                  onPress={() => Linking.openURL('https://mlexpress.com')}
+                  onPress={() => Linking.openURL('https://www.market-link-express.com')}
                 >
-                  <Text style={styles.aboutLinkText}>🌐 {t.website}: mlexpress.com</Text>
+                  <Text style={styles.aboutLinkText}>🌐 {t.website}: www.market-link-express.com</Text>
                 </TouchableOpacity>
               </View>
 
@@ -818,7 +845,7 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: theme.colors.background.default,
   },
   header: {
     paddingTop: 50,
@@ -826,9 +853,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: theme.typography.sizes.display,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: theme.colors.text.light,
   },
   scrollView: {
     flex: 1,
@@ -838,81 +865,102 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   userCard: {
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.l,
+    marginBottom: theme.spacing.xl,
+    ...theme.shadows.medium,
+  },
+  userHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
   },
   avatarContainer: {
-    marginRight: 16,
+    marginRight: theme.spacing.l,
   },
   avatar: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: theme.colors.white,
   },
   avatarText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: theme.colors.white,
   },
   userInfo: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.s,
   },
   userName: {
-    fontSize: 22,
+    fontSize: theme.typography.sizes.xl,
     fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
+    color: theme.colors.white,
+    marginRight: theme.spacing.s,
+    maxWidth: 150,
+  },
+  userBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.s,
+  },
+  userBadgeText: {
+    color: theme.colors.white,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  contactInfoContainer: {
+    gap: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   userContact: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.s,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 2,
+    marginLeft: 6,
   },
   loginButton: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    marginTop: theme.spacing.s,
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.l,
     alignSelf: 'flex-start',
   },
   loginButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.primary.DEFAULT,
+    fontSize: theme.typography.sizes.s,
+    fontWeight: 'bold',
   },
   editButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  editButtonText: {
-    fontSize: 20,
+    marginLeft: theme.spacing.s,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.xxl,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: theme.typography.sizes.l,
     fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.l,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -922,30 +970,26 @@ const styles = StyleSheet.create({
   statCard: {
     width: (width - 60) / 2,
     marginBottom: 12,
-    borderRadius: 16,
+    borderRadius: theme.borderRadius.l,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    ...theme.shadows.small,
   },
   statGradient: {
-    padding: 16,
+    padding: theme.spacing.l,
     alignItems: 'center',
   },
   statIcon: {
-    fontSize: 30,
-    marginBottom: 8,
+    fontSize: 28,
+    marginBottom: theme.spacing.s,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: theme.colors.white,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.xs,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
   },
@@ -957,7 +1001,7 @@ const styles = StyleSheet.create({
   actionCard: {
     width: (width - 60) / 4,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.l,
   },
   actionIcon: {
     width: 52,
@@ -965,33 +1009,29 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.s,
   },
   actionIconText: {
-    fontSize: 26,
+    fontSize: 24,
   },
   actionLabel: {
-    fontSize: 12,
-    color: '#4b5563',
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.text.secondary,
     textAlign: 'center',
   },
   settingsList: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.l,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...theme.shadows.small,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: theme.spacing.l,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: theme.colors.border.light,
   },
   settingLeft: {
     flexDirection: 'row',
@@ -999,16 +1039,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingIcon: {
-    fontSize: 22,
-    marginRight: 12,
+    fontSize: 20,
+    marginRight: theme.spacing.m,
   },
   settingLabel: {
-    fontSize: 16,
-    color: '#1f2937',
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.primary,
   },
   settingArrow: {
-    fontSize: 22,
-    color: '#9ca3af',
+    fontSize: 20,
+    color: theme.colors.text.tertiary,
   },
   settingRight: {
     flexDirection: 'row',
@@ -1023,47 +1063,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notificationToggleText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#ffffff',
+    color: theme.colors.white,
   },
   languageButtons: {
     flexDirection: 'row',
     gap: 8,
   },
   languageButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background.subtle,
   },
   languageButtonActive: {
-    backgroundColor: '#2E86AB',
+    backgroundColor: theme.colors.primary.DEFAULT,
   },
   languageButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 12,
+    color: theme.colors.text.secondary,
     fontWeight: '600',
   },
   languageButtonTextActive: {
-    color: '#ffffff',
+    color: theme.colors.white,
   },
   logoutButton: {
-    backgroundColor: '#ef4444',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: theme.colors.error.DEFAULT,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.l,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginTop: theme.spacing.s,
+    marginBottom: theme.spacing.xxl,
+    ...theme.shadows.medium,
   },
   logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+    color: theme.colors.white,
+    fontSize: theme.typography.sizes.m,
     fontWeight: '600',
   },
   footer: {
@@ -1071,14 +1107,14 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   footerText: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: theme.typography.sizes.s,
+    color: theme.colors.text.secondary,
     fontWeight: '600',
     marginBottom: 4,
   },
   footerVersion: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.text.tertiary,
   },
   modalOverlay: {
     flex: 1,
@@ -1088,33 +1124,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
     width: '100%',
     maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    ...theme.shadows.large,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: theme.typography.sizes.xl,
     fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 20,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xl,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.colors.background.input,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    color: '#1f2937',
-    marginBottom: 12,
+    borderColor: theme.colors.border.DEFAULT,
+    borderRadius: theme.borderRadius.m,
+    padding: theme.spacing.m,
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.m,
   },
   textArea: {
     height: 80,
@@ -1123,35 +1155,35 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: theme.spacing.s,
   },
   modalButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
+    padding: theme.spacing.m,
+    borderRadius: theme.borderRadius.m,
     alignItems: 'center',
   },
   modalButtonCancel: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.background.subtle,
   },
   modalButtonConfirm: {
-    backgroundColor: '#2E86AB',
+    backgroundColor: theme.colors.primary.DEFAULT,
   },
   modalButtonText: {
-    fontSize: 16,
+    fontSize: theme.typography.sizes.m,
     fontWeight: '600',
-    color: '#6b7280',
+    color: theme.colors.text.secondary,
   },
   modalButtonTextConfirm: {
-    color: '#ffffff',
+    color: theme.colors.white,
   },
   aboutScrollView: {
     maxHeight: 400,
     marginBottom: 16,
   },
   aboutDescription: {
-    fontSize: 15,
-    color: '#4b5563',
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.secondary,
     lineHeight: 22,
     marginBottom: 20,
     textAlign: 'left',
@@ -1160,14 +1192,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   aboutSectionTitle: {
-    fontSize: 16,
+    fontSize: theme.typography.sizes.m,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.colors.text.primary,
     marginBottom: 8,
   },
   aboutSectionValue: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.secondary,
   },
   aboutLink: {
     flexDirection: 'row',
@@ -1175,21 +1207,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.borderRadius.s,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.colors.border.light,
   },
   aboutLinkText: {
-    fontSize: 14,
-    color: '#2E86AB',
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.primary.DEFAULT,
     fontWeight: '500',
     flex: 1,
   },
   aboutLinkArrow: {
     fontSize: 20,
-    color: '#9ca3af',
+    color: theme.colors.text.tertiary,
     marginLeft: 8,
   },
 });

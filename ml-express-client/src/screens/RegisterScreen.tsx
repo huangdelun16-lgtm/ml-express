@@ -16,6 +16,7 @@ import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import LanguageSelector from '../components/LanguageSelector';
+import { feedbackService } from '../services/FeedbackService';
 
 export default function RegisterScreen({ navigation }: any) {
   const { language } = useApp();
@@ -163,12 +164,12 @@ export default function RegisterScreen({ navigation }: any) {
   // 发送验证码
   const handleSendVerificationCode = async () => {
     if (!email) {
-      Alert.alert('', currentT.invalidEmail);
+      feedbackService.warning(currentT.invalidEmail);
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('', currentT.invalidEmail);
+      feedbackService.warning(currentT.invalidEmail);
       return;
     }
 
@@ -193,13 +194,13 @@ export default function RegisterScreen({ navigation }: any) {
       if (result.success) {
         setCodeSent(true);
         setCountdown(60);
-        Alert.alert(currentT.codeSent, currentT.codeSentMsg);
+        feedbackService.success(currentT.codeSentMsg);
       } else {
-        Alert.alert('发送失败', result.message || '验证码发送失败');
+        feedbackService.error(result.message || '验证码发送失败');
       }
     } catch (error) {
       hideLoading();
-      Alert.alert('发送失败', '网络错误，请重试');
+      feedbackService.error('发送失败，网络错误');
     }
   };
 
@@ -218,42 +219,42 @@ export default function RegisterScreen({ navigation }: any) {
   const handleRegister = async () => {
     // 验证必填字段
     if (!name || !email || !phone || !password || !confirmPassword) {
-      Alert.alert('', currentT.fillAllFields);
+      feedbackService.warning(currentT.fillAllFields);
       return;
     }
 
     // 验证邮箱格式
     if (!validateEmail(email)) {
-      Alert.alert('', currentT.invalidEmail);
+      feedbackService.warning(currentT.invalidEmail);
       return;
     }
 
     // 验证手机号格式
     if (!validatePhone(phone)) {
-      Alert.alert('', currentT.invalidPhone);
+      feedbackService.warning(currentT.invalidPhone);
       return;
     }
 
     // 验证密码长度
     if (password.length < 6) {
-      Alert.alert('', currentT.passwordTooShort);
+      feedbackService.warning(currentT.passwordTooShort);
       return;
     }
 
     // 验证密码一致性
     if (password !== confirmPassword) {
-      Alert.alert('', currentT.passwordMismatch);
+      feedbackService.warning(currentT.passwordMismatch);
       return;
     }
 
     // 验证验证码
     if (!verificationCode) {
-      Alert.alert('', currentT.codeRequired);
+      feedbackService.warning(currentT.codeRequired);
       return;
     }
 
     if (!codeSent) {
-      Alert.alert('', currentT.sendCodeFirst);
+      feedbackService.warning(currentT.sendCodeFirst);
       return;
     }
 
@@ -278,7 +279,7 @@ export default function RegisterScreen({ navigation }: any) {
       
       if (!verifyResult.success) {
         hideLoading();
-        Alert.alert(currentT.invalidCode, verifyResult.message || currentT.invalidCode);
+        feedbackService.error(verifyResult.message || currentT.invalidCode);
         return;
       }
 
@@ -304,13 +305,14 @@ export default function RegisterScreen({ navigation }: any) {
             }
           ]
         );
+        // 这里使用Alert保留，因为需要用户确认后跳转
       } else {
         const errorMessage = result.error?.message || currentT.registerFailed;
-        Alert.alert(currentT.registerFailed, errorMessage);
+        feedbackService.error(errorMessage);
       }
     } catch (error: any) {
       hideLoading();
-      Alert.alert(currentT.registerFailed, error.message || currentT.registerFailed);
+      feedbackService.error(error.message || currentT.registerFailed);
     } finally {
       setLoading(false);
     }

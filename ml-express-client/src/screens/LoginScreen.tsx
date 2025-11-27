@@ -18,6 +18,7 @@ import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import LanguageSelector from '../components/LanguageSelector';
+import { feedbackService } from '../services/FeedbackService';
 
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
@@ -93,7 +94,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('', currentT.fillAllFields);
+      feedbackService.warning(currentT.fillAllFields);
       return;
     }
 
@@ -113,15 +114,16 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userName', result.data.name);
         await AsyncStorage.setItem('userPhone', result.data.phone);
         
+        feedbackService.success(currentT.loginSuccess);
         navigation.replace('Main');
       } else {
         const errorMessage = result.error?.message || currentT.loginFailed;
-        Alert.alert(currentT.loginFailed, errorMessage);
+        feedbackService.error(errorMessage);
       }
     } catch (error: any) {
       hideLoading();
       console.error('登录错误:', error);
-      Alert.alert(currentT.loginFailed, error.message || currentT.loginFailed);
+      feedbackService.error(error.message || currentT.loginFailed);
     } finally {
       setLoading(false);
     }

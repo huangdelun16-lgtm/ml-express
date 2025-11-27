@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import NotificationService from './notificationService';
+import { errorService } from './ErrorService';
+import { retry } from '../utils/retry';
 
 // 使用与Web端相同的Supabase配置
 const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
@@ -144,10 +146,10 @@ export const customerService = {
 
       return { success: true, data };
     } catch (error: any) {
-      console.error('注册失败:', error);
+      const appError = errorService.handleError(error, { context: 'customerService.register', silent: true });
       return { 
         success: false, 
-        error: { message: error.message || '注册失败，请重试' }
+        error: appError
       };
     }
   },
@@ -241,10 +243,10 @@ export const customerService = {
       const { password: _, ...userDataWithoutPassword } = userData;
       return { success: true, data: userDataWithoutPassword };
     } catch (error: any) {
-      console.error('登录失败:', error);
+      const appError = errorService.handleError(error, { context: 'customerService.login', silent: true });
       return { 
         success: false, 
-        error: { message: error.message || '登录失败，请重试' }
+        error: appError
       };
     }
   },
@@ -419,15 +421,15 @@ export const packageService = {
 
       return { success: true, data };
     } catch (error) {
-      console.error('创建订单失败:', error);
-      return { success: false, error };
+      const appError = errorService.handleError(error, { context: 'packageService.createOrder', silent: true });
+      return { success: false, error: appError };
     }
   },
 
   // createPackage 别名（为了兼容性，接受完整的包裹数据）
   async createPackage(packageData: any) {
     try {
-      console.log('开始创建订单，数据：', packageData);
+      // console.log('开始创建订单，数据：', packageData); // 使用统一日志服务后可移除
 
       // 提取需要的字段并添加默认值
       // 注意：packages表没有customer_id字段，我们将客户ID添加到description中
@@ -458,6 +460,7 @@ export const packageService = {
         pickup_time: '',
         delivery_time: '',
         courier: '待分配',
+        payment_method: packageData.payment_method || 'cash', // 添加支付方式
       };
 
       // 如果提供了自定义ID，使用它
@@ -465,7 +468,7 @@ export const packageService = {
         insertData.id = packageData.id;
       }
 
-      console.log('准备插入数据库的数据：', insertData);
+      // console.log('准备插入数据库的数据：', insertData);
 
       const { data, error } = await supabase
         .from('packages')
@@ -474,11 +477,10 @@ export const packageService = {
         .single();
 
       if (error) {
-        console.error('Supabase插入错误：', error);
         throw error;
       }
 
-      console.log('订单创建成功：', data);
+      // console.log('订单创建成功：', data);
       
       // 更新用户订单统计（如果提供了customer_id）
       if (packageData.customer_id) {
@@ -497,11 +499,10 @@ export const packageService = {
                 total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
               })
               .eq('id', packageData.customer_id);
-            console.log('用户统计已更新');
           }
         } catch (updateError) {
-          console.warn('更新用户统计失败（不影响订单创建）:', updateError);
-          // 不抛出错误，因为订单已经创建成功
+          // 统计更新失败不影响订单创建，仅记录
+          errorService.handleError(updateError, { context: 'createPackage.updateStats', silent: true });
         }
       }
 
@@ -514,41 +515,43 @@ export const packageService = {
           customerName: packageData.sender_name,
           customerPhone: packageData.sender_phone,
         });
-        console.log('订单创建通知已发送');
       } catch (notificationError) {
-        console.warn('发送订单创建通知失败:', notificationError);
+        errorService.handleError(notificationError, { context: 'createPackage.sendNotification', silent: true });
       }
 
       return { success: true, data };
     } catch (error: any) {
-      console.error('创建包裹失败，完整错误：', JSON.stringify(error, null, 2));
+      const appError = errorService.handleError(error, { context: 'packageService.createPackage', silent: true });
       return { 
         success: false, 
-        error: { 
-          message: error.message || error.hint || error.details || '创建订单失败，请检查网络连接',
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        } 
+        error: appError 
       };
     }
   },
 
   // 获取客户的所有订单（通过description中的客户ID匹配）
   async getCustomerOrders(customerId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('packages')
-        .select('*')
-        .ilike('description', `%[客户ID: ${customerId}]%`)
-        .order('created_at', { ascending: false });
+    return retry(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('packages')
+          .select('*')
+          .ilike('description', `%[客户ID: ${customerId}]%`)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('获取订单失败:', error);
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        throw error; // 抛出错误以触发重试
+      }
+    }, {
+      retries: 2,
+      delay: 1000,
+      shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
+    }).catch(error => {
+      errorService.handleError(error, { context: 'packageService.getCustomerOrders', silent: true });
       return [];
-    }
+    });
   },
 
   // 获取客户最近的订单（限制数量，通过description匹配）
@@ -808,43 +811,51 @@ export const systemSettingsService = {
 
   // 获取计费规则
   async getPricingSettings() {
-    try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('settings_key, settings_value')
-        .like('settings_key', 'pricing.%');
+    return retry(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('settings_key, settings_value')
+          .like('settings_key', 'pricing.%');
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // 转换为对象格式
-      const settings: any = {};
-      data?.forEach((item: any) => {
-        const key = item.settings_key.replace('pricing.', '');
-        // settings_value 可能是 JSON 字符串，需要解析
-        let value = item.settings_value;
-        if (typeof value === 'string') {
-          try {
-            value = JSON.parse(value);
-          } catch {
-            value = parseFloat(value) || 0;
+        // 转换为对象格式
+        const settings: any = {};
+        data?.forEach((item: any) => {
+          const key = item.settings_key.replace('pricing.', '');
+          // settings_value 可能是 JSON 字符串，需要解析
+          let value = item.settings_value;
+          if (typeof value === 'string') {
+            try {
+              value = JSON.parse(value);
+            } catch {
+              value = parseFloat(value) || 0;
+            }
           }
-        }
-        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-      });
+          settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        });
 
-      return {
-        base_fee: settings.base_fee || 1000,
-        per_km_fee: settings.per_km_fee || 500,
-        weight_surcharge: settings.weight_surcharge || 150,
-        urgent_surcharge: settings.urgent_surcharge || 1500,
-        scheduled_surcharge: settings.scheduled_surcharge || 500,
-        oversize_surcharge: settings.oversize_surcharge || 300,
-        fragile_surcharge: settings.fragile_surcharge || 400,
-        food_beverage_surcharge: settings.food_beverage_surcharge || 300,
-        free_km_threshold: settings.free_km_threshold || 3,
-      };
-    } catch (error) {
-      console.error('获取计费设置失败:', error);
+        return {
+          base_fee: settings.base_fee || 1000,
+          per_km_fee: settings.per_km_fee || 500,
+          weight_surcharge: settings.weight_surcharge || 150,
+          urgent_surcharge: settings.urgent_surcharge || 1500,
+          scheduled_surcharge: settings.scheduled_surcharge || 500,
+          oversize_surcharge: settings.oversize_surcharge || 300,
+          fragile_surcharge: settings.fragile_surcharge || 400,
+          food_beverage_surcharge: settings.food_beverage_surcharge || 300,
+          free_km_threshold: settings.free_km_threshold || 3,
+        };
+      } catch (error) {
+        throw error; // 抛出错误以触发重试
+      }
+    }, {
+      retries: 3, // 计费规则很重要，多试几次
+      delay: 1000,
+      shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
+    }).catch(error => {
+      errorService.handleError(error, { context: 'systemSettingsService.getPricingSettings', silent: true });
       // 返回默认值
       return {
         base_fee: 1000,
@@ -857,6 +868,6 @@ export const systemSettingsService = {
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
       };
-    }
+    });
   },
 };

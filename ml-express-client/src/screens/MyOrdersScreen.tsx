@@ -16,6 +16,9 @@ import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
+import BackToHomeButton from '../components/BackToHomeButton';
+import { errorService } from '../services/ErrorService';
+import { OrderSkeleton } from '../components/SkeletonLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -234,7 +237,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         setLoading(false);
       }
     } catch (error) {
-      console.error('加载用户信息失败:', error);
+      errorService.handleError(error, { context: 'MyOrdersScreen.loadUserInfo', silent: true });
       setLoading(false);
     }
   };
@@ -247,9 +250,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       setOrders(data);
       filterOrders(data, selectedStatus);
     } catch (error: any) {
-      console.error('加载订单失败:', error);
-      const errorMsg = error?.message || '加载订单失败，请稍后重试';
-      showToast(errorMsg, 'error');
+      errorService.handleError(error, { context: 'MyOrdersScreen.loadOrders' });
     } finally {
       setLoading(false);
     }
@@ -351,15 +352,32 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>{t.loading}</Text>
+      <View style={styles.container}>
+        <BackToHomeButton navigation={navigation} position="topRight" />
+        <LinearGradient
+          colors={['#b0d3e8', '#7895a3']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <Text style={styles.headerTitle}>{t.myOrders}</Text>
+          <Text style={styles.headerSubtitle}>{t.trackPackages}</Text>
+        </LinearGradient>
+        
+        <View style={styles.content}>
+          <View style={{ padding: 20 }}>
+            <OrderSkeleton />
+            <OrderSkeleton />
+            <OrderSkeleton />
+          </View>
+        </View>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
+    return (
+      <View style={styles.container}>
+        <BackToHomeButton navigation={navigation} position="topRight" />
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

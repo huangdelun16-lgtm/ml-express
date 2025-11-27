@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGoogleMapsApiKey } from './useGoogleMapsApiKey';
+import { errorService } from '../services/ErrorService';
 
 interface UsePlaceAutocompleteOptions {
   language: 'zh' | 'en' | 'my';
@@ -48,9 +49,53 @@ export function usePlaceAutocomplete({
 
       try {
         if (!googleMapsApiKey) {
-          console.warn('Google Maps API Key 未配置，自动完成功能不可用。');
-          setAutocompleteSuggestions([]);
-          setShowSuggestions(false);
+          console.warn('Google Maps API Key 未配置，自动完成功能不可用。使用模拟数据演示。');
+          // 模拟数据 (仅用于演示)
+          const mockSuggestions = [
+            {
+              place_id: 'mock_1',
+              main_text: 'Mandalay Palace',
+              secondary_text: 'Mandalay, Myanmar',
+              description: 'Mandalay Palace, Mandalay, Myanmar',
+              typeIcon: '🏰',
+              isEstablishment: true,
+            },
+            {
+              place_id: 'mock_2',
+              main_text: 'Zegyo Market',
+              secondary_text: '84th Street, Mandalay',
+              description: 'Zegyo Market, 84th Street, Mandalay',
+              typeIcon: '🏪',
+              isEstablishment: true,
+            },
+            {
+              place_id: 'mock_3',
+              main_text: 'Mandalay Hill',
+              secondary_text: 'Mandalay',
+              description: 'Mandalay Hill, Mandalay',
+              typeIcon: '⛰️',
+              isEstablishment: false,
+            },
+            {
+              place_id: 'mock_4',
+              main_text: 'Diamond Plaza',
+              secondary_text: 'Chan Aye Thar Zan, Mandalay',
+              description: 'Diamond Plaza, Chan Aye Thar Zan, Mandalay',
+              typeIcon: '🏬',
+              isEstablishment: true,
+            },
+            {
+              place_id: 'mock_5',
+              main_text: 'Man Myanmar Plaza',
+              secondary_text: '84th Street, Mandalay',
+              description: 'Man Myanmar Plaza, 84th Street, Mandalay',
+              typeIcon: '🏢',
+              isEstablishment: true,
+            }
+          ].filter(item => item.main_text.toLowerCase().includes(input.toLowerCase()) || item.description.toLowerCase().includes(input.toLowerCase()));
+          
+          setAutocompleteSuggestions(mockSuggestions);
+          setShowSuggestions(true);
           setIsLoadingSuggestions(false);
           return;
         }
@@ -130,7 +175,10 @@ export function usePlaceAutocomplete({
 
         failureCountRef.current += 1;
         const backoffDelay = Math.min(4000, 500 * failureCountRef.current);
-        console.error(`自动完成请求失败，第 ${failureCountRef.current} 次，${backoffDelay}ms 后重试`, error);
+        errorService.handleError(error, { 
+          context: 'usePlaceAutocomplete.performAutocompleteSearch', 
+          silent: true 
+        });
         setTimeout(() => {
           if (lastSearchQueryRef.current === input.trim()) {
             performAutocompleteSearch(input);
@@ -179,7 +227,40 @@ export function usePlaceAutocomplete({
 
       try {
         if (!googleMapsApiKey) {
-          console.warn('Google Maps API Key 未配置，地点详情查询不可用。');
+          console.warn('Google Maps API Key 未配置，地点详情查询不可用。使用模拟坐标。');
+          // 模拟坐标 (曼德勒附近，仅用于演示)
+          // 根据 mock ID 返回固定坐标，以便演示更真实
+          let mockLocation = { lat: 21.9588, lng: 96.0891 }; // Default Mandalay
+          
+          if (suggestion.place_id === 'mock_1') mockLocation = { lat: 21.9930, lng: 96.0967 }; // Palace
+          else if (suggestion.place_id === 'mock_2') mockLocation = { lat: 21.9750, lng: 96.0830 }; // Zegyo
+          else if (suggestion.place_id === 'mock_3') mockLocation = { lat: 22.0167, lng: 96.1080 }; // Hill
+          else if (suggestion.place_id === 'mock_4') mockLocation = { lat: 21.9730, lng: 96.0920 }; // Diamond
+          else if (suggestion.place_id === 'mock_5') mockLocation = { lat: 21.9740, lng: 96.0820 }; // Man Myanmar
+          else {
+             // 随机附近坐标
+             mockLocation = {
+              lat: 21.9588 + (Math.random() - 0.5) * 0.05,
+              lng: 96.0891 + (Math.random() - 0.5) * 0.05,
+            };
+          }
+          
+          onLocationChange({
+            latitude: mockLocation.lat,
+            longitude: mockLocation.lng,
+          });
+          
+          if (onPlaceChange) {
+            onPlaceChange({
+              name: suggestion.main_text,
+              address: suggestion.description,
+              types: ['mock_type'],
+              rating: 4.5,
+            });
+          }
+          
+          setMapAddressInput(suggestion.description);
+          lastSearchQueryRef.current = '';
           setIsLoadingSuggestions(false);
           return;
         }
@@ -217,7 +298,10 @@ export function usePlaceAutocomplete({
           setMapAddressInput(place.formatted_address || place.vicinity || suggestion.description);
           lastSearchQueryRef.current = '';
         } else {
-          console.warn('获取地点详情失败，使用描述信息');
+          errorService.handleError(new Error('获取地点详情失败'), { 
+            context: 'usePlaceAutocomplete.handleSelectSuggestion', 
+            silent: true 
+          });
           // 即使详情获取失败，也更新位置
           if (onPlaceChange) {
             onPlaceChange({
@@ -227,7 +311,10 @@ export function usePlaceAutocomplete({
           }
         }
       } catch (error) {
-        console.error('获取地点详情失败:', error);
+        errorService.handleError(error, { 
+          context: 'usePlaceAutocomplete.handleSelectSuggestion', 
+          silent: true 
+        });
       } finally {
         setIsLoadingSuggestions(false);
         setAutocompleteSuggestions([]);

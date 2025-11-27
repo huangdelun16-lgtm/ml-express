@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "7da5ae54-bcf3-4379-8104-a078c05e3d0d"
+      }
+    },
+    "android": {
+      "package": "com.amt349.marketlinkexpress"
+    }
+  }
+}

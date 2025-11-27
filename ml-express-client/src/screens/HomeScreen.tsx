@@ -18,11 +18,14 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { packageService } from '../services/supabase';
+import { errorService } from '../services/ErrorService';
+import { theme } from '../config/theme';
+import { APP_CONFIG } from '../config/constants';
 
 const { width } = Dimensions.get('window');
 
 const HOTLINE_NUMBERS = [
-  { display: '(+95) 09788848928', tel: '+959788848928' },
+  { display: APP_CONFIG.CONTACT.PHONE_DISPLAY, tel: APP_CONFIG.CONTACT.PHONE },
 ];
 
 interface OrderStats {
@@ -148,6 +151,8 @@ export default function HomeScreen({ navigation }: any) {
       wechatValue: 'AMT349',
       viber: 'Viber',
       viberValue: '09259369349',
+      gmail: 'Gmail',
+      gmailValue: 'huangdelun16@gmail.com',
       features: 'Why Choose Us',
       feature1: '24/7 Customer Service',
       feature2: 'Myanmar-wide Coverage',
@@ -195,6 +200,8 @@ export default function HomeScreen({ navigation }: any) {
       wechatValue: 'AMT349',
       viber: 'Viber',
       viberValue: '09259369349',
+      gmail: 'Gmail',
+      gmailValue: 'huangdelun16@gmail.com',
       features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
       feature1: '၂၄နာရီဝန်ဆောင်မှု',
       feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
@@ -250,7 +257,7 @@ export default function HomeScreen({ navigation }: any) {
         await loadOrderData(storedUserId);
       }
     } catch (error) {
-      console.error('加载用户数据失败:', error);
+      errorService.handleError(error, { context: 'HomeScreen.loadUserData', silent: true });
     }
   };
 
@@ -264,7 +271,7 @@ export default function HomeScreen({ navigation }: any) {
       const orders = await packageService.getRecentOrders(customerId, 3);
       setRecentOrders(orders as RecentOrder[]);
     } catch (error) {
-      console.error('加载订单数据失败:', error);
+      errorService.handleError(error, { context: 'HomeScreen.loadOrderData', silent: true });
     }
   };
 

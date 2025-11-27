@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -26,6 +25,16 @@ import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
 import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
+import BackToHomeButton from '../components/BackToHomeButton';
+import { errorService } from '../services/ErrorService';
+import { feedbackService } from '../services/FeedbackService';
+// 导入拆分后的组件
+import SenderForm from '../components/placeOrder/SenderForm';
+import ReceiverForm from '../components/placeOrder/ReceiverForm';
+import PackageInfo from '../components/placeOrder/PackageInfo';
+import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
+import PriceCalculation from '../components/placeOrder/PriceCalculation';
+import MapModal from '../components/placeOrder/MapModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -90,6 +99,72 @@ export default function PlaceOrderScreen({ navigation }: any) {
   
   // 地图POI相关
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
+  // 表单验证状态
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const validateField = useCallback((field: string, value: string) => {
+    let error = '';
+    switch (field) {
+      case 'senderName':
+      case 'receiverName':
+        if (!value.trim()) error = '请输入姓名';
+        break;
+      case 'senderPhone':
+      case 'receiverPhone':
+        if (!value.trim()) error = '请输入电话';
+        else if (!/^09\d{7,9}$/.test(value.trim())) error = '手机号格式错误 (09...)';
+        break;
+      case 'senderAddress':
+      case 'receiverAddress':
+        if (!value.trim()) error = '请输入地址';
+        break;
+    }
+    return error;
+  }, []);
+
+  const handleFieldChange = useCallback((field: string, value: string) => {
+    // 更新对应状态
+    switch (field) {
+      case 'senderName': setSenderName(value); break;
+      case 'senderPhone': setSenderPhone(value); break;
+      case 'senderAddress': setSenderAddress(value); break;
+      case 'receiverName': setReceiverName(value); break;
+      case 'receiverPhone': setReceiverPhone(value); break;
+      case 'receiverAddress': setReceiverAddress(value); break;
+    }
+
+    // 实时验证（如果已触摸）
+    if (touched[field]) {
+      const error = validateField(field, value);
+      setErrors(prev => ({ ...prev, [field]: error }));
+    } else {
+      // 清除之前的错误（如果有）
+      if (errors[field]) {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
+      }
+    }
+  }, [touched, errors, validateField]);
+
+  const handleFieldBlur = useCallback((field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    let value = '';
+    switch (field) {
+      case 'senderName': value = senderName; break;
+      case 'senderPhone': value = senderPhone; break;
+      case 'senderAddress': value = senderAddress; break;
+      case 'receiverName': value = receiverName; break;
+      case 'receiverPhone': value = receiverPhone; break;
+      case 'receiverAddress': value = receiverAddress; break;
+    }
+    const error = validateField(field, value);
+    setErrors(prev => ({ ...prev, [field]: error }));
+  }, [senderName, senderPhone, senderAddress, receiverName, receiverPhone, receiverAddress, validateField]);
 
   const {
     mapAddressInput,
@@ -385,22 +460,22 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
   const currentT = t[language];
 
-  // 包裹类型选项（与Web端一致）
-  const packageTypes = [
+  // 包裹类型选项（与Web端一致）- 使用 useMemo 优化
+  const packageTypes = useMemo(() => [
     { value: '文件', label: currentT.packageTypes.document },
     { value: '标准件（45x60x15cm）和（5KG）以内', label: currentT.packageTypes.standard },
     { value: '超重件（5KG）以上', label: currentT.packageTypes.overweight },
     { value: '超规件（45x60x15cm）以上', label: currentT.packageTypes.oversized },
     { value: '易碎品', label: currentT.packageTypes.fragile },
     { value: '食品和饮料', label: currentT.packageTypes.foodDrinks },
-  ];
+  ], [currentT.packageTypes]);
 
-  // 配送速度选项（从计费规则获取）
-  const deliverySpeeds = [
+  // 配送速度选项（从计费规则获取）- 使用 useMemo 优化
+  const deliverySpeeds = useMemo(() => [
     { value: '准时达', label: currentT.speedStandard, extra: 0 },
     { value: '急送达', label: currentT.speedExpress, extra: pricingSettings.urgent_surcharge },
     { value: '定时达', label: currentT.speedScheduled, extra: pricingSettings.scheduled_surcharge },
-  ];
+  ], [currentT.speedStandard, currentT.speedExpress, currentT.speedScheduled, pricingSettings.urgent_surcharge, pricingSettings.scheduled_surcharge]);
 
   const persistOrderLocally = useCallback(
     async (payload: any, syncStatus: 'pending' | 'synced', errorMessage?: string) => {
@@ -408,7 +483,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       try {
         await databaseService.saveOrder(payload, { syncStatus, errorMessage });
       } catch (dbError) {
-        console.error('保存离线订单失败:', dbError);
+        errorService.handleError(dbError, { context: 'PlaceOrderScreen.persistOrderLocally', silent: true });
       }
     },
     []
@@ -427,18 +502,18 @@ export default function PlaceOrderScreen({ navigation }: any) {
           if (result?.success || result?.error?.code === '23505') {
             await databaseService.markOrderSynced(record.id);
           } else {
-            console.warn('离线订单同步失败:', record.id, result?.error);
+            errorService.handleError(result?.error, { context: 'PlaceOrderScreen.syncPendingOrders', silent: true });
           }
         } catch (syncError: any) {
           if (syncError?.code === '23505') {
             await databaseService.markOrderSynced(record.id);
           } else {
-            console.warn('离线订单同步失败:', record.id, syncError);
+            errorService.handleError(syncError, { context: 'PlaceOrderScreen.syncPendingOrders', silent: true });
           }
         }
       }
     } catch (error) {
-      console.error('读取离线订单失败:', error);
+      errorService.handleError(error, { context: 'PlaceOrderScreen.syncPendingOrders', silent: true });
     }
   }, []);
 
@@ -480,7 +555,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         if (useMyInfo) setSenderPhone(phone);
       }
     } catch (error) {
-      console.error('加载用户信息失败:', error);
+      errorService.handleError(error, { context: 'PlaceOrderScreen.loadUserInfo', silent: true });
     }
   };
 
@@ -489,7 +564,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       const settings = await systemSettingsService.getPricingSettings();
       setPricingSettings(settings);
     } catch (error) {
-      console.error('加载计费规则失败:', error);
+      errorService.handleError(error, { context: 'PlaceOrderScreen.loadPricingSettings' });
     }
   };
 
@@ -536,8 +611,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
     } catch (error) {
       hideLoading();
-      console.error('获取位置失败:', error);
-      Alert.alert('错误', '获取位置失败，请手动选择位置');
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleUseCurrentLocation' });
     }
   };
 
@@ -578,13 +652,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
     } catch (error) {
       hideLoading();
-      console.error('获取位置失败:', error);
-      Alert.alert('错误', '获取位置失败，请手动输入地址');
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleGetCurrentLocation' });
     }
   };
 
   // 打开地图选择器 - 优化：先打开地图，异步获取位置
-  const openMapSelector = async (type: 'sender' | 'receiver') => {
+  const openMapSelector = useCallback(async (type: 'sender' | 'receiver') => {
     try {
       setMapType(type);
       
@@ -662,14 +735,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
         }
       })();
     } catch (error) {
-      console.error('打开地图失败:', error);
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleOpenMap', silent: true });
       // 即使出错也打开地图，使用默认位置
       setShowMapModal(true);
     }
-  };
+  }, [senderAddress, receiverAddress, senderCoordinates, receiverCoordinates]);
 
   // 确认地图位置
-  const confirmMapLocation = async () => {
+  const confirmMapLocation = useCallback(async () => {
     try {
       showLoading('获取地址中...');
       
@@ -720,10 +793,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
     } catch (error) {
       hideLoading();
-      console.error('获取地址失败:', error);
-      Alert.alert('错误', '获取地址失败');
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleReverseGeocode' });
     }
-  };
+  }, [mapAddressInput, selectedLocation, mapType, currentT.coordinates, setSenderAddress, setReceiverAddress, setSenderCoordinates, setReceiverCoordinates, setMapAddressInput, setShowMapModal, showLoading, hideLoading]);
 
   // 使用Haversine公式计算两点之间的距离（公里）
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -738,7 +810,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   };
 
   // 精准计算费用
-  const calculatePrice = async () => {
+  const calculatePrice = useCallback(async () => {
     try {
       showLoading(currentT.calculating, 'package');
       
@@ -800,10 +872,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       
     } catch (error) {
       hideLoading();
-      console.error('计算费用失败:', error);
-      Alert.alert(currentT.calculateFailed, '计算失败，请重试');
+      errorService.handleError(error, { context: 'PlaceOrderScreen.calculateFee' });
     }
-  };
+  }, [senderCoordinates, receiverCoordinates, packageType, weight, deliverySpeed, pricingSettings, currentT, showLoading, hideLoading]);
 
   // 估算距离（简化版，实际应该使用地图API）
   const estimateDistance = () => {
@@ -825,23 +896,44 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
   // 提交订单
   const handleSubmitOrder = async () => {
-    // 验证必填字段
-    if (!senderName || !senderPhone || !senderAddress ||
-        !receiverName || !receiverPhone || !receiverAddress ||
-        !packageType) {
-      Alert.alert('提示', currentT.fillRequired);
+    // 1. 验证必填字段
+    const newErrors: Record<string, string> = {};
+    let isValid = true;
+
+    const fieldsToValidate = [
+      { field: 'senderName', value: senderName },
+      { field: 'senderPhone', value: senderPhone },
+      { field: 'senderAddress', value: senderAddress },
+      { field: 'receiverName', value: receiverName },
+      { field: 'receiverPhone', value: receiverPhone },
+      { field: 'receiverAddress', value: receiverAddress },
+    ];
+
+    fieldsToValidate.forEach(({ field, value }) => {
+      const error = validateField(field, value);
+      if (error) {
+        newErrors[field] = error;
+        isValid = false;
+      }
+    });
+
+    setErrors(newErrors);
+    setTouched(fieldsToValidate.reduce((acc, { field }) => ({ ...acc, [field]: true }), {}));
+
+    if (!isValid) {
+      feedbackService.error(currentT.fillRequired);
       return;
     }
 
     // 验证重量字段（只在需要时验证）
     if (showWeightInput && !weight) {
-      Alert.alert('提示', '请填写包裹重量');
+      feedbackService.warning('请填写包裹重量');
       return;
     }
 
     // 验证定时达时间
     if (deliverySpeed === '定时达' && !scheduledTime) {
-      Alert.alert('提示', '请填写指定送达时间');
+      feedbackService.warning('请填写指定送达时间');
       return;
     }
 
@@ -849,6 +941,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
     try {
       showLoading(currentT.creating, 'package');
+      feedbackService.trigger(undefined); // 触觉反馈
 
       // 生成订单ID（根据寄件地址所在城市自动选择前缀）
       const generateOrderId = (address: string) => {
@@ -1003,7 +1096,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       }
     } catch (error: any) {
       hideLoading();
-      console.error('【订单创建失败】捕获到异常:', error);
+      errorService.handleError(error, { context: 'PlaceOrderScreen.handleSubmit', silent: true });
       await persistOrderLocally(offlinePayload, 'pending', error?.message);
       showOfflineSavedAlert();
     }
@@ -1029,7 +1122,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   };
 
   // 处理包裹类型点击
-  const handlePackageTypeClick = (typeValue: string) => {
+  const handlePackageTypeClick = useCallback((typeValue: string) => {
     setPackageType(typeValue);
     
     // 控制重量框的显示逻辑
@@ -1045,13 +1138,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
       setSelectedPackageTypeInfo(typeValue);
       setShowPackageTypeInfo(true);
     }
-  };
+  }, [setPackageType, setShowWeightInput]);
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <BackToHomeButton navigation={navigation} position="topRight" />
       <LinearGradient
         colors={['#b0d3e8', '#7895a3']}
         start={{ x: 0, y: 0 }}
@@ -1064,341 +1158,85 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* 寄件人信息 */}
-        <FadeInView delay={100}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <PackageIcon size={18} color="#1e293b" />
-                <Text style={styles.sectionTitle}> {currentT.senderInfo}</Text>
-              </View>
-              <View style={styles.switchContainer}>
-                <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
-                <Switch
-                  value={useMyInfo}
-                  onValueChange={setUseMyInfo}
-                  trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-                  thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
-                />
-              </View>
-            </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.senderName} *</Text>
-            <TextInput
-              style={styles.input}
-              value={senderName}
-              onChangeText={setSenderName}
-              placeholder={currentT.placeholders.name}
-              placeholderTextColor="#9ca3af"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.senderPhone} *</Text>
-            <TextInput
-              style={styles.input}
-              value={senderPhone}
-              onChangeText={setSenderPhone}
-              placeholder={currentT.placeholders.phone}
-              placeholderTextColor="#9ca3af"
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>{currentT.senderAddress} *</Text>
-              <TouchableOpacity onPress={() => openMapSelector('sender')}>
-                <Text style={styles.linkButton}>🗺️ {currentT.openMap}</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={senderAddress}
-              onChangeText={(text) => {
-                // 如果用户手动编辑地址，移除坐标信息
-                const lines = text.split('\n');
-                const addressLines = lines.filter(line => !line.includes('📍'));
-                setSenderAddress(addressLines.join('\n'));
-              }}
-              placeholder={currentT.placeholders.address}
-              placeholderTextColor="#9ca3af"
-              multiline
-              numberOfLines={3}
-            />
-            {senderCoordinates && (
-              <View style={styles.coordsContainer}>
-                <Text style={styles.coordsLabel}>经纬度：</Text>
-                <Text style={styles.coordsText}>
-                  {senderCoordinates.lat.toFixed(6)}, {senderCoordinates.lng.toFixed(6)}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-        </FadeInView>
+        <SenderForm
+          language={language}
+          styles={styles}
+          currentT={currentT}
+          senderName={senderName}
+          senderPhone={senderPhone}
+          senderAddress={senderAddress}
+          useMyInfo={useMyInfo}
+          senderCoordinates={senderCoordinates}
+          errors={errors}
+          touched={touched}
+          onSenderNameChange={(text) => handleFieldChange('senderName', text)}
+          onSenderPhoneChange={(text) => handleFieldChange('senderPhone', text)}
+          onSenderAddressChange={(text) => handleFieldChange('senderAddress', text)}
+          onUseMyInfoChange={setUseMyInfo}
+          onOpenMap={() => openMapSelector('sender')}
+          onBlur={handleFieldBlur}
+        />
 
         {/* 收件人信息 */}
-        <FadeInView delay={200}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleContainer}>
-              <LocationIcon size={18} color="#1e293b" />
-              <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
-            </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.receiverName} *</Text>
-            <TextInput
-              style={styles.input}
-              value={receiverName}
-              onChangeText={setReceiverName}
-              placeholder={currentT.placeholders.name}
-              placeholderTextColor="#9ca3af"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{currentT.receiverPhone} *</Text>
-            <TextInput
-              style={styles.input}
-              value={receiverPhone}
-              onChangeText={setReceiverPhone}
-              placeholder={currentT.placeholders.phone}
-              placeholderTextColor="#9ca3af"
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>{currentT.receiverAddress} *</Text>
-              <TouchableOpacity onPress={() => openMapSelector('receiver')}>
-                <Text style={styles.linkButton}>🗺️ {currentT.openMap}</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={receiverAddress}
-              onChangeText={(text) => {
-                // 如果用户手动编辑地址，移除坐标信息
-                const lines = text.split('\n');
-                const addressLines = lines.filter(line => !line.includes('📍'));
-                setReceiverAddress(addressLines.join('\n'));
-              }}
-              placeholder={currentT.placeholders.address}
-              placeholderTextColor="#9ca3af"
-              multiline
-              numberOfLines={3}
-            />
-            {receiverCoordinates && (
-              <View style={styles.coordsContainer}>
-                <Text style={styles.coordsLabel}>经纬度：</Text>
-                <Text style={styles.coordsText}>
-                  {receiverCoordinates.lat.toFixed(6)}, {receiverCoordinates.lng.toFixed(6)}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-        </FadeInView>
+        <ReceiverForm
+          language={language}
+          styles={styles}
+          currentT={currentT}
+          receiverName={receiverName}
+          receiverPhone={receiverPhone}
+          receiverAddress={receiverAddress}
+          receiverCoordinates={receiverCoordinates}
+          errors={errors}
+          touched={touched}
+          onReceiverNameChange={(text) => handleFieldChange('receiverName', text)}
+          onReceiverPhoneChange={(text) => handleFieldChange('receiverPhone', text)}
+          onReceiverAddressChange={(text) => handleFieldChange('receiverAddress', text)}
+          onOpenMap={() => openMapSelector('receiver')}
+          onBlur={handleFieldBlur}
+        />
 
         {/* 包裹信息 */}
-        <FadeInView delay={300}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleContainer}>
-              <PackageIcon size={18} color="#1e293b" />
-              <Text style={styles.sectionTitle}> {currentT.packageInfo}</Text>
-            </View>
+        <PackageInfo
+          language={language}
+          styles={styles}
+          currentT={currentT}
+          packageType={packageType}
+          weight={weight}
+          description={description}
+          showWeightInput={showWeightInput}
+          packageTypes={packageTypes}
+          onPackageTypeChange={setPackageType}
+          onWeightChange={setWeight}
+          onDescriptionChange={setDescription}
+          onPackageTypeInfoClick={handlePackageTypeClick}
+        />
 
-            {/* 包裹类型部分 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>包裹类型 *</Text>
-              <View style={styles.chipContainer}>
-                {packageTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    style={[
-                      styles.chip,
-                      packageType === type.value && styles.chipActive
-                    ]}
-                    onPress={() => handlePackageTypeClick(type.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      packageType === type.value && styles.chipTextActive
-                    ]}>
-                      {type.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* 重量输入框 - 只在选择超重件或超规件时显示 */}
-            {showWeightInput && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{currentT.weight} *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={weight}
-                  onChangeText={setWeight}
-                  placeholder={currentT.placeholders.weight}
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            )}
-
-            {/* 配送选项部分 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>🚚配送选项 *</Text>
-              {deliverySpeeds.map((speed) => (
-                <TouchableOpacity
-                  key={speed.value}
-                  style={[
-                    styles.radioOption,
-                    deliverySpeed === speed.value && styles.radioOptionActive
-                  ]}
-                  onPress={() => {
-                    setDeliverySpeed(speed.value);
-                    if (speed.value === '定时达') {
-                      setShowTimePicker(true);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.radio}>
-                    {deliverySpeed === speed.value && <View style={styles.radioInner} />}
-                  </View>
-                    <View style={styles.radioContent}>
-                    <Text style={[
-                      styles.radioText,
-                      deliverySpeed === speed.value && styles.radioTextActive
-                    ]}>
-                      {speed.label}
-                    </Text>
-                    {speed.extra > 0 && (
-                      <Text style={styles.extraPrice}>+{speed.extra} MMK</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{currentT.description}</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={currentT.placeholders.description}
-                placeholderTextColor="#9ca3af"
-                multiline
-                numberOfLines={2}
-              />
-            </View>
-          </View>
-        </FadeInView>
+        {/* 配送选项 */}
+        <DeliveryOptions
+          language={language}
+          styles={styles}
+          currentT={currentT}
+          deliverySpeed={deliverySpeed}
+          deliverySpeeds={deliverySpeeds}
+          onDeliverySpeedChange={setDeliverySpeed}
+          onScheduleTimeClick={() => setShowTimePicker(true)}
+        />
 
         {/* 价格估算 */}
-        <ScaleInView delay={400}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <MoneyIcon size={18} color="#1e293b" />
-              <Text style={styles.sectionTitle}> {currentT.priceEstimate}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.calculateButton}
-              onPress={calculatePrice}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.calculateButtonGradient}
-              >
-                <Text style={styles.calculateButtonText}>🧮 {currentT.calculateButton}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.priceCard}>
-            {!isCalculated ? (
-              <View style={styles.pricePlaceholder}>
-                <Text style={styles.pricePlaceholderText}>
-                  📊 点击"计算"按钮获取精准费用
-                </Text>
-                <Text style={styles.pricePlaceholderSubtext}>
-                  需要先选择寄件和收件地址的精确位置
-                </Text>
-              </View>
-            ) : (
-              <>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>{currentT.distance}:</Text>
-                  <Text style={styles.priceValue}>{calculatedDistance} {currentT.kmUnit}</Text>
-                </View>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
-                  <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
-                </View>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
-                  <Text style={styles.priceValue}>
-                    {Math.round(Math.max(0, calculatedDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee)} MMK
-                  </Text>
-                </View>
-                {packageType === '超重件（5KG）以上' && parseFloat(weight || '0') > 5 && (
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>超重附加费:</Text>
-                    <Text style={styles.priceValue}>
-                      {Math.round(Math.max(0, parseFloat(weight) - 5) * pricingSettings.weight_surcharge)} MMK
-                    </Text>
-                  </View>
-                )}
-                {deliverySpeed !== '准时达' && (
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
-                    <Text style={styles.priceValue}>
-                      {deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0} MMK
-                    </Text>
-                  </View>
-                )}
-                {packageType === '超规件（45x60x15cm）以上' && (
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>超规附加费:</Text>
-                    <Text style={styles.priceValue}>
-                      {Math.round(calculatedDistance * pricingSettings.oversize_surcharge)} MMK
-                    </Text>
-                  </View>
-                )}
-                {packageType === '易碎品' && (
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>易碎品附加费:</Text>
-                    <Text style={styles.priceValue}>{pricingSettings.fragile_surcharge} MMK</Text>
-                  </View>
-                )}
-                {packageType === '食品和饮料' && (
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>食品附加费:</Text>
-                    <Text style={styles.priceValue}>
-                      {Math.round(calculatedDistance * pricingSettings.food_beverage_surcharge)} MMK
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.priceDivider} />
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>
-                  <Text style={styles.priceTotal}>{calculatedPrice} MMK</Text>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-        </ScaleInView>
+        <PriceCalculation
+          language={language}
+          styles={styles}
+          currentT={currentT}
+          isCalculated={isCalculated}
+          calculatedDistance={calculatedDistance}
+          calculatedPrice={calculatedPrice}
+          packageType={packageType}
+          weight={weight}
+          deliverySpeed={deliverySpeed}
+          deliverySpeeds={deliverySpeeds}
+          pricingSettings={pricingSettings}
+          onCalculate={calculatePrice}
+        />
 
         {/* 支付方式选择 */}
         <ScaleInView delay={450}>
@@ -1496,176 +1334,27 @@ export default function PlaceOrderScreen({ navigation }: any) {
       </ScrollView>
 
       {/* 地图选择模态框 */}
-      <Modal
+      <MapModal
         visible={showMapModal}
-        animationType="slide"
-        onRequestClose={() => setShowMapModal(false)}
-      >
-        <View style={styles.mapModalContainer}>
-          <View style={styles.mapHeader}>
-            <TouchableOpacity onPress={() => setShowMapModal(false)}>
-              <Text style={styles.mapCloseButton}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.mapTitle}>
-              {mapType === 'sender' ? currentT.senderAddress : currentT.receiverAddress}
-            </Text>
-            <View style={styles.mapHeaderButtons}>
-              <TouchableOpacity onPress={useCurrentLocationInMap} style={styles.mapCurrentLocationButton}>
-                <Text style={styles.mapCurrentLocationText}>📍 {currentT.useCurrentLocation}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={confirmMapLocation}>
-                <Text style={styles.mapConfirmButton}>✓</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* 地址输入框 - 移动到标题下方 */}
-          <View style={styles.mapAddressInputContainer}>
-            <TextInput
-              style={styles.mapAddressInput}
-              value={mapAddressInput}
-              onChangeText={(text) => {
-                setMapAddressInput(text);
-                handleMapAddressInputChange(text);
-              }}
-              placeholder={language === 'zh' ? '搜索店铺名称或输入详细地址' : language === 'en' ? 'Search store name or enter detailed address' : 'ဆိုင်အမည် ရှာဖွေရန် သို့မဟုတ် အသေးစိတ်လိပ်စာထည့်ပါ'}
-              placeholderTextColor="#9ca3af"
-              onFocus={() => {
-                if (mapAddressInput.trim()) {
-                  handleMapAddressInputChange(mapAddressInput);
-                }
-              }}
-              onBlur={() => {
-                // 延迟隐藏建议列表，以便点击建议项
-                setTimeout(() => setShowSuggestions(false), 200);
-              }}
-            />
-            
-            {/* 自动完成建议列表 */}
-            {showSuggestions && autocompleteSuggestions.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <ScrollView 
-                  style={styles.suggestionsList} 
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled={true}
-                >
-                  {autocompleteSuggestions.map((suggestion, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        handleSelectSuggestion(suggestion);
-                        setShowSuggestions(false);
-                      }}
-                      activeOpacity={0.7}
-                      style={[
-                        styles.suggestionItem,
-                        index < autocompleteSuggestions.length - 1 && styles.suggestionItemBorder
-                      ]}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        {/* 店铺类型图标 */}
-                        <Text style={{ fontSize: 20, marginRight: 12 }}>
-                          {suggestion.typeIcon || '📍'}
-                        </Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.suggestionMainText}>{suggestion.main_text}</Text>
-                          {suggestion.secondary_text && (
-                            <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
-                              {suggestion.secondary_text}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 20, color: '#9ca3af', marginLeft: 8 }}>›</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          <MapView
-            provider={PROVIDER_GOOGLE}
-            style={styles.map}
-            initialRegion={{
-              latitude: selectedLocation.latitude,
-              longitude: selectedLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            region={{
-              latitude: selectedLocation.latitude,
-              longitude: selectedLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-            showsCompass={true}
-            showsScale={true}
-            loadingEnabled={true}
-            mapType="standard"
-            onPress={(e) => {
-              setSelectedLocation(e.nativeEvent.coordinate);
-              setSelectedPlace(null); // 清除POI选择
-            }}
-            onPoiClick={(e) => {
-              // 点击POI时自动选择该位置
-              setSelectedLocation(e.nativeEvent.coordinate);
-              setSelectedPlace({
-                name: e.nativeEvent.name || '选中位置',
-                address: e.nativeEvent.name || '未知地址'
-              });
-            }}
-            onMapReady={() => {
-              console.log('地图已准备就绪');
-            }}
-            onError={(error) => {
-              console.error('地图加载错误:', error);
-              Alert.alert(
-                language === 'zh' ? '地图加载失败' : language === 'en' ? 'Map Loading Failed' : 'မြေပုံဖွင့်ရန်မအောင်မြင်ပါ',
-                language === 'zh' 
-                  ? '请检查网络连接或Google Maps API配置。' 
-                  : language === 'en' 
-                  ? 'Please check your network connection or Google Maps API configuration.'
-                  : 'ကျေးဇူးပြု၍ ကွန်ရက်ချိတ်ဆက်မှု သို့မဟုတ် Google Maps API ကိုစစ်ဆေးပါ။'
-              );
-            }}
-          >
-            {/* 主标记 - 用户选择的位置 */}
-            <Marker
-              coordinate={selectedLocation}
-              draggable
-              onDragEnd={(e) => {
-                setSelectedLocation(e.nativeEvent.coordinate);
-                setSelectedPlace(null); // 拖动时清除POI选择
-              }}
-              title="选择的位置"
-              description="拖动或点击地图调整位置"
-            />
-          </MapView>
-
-          {/* 已选择地点信息 - 显示在地图下方 */}
-          {selectedPlace && (
-            <View style={styles.selectedPlaceInfo}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={{ fontSize: 18, marginRight: 8 }}>✅</Text>
-                <Text style={styles.selectedPlaceName}>
-                  {selectedPlace.name || (language === 'zh' ? '已选择位置' : language === 'en' ? 'Selected Location' : 'ရွေးချယ်ထားသောနေရာ')}
-                </Text>
-                {selectedPlace.rating && (
-                  <Text style={{ fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>
-                    ⭐ {selectedPlace.rating.toFixed(1)}
-                  </Text>
-                )}
-              </View>
-              {selectedPlace.address && (
-                <Text style={styles.selectedPlaceAddress}>{selectedPlace.address}</Text>
-              )}
-            </View>
-          )}
-        </View>
-      </Modal>
+        language={language}
+        styles={styles}
+        currentT={currentT}
+        mapType={mapType}
+        selectedLocation={selectedLocation}
+        selectedPlace={selectedPlace}
+        mapAddressInput={mapAddressInput}
+        showSuggestions={showSuggestions}
+        autocompleteSuggestions={autocompleteSuggestions}
+        onClose={() => setShowMapModal(false)}
+        onConfirm={confirmMapLocation}
+        onAddressInputChange={setMapAddressInput}
+        onMapAddressInputChange={handleMapAddressInputChange}
+        onUseCurrentLocation={useCurrentLocationInMap}
+        onSelectSuggestion={handleSelectSuggestion}
+        onSetShowSuggestions={setShowSuggestions}
+        onLocationChange={setSelectedLocation}
+        onPlaceChange={setSelectedPlace}
+      />
 
       {/* 包裹类型说明模态框 */}
       <Modal
@@ -2362,14 +2051,14 @@ const baseStyles = StyleSheet.create({
   },
   suggestionsContainer: {
     position: 'absolute',
-    top: 60, // 输入框下方
+    top: 70, // 输入框下方 (padding 15 + input height ~50 + margin 5)
     left: 20,
     right: 20,
     backgroundColor: '#ffffff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    maxHeight: 400, // 增加最大高度，显示更多结果
+    maxHeight: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

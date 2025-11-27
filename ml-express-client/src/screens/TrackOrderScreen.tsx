@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
+import BackToHomeButton from '../components/BackToHomeButton';
 
 const { width } = Dimensions.get('window');
 
@@ -47,7 +48,7 @@ interface TrackingEvent {
   longitude?: number;
 }
 
-export default function TrackOrderScreen() {
+export default function TrackOrderScreen({ navigation }: any) {
   const { language } = useApp();
   const [trackingCode, setTrackingCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -236,6 +237,7 @@ export default function TrackOrderScreen() {
 
   return (
     <View style={styles.container}>
+      <BackToHomeButton navigation={navigation} position="topRight" />
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { errorService, AppError } from '../services/ErrorService';
 
 interface ErrorHandlerProps {
-  error?: Error | null;
+  error?: any;
   onRetry?: () => void;
   onDismiss?: () => void;
 }
@@ -14,10 +15,13 @@ const ErrorHandler: React.FC<ErrorHandlerProps> = ({
   onDismiss 
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [appError, setAppError] = useState<AppError | null>(null);
   const slideAnim = useState(new Animated.Value(-100))[0];
 
   useEffect(() => {
     if (error) {
+      const parsed = errorService.parseError(error);
+      setAppError(parsed);
       setIsVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -31,6 +35,7 @@ const ErrorHandler: React.FC<ErrorHandlerProps> = ({
         useNativeDriver: true,
       }).start(() => {
         setIsVisible(false);
+        setAppError(null);
       });
     }
   }, [error, slideAnim]);
@@ -42,6 +47,7 @@ const ErrorHandler: React.FC<ErrorHandlerProps> = ({
       useNativeDriver: true,
     }).start(() => {
       setIsVisible(false);
+      setAppError(null);
       onDismiss?.();
     });
   };
@@ -51,7 +57,7 @@ const ErrorHandler: React.FC<ErrorHandlerProps> = ({
     onRetry?.();
   };
 
-  if (!isVisible || !error) return null;
+  if (!isVisible || !appError) return null;
 
   return (
     <Animated.View
@@ -69,9 +75,9 @@ const ErrorHandler: React.FC<ErrorHandlerProps> = ({
         <View style={styles.content}>
           <Text style={styles.icon}>⚠️</Text>
           <View style={styles.textContainer}>
-            <Text style={styles.title}>出现错误</Text>
+            <Text style={styles.title}>提示</Text>
             <Text style={styles.message} numberOfLines={2}>
-              {error.message || '未知错误'}
+              {appError.message}
             </Text>
           </View>
           <View style={styles.buttons}>
@@ -105,86 +111,22 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    // 报告错误到Sentry（如果已初始化）
-    try {
-      // Sentry 已暂时禁用
-      // const { sentryService } = require('../services/SentryService');
-      // sentryService.captureException(error, {
-      //   errorInfo,
-      //   componentStack: errorInfo.componentStack,
-      // });
-    } catch (sentryError) {
-      // Sentry未初始化或导入失败，忽略
-      console.warn('Sentry error reporting failed:', sentryError);
-    }
-  }
-
-  async getErrorMessage() {
-    // 尝试从AsyncStorage获取语言设置
-    let language = 'zh';
-    try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      const lang = await AsyncStorage.getItem('ml-express-language');
-      if (lang && ['zh', 'en', 'my'].includes(lang)) {
-        language = lang;
-      }
-    } catch (e) {
-      // 忽略错误，使用默认语言
-    }
-
-    const messages: Record<string, { title: string; message: string; retry: string }> = {
-      zh: {
-        title: '应用出现错误',
-        message: '很抱歉，应用遇到了一个错误。请重启应用或联系技术支持。',
-        retry: '重试',
-      },
-      en: {
-        title: 'Application Error',
-        message: 'Sorry, the app encountered an error. Please restart the app or contact support.',
-        retry: 'Retry',
-      },
-      my: {
-        title: 'အက်ပ်အမှားအယွင်း',
-        message: 'ဝမ်းနည်းပါတယ်၊ အက်ပ်တွင် အမှားအယွင်းတစ်ခု ဖြစ်ပွားခဲ့သည်။ ကျေးဇူးပြု၍ အက်ပ်ကို ပြန်လည်စတင်ပါ သို့မဟုတ် အထောက်အပံ့ကို ဆက်သွယ်ပါ။',
-        retry: 'ပြန်လုပ်ရန်',
-      },
-    };
-
-    return messages[language] || messages.zh;
+    // 使用 ErrorService 记录错误
+    errorService.handleError(error, { context: 'ErrorBoundary', silent: true });
+    console.error('ErrorBoundary caught error:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      // 使用同步方式获取错误消息（简化版本）
-      const errorMessages = {
-        zh: {
-          title: '应用出现错误',
-          message: '很抱歉，应用遇到了一个错误。请重启应用或联系技术支持。',
-          retry: '重试',
-        },
-        en: {
-          title: 'Application Error',
-          message: 'Sorry, the app encountered an error. Please restart the app or contact support.',
-          retry: 'Retry',
-        },
-        my: {
-          title: 'အက်ပ်အမှားအယွင်း',
-          message: 'ဝမ်းနည်းပါတယ်၊ အက်ပ်တွင် အမှားအယွင်းတစ်ခု ဖြစ်ပွားခဲ့သည်။ ကျေးဇူးပြု၍ အက်ပ်ကို ပြန်လည်စတင်ပါ သို့မဟုတ် အထောက်အပံ့ကို ဆက်သွယ်ပါ။',
-          retry: 'ပြန်လုပ်ရန်',
-        },
-      };
-      
-      // 默认使用中文，实际应用中可以通过Context获取
-      const messages = errorMessages.zh;
+      // 这里简化处理，实际应用中可以获取更详细的错误信息
+      const appError = errorService.parseError(this.state.error);
       
       return this.props.fallback || (
         <View style={styles.errorBoundaryContainer}>
           <Text style={styles.errorBoundaryIcon}>💥</Text>
-          <Text style={styles.errorBoundaryTitle}>{messages.title}</Text>
+          <Text style={styles.errorBoundaryTitle}>应用出现错误</Text>
           <Text style={styles.errorBoundaryMessage}>
-            {messages.message}
+            {appError.message}
           </Text>
           {this.state.error && __DEV__ && (
             <Text style={styles.errorBoundaryDebug}>
@@ -199,7 +141,7 @@ export class ErrorBoundary extends React.Component<
               colors={['#2E86AB', '#4CA1CF']}
               style={styles.errorBoundaryButtonGradient}
             >
-              <Text style={styles.errorBoundaryButtonText}>{messages.retry}</Text>
+              <Text style={styles.errorBoundaryButtonText}>重试</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -214,9 +156,14 @@ export class ErrorBoundary extends React.Component<
 export const useErrorHandler = () => {
   const [error, setError] = useState<Error | null>(null);
 
-  const handleError = (error: Error) => {
-    console.error('Error caught:', error);
-    setError(error);
+  const handleError = (error: any, options?: { context?: string; silent?: boolean }) => {
+    const appError = errorService.handleError(error, { 
+        context: options?.context, 
+        silent: true // 我们自己显示错误 UI，所以让 Service 保持沉默
+    });
+    // 这里我们将 appError 转回 Error 对象或者直接使用它
+    // 为了兼容现有代码，我们设置 error state
+    setError(new Error(appError.message));
   };
 
   const clearError = () => {
@@ -225,7 +172,6 @@ export const useErrorHandler = () => {
 
   const retry = () => {
     clearError();
-    // 可以在这里添加重试逻辑
   };
 
   return {
@@ -238,7 +184,7 @@ export const useErrorHandler = () => {
 
 // 全局错误处理器
 export const GlobalErrorHandler: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { error, clearError, retry } = useErrorHandler();
+  const { error, clearError, retry, handleError } = useErrorHandler();
 
   useEffect(() => {
     const originalConsoleError = console.error;
@@ -249,8 +195,8 @@ export const GlobalErrorHandler: React.FC<{ children: React.ReactNode }> = ({ ch
       if (args[0]?.includes?.('Error:') || args[0]?.includes?.('TypeError:')) {
         const errorMessage = args.join(' ');
         const error = new Error(errorMessage);
-        // 这里可以发送错误到错误报告服务
-        console.log('Global error caught:', error);
+        // 捕获全局错误
+        handleError(error, { context: 'GlobalErrorHandler' });
       }
     };
 
@@ -269,42 +215,6 @@ export const GlobalErrorHandler: React.FC<{ children: React.ReactNode }> = ({ ch
       />
     </>
   );
-};
-
-// 错误类型枚举
-export enum ErrorType {
-  NETWORK = 'NETWORK',
-  VALIDATION = 'VALIDATION',
-  PERMISSION = 'PERMISSION',
-  UNKNOWN = 'UNKNOWN',
-}
-
-// 错误消息映射
-export const ErrorMessages = {
-  [ErrorType.NETWORK]: '网络连接失败，请检查网络设置',
-  [ErrorType.VALIDATION]: '输入信息有误，请检查后重试',
-  [ErrorType.PERMISSION]: '权限被拒绝，请在设置中开启相关权限',
-  [ErrorType.UNKNOWN]: '未知错误，请稍后重试',
-};
-
-// 错误处理工具函数
-export const handleApiError = (error: any): string => {
-  if (error?.response?.status === 401) {
-    return '登录已过期，请重新登录';
-  }
-  if (error?.response?.status === 403) {
-    return '没有权限执行此操作';
-  }
-  if (error?.response?.status === 404) {
-    return '请求的资源不存在';
-  }
-  if (error?.response?.status >= 500) {
-    return '服务器错误，请稍后重试';
-  }
-  if (error?.code === 'NETWORK_ERROR') {
-    return '网络连接失败，请检查网络设置';
-  }
-  return error?.message || '操作失败，请稍后重试';
 };
 
 const styles = StyleSheet.create({
