@@ -1312,7 +1312,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
 
                     {/* 页码显示（最多显示5个页码） */}
                     {Array.from({ length: Math.min(5, getTotalPages()) }, (_, i) => {
-                      let pageNum;
+                      let pageNum: number;
                       if (getTotalPages() <= 5) {
                         pageNum = i + 1;
                       } else if (currentPage <= 3) {
