@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,11 +48,21 @@ const linking = {
   },
 };
 
+import { analytics, EventType } from './src/services/AnalyticsService';
+
+// ...
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     initializeApp();
+    
+    // 应用启动追踪
+    analytics.track(EventType.APP_OPEN, {
+      platform: Platform.OS,
+      version: '1.1.0'
+    });
   }, []);
 
   const initializeApp = async () => {

@@ -18,11 +18,18 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { packageService } from '../services/supabase';
-import { errorService } from '../services/ErrorService';
-import { theme } from '../config/theme';
-import { APP_CONFIG } from '../config/constants';
+import { analytics, EventType } from '../services/AnalyticsService';
 
-const { width } = Dimensions.get('window');
+// ...
+
+export default function HomeScreen({ navigation }: any) {
+  // ... (existing hooks)
+
+  useEffect(() => {
+    analytics.trackPageView('HomeScreen');
+  }, []);
+
+  // ...
 
 const HOTLINE_NUMBERS = [
   { display: APP_CONFIG.CONTACT.PHONE_DISPLAY, tel: APP_CONFIG.CONTACT.PHONE },
@@ -372,7 +379,7 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.subtitle}>{currentT.subtitle}</Text>
             
             {/* 用户欢迎信息 */}
-            <View style={styles.welcomeContainer}>
+            <View style={styles.welcomeContainer} accessibilityRole="header">
               <Text style={styles.welcomeText}>
                 {userName ? `${currentT.welcomeBack}, ${userName}!` : 
                  isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
@@ -390,6 +397,8 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.statCard}
                 onPress={() => navigation.navigate('MyOrders', { filterStatus: 'all' })}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${currentT.totalOrders}: ${orderStats.total}`}
               >
                 <LinearGradient
                   colors={['#3b82f6', '#2563eb']}
@@ -406,6 +415,8 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.statCard}
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('MyOrders', { filterStatus: '待取件' })}
+                accessibilityRole="button"
+                accessibilityLabel={`${currentT.pendingOrders}: ${orderStats.pending}`}
               >
                 <LinearGradient
                   colors={['#f59e0b', '#d97706']}
@@ -422,6 +433,8 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.statCard}
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('MyOrders', { filterStatus: '配送中' })}
+                accessibilityRole="button"
+                accessibilityLabel={`${currentT.inTransitOrders}: ${orderStats.inTransit}`}
               >
                 <LinearGradient
                   colors={['#8b5cf6', '#7c3aed']}
@@ -438,6 +451,8 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.statCard}
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('MyOrders', { filterStatus: '已送达' })}
+                accessibilityRole="button"
+                accessibilityLabel={`${currentT.deliveredOrders}: ${orderStats.delivered}`}
               >
                 <LinearGradient
                   colors={['#10b981', '#059669']}
@@ -461,6 +476,9 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('PlaceOrder', currentT.placeOrder + '...')}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.placeOrder}
+              accessibilityHint="跳转到下单页面"
             >
               <LinearGradient
                 colors={['#f59e0b', '#d97706']}
@@ -480,6 +498,9 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('TrackOrder', currentT.trackOrder + '...')}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.trackOrder}
+              accessibilityHint="跳转到订单追踪页面"
             >
               <LinearGradient
                 colors={['#3b82f6', '#2563eb']}
@@ -499,6 +520,9 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('MyOrders', currentT.myOrders + '...')}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.myOrders}
+              accessibilityHint="查看我的订单列表"
             >
               <LinearGradient
                 colors={['#8b5cf6', '#7c3aed']}
@@ -518,6 +542,9 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('Profile', currentT.profile + '...')}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.profile}
+              accessibilityHint="查看个人中心"
             >
               <LinearGradient
                 colors={['#10b981', '#059669']}
@@ -573,6 +600,8 @@ export default function HomeScreen({ navigation }: any) {
                   style={styles.orderCard}
                   onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`订单 ${order.id}, 收件人 ${order.receiver_name}, 状态 ${order.status}`}
                 >
                   <View style={styles.orderHeader}>
                     <View style={styles.orderInfo}>
@@ -714,6 +743,8 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.contactCard}
               onPress={handleCallHotline}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${currentT.phone}: ${hotlineDisplay}`}
             >
               <LinearGradient
                 colors={['#3b82f6', '#2563eb']}
