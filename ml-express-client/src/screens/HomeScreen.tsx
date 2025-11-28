@@ -531,6 +531,80 @@ export default function HomeScreen({ navigation }: any) {
                 </LinearGradient>
               </View>
             </View>
+
+            {/* 第三张卡片：上线促销 (新设计) */}
+            <View style={styles.bannerCardWrapper}>
+              <View style={styles.bannerCard}>
+                <LinearGradient
+                  colors={['#e2e8f0', '#f8fafc', '#ffffff']} // 极简企业灰白调
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.bannerGradient}
+                >
+                  <View style={styles.bannerContentRow}>
+                    <View style={styles.bannerTextArea}>
+                      <View style={{
+                        backgroundColor: '#1e293b', 
+                        paddingHorizontal: 8, 
+                        paddingVertical: 2, 
+                        borderRadius: 4, 
+                        alignSelf: 'flex-start',
+                        marginBottom: 6
+                      }}>
+                        <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>NEW LAUNCH</Text>
+                      </View>
+                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>MARKET LINK Express{'\n'}新同城快递上线</Text>
+                      
+                      <View style={{marginVertical: 6}}>
+                        <Text style={{fontSize: 18, fontWeight: 'bold', color: '#2563eb'}}>2000 MMK / 每程</Text>
+                        <Text style={{fontSize: 10, color: '#64748b'}}>曼德勒市内统一价 · 活动仅1个月</Text>
+                      </View>
+
+                      <View style={{gap: 2}}>
+                        <Text style={{fontSize: 10, color: '#475569'}}>📅 2026年1月1日正式启动</Text>
+                        <Text style={{fontSize: 9, color: '#94a3b8', fontStyle: 'italic'}}>2026 ဇန်နဝါရီ 1 · စတင်တင်ပြ</Text>
+                        <Text style={{fontSize: 9, color: '#94a3b8', fontStyle: 'italic'}}>စနစ်စမ်းသပ်ပရိုမိုးရှင်း</Text>
+                      </View>
+                      
+                      <View style={[styles.bannerCtaButton, { backgroundColor: '#2563eb', marginTop: 8 }]}>
+                        <Text style={[styles.bannerCtaText, { color: '#ffffff' }]}>立即体验 →</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.phoneMockupContainer}>
+                      {/* 3D 手机 (浅色极简风格) */}
+                      <View style={[styles.phoneMockup, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]}>
+                        <View style={[styles.phoneScreen, { backgroundColor: '#ffffff', padding: 10, alignItems: 'center', justifyContent: 'center' }]}>
+                          <View style={{width: 40, height: 40, borderRadius: 20, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 10}}>
+                            <Text style={{fontSize: 20}}>🚀</Text>
+                          </View>
+                          <Text style={{fontSize: 10, fontWeight: 'bold', color: '#1e293b', textAlign: 'center'}}>GRAND OPENING</Text>
+                          <Text style={{fontSize: 8, color: '#64748b', textAlign: 'center', marginTop: 2}}>Jan 1, 2026</Text>
+                          
+                          <View style={{width: '100%', height: 1, backgroundColor: '#e2e8f0', marginVertical: 8}} />
+                          
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                            <Text style={{fontSize: 12}}>💰</Text>
+                            <Text style={{fontSize: 12, fontWeight: 'bold', color: '#2563eb'}}>2000 Ks</Text>
+                          </View>
+                        </View>
+                        <LinearGradient
+                          colors={['rgba(255,255,255,0.8)', 'transparent', 'rgba(255,255,255,0.1)']}
+                          style={styles.phoneReflection}
+                        />
+                      </View>
+                      {/* 3D 浮动元素 - 促销标签 */}
+                      <View style={[styles.floatingIcon, { top: -5, right: -10, backgroundColor: '#ef4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }]}>
+                        <Text style={{fontSize: 8, color: 'white', fontWeight: 'bold'}}>-50%</Text>
+                      </View>
+                      <View style={[styles.floatingIcon, { bottom: 15, left: -15, backgroundColor: '#ffffff', padding: 4, shadowColor: '#000', shadowOpacity: 0.1, elevation: 2 }]}>
+                        <Text style={{fontSize: 16}}>🎉</Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
           </ScrollView>
         </View>
 
