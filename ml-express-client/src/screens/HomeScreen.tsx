@@ -488,7 +488,6 @@ export default function HomeScreen({ navigation }: any) {
                   
                   <View style={styles.bannerContentRow}>
                     <View style={styles.bannerTextArea}>
-                      <Text style={[styles.bannerBrandName, { color: '#1f2937', textAlign: 'left' }]}>MARKET LINK Express</Text>
                       <Text style={[styles.bannerHeadline, { color: '#1f2937', marginTop: 4 }]}>一键填写地址{'\n'}极速上门取件</Text>
                       <Text style={[styles.bannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 全城服务 · 30分钟送达</Text>
                       <Text style={[styles.bannerBurmeseText, { color: '#6b7280' }]}>
@@ -553,7 +552,7 @@ export default function HomeScreen({ navigation }: any) {
                       }}>
                         <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>NEW LAUNCH</Text>
                       </View>
-                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>MARKET LINK Express{'\n'}新同城快递上线</Text>
+                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>新同城快递上线</Text>
                       
                       <View style={{marginVertical: 6}}>
                         <Text style={{fontSize: 18, fontWeight: 'bold', color: '#2563eb'}}>2000 MMK / 每程</Text>
