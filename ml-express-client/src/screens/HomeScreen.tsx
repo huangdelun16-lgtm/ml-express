@@ -18,18 +18,12 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { packageService } from '../services/supabase';
+import { errorService } from '../services/ErrorService';
+import { theme } from '../config/theme';
+import { APP_CONFIG } from '../config/constants';
 import { analytics, EventType } from '../services/AnalyticsService';
 
-// ...
-
-export default function HomeScreen({ navigation }: any) {
-  // ... (existing hooks)
-
-  useEffect(() => {
-    analytics.trackPageView('HomeScreen');
-  }, []);
-
-  // ...
+const { width } = Dimensions.get('window');
 
 const HOTLINE_NUMBERS = [
   { display: APP_CONFIG.CONTACT.PHONE_DISPLAY, tel: APP_CONFIG.CONTACT.PHONE },
@@ -55,6 +49,11 @@ interface RecentOrder {
 export default function HomeScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
+  
+  useEffect(() => {
+    analytics.trackPageView('HomeScreen');
+  }, []);
+
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
