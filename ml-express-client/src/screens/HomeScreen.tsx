@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,28 @@ export default function HomeScreen({ navigation }: any) {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const scrollY = new Animated.Value(0);
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  // 自动轮播逻辑
+  useEffect(() => {
+    const timer = setInterval(() => {
+      let nextIndex = currentBannerIndex + 1;
+      if (nextIndex >= 2) { // 总共2张卡片
+        nextIndex = 0;
+      }
+      
+      if (bannerScrollRef.current) {
+        bannerScrollRef.current.scrollTo({
+          x: nextIndex * (width - 32), // 宽度需要计算 padding
+          animated: true,
+        });
+        setCurrentBannerIndex(nextIndex);
+      }
+    }, 5000); // 5秒切换
+
+    return () => clearInterval(timer);
+  }, [currentBannerIndex]);
 
   const t = {
     zh: {
@@ -387,79 +409,128 @@ export default function HomeScreen({ navigation }: any) {
           </LinearGradient>
         </Animated.View>
 
-        {/* 3D 风格广告横幅 */}
+        {/* 3D 风格广告横幅 (自动轮播) */}
         <View style={styles.bannerContainer}>
-          <TouchableOpacity 
-            style={styles.bannerCard}
-            activeOpacity={0.95}
-            onPress={() => Linking.openURL('https://www.market-link-express.com')}
+          <ScrollView
+            ref={bannerScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={false} // 禁止手动滑动（如果只想自动轮播）或者设为 true
+            style={styles.bannerScroll}
+            contentContainerStyle={{ width: (width - 32) * 2 }} // 确保宽度足够放下两张卡片
           >
-            <LinearGradient
-              colors={['#3b82f6', '#60a5fa', '#ffffff']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              locations={[0, 0.6, 1]}
-              style={styles.bannerGradient}
-            >
-              {/* 背景装饰：曼德勒城市剪影 (抽象) */}
-              <View style={styles.citySilhouette} />
-
-              <View style={styles.bannerContentRow}>
-                {/* 左侧：文案区域 */}
-                <View style={styles.bannerTextArea}>
-                  {/* Logo (仅图标) */}
-                  <Image 
-                    source={require('../../assets/logo.png')} 
-                    style={styles.bannerLogoIcon} 
-                    resizeMode="contain"
-                  />
-                  
-                  <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
-                  <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位</Text>
-                  <Text style={styles.bannerBurmeseText}>
-                    မန္တလေးမြို့တွင်း သယ်ပို့ခြင်း – မြန်မြန်ဆန်ဆန် · လုံခြုံစိတ်ချ · စမတ်စမတ်
-                  </Text>
-                  
-                  <View style={styles.bannerCtaButton}>
-                    <Text style={styles.bannerCtaText}>立即下单 →</Text>
-                  </View>
-                </View>
-
-                {/* 右侧：3D 手机模型 */}
-                <View style={styles.phoneMockupContainer}>
-                  <View style={styles.phoneMockup}>
-                    {/* 手机屏幕内容 (模拟地图追踪 UI) */}
-                    <View style={styles.phoneScreen}>
-                      <View style={styles.mapRoute} />
-                      <View style={styles.mapPinSender}>
-                        <Text style={{fontSize: 10}}>🏠</Text>
-                      </View>
-                      <View style={styles.mapPinRider}>
-                        <Text style={{fontSize: 12}}>🛵</Text>
-                      </View>
-                      <View style={styles.mapPinReceiver}>
-                        <Text style={{fontSize: 10}}>📍</Text>
-                      </View>
-                      {/* 浮动卡片 */}
-                      <View style={styles.floatingCard}>
-                        <Text style={{fontSize: 8, fontWeight: 'bold', color: '#333'}}>正在配送中...</Text>
-                        <Text style={{fontSize: 7, color: '#666'}}>预计 15 分钟送达</Text>
+            {/* 第一张卡片：地图追踪 (不可点击) */}
+            <View style={styles.bannerCardWrapper}>
+              <View style={styles.bannerCard}>
+                <LinearGradient
+                  colors={['#3b82f6', '#60a5fa', '#ffffff']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.6, 1]}
+                  style={styles.bannerGradient}
+                >
+                  <View style={styles.citySilhouette} />
+                  <View style={styles.bannerContentRow}>
+                    <View style={styles.bannerTextArea}>
+                      <Image 
+                        source={require('../../assets/logo.png')} 
+                        style={styles.bannerLogoIcon} 
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
+                      <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位</Text>
+                      <Text style={styles.bannerBurmeseText}>
+                        မန္တလေးမြို့တွင်း သယ်ပို့ခြင်း – မြန်မြန်ဆန်ဆန် · လုံခြုံစိတ်ချ · စမတ်စမတ်
+                      </Text>
+                      <View style={styles.bannerCtaButton}>
+                        <Text style={styles.bannerCtaText}>立即下单 →</Text>
                       </View>
                     </View>
-                    {/* 手机光泽效果 */}
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.4)', 'transparent', 'rgba(255,255,255,0.1)']}
-                      style={styles.phoneReflection}
-                    />
+                    <View style={styles.phoneMockupContainer}>
+                      <View style={styles.phoneMockup}>
+                        <View style={styles.phoneScreen}>
+                          <View style={styles.mapRoute} />
+                          <View style={styles.mapPinSender}><Text style={{fontSize: 10}}>🏠</Text></View>
+                          <View style={styles.mapPinRider}><Text style={{fontSize: 12}}>🛵</Text></View>
+                          <View style={styles.mapPinReceiver}><Text style={{fontSize: 10}}>📍</Text></View>
+                          <View style={styles.floatingCard}>
+                            <Text style={{fontSize: 8, fontWeight: 'bold', color: '#333'}}>正在配送中...</Text>
+                            <Text style={{fontSize: 7, color: '#666'}}>预计 15 分钟送达</Text>
+                          </View>
+                        </View>
+                        <LinearGradient
+                          colors={['rgba(255,255,255,0.4)', 'transparent', 'rgba(255,255,255,0.1)']}
+                          style={styles.phoneReflection}
+                        />
+                      </View>
+                      <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
+                        <Text style={{fontSize: 24}}>📦</Text>
+                      </View>
+                    </View>
                   </View>
-                  {/* 悬浮元素 */}
-                  <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
-                    <Text style={{fontSize: 24}}>📦</Text>
-                  </View>
-                </View>
+                </LinearGradient>
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
+            </View>
+
+            {/* 第二张卡片：地址填写 (新设计) */}
+            <View style={styles.bannerCardWrapper}>
+              <View style={styles.bannerCard}>
+                <LinearGradient
+                  colors={['#f3f4f6', '#ffffff', '#e5e7eb']} // 浅灰色调
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.bannerGradient}
+                >
+                  {/* 曼德勒皇宫剪影背景 (更柔和) */}
+                  <View style={[styles.citySilhouette, { backgroundColor: 'rgba(0,0,0,0.05)', height: 80 }]} />
+                  
+                  <View style={styles.bannerContentRow}>
+                    <View style={styles.bannerTextArea}>
+                      <Text style={[styles.bannerBrandName, { color: '#1f2937', textAlign: 'left' }]}>MARKET LINK Express</Text>
+                      <Text style={[styles.bannerHeadline, { color: '#1f2937', marginTop: 4 }]}>一键填写地址{'\n'}极速上门取件</Text>
+                      <Text style={[styles.bannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 全城服务 · 30分钟送达</Text>
+                      <Text style={[styles.bannerBurmeseText, { color: '#6b7280' }]}>
+                        မန္တလေး မြိုထဲ သယ်ပို့ – လွယ်ကူ၊ မြန်ဆန်၊ စိတ်ချရ
+                      </Text>
+                      <View style={[styles.bannerCtaButton, { backgroundColor: '#1f2937' }]}>
+                        <Text style={[styles.bannerCtaText, { color: '#ffffff' }]}>立即下单 →</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.phoneMockupContainer}>
+                      {/* 3D 手机 (地址填写页面风格) */}
+                      <View style={[styles.phoneMockup, { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }]}>
+                        <View style={[styles.phoneScreen, { padding: 8 }]}>
+                          {/* 模拟输入框 */}
+                          <View style={{height: 20, backgroundColor: 'white', borderRadius: 4, marginBottom: 6, borderWidth: 1, borderColor: '#e5e7eb', justifyContent: 'center', paddingHorizontal: 4}}>
+                            <Text style={{fontSize: 6, color: '#9ca3af'}}>📍 取件地址</Text>
+                          </View>
+                          <View style={{height: 20, backgroundColor: 'white', borderRadius: 4, marginBottom: 6, borderWidth: 1, borderColor: '#e5e7eb', justifyContent: 'center', paddingHorizontal: 4}}>
+                            <Text style={{fontSize: 6, color: '#9ca3af'}}>🏠 送达地址</Text>
+                          </View>
+                          <View style={{height: 30, backgroundColor: '#3b82f6', borderRadius: 4, marginTop: 4, alignItems: 'center', justifyContent: 'center'}}>
+                            <Text style={{fontSize: 8, color: 'white', fontWeight: 'bold'}}>确认下单</Text>
+                          </View>
+                        </View>
+                        <LinearGradient
+                          colors={['rgba(255,255,255,0.6)', 'transparent', 'rgba(255,255,255,0.2)']}
+                          style={styles.phoneReflection}
+                        />
+                      </View>
+                      {/* 3D 浮动元素 */}
+                      <View style={[styles.floatingIcon, { top: 0, right: -15, backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+                        <Text style={{fontSize: 20}}>📍</Text>
+                      </View>
+                      <View style={[styles.floatingIcon, { bottom: 20, left: -15, backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+                        <Text style={{fontSize: 18}}>📝</Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
+          </ScrollView>
         </View>
 
         {/* Quick Action Cards - 4 Cards in Grid */}
