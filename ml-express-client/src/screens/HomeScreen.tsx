@@ -1019,7 +1019,7 @@ const styles = StyleSheet.create({
   },
   bannerCard: {
     width: '100%',
-    height: 220,
+    height: 240,
     borderRadius: 20,
     overflow: 'hidden',
     ...theme.shadows.medium,
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   phoneMockup: {
     width: 100,
-    height: 190,
+    height: 210,
     backgroundColor: '#1f2937', // 手机边框
     borderRadius: 14,
     borderWidth: 2,
