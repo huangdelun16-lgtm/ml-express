@@ -414,11 +414,12 @@ export default function HomeScreen({ navigation }: any) {
           <ScrollView
             ref={bannerScrollRef}
             horizontal
-            pagingEnabled
+            snapToInterval={width - 32}
+            decelerationRate="fast"
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={false} // 禁止手动滑动（如果只想自动轮播）或者设为 true
+            scrollEnabled={false}
             style={styles.bannerScroll}
-            contentContainerStyle={{ width: (width - 32) * 2 }} // 确保宽度足够放下两张卡片
+            contentContainerStyle={{ width: (width - 32) * 2 }}
           >
             {/* 第一张卡片：地图追踪 (不可点击) */}
             <View style={styles.bannerCardWrapper}>
