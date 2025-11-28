@@ -935,9 +935,17 @@ const styles = StyleSheet.create({
     marginTop: -30,
     marginBottom: 16,
   },
+  bannerScroll: {
+    overflow: 'hidden',
+  },
+  bannerCardWrapper: {
+    width: width - 32,
+    paddingRight: 0,
+    overflow: 'visible',
+  },
   bannerCard: {
     width: '100%',
-    height: 180, // 增加高度以容纳 3D 效果
+    height: 180,
     borderRadius: 20,
     overflow: 'hidden',
     ...theme.shadows.medium,
@@ -972,6 +980,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     marginBottom: 8,
+  },
+  bannerBrandName: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
   bannerHeadline: {
     fontSize: 18,
