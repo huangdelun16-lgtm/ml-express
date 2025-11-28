@@ -424,9 +424,14 @@ export default function HomeScreen({ navigation }: any) {
             style={styles.bannerScroll}
             contentContainerStyle={{ width: (width - 32) * 3 }}
           >
-            {/* 第一张卡片：地图追踪 (不可点击) */}
+            {/* 第一张卡片：地图追踪 */}
             <View style={styles.bannerCardWrapper}>
-              <View style={styles.bannerCard}>
+              <TouchableOpacity 
+                style={styles.bannerCard}
+                activeOpacity={1}
+                onPressIn={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
+              >
                 <LinearGradient
                   colors={['#3b82f6', '#60a5fa', '#ffffff']}
                   start={{ x: 0, y: 0 }}
@@ -474,7 +479,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* 第二张卡片：地址填写 (新设计) */}
@@ -565,7 +570,6 @@ export default function HomeScreen({ navigation }: any) {
                       }}>
                         <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>NEW LAUNCH</Text>
                       </View>
-                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>MARKET LINK Express</Text>
                       
                       <View style={{marginVertical: 6}}>
                         <Text style={{fontSize: 18, fontWeight: 'bold', color: '#2563eb'}}>MDY同城2000MMK/一趟</Text>
@@ -574,8 +578,7 @@ export default function HomeScreen({ navigation }: any) {
 
                       <View style={{gap: 2}}>
                         <Text style={{fontSize: 10, color: '#475569'}}>📅 2026年1月1日正式启动</Text>
-                        <Text style={{fontSize: 9, color: '#94a3b8', fontStyle: 'italic'}}>2026 ဇန်နဝါရီ 1 · စတင်တင်ပြ</Text>
-                        <Text style={{fontSize: 9, color: '#94a3b8', fontStyle: 'italic'}}>စနစ်စမ်းသပ်ပရိုမိုးရှင်း</Text>
+                        <Text style={{fontSize: 9, color: '#94a3b8', fontStyle: 'italic'}}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</Text>
                       </View>
                       
                       <View style={[styles.bannerCtaButton, { backgroundColor: '#2563eb', marginTop: 8 }]}>
