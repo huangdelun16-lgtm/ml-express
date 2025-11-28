@@ -115,8 +115,8 @@ export default function ProfileScreen({ navigation }: any) {
       privacyPolicy: '隐私政策',
       termsOfService: '用户协议',
       contactUs: '联系我们',
-      email: '邮箱',
-      phone: '电话',
+      contactEmail: '邮箱',
+      contactPhone: '电话',
       website: '网站',
       wechat: '微信',
       openLink: '打开链接',
@@ -173,8 +173,8 @@ export default function ProfileScreen({ navigation }: any) {
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
       contactUs: 'Contact Us',
-      email: 'Email',
-      phone: 'Phone',
+      contactEmail: 'Email',
+      contactPhone: 'Phone',
       website: 'Website',
       wechat: 'WeChat',
       openLink: 'Open Link',
@@ -231,8 +231,8 @@ export default function ProfileScreen({ navigation }: any) {
       privacyPolicy: 'ကိုယ်ရေးလုံခြုံမှုမူဝါဒ',
       termsOfService: 'အသုံးပြုသူစည်းမျဉ်းများ',
       contactUs: 'ဆက်သွယ်ရန်',
-      email: 'အီးမေးလ်',
-      phone: 'ဖုန်း',
+      contactEmail: 'အီးမေးလ်',
+      contactPhone: 'ဖုန်း',
       website: 'ဝက်ဘ်ဆိုဒ်',
       wechat: 'WeChat',
       openLink: 'လင့်ခ်ဖွင့်ရန်',
@@ -753,13 +753,13 @@ export default function ProfileScreen({ navigation }: any) {
                   style={styles.aboutLink}
                   onPress={() => Linking.openURL('mailto:marketlink982@gmail.com')}
                 >
-                  <Text style={styles.aboutLinkText}>📧 {t.email}: marketlink982@gmail.com</Text>
+                  <Text style={styles.aboutLinkText}>📧 {t.contactEmail}: marketlink982@gmail.com</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.aboutLink}
                   onPress={() => Linking.openURL('tel:+9509788848928')}
                 >
-                  <Text style={styles.aboutLinkText}>📞 {t.phone}: (+95) 09788848928</Text>
+                  <Text style={styles.aboutLinkText}>📞 {t.contactPhone}: (+95) 09788848928</Text>
                 </TouchableOpacity>
                 <View style={styles.aboutLink}>
                   <Text style={styles.aboutLinkText}>💬 {t.wechat}: AMT349</Text>

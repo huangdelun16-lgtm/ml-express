@@ -684,13 +684,13 @@ const ProfilePage: React.FC = () => {
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.15)',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1))',
           backdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          padding: '2rem',
+          borderRadius: '24px',
+          padding: '2.5rem',
           marginBottom: '2rem',
           border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease 0.2s'
@@ -699,24 +699,25 @@ const ProfilePage: React.FC = () => {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '1.5rem',
-            marginBottom: '2rem',
-            paddingBottom: '1.5rem',
-            borderBottom: '2px solid rgba(255,255,255,0.3)'
+            gap: '2rem',
+            marginBottom: '2.5rem',
+            paddingBottom: '2rem',
+            borderBottom: '1px solid rgba(255,255,255,0.2)'
           }}>
             {/* 头像 */}
             <div style={{
-              width: '80px',
-              height: '80px',
+              width: '100px',
+              height: '100px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.2)',
+              background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '3px solid rgba(255, 255, 255, 0.5)',
-              fontSize: '2rem',
+              border: '4px solid rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+              fontSize: '2.5rem',
               fontWeight: 'bold',
-              color: 'white',
+              color: '#0284c7',
               flexShrink: 0
             }}>
               {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
@@ -724,14 +725,37 @@ const ProfilePage: React.FC = () => {
             
             {/* 用户基本信息 */}
             <div style={{ flex: 1 }}>
-              <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {currentUser.name || '-'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem' }}>
+                <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
+                  {currentUser.name || '-'}
+                </div>
+                <div style={{
+                  background: 'rgba(255, 215, 0, 0.2)',
+                  border: '1px solid rgba(255, 215, 0, 0.5)',
+                  color: '#ffd700',
+                  padding: '0.2rem 0.8rem',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                }}>
+                  VIP 会员
+                </div>
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
-                {currentUser.email || '-'}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem' }}>
-                {currentUser.phone || '-'}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📧</span>
+                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                    {currentUser.email || '未绑定邮箱'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
+                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                    {currentUser.phone || '未绑定电话'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -740,70 +764,94 @@ const ProfilePage: React.FC = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-            gap: '1rem',
-            marginBottom: '1.5rem'
+            gap: '1.5rem',
+            marginBottom: '2.5rem'
           }}>
             {/* 全部订单 */}
             <div style={{
-              background: 'rgba(59, 130, 246, 0.2)',
-              borderRadius: '12px',
-              padding: '1rem',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2))',
+              borderRadius: '16px',
+              padding: '1.5rem',
               border: '1px solid rgba(59, 130, 246, 0.3)',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                {t.totalOrders}
-              </div>
-              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+              textAlign: 'center',
+              transition: 'transform 0.3s ease',
+              cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
                 {orderStats.total}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+                {t.totalOrders}
               </div>
             </div>
 
             {/* 待取件 */}
             <div style={{
-              background: 'rgba(245, 158, 11, 0.2)',
-              borderRadius: '12px',
-              padding: '1rem',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2))',
+              borderRadius: '16px',
+              padding: '1.5rem',
               border: '1px solid rgba(245, 158, 11, 0.3)',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                {t.pendingPickup}
-              </div>
-              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+              textAlign: 'center',
+              transition: 'transform 0.3s ease',
+              cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
+              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
                 {orderStats.pendingPickup}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+                {t.pendingPickup}
               </div>
             </div>
 
             {/* 配送中 */}
             <div style={{
-              background: 'rgba(139, 92, 246, 0.2)',
-              borderRadius: '12px',
-              padding: '1rem',
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.2))',
+              borderRadius: '16px',
+              padding: '1.5rem',
               border: '1px solid rgba(139, 92, 246, 0.3)',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                {t.inTransit}
-              </div>
-              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+              textAlign: 'center',
+              transition: 'transform 0.3s ease',
+              cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🚚</div>
+              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
                 {orderStats.inTransit}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+                {t.inTransit}
               </div>
             </div>
 
             {/* 已完成 */}
             <div style={{
-              background: 'rgba(16, 185, 129, 0.2)',
-              borderRadius: '12px',
-              padding: '1rem',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2))',
+              borderRadius: '16px',
+              padding: '1.5rem',
               border: '1px solid rgba(16, 185, 129, 0.3)',
-              textAlign: 'center'
-            }}>
-              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                {t.completed}
-              </div>
-              <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+              textAlign: 'center',
+              transition: 'transform 0.3s ease',
+              cursor: 'default'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
+              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
                 {orderStats.completed}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+                {t.completed}
               </div>
             </div>
           </div>
@@ -812,28 +860,38 @@ const ProfilePage: React.FC = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-            gap: '1.5rem'
+            gap: '1.5rem',
+            padding: '1.5rem',
+            background: 'rgba(0, 0, 0, 0.2)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.accountDate}
-              </label>
-              <div style={{ color: 'white', fontSize: '1rem' }}>
-                {currentUser.created_at 
-                  ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })
-                  : '-'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ fontSize: '1.5rem' }}>📅</div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                  {t.accountDate}
+                </label>
+                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                  {currentUser.created_at 
+                    ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })
+                    : '-'}
+                </div>
               </div>
             </div>
-            <div>
-              <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
-                {t.address}
-              </label>
-              <div style={{ color: 'white', fontSize: '1rem' }}>
-                {currentUser.address || '-'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ fontSize: '1.5rem' }}>📍</div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                  {t.address}
+                </label>
+                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                  {currentUser.address || '-'}
+                </div>
               </div>
             </div>
           </div>

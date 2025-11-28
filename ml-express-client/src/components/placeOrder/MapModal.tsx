@@ -204,17 +204,6 @@ const MapModal = memo<MapModalProps>(({
               console.log('地图已准备就绪');
             }
           }}
-          onError={(error) => {
-            errorService.handleError(error, { context: 'MapModal.MapView.onError' });
-            Alert.alert(
-              language === 'zh' ? '地图加载失败' : language === 'en' ? 'Map Loading Failed' : 'မြေပုံဖွင့်ရန်မအောင်မြင်ပါ',
-              language === 'zh' 
-                ? '请检查网络连接或Google Maps API配置。' 
-                : language === 'en' 
-                ? 'Please check your network connection or Google Maps API configuration.'
-                : 'ကျေးဇူးပြု၍ ကွန်ရက်ချိတ်ဆက်မှု သို့မဟုတ် Google Maps API ကိုစစ်ဆေးပါ။'
-            );
-          }}
         >
           <Marker
             coordinate={selectedLocation}
