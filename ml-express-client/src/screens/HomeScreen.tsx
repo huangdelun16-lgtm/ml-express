@@ -387,85 +387,83 @@ export default function HomeScreen({ navigation }: any) {
           </LinearGradient>
         </Animated.View>
 
-        {/* 订单统计卡片 */}
-        {!isGuest && userId && (
-          <View style={styles.statsContainer}>
-            <Text style={styles.sectionTitle}>{currentT.orderStats}</Text>
-            <View style={styles.statsGrid}>
-              <TouchableOpacity
-                style={styles.statCard}
-                onPress={() => navigation.navigate('MyOrders', { filterStatus: 'all' })}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${currentT.totalOrders}: ${orderStats.total}`}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.statGradient}
-                >
-                  <Text style={styles.statNumber}>{orderStats.total}</Text>
-                  <Text style={styles.statLabel}>{currentT.totalOrders}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+        {/* 3D 风格广告横幅 */}
+        <View style={styles.bannerContainer}>
+          <TouchableOpacity 
+            style={styles.bannerCard}
+            activeOpacity={0.95}
+            onPress={() => Linking.openURL('https://www.market-link-express.com')}
+          >
+            <LinearGradient
+              colors={['#3b82f6', '#60a5fa', '#ffffff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              locations={[0, 0.6, 1]}
+              style={styles.bannerGradient}
+            >
+              {/* 背景装饰：曼德勒城市剪影 (抽象) */}
+              <View style={styles.citySilhouette} />
 
-              <TouchableOpacity
-                style={styles.statCard}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('MyOrders', { filterStatus: '待取件' })}
-                accessibilityRole="button"
-                accessibilityLabel={`${currentT.pendingOrders}: ${orderStats.pending}`}
-              >
-                <LinearGradient
-                  colors={['#f59e0b', '#d97706']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.statGradient}
-                >
-                  <Text style={styles.statNumber}>{orderStats.pending}</Text>
-                  <Text style={styles.statLabel}>{currentT.pendingOrders}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              <View style={styles.bannerContentRow}>
+                {/* 左侧：文案区域 */}
+                <View style={styles.bannerTextArea}>
+                  {/* Logo (仅图标) */}
+                  <Image 
+                    source={require('../../assets/logo.png')} 
+                    style={styles.bannerLogoIcon} 
+                    resizeMode="contain"
+                  />
+                  
+                  <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
+                  <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位{'\n'}支持 KBZPay / WavePay</Text>
+                  <Text style={styles.bannerBurmeseText}>
+                    မန္တလေးမြို့တွင်း သယ်ပို့ခြင်း – မြန်မြန်ဆန်ဆန် · လုံခြုံစိတ်ချ · စမတ်စမတ်
+                  </Text>
+                  
+                  <View style={styles.bannerCtaButton}>
+                    <Text style={styles.bannerCtaText}>立即下单 →</Text>
+                  </View>
+                </View>
 
-              <TouchableOpacity
-                style={styles.statCard}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('MyOrders', { filterStatus: '配送中' })}
-                accessibilityRole="button"
-                accessibilityLabel={`${currentT.inTransitOrders}: ${orderStats.inTransit}`}
-              >
-                <LinearGradient
-                  colors={['#8b5cf6', '#7c3aed']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.statGradient}
-                >
-                  <Text style={styles.statNumber}>{orderStats.inTransit}</Text>
-                  <Text style={styles.statLabel}>{currentT.inTransitOrders}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.statCard}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('MyOrders', { filterStatus: '已送达' })}
-                accessibilityRole="button"
-                accessibilityLabel={`${currentT.deliveredOrders}: ${orderStats.delivered}`}
-              >
-                <LinearGradient
-                  colors={['#10b981', '#059669']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.statGradient}
-                >
-                  <Text style={styles.statNumber}>{orderStats.delivered}</Text>
-                  <Text style={styles.statLabel}>{currentT.deliveredOrders}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+                {/* 右侧：3D 手机模型 */}
+                <View style={styles.phoneMockupContainer}>
+                  <View style={styles.phoneMockup}>
+                    {/* 手机屏幕内容 (模拟地图追踪 UI) */}
+                    <View style={styles.phoneScreen}>
+                      <View style={styles.mapRoute} />
+                      <View style={styles.mapPinSender}>
+                        <Text style={{fontSize: 10}}>🏠</Text>
+                      </View>
+                      <View style={styles.mapPinRider}>
+                        <Text style={{fontSize: 12}}>🛵</Text>
+                      </View>
+                      <View style={styles.mapPinReceiver}>
+                        <Text style={{fontSize: 10}}>📍</Text>
+                      </View>
+                      {/* 浮动卡片 */}
+                      <View style={styles.floatingCard}>
+                        <Text style={{fontSize: 8, fontWeight: 'bold', color: '#333'}}>正在配送中...</Text>
+                        <Text style={{fontSize: 7, color: '#666'}}>预计 15 分钟送达</Text>
+                      </View>
+                    </View>
+                    {/* 手机光泽效果 */}
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.4)', 'transparent', 'rgba(255,255,255,0.1)']}
+                      style={styles.phoneReflection}
+                    />
+                  </View>
+                  {/* 悬浮元素 */}
+                  <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
+                    <Text style={{fontSize: 24}}>📦</Text>
+                  </View>
+                  <View style={[styles.floatingIcon, { bottom: 10, left: -20 }]}>
+                    <Text style={{fontSize: 20}}>⚡</Text>
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         {/* Quick Action Cards - 4 Cards in Grid */}
         <View style={styles.quickActionsContainer}>
@@ -863,53 +861,194 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  statsContainer: {
+  bannerContainer: {
     paddingHorizontal: 16,
-    marginTop: -18,
+    marginTop: -30,
     marginBottom: 16,
+  },
+  bannerCard: {
+    width: '100%',
+    height: 180, // 增加高度以容纳 3D 效果
+    borderRadius: 20,
+    overflow: 'hidden',
+    ...theme.shadows.medium,
+    elevation: 10,
+  },
+  bannerGradient: {
+    flex: 1,
+    padding: 20,
+    position: 'relative',
+  },
+  citySilhouette: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderTopLeftRadius: 100,
+    borderTopRightRadius: 50,
+    opacity: 0.5,
+  },
+  bannerContentRow: {
+    flexDirection: 'row',
+    height: '100%',
+  },
+  bannerTextArea: {
+    flex: 1.2,
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  bannerLogoIcon: {
+    width: 32,
+    height: 32,
+    marginBottom: 8,
+  },
+  bannerHeadline: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 4,
+    lineHeight: 22,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  bannerSubHeadline: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
+    lineHeight: 14,
+    fontWeight: '500',
+  },
+  bannerBurmeseText: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: 12,
+    lineHeight: 14,
+    fontStyle: 'italic',
+  },
+  bannerCtaButton: {
+    backgroundColor: '#fbbf24', // 黄色按钮
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bannerCtaText: {
+    color: '#1e3a8a',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  
+  // 3D 手机模型样式
+  phoneMockupContainer: {
+    flex: 0.8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  phoneMockup: {
+    width: 90,
+    height: 160,
+    backgroundColor: '#1f2937', // 手机边框
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#374151',
+    transform: [
+      { perspective: 800 },
+      { rotateY: '-15deg' },
+      { rotateX: '10deg' },
+      { rotateZ: '-5deg' },
+    ],
+    shadowColor: '#000',
+    shadowOffset: { width: 10, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  phoneScreen: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+    margin: 3,
+    borderRadius: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  phoneReflection: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  mapRoute: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    width: 40,
+    height: 60,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: '#3b82f6',
+    borderStyle: 'dashed',
+    borderRadius: 10,
+  },
+  mapPinSender: {
+    position: 'absolute',
+    top: 35,
+    left: 15,
+  },
+  mapPinReceiver: {
+    position: 'absolute',
+    bottom: 40,
+    right: 20,
+  },
+  mapPinRider: {
+    position: 'absolute',
+    top: 80,
+    left: 40,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    padding: 2,
+    elevation: 2,
+  },
+  floatingCard: {
+    position: 'absolute',
+    bottom: 10,
+    left: 5,
+    right: 5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 6,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  floatingIcon: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    padding: 5,
+  },
+  quickActionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  statCard: {
-    width: (width - 48) / 2,
-    height: 100,
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statGradient: {
-    padding: 16,
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'center',
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontWeight: '600',
-  },
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
   },
   quickActionsGrid: {
     flexDirection: 'row',
