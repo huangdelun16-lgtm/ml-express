@@ -442,7 +442,7 @@ export default function HomeScreen({ navigation }: any) {
                       <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
                       <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位</Text>
                       <Text style={styles.bannerBurmeseText}>
-                        မန္တလေးမြို့တွင်း သယ်ပို့ခြင်း – မြန်မြန်ဆန်ဆန် · လုံခြုံစိတ်ချ · စမတ်စမတ်
+                        မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း
                       </Text>
                       <View style={styles.bannerCtaButton}>
                         <Text style={styles.bannerCtaText}>立即下单 →</Text>
@@ -492,7 +492,7 @@ export default function HomeScreen({ navigation }: any) {
                       <Text style={[styles.bannerHeadline, { color: '#1f2937', marginTop: 4 }]}>一键填写地址{'\n'}极速上门取件</Text>
                       <Text style={[styles.bannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 全城服务 · 30分钟送达</Text>
                       <Text style={[styles.bannerBurmeseText, { color: '#6b7280' }]}>
-                        မန္တလေး မြိုထဲ သယ်ပို့ – လွယ်ကူ၊ မြန်ဆန်၊ စိတ်ချရ
+                        မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း
                       </Text>
                       <View style={[styles.bannerCtaButton, { backgroundColor: '#1f2937' }]}>
                         <Text style={[styles.bannerCtaText, { color: '#ffffff' }]}>立即下单 →</Text>
