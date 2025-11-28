@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   },
   bannerCard: {
     width: '100%',
-    height: 180,
+    height: 220,
     borderRadius: 20,
     overflow: 'hidden',
     ...theme.shadows.medium,
@@ -1038,10 +1038,10 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   phoneMockup: {
-    width: 90,
-    height: 160,
+    width: 100,
+    height: 190,
     backgroundColor: '#1f2937', // 手机边框
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#374151',
     transform: [
