@@ -415,7 +415,7 @@ export default function HomeScreen({ navigation }: any) {
                   />
                   
                   <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
-                  <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位{'\n'}支持 KBZPay / WavePay</Text>
+                  <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位</Text>
                   <Text style={styles.bannerBurmeseText}>
                     မန္တလေးမြို့တွင်း သယ်ပို့ခြင်း – မြန်မြန်ဆန်ဆန် · လုံခြုံစိတ်ချ · စမတ်စမတ်
                   </Text>
@@ -455,9 +455,6 @@ export default function HomeScreen({ navigation }: any) {
                   {/* 悬浮元素 */}
                   <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
                     <Text style={{fontSize: 24}}>📦</Text>
-                  </View>
-                  <View style={[styles.floatingIcon, { bottom: 10, left: -20 }]}>
-                    <Text style={{fontSize: 20}}>⚡</Text>
                   </View>
                 </View>
               </View>
