@@ -74,7 +74,7 @@ export default function HomeScreen({ navigation }: any) {
   useEffect(() => {
     const timer = setInterval(() => {
       let nextIndex = currentBannerIndex + 1;
-      if (nextIndex >= 2) { // 总共2张卡片
+      if (nextIndex >= 3) { // 总共3张卡片
         nextIndex = 0;
       }
       
@@ -419,7 +419,7 @@ export default function HomeScreen({ navigation }: any) {
             showsHorizontalScrollIndicator={false}
             scrollEnabled={false}
             style={styles.bannerScroll}
-            contentContainerStyle={{ width: (width - 32) * 2 }}
+            contentContainerStyle={{ width: (width - 32) * 3 }}
           >
             {/* 第一张卡片：地图追踪 (不可点击) */}
             <View style={styles.bannerCardWrapper}>
