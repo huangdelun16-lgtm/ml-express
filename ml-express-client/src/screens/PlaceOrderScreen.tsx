@@ -26,18 +26,10 @@ import { FadeInView, ScaleInView } from '../components/Animations';
 import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import BackToHomeButton from '../components/BackToHomeButton';
+import { errorService } from '../services/ErrorService';
+import { feedbackService } from '../services/FeedbackService';
 import { analytics } from '../services/AnalyticsService';
-
-// ...
-
-export default function PlaceOrderScreen({ navigation }: any) {
-  // ...
-
-  useEffect(() => {
-    analytics.trackPageView('PlaceOrderScreen');
-  }, []);
-
-  // ...
+// 导入拆分后的组件
 import SenderForm from '../components/placeOrder/SenderForm';
 import ReceiverForm from '../components/placeOrder/ReceiverForm';
 import PackageInfo from '../components/placeOrder/PackageInfo';
@@ -51,6 +43,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const styles = useLanguageStyles(baseStyles);
+
+  useEffect(() => {
+    analytics.trackPageView('PlaceOrderScreen');
+  }, []);
   
   // 用户信息
   const [userId, setUserId] = useState('');
