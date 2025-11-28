@@ -69,9 +69,12 @@ export default function HomeScreen({ navigation }: any) {
   const scrollY = new Animated.Value(0);
   const bannerScrollRef = useRef<ScrollView>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
 
   // 自动轮播逻辑
   useEffect(() => {
+    if (isBannerPaused) return; // 如果暂停，不执行轮播
+
     const timer = setInterval(() => {
       let nextIndex = currentBannerIndex + 1;
       if (nextIndex >= 3) { // 总共3张卡片
@@ -88,7 +91,7 @@ export default function HomeScreen({ navigation }: any) {
     }, 5000); // 5秒切换
 
     return () => clearInterval(timer);
-  }, [currentBannerIndex]);
+  }, [currentBannerIndex, isBannerPaused]);
 
   const t = {
     zh: {
@@ -476,7 +479,12 @@ export default function HomeScreen({ navigation }: any) {
 
             {/* 第二张卡片：地址填写 (新设计) */}
             <View style={styles.bannerCardWrapper}>
-              <View style={styles.bannerCard}>
+              <TouchableOpacity 
+                style={styles.bannerCard}
+                activeOpacity={1}
+                onPressIn={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
+              >
                 <LinearGradient
                   colors={['#f3f4f6', '#ffffff', '#e5e7eb']} // 浅灰色调
                   start={{ x: 0, y: 0 }}
@@ -528,12 +536,17 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* 第三张卡片：上线促销 (新设计) */}
             <View style={styles.bannerCardWrapper}>
-              <View style={styles.bannerCard}>
+              <TouchableOpacity 
+                style={styles.bannerCard}
+                activeOpacity={1}
+                onPressIn={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
+              >
                 <LinearGradient
                   colors={['#e2e8f0', '#f8fafc', '#ffffff']} // 极简企业灰白调
                   start={{ x: 0, y: 0 }}
@@ -552,10 +565,10 @@ export default function HomeScreen({ navigation }: any) {
                       }}>
                         <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>NEW LAUNCH</Text>
                       </View>
-                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>新同城快递上线</Text>
+                      <Text style={[styles.bannerHeadline, { color: '#1e293b', fontSize: 16 }]}>MARKET LINK Express</Text>
                       
                       <View style={{marginVertical: 6}}>
-                        <Text style={{fontSize: 18, fontWeight: 'bold', color: '#2563eb'}}>2000 MMK / 每程</Text>
+                        <Text style={{fontSize: 18, fontWeight: 'bold', color: '#2563eb'}}>MDY同城2000MMK/一趟</Text>
                         <Text style={{fontSize: 10, color: '#64748b'}}>曼德勒市内统一价 · 活动仅1个月</Text>
                       </View>
 
@@ -602,7 +615,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </View>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
