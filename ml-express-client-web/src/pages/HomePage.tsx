@@ -2666,18 +2666,24 @@ const HomePage: React.FC = () => {
                   margin: '4px 0 8px 0',
                   lineHeight: '1.3',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>一键填写地址<br/>极速上门取件</h2>
                 <p style={{
                   fontSize: '20px',
                   color: '#4b5563',
                   margin: '0 0 12px 0',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>实时定位 · 全城服务 · 30分钟送达</p>
                 <p style={{
                   fontSize: '16px',
@@ -2686,9 +2692,12 @@ const HomePage: React.FC = () => {
                   lineHeight: '20px',
                   fontStyle: 'italic',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း</p>
               </div>
               
