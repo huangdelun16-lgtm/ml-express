@@ -2890,32 +2890,6 @@ const HomePage: React.FC = () => {
                     }}></div>
                   </div>
                 </div>
-                <div style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-10px',
-                  backgroundColor: '#ef4444',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  zIndex: 10
-                }}>
-                  <span style={{
-                    fontSize: '8px',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}>-50%</span>
-                </div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '15px',
-                  left: '-15px',
-                  backgroundColor: '#ffffff',
-                  padding: '4px',
-                  borderRadius: '50%',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  zIndex: 10,
-                  fontSize: '16px'
-                }}>🎉</div>
               </div>
             </div>
           </div>
