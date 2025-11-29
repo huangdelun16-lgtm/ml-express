@@ -2849,20 +2849,6 @@ const HomePage: React.FC = () => {
                     fontStyle: 'italic'
                   }}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</div>
                 </div>
-                
-                <div style={{
-                  backgroundColor: '#2563eb',
-                  padding: '10px 20px',
-                  borderRadius: '20px',
-                  display: 'inline-block',
-                  marginTop: '12px'
-                }}>
-                  <span style={{
-                    color: '#ffffff',
-                    fontSize: '18px',
-                    fontWeight: '800'
-                  }}>立即体验 →</span>
-                </div>
               </div>
               
               <div style={{
