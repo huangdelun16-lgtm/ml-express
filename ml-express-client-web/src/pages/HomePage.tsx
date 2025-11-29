@@ -2503,34 +2503,34 @@ const HomePage: React.FC = () => {
                   }}
                 />
                 <h2 style={{
-                  fontSize: '20px',
+                  fontSize: '32px',
                   fontWeight: 'bold',
                   color: '#1e293b',
-                  margin: '0 0 4px 0',
+                  margin: '0 0 8px 0',
                   lineHeight: '1.3'
                 }}>曼德勒同城快递<br/>极速送达</h2>
                 <p style={{
-                  fontSize: '12px',
+                  fontSize: '20px',
                   color: '#4b5563',
-                  margin: '0 0 8px 0'
+                  margin: '0 0 12px 0'
                 }}>5分钟接单 · 实时定位</p>
                 <p style={{
-                  fontSize: '10px',
+                  fontSize: '16px',
                   color: 'rgba(30, 41, 59, 0.85)',
-                  margin: '0 0 12px 0',
-                  lineHeight: '14px',
+                  margin: '0 0 16px 0',
+                  lineHeight: '20px',
                   fontStyle: 'italic'
                 }}>မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း</p>
                 <div style={{
                   backgroundColor: '#fbbf24',
-                  padding: '6px 14px',
+                  padding: '10px 20px',
                   borderRadius: '20px',
                   display: 'inline-block',
                   boxShadow: '0 2px 4px rgba(251, 191, 36, 0.3)'
                 }}>
                   <span style={{
                     color: '#1e3a8a',
-                    fontSize: '12px',
+                    fontSize: '18px',
                     fontWeight: '800'
                   }}>立即下单 →</span>
                 </div>
@@ -2651,33 +2651,33 @@ const HomePage: React.FC = () => {
               
               <div style={{ flex: 1, zIndex: 2 }}>
                 <h2 style={{
-                  fontSize: '20px',
+                  fontSize: '32px',
                   fontWeight: 'bold',
                   color: '#1f2937',
-                  margin: '4px 0 4px 0',
+                  margin: '4px 0 8px 0',
                   lineHeight: '1.3'
                 }}>一键填写地址<br/>极速上门取件</h2>
                 <p style={{
-                  fontSize: '12px',
+                  fontSize: '20px',
                   color: '#4b5563',
-                  margin: '0 0 8px 0'
+                  margin: '0 0 12px 0'
                 }}>实时定位 · 全城服务 · 30分钟送达</p>
                 <p style={{
-                  fontSize: '10px',
+                  fontSize: '16px',
                   color: '#6b7280',
-                  margin: '0 0 12px 0',
-                  lineHeight: '14px',
+                  margin: '0 0 16px 0',
+                  lineHeight: '20px',
                   fontStyle: 'italic'
                 }}>မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း</p>
                 <div style={{
                   backgroundColor: '#1f2937',
-                  padding: '6px 14px',
+                  padding: '10px 20px',
                   borderRadius: '20px',
                   display: 'inline-block'
                 }}>
                   <span style={{
                     color: '#ffffff',
-                    fontSize: '12px',
+                    fontSize: '18px',
                     fontWeight: '800'
                   }}>立即下单 →</span>
                 </div>
@@ -2812,39 +2812,39 @@ const HomePage: React.FC = () => {
               <div style={{ flex: 1, zIndex: 2 }}>
                 <div style={{
                   backgroundColor: '#1e293b',
-                  padding: '2px 8px',
+                  padding: '4px 12px',
                   borderRadius: '4px',
                   display: 'inline-block',
-                  marginBottom: '6px'
+                  marginBottom: '10px'
                 }}>
                   <span style={{
                     color: '#fff',
-                    fontSize: '10px',
+                    fontSize: '14px',
                     fontWeight: 'bold'
                   }}>NEW LAUNCH</span>
                 </div>
                 
-                <div style={{ margin: '6px 0' }}>
+                <div style={{ margin: '10px 0' }}>
                   <div style={{
-                    fontSize: '18px',
+                    fontSize: '28px',
                     fontWeight: 'bold',
                     color: '#2563eb',
-                    marginBottom: '4px'
+                    marginBottom: '6px'
                   }}>MDY同城2000MMK/一趟</div>
                   <div style={{
-                    fontSize: '10px',
+                    fontSize: '16px',
                     color: '#64748b'
                   }}>曼德勒市内统一价 · 活动仅1个月</div>
                 </div>
 
-                <div style={{ marginTop: '8px' }}>
+                <div style={{ marginTop: '12px' }}>
                   <div style={{
-                    fontSize: '10px',
+                    fontSize: '16px',
                     color: '#475569',
-                    marginBottom: '2px'
+                    marginBottom: '4px'
                   }}>📅 2026年1月1日正式启动</div>
                   <div style={{
-                    fontSize: '9px',
+                    fontSize: '14px',
                     color: '#94a3b8',
                     fontStyle: 'italic'
                   }}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</div>
@@ -2852,14 +2852,14 @@ const HomePage: React.FC = () => {
                 
                 <div style={{
                   backgroundColor: '#2563eb',
-                  padding: '6px 14px',
+                  padding: '10px 20px',
                   borderRadius: '20px',
                   display: 'inline-block',
-                  marginTop: '8px'
+                  marginTop: '12px'
                 }}>
                   <span style={{
                     color: '#ffffff',
-                    fontSize: '12px',
+                    fontSize: '18px',
                     fontWeight: '800'
                   }}>立即体验 →</span>
                 </div>
