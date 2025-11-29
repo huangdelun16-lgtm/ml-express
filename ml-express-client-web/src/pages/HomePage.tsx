@@ -2809,11 +2809,19 @@ const HomePage: React.FC = () => {
                     fontSize: '28px',
                     fontWeight: 'bold',
                     color: '#2563eb',
-                    marginBottom: '6px'
+                    marginBottom: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    WebkitTextSizeAdjust: '100%'
                   }}>MDY同城2000MMK/一趟</div>
                   <div style={{
                     fontSize: '16px',
-                    color: '#64748b'
+                    color: '#64748b',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    WebkitTextSizeAdjust: '100%'
                   }}>曼德勒市内统一价 · 活动仅1个月</div>
                 </div>
 
@@ -2821,12 +2829,20 @@ const HomePage: React.FC = () => {
                   <div style={{
                     fontSize: '16px',
                     color: '#475569',
-                    marginBottom: '4px'
+                    marginBottom: '4px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    WebkitTextSizeAdjust: '100%'
                   }}>📅 2026年1月1日正式启动</div>
                   <div style={{
                     fontSize: '14px',
                     color: '#94a3b8',
-                    fontStyle: 'italic'
+                    fontStyle: 'italic',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    WebkitTextSizeAdjust: '100%'
                   }}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</div>
                 </div>
               </div>
