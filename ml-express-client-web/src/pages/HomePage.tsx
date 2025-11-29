@@ -2432,6 +2432,554 @@ const HomePage: React.FC = () => {
         </div>
       </nav>
 
+      {/* 3D 风格广告横幅 (自动轮播) */}
+      <div style={{
+        position: 'relative',
+        zIndex: 5,
+        marginBottom: '24px',
+        padding: '0 16px'
+      }}>
+        <div
+          ref={bannerScrollRef}
+          style={{
+            display: 'flex',
+            overflowX: 'hidden',
+            scrollSnapType: 'x mandatory',
+            scrollBehavior: 'smooth',
+            width: '100%',
+            maxWidth: '1200px',
+            margin: '0 auto',
+            borderRadius: '16px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+          }}
+        >
+          {/* 第一张卡片：地图追踪 */}
+          <div
+            style={{
+              minWidth: '100%',
+              scrollSnapAlign: 'start',
+              height: '220px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onMouseDown={() => setIsBannerPaused(true)}
+            onMouseUp={() => setIsBannerPaused(false)}
+            onMouseLeave={() => setIsBannerPaused(false)}
+            onClick={() => window.open('https://www.market-link-express.com', '_blank')}
+          >
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 60%, #ffffff 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '60px',
+                background: 'rgba(0,0,0,0.1)',
+                clipPath: 'polygon(0 100%, 0 60%, 20% 50%, 40% 60%, 60% 50%, 80% 60%, 100% 50%, 100% 100%)'
+              }}></div>
+              
+              <div style={{ flex: 1, zIndex: 2 }}>
+                <img 
+                  src="/logo.png" 
+                  alt="Logo"
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    marginBottom: '8px'
+                  }}
+                />
+                <h2 style={{
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  margin: '0 0 4px 0',
+                  lineHeight: '1.3'
+                }}>曼德勒同城快递<br/>极速送达</h2>
+                <p style={{
+                  fontSize: '12px',
+                  color: '#4b5563',
+                  margin: '0 0 8px 0'
+                }}>5分钟接单 · 实时定位</p>
+                <p style={{
+                  fontSize: '10px',
+                  color: 'rgba(30, 41, 59, 0.85)',
+                  margin: '0 0 12px 0',
+                  lineHeight: '14px',
+                  fontStyle: 'italic'
+                }}>မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း</p>
+                <div style={{
+                  backgroundColor: '#fbbf24',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  display: 'inline-block',
+                  boxShadow: '0 2px 4px rgba(251, 191, 36, 0.3)'
+                }}>
+                  <span style={{
+                    color: '#1e3a8a',
+                    fontSize: '12px',
+                    fontWeight: '800'
+                  }}>立即下单 →</span>
+                </div>
+              </div>
+              
+              <div style={{
+                flex: '0.8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                position: 'relative'
+              }}>
+                <div style={{
+                  width: '100px',
+                  height: '210px',
+                  backgroundColor: '#1f2937',
+                  borderRadius: '14px',
+                  border: '2px solid #374151',
+                  transform: 'perspective(800px) rotateY(-15deg) rotateX(10deg) rotateZ(-5deg)',
+                  boxShadow: '10px 10px 20px rgba(0,0,0,0.4)',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    width: 'calc(100% - 6px)',
+                    height: 'calc(100% - 6px)',
+                    backgroundColor: '#f3f4f6',
+                    margin: '3px',
+                    borderRadius: '8px',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '40px',
+                      left: '20px',
+                      width: '40px',
+                      height: '60px',
+                      borderLeft: '2px dashed #3b82f6',
+                      borderBottom: '2px dashed #3b82f6',
+                      borderRadius: '10px'
+                    }}></div>
+                    <div style={{ position: 'absolute', top: '35px', left: '15px', fontSize: '10px' }}>🏠</div>
+                    <div style={{ position: 'absolute', top: '80px', left: '40px', fontSize: '12px', backgroundColor: '#ffffff', borderRadius: '10px', padding: '2px' }}>🛵</div>
+                    <div style={{ position: 'absolute', bottom: '40px', right: '20px', fontSize: '10px' }}>📍</div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '5px',
+                      right: '5px',
+                      backgroundColor: 'rgba(255,255,255,0.9)',
+                      borderRadius: '6px',
+                      padding: '4px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{ fontSize: '8px', fontWeight: 'bold', color: '#333' }}>正在配送中...</div>
+                      <div style={{ fontSize: '7px', color: '#666' }}>预计 15 分钟送达</div>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(255,255,255,0.1) 100%)',
+                      pointerEvents: 'none'
+                    }}></div>
+                  </div>
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  top: '-10px',
+                  right: '-10px',
+                  fontSize: '24px',
+                  zIndex: 10
+                }}>📦</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 第二张卡片：地址填写 */}
+          <div
+            style={{
+              minWidth: '100%',
+              scrollSnapAlign: 'start',
+              height: '220px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onMouseDown={() => setIsBannerPaused(true)}
+            onMouseUp={() => setIsBannerPaused(false)}
+            onMouseLeave={() => setIsBannerPaused(false)}
+          >
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #f3f4f6 0%, #ffffff 50%, #e5e7eb 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '80px',
+                background: 'rgba(0,0,0,0.05)',
+                clipPath: 'polygon(0 100%, 0 60%, 20% 50%, 40% 60%, 60% 50%, 80% 60%, 100% 50%, 100% 100%)'
+              }}></div>
+              
+              <div style={{ flex: 1, zIndex: 2 }}>
+                <h2 style={{
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  margin: '4px 0 4px 0',
+                  lineHeight: '1.3'
+                }}>一键填写地址<br/>极速上门取件</h2>
+                <p style={{
+                  fontSize: '12px',
+                  color: '#4b5563',
+                  margin: '0 0 8px 0'
+                }}>实时定位 · 全城服务 · 30分钟送达</p>
+                <p style={{
+                  fontSize: '10px',
+                  color: '#6b7280',
+                  margin: '0 0 12px 0',
+                  lineHeight: '14px',
+                  fontStyle: 'italic'
+                }}>မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း</p>
+                <div style={{
+                  backgroundColor: '#1f2937',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  display: 'inline-block'
+                }}>
+                  <span style={{
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: '800'
+                  }}>立即下单 →</span>
+                </div>
+              </div>
+              
+              <div style={{
+                flex: '0.8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                position: 'relative'
+              }}>
+                <div style={{
+                  width: '100px',
+                  height: '210px',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '14px',
+                  border: '2px solid #e5e7eb',
+                  transform: 'perspective(800px) rotateY(-15deg) rotateX(10deg) rotateZ(-5deg)',
+                  boxShadow: '10px 10px 20px rgba(0,0,0,0.2)',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    width: 'calc(100% - 6px)',
+                    height: 'calc(100% - 6px)',
+                    backgroundColor: '#ffffff',
+                    margin: '3px',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      height: '20px',
+                      backgroundColor: 'white',
+                      borderRadius: '4px',
+                      marginBottom: '6px',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      paddingLeft: '4px',
+                      fontSize: '6px',
+                      color: '#9ca3af'
+                    }}>📍 取件地址</div>
+                    <div style={{
+                      height: '20px',
+                      backgroundColor: 'white',
+                      borderRadius: '4px',
+                      marginBottom: '6px',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      paddingLeft: '4px',
+                      fontSize: '6px',
+                      color: '#9ca3af'
+                    }}>🏠 送达地址</div>
+                    <div style={{
+                      height: '30px',
+                      backgroundColor: '#3b82f6',
+                      borderRadius: '4px',
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '8px',
+                      color: 'white',
+                      fontWeight: 'bold'
+                    }}>确认下单</div>
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, transparent 50%, rgba(255,255,255,0.2) 100%)',
+                      pointerEvents: 'none'
+                    }}></div>
+                  </div>
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  top: '0',
+                  right: '-15px',
+                  fontSize: '20px',
+                  backgroundColor: 'rgba(59,130,246,0.1)',
+                  borderRadius: '50%',
+                  padding: '5px',
+                  zIndex: 10
+                }}>📍</div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '20px',
+                  left: '-15px',
+                  fontSize: '18px',
+                  backgroundColor: 'rgba(59,130,246,0.1)',
+                  borderRadius: '50%',
+                  padding: '5px',
+                  zIndex: 10
+                }}>📝</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 第三张卡片：上线促销 */}
+          <div
+            style={{
+              minWidth: '100%',
+              scrollSnapAlign: 'start',
+              height: '220px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onMouseDown={() => setIsBannerPaused(true)}
+            onMouseUp={() => setIsBannerPaused(false)}
+            onMouseLeave={() => setIsBannerPaused(false)}
+          >
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 50%, #ffffff 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ flex: 1, zIndex: 2 }}>
+                <div style={{
+                  backgroundColor: '#1e293b',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  display: 'inline-block',
+                  marginBottom: '6px'
+                }}>
+                  <span style={{
+                    color: '#fff',
+                    fontSize: '10px',
+                    fontWeight: 'bold'
+                  }}>NEW LAUNCH</span>
+                </div>
+                
+                <div style={{ margin: '6px 0' }}>
+                  <div style={{
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#2563eb',
+                    marginBottom: '4px'
+                  }}>MDY同城2000MMK/一趟</div>
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#64748b'
+                  }}>曼德勒市内统一价 · 活动仅1个月</div>
+                </div>
+
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#475569',
+                    marginBottom: '2px'
+                  }}>📅 2026年1月1日正式启动</div>
+                  <div style={{
+                    fontSize: '9px',
+                    color: '#94a3b8',
+                    fontStyle: 'italic'
+                  }}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</div>
+                </div>
+                
+                <div style={{
+                  backgroundColor: '#2563eb',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  display: 'inline-block',
+                  marginTop: '8px'
+                }}>
+                  <span style={{
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: '800'
+                  }}>立即体验 →</span>
+                </div>
+              </div>
+              
+              <div style={{
+                flex: '0.8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                position: 'relative'
+              }}>
+                <div style={{
+                  width: '100px',
+                  height: '210px',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: '14px',
+                  border: '2px solid #cbd5e1',
+                  transform: 'perspective(800px) rotateY(-15deg) rotateX(10deg) rotateZ(-5deg)',
+                  boxShadow: '10px 10px 20px rgba(0,0,0,0.2)',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    width: 'calc(100% - 6px)',
+                    height: 'calc(100% - 6px)',
+                    backgroundColor: '#ffffff',
+                    margin: '3px',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '20px',
+                      backgroundColor: '#eff6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '10px',
+                      fontSize: '20px'
+                    }}>🚀</div>
+                    <div style={{
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      color: '#1e293b',
+                      textAlign: 'center'
+                    }}>GRAND OPENING</div>
+                    <div style={{
+                      fontSize: '8px',
+                      color: '#64748b',
+                      textAlign: 'center',
+                      marginTop: '2px'
+                    }}>Jan 1, 2026</div>
+                    <div style={{
+                      width: '100%',
+                      height: '1px',
+                      backgroundColor: '#e2e8f0',
+                      margin: '8px 0'
+                    }}></div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '12px' }}>💰</span>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: '#2563eb'
+                      }}>2000 Ks</span>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, transparent 50%, rgba(255,255,255,0.1) 100%)',
+                      pointerEvents: 'none'
+                    }}></div>
+                  </div>
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-10px',
+                  backgroundColor: '#ef4444',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  zIndex: 10
+                }}>
+                  <span style={{
+                    fontSize: '8px',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}>-50%</span>
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '15px',
+                  left: '-15px',
+                  backgroundColor: '#ffffff',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  fontSize: '16px'
+                }}>🎉</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 英雄区域 */}
       <section id="home" style={{
         position: 'relative',
