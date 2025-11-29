@@ -223,15 +223,15 @@ const HomePage: React.FC = () => {
     if (isBannerPaused) return;
 
     const timer = setInterval(() => {
-      let nextIndex = currentBannerIndex + 1;
-      if (nextIndex >= 3) {
-        nextIndex = 0;
-      }
-      
       if (bannerScrollRef.current) {
-        const cardWidth = bannerScrollRef.current.offsetWidth;
+        const containerWidth = bannerScrollRef.current.offsetWidth;
+        let nextIndex = currentBannerIndex + 1;
+        if (nextIndex >= 3) {
+          nextIndex = 0;
+        }
+        
         bannerScrollRef.current.scrollTo({
-          left: nextIndex * cardWidth,
+          left: nextIndex * containerWidth,
           behavior: 'smooth'
         });
         setCurrentBannerIndex(nextIndex);
@@ -2437,7 +2437,9 @@ const HomePage: React.FC = () => {
         position: 'relative',
         zIndex: 5,
         marginBottom: '24px',
-        padding: '0 16px'
+        padding: '0 16px',
+        maxWidth: '1200px',
+        margin: '0 auto 24px auto'
       }}>
         <div
           ref={bannerScrollRef}
@@ -2447,10 +2449,9 @@ const HomePage: React.FC = () => {
             scrollSnapType: 'x mandatory',
             scrollBehavior: 'smooth',
             width: '100%',
-            maxWidth: '1200px',
-            margin: '0 auto',
             borderRadius: '16px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            position: 'relative'
           }}
         >
           {/* 第一张卡片：地图追踪 */}
