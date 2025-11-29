@@ -656,7 +656,10 @@ export default function ProfileScreen({ navigation }: any) {
         )}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>MARKET LINK EXPRESS</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Text style={styles.footerText}>MARKET LINK EXPRESS</Text>
+            <Text style={[styles.footerText, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+          </View>
           <Text style={styles.footerVersion}>v{appVersion}</Text>
         </View>
       </ScrollView>

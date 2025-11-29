@@ -207,7 +207,10 @@ const PackageLoadingAnimation: React.FC<PackageLoadingAnimationProps> = ({
       <View style={styles.content}>
         {/* 品牌标题 */}
         <View style={styles.header}>
-          <Text style={styles.brandTitle}>MARKET LINK EXPRESS</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Text style={styles.brandTitle}>MARKET LINK EXPRESS</Text>
+            <Text style={[styles.brandTitle, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+          </View>
           <Text style={styles.brandSubtitle}>专业快递服务</Text>
         </View>
 

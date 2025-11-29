@@ -399,7 +399,10 @@ export default function HomeScreen({ navigation }: any) {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.title}>{currentT.title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Text style={styles.title}>{currentT.title}</Text>
+              <Text style={[styles.title, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+            </View>
             <Text style={styles.subtitle}>{currentT.subtitle}</Text>
             
             {/* 用户欢迎信息 */}

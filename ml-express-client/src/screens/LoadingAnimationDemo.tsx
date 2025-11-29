@@ -33,7 +33,10 @@ export default function LoadingAnimationDemo() {
         style={styles.header}
       >
         <Text style={styles.headerTitle}>加载动画演示</Text>
-        <Text style={styles.headerSubtitle}>MARKET LINK EXPRESS</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Text style={styles.headerSubtitle}>MARKET LINK EXPRESS</Text>
+          <Text style={[styles.headerSubtitle, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+        </View>
       </LinearGradient>
 
       {/* 3D快递盒动画 */}

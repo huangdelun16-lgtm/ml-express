@@ -190,7 +190,10 @@ export default function DeliveryLoadingAnimation({
                 {/* 公司名称 - 第一行 */}
                 <Text style={styles.companyName}>MARKET LINK</Text>
                 {/* 公司名称 - 第二行 */}
-                <Text style={styles.companyName}>EXPRESS</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Text style={styles.companyName}>EXPRESS</Text>
+                  <Text style={[styles.companyName, { fontStyle: 'italic', marginLeft: 4 }]}>Delivery Service</Text>
+                </View>
                 
                 {/* 货箱门的线条 */}
                 <View style={styles.cargoBoxDoor} />
