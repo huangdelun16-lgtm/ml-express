@@ -401,7 +401,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
               <Text style={styles.title}>{currentT.title}</Text>
-              <Text style={[styles.title, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+              <Text style={[styles.title, { fontStyle: 'italic', marginLeft: 8, fontSize: 14 }]}>Delivery Service</Text>
             </View>
             <Text style={styles.subtitle}>{currentT.subtitle}</Text>
             

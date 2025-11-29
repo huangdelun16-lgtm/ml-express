@@ -192,7 +192,7 @@ export default function DeliveryLoadingAnimation({
                 {/* 公司名称 - 第二行 */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <Text style={styles.companyName}>EXPRESS</Text>
-                  <Text style={[styles.companyName, { fontStyle: 'italic', marginLeft: 4 }]}>Delivery Service</Text>
+                  <Text style={[styles.companyName, { fontStyle: 'italic', marginLeft: 4, fontSize: 7 }]}>Delivery Service</Text>
                 </View>
                 
                 {/* 货箱门的线条 */}

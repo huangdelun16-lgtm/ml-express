@@ -144,7 +144,7 @@ export default function WelcomeScreen({ navigation }: any) {
             <Text style={styles.welcomeTitle}>{currentT.welcomeTitle}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
               <Text style={styles.brandName}>{currentT.welcomeSubtitle}</Text>
-              <Text style={[styles.brandName, { fontStyle: 'italic', marginLeft: 8 }]}>Delivery Service</Text>
+              <Text style={[styles.brandName, { fontStyle: 'italic', marginLeft: 8, fontSize: 16 }]}>Delivery Service</Text>
             </View>
             <View style={styles.separator} />
             <Text style={styles.description}>{currentT.description}</Text>
