@@ -13,6 +13,26 @@
   to = "/index.html"
   status = 200
 
+# 缓存控制 - 确保浏览器获取最新版本
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+
+# HTML文件不缓存
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+
+# JS和CSS文件缓存1小时（但文件名包含hash，所以更新时会自动失效）
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
 # 环境变量
 # 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
 # Dashboard 中的环境变量优先级高于此文件中的配置
