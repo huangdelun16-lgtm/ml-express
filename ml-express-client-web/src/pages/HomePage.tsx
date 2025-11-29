@@ -2510,18 +2510,24 @@ const HomePage: React.FC = () => {
                   margin: '0 0 8px 0',
                   lineHeight: '1.3',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>曼德勒同城快递<br/>极速送达</h2>
                 <p style={{
                   fontSize: '20px',
                   color: '#4b5563',
                   margin: '0 0 12px 0',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>5分钟接单 · 实时定位</p>
                 <p style={{
                   fontSize: '16px',
@@ -2530,9 +2536,12 @@ const HomePage: React.FC = () => {
                   lineHeight: '20px',
                   fontStyle: 'italic',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  WebkitTextSizeAdjust: '100%'
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
                 }}>မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း</p>
               </div>
               
