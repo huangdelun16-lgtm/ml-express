@@ -2459,7 +2459,7 @@ const HomePage: React.FC = () => {
             style={{
               minWidth: '100%',
               scrollSnapAlign: 'start',
-              height: '220px',
+              height: '280px',
               borderRadius: '16px',
               overflow: 'hidden',
               position: 'relative',
@@ -2617,7 +2617,7 @@ const HomePage: React.FC = () => {
             style={{
               minWidth: '100%',
               scrollSnapAlign: 'start',
-              height: '220px',
+              height: '280px',
               borderRadius: '16px',
               overflow: 'hidden',
               position: 'relative',
@@ -2787,7 +2787,7 @@ const HomePage: React.FC = () => {
             style={{
               minWidth: '100%',
               scrollSnapAlign: 'start',
-              height: '220px',
+              height: '280px',
               borderRadius: '16px',
               overflow: 'hidden',
               position: 'relative',
