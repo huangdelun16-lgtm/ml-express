@@ -2521,19 +2521,6 @@ const HomePage: React.FC = () => {
                   lineHeight: '20px',
                   fontStyle: 'italic'
                 }}>မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း</p>
-                <div style={{
-                  backgroundColor: '#fbbf24',
-                  padding: '10px 20px',
-                  borderRadius: '20px',
-                  display: 'inline-block',
-                  boxShadow: '0 2px 4px rgba(251, 191, 36, 0.3)'
-                }}>
-                  <span style={{
-                    color: '#1e3a8a',
-                    fontSize: '18px',
-                    fontWeight: '800'
-                  }}>立即下单 →</span>
-                </div>
               </div>
               
               <div style={{
@@ -2669,18 +2656,6 @@ const HomePage: React.FC = () => {
                   lineHeight: '20px',
                   fontStyle: 'italic'
                 }}>မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း</p>
-                <div style={{
-                  backgroundColor: '#1f2937',
-                  padding: '10px 20px',
-                  borderRadius: '20px',
-                  display: 'inline-block'
-                }}>
-                  <span style={{
-                    color: '#ffffff',
-                    fontSize: '18px',
-                    fontWeight: '800'
-                  }}>立即下单 →</span>
-                </div>
               </div>
               
               <div style={{
@@ -2758,26 +2733,6 @@ const HomePage: React.FC = () => {
                     }}></div>
                   </div>
                 </div>
-                <div style={{
-                  position: 'absolute',
-                  top: '0',
-                  right: '-15px',
-                  fontSize: '20px',
-                  backgroundColor: 'rgba(59,130,246,0.1)',
-                  borderRadius: '50%',
-                  padding: '5px',
-                  zIndex: 10
-                }}>📍</div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '-15px',
-                  fontSize: '18px',
-                  backgroundColor: 'rgba(59,130,246,0.1)',
-                  borderRadius: '50%',
-                  padding: '5px',
-                  zIndex: 10
-                }}>📝</div>
               </div>
             </div>
           </div>
