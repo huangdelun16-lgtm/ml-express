@@ -147,6 +147,10 @@ const HomePage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState<CityKey>(DEFAULT_CITY_KEY);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  // 广告卡片轮播状态
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
+  const bannerScrollRef = React.useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
@@ -213,6 +217,29 @@ const HomePage: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [countdown]);
+
+  // 广告卡片自动轮播逻辑
+  useEffect(() => {
+    if (isBannerPaused) return;
+
+    const timer = setInterval(() => {
+      let nextIndex = currentBannerIndex + 1;
+      if (nextIndex >= 3) {
+        nextIndex = 0;
+      }
+      
+      if (bannerScrollRef.current) {
+        const cardWidth = bannerScrollRef.current.offsetWidth;
+        bannerScrollRef.current.scrollTo({
+          left: nextIndex * cardWidth,
+          behavior: 'smooth'
+        });
+        setCurrentBannerIndex(nextIndex);
+      }
+    }, 5000); // 5秒切换
+
+    return () => clearInterval(timer);
+  }, [currentBannerIndex, isBannerPaused]);
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
