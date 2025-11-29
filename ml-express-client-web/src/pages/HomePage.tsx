@@ -2818,7 +2818,14 @@ const HomePage: React.FC = () => {
                   <span style={{
                     color: '#fff',
                     fontSize: '14px',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'inline-block',
+                    visibility: 'visible',
+                    opacity: 1
                   }}>NEW LAUNCH</span>
                 </div>
                 
@@ -2829,17 +2836,23 @@ const HomePage: React.FC = () => {
                     color: '#2563eb',
                     marginBottom: '6px',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    WebkitTextSizeAdjust: '100%'
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
                   }}>MDY同城2000MMK/一趟</div>
                   <div style={{
                     fontSize: '16px',
                     color: '#64748b',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    WebkitTextSizeAdjust: '100%'
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
                   }}>曼德勒市内统一价 · 活动仅1个月</div>
                 </div>
 
@@ -2849,18 +2862,24 @@ const HomePage: React.FC = () => {
                     color: '#475569',
                     marginBottom: '4px',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    WebkitTextSizeAdjust: '100%'
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
                   }}>📅 2026年1月1日正式启动</div>
                   <div style={{
                     fontSize: '14px',
                     color: '#94a3b8',
                     fontStyle: 'italic',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale',
-                    WebkitTextSizeAdjust: '100%'
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
                   }}>Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်</div>
                 </div>
               </div>
