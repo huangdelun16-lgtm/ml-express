@@ -2439,7 +2439,8 @@ const HomePage: React.FC = () => {
         marginBottom: '24px',
         padding: '0 16px',
         maxWidth: '1200px',
-        margin: '0 auto 24px auto'
+        margin: '0 auto 24px auto',
+        width: '100%'
       }}>
         <div
           ref={bannerScrollRef}
