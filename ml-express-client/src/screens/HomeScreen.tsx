@@ -453,9 +453,10 @@ export default function HomeScreen({ navigation }: any) {
                 activeOpacity={0.9}
                 onPress={() => {
                   if (!isScrolling) {
-                    console.log('Banner 0 clicked');
+                    console.log('Banner 0 clicked, setting index to 0');
                     setSelectedBannerIndex(0);
                     setShowBannerModal(true);
+                    console.log('Modal should show with index:', 0);
                   }
                 }}
                 delayPressIn={150}
@@ -840,8 +841,14 @@ export default function HomeScreen({ navigation }: any) {
           visible={showBannerModal}
           transparent={true}
           animationType="slide"
-          onRequestClose={() => setShowBannerModal(false)}
+          onRequestClose={() => {
+            console.log('Modal onRequestClose called');
+            setShowBannerModal(false);
+          }}
           statusBarTranslucent={true}
+          onShow={() => {
+            console.log('Modal onShow - selectedBannerIndex:', selectedBannerIndex);
+          }}
         >
           <TouchableOpacity
             style={styles.modalOverlay}
@@ -866,7 +873,11 @@ export default function HomeScreen({ navigation }: any) {
                 showsVerticalScrollIndicator={true}
                 bounces={true}
               >
-                {showBannerModal && selectedBannerIndex === 0 && (
+                {(() => {
+                  console.log('Modal render check - showBannerModal:', showBannerModal, 'selectedBannerIndex:', selectedBannerIndex);
+                  return null;
+                })()}
+                {selectedBannerIndex === 0 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#3b82f6', '#60a5fa', '#ffffff']}
@@ -892,7 +903,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {showBannerModal && selectedBannerIndex === 1 && (
+                {selectedBannerIndex === 1 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#f3f4f6', '#ffffff', '#e5e7eb']}
@@ -912,7 +923,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {showBannerModal && selectedBannerIndex === 2 && (
+                {selectedBannerIndex === 2 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#e2e8f0', '#f8fafc', '#ffffff']}
@@ -938,7 +949,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {showBannerModal && selectedBannerIndex === 3 && (
+                {selectedBannerIndex === 3 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#ffffff', '#f8fafc', '#f1f5f9']}
@@ -1961,7 +1972,7 @@ const styles = StyleSheet.create({
     maxHeight: Dimensions.get('window').height * 0.85,
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: 'visible',
     ...theme.shadows.large,
     elevation: 20,
     position: 'relative',
@@ -1987,14 +1998,15 @@ const styles = StyleSheet.create({
   modalScrollView: {
     width: '100%',
     flex: 1,
+    backgroundColor: 'transparent',
   },
   modalScrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   modalBannerContent: {
     width: '100%',
     minHeight: 400,
-    paddingBottom: 20,
   },
   modalBannerGradient: {
     width: '100%',
@@ -2003,6 +2015,7 @@ const styles = StyleSheet.create({
     minHeight: 400,
     alignItems: 'center',
     justifyContent: 'flex-start',
+    flex: 1,
   },
   modalBannerLogo: {
     width: 60,
