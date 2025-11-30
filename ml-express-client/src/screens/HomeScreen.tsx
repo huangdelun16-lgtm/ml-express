@@ -445,6 +445,7 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.bannerCard}
                 activeOpacity={0.9}
                 onPress={() => {
+                  console.log('Banner 0 clicked');
                   setSelectedBannerIndex(0);
                   setShowBannerModal(true);
                 }}
@@ -851,7 +852,7 @@ export default function HomeScreen({ navigation }: any) {
                 showsVerticalScrollIndicator={true}
                 bounces={true}
               >
-                {selectedBannerIndex === 0 && (
+                {showBannerModal && selectedBannerIndex === 0 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#3b82f6', '#60a5fa', '#ffffff']}
@@ -877,7 +878,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {selectedBannerIndex === 1 && (
+                {showBannerModal && selectedBannerIndex === 1 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#f3f4f6', '#ffffff', '#e5e7eb']}
@@ -897,7 +898,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {selectedBannerIndex === 2 && (
+                {showBannerModal && selectedBannerIndex === 2 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#e2e8f0', '#f8fafc', '#ffffff']}
@@ -923,7 +924,7 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
                 
-                {selectedBannerIndex === 3 && (
+                {showBannerModal && selectedBannerIndex === 3 && (
                   <View style={styles.modalBannerContent}>
                     <LinearGradient
                       colors={['#ffffff', '#f8fafc', '#f1f5f9']}
