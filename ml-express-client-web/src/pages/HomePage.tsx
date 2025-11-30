@@ -3065,22 +3065,6 @@ const HomePage: React.FC = () => {
                     }}>Web 上注册账号即可直接下单，无需下载软件</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>💻</span>
-                    <p style={{
-                      fontSize: '14px',
-                      color: '#475569',
-                      margin: 0,
-                      lineHeight: '20px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      WebkitFontSmoothing: 'antialiased' as any,
-                      MozOsxFontSmoothing: 'grayscale' as any,
-                      WebkitTextSizeAdjust: '100%' as any,
-                      display: 'block',
-                      visibility: 'visible',
-                      opacity: 1
-                    }}>网页版操作简单，无需安装，随时随地都能下单</p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                     <span style={{ fontSize: '18px', lineHeight: '20px' }}>📱</span>
                     <p style={{
                       fontSize: '14px',
@@ -3098,73 +3082,36 @@ const HomePage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* CTA 按钮 */}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  <button
-                    onClick={() => {
-                      setShowRegisterModal(true);
-                      setIsLoginMode(false);
-                    }}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      flex: 1,
-                      boxShadow: '0 4px 8px rgba(37, 99, 235, 0.3)',
-                      transition: 'all 0.2s ease',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      WebkitFontSmoothing: 'antialiased' as any,
-                      MozOsxFontSmoothing: 'grayscale' as any,
-                      WebkitTextSizeAdjust: '100%' as any
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#1d4ed8';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(37, 99, 235, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = '#2563eb';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(37, 99, 235, 0.3)';
-                    }}
-                  >立即注册</button>
-                  <button
-                    onClick={() => {
-                      window.open('https://play.google.com/store/apps/details?id=com.marketlinkexpress', '_blank');
-                    }}
-                    style={{
-                      backgroundColor: '#f59e0b',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      flex: 1,
-                      boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)',
-                      transition: 'all 0.2s ease',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      WebkitFontSmoothing: 'antialiased' as any,
-                      MozOsxFontSmoothing: 'grayscale' as any,
-                      WebkitTextSizeAdjust: '100%' as any
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#d97706';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(245, 158, 11, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f59e0b';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
-                    }}
-                  >下载 App 获取更快体验</button>
+                {/* 缅文说明 */}
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    lineHeight: '18px',
+                    fontStyle: 'italic',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
+                  }}>Webပေါ်မှတ်ပုံတင်ပြီး လျင်မြန်စွာ Orderတင်နိုင်သည်</p>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    lineHeight: '18px',
+                    fontStyle: 'italic',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    WebkitFontSmoothing: 'antialiased' as any,
+                    MozOsxFontSmoothing: 'grayscale' as any,
+                    WebkitTextSizeAdjust: '100%' as any,
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
+                  }}>AppကိုDownload အသုံးပြုခြင်းဖြင့် ပိုမိုလုံခြုံလျင်မြန်သော အတွေအကြုံကိုရယူလိုက်ပါ</p>
                 </div>
               </div>
 

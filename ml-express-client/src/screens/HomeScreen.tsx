@@ -687,12 +687,6 @@ export default function HomeScreen({ navigation }: any) {
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={{ fontSize: 18 }}>💻</Text>
-                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
-                            网页版操作简单，无需安装，随时随地都能下单
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text style={{ fontSize: 18 }}>📱</Text>
                           <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
                             想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪
@@ -700,60 +694,14 @@ export default function HomeScreen({ navigation }: any) {
                         </View>
                       </View>
 
-                      {/* CTA 按钮 */}
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: '#2563eb',
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            borderRadius: 8,
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            shadowColor: '#2563eb',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 8,
-                            elevation: 4,
-                          }}
-                          onPress={() => {
-                            // 可以导航到注册页面
-                            navigation.navigate('Profile');
-                          }}
-                        >
-                          <Text style={{
-                            color: '#ffffff',
-                            fontSize: 13,
-                            fontWeight: 'bold',
-                          }}>立即注册</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: '#f59e0b',
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            borderRadius: 8,
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            shadowColor: '#f59e0b',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 8,
-                            elevation: 4,
-                          }}
-                          onPress={() => {
-                            // 可以打开下载链接
-                            Linking.openURL('https://play.google.com/store/apps/details?id=com.marketlinkexpress');
-                          }}
-                        >
-                          <Text style={{
-                            color: '#ffffff',
-                            fontSize: 13,
-                            fontWeight: 'bold',
-                          }}>下载 App</Text>
-                        </TouchableOpacity>
+                      {/* 缅文说明 */}
+                      <View style={{ gap: 6, marginTop: 8 }}>
+                        <Text style={{ fontSize: 11, color: '#64748b', lineHeight: 16, fontStyle: 'italic' }}>
+                          Webပေါ်မှတ်ပုံတင်ပြီး လျင်မြန်စွာ Orderတင်နိုင်သည်
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748b', lineHeight: 16, fontStyle: 'italic' }}>
+                          AppကိုDownload အသုံးပြုခြင်းဖြင့် ပိုမိုလုံခြုံလျင်မြန်သော အတွေအကြုံကိုရယူလိုက်ပါ
+                        </Text>
                       </View>
                     </View>
 
