@@ -679,23 +679,23 @@ export default function HomeScreen({ navigation }: any) {
                       }}>新用户现在即可开始下单！</Text>
 
                       {/* 副文本 */}
-                      <View style={{ gap: 8, marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={{ fontSize: 18 }}>🌐</Text>
-                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
+                      <View style={{ gap: 8, marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                          <Text style={{ fontSize: 18, lineHeight: 20 }}>🌐</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16, flex: 1 }}>
                             Web 上注册账号即可直接下单，无需下载软件
                           </Text>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={{ fontSize: 18 }}>📱</Text>
-                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                          <Text style={{ fontSize: 18, lineHeight: 20 }}>📱</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16, flex: 1 }}>
                             想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪
                           </Text>
                         </View>
                       </View>
 
-                      {/* 缅文说明 */}
-                      <View style={{ gap: 6, marginTop: 8 }}>
+                      {/* 缅文说明 - 与中文对齐 */}
+                      <View style={{ gap: 6, marginTop: 8, paddingLeft: 24 }}>
                         <Text style={{ fontSize: 11, color: '#64748b', lineHeight: 16, fontStyle: 'italic' }}>
                           Webပေါ်မှတ်ပုံတင်ပြီး လျင်မြန်စွာ Orderတင်နိုင်သည်
                         </Text>

@@ -3047,9 +3047,9 @@ const HomePage: React.FC = () => {
                 }}>新用户现在即可开始下单！</h2>
 
                 {/* 副文本 */}
-                <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>🌐</span>
+                    <span style={{ fontSize: '18px', lineHeight: '20px', flexShrink: 0 }}>🌐</span>
                     <p style={{
                       fontSize: '14px',
                       color: '#475569',
@@ -3061,11 +3061,12 @@ const HomePage: React.FC = () => {
                       WebkitTextSizeAdjust: '100%' as any,
                       display: 'block',
                       visibility: 'visible',
-                      opacity: 1
+                      opacity: 1,
+                      flex: 1
                     }}>Web 上注册账号即可直接下单，无需下载软件</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>📱</span>
+                    <span style={{ fontSize: '18px', lineHeight: '20px', flexShrink: 0 }}>📱</span>
                     <p style={{
                       fontSize: '14px',
                       color: '#475569',
@@ -3077,13 +3078,20 @@ const HomePage: React.FC = () => {
                       WebkitTextSizeAdjust: '100%' as any,
                       display: 'block',
                       visibility: 'visible',
-                      opacity: 1
+                      opacity: 1,
+                      flex: 1
                     }}>想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪</p>
                   </div>
                 </div>
 
-                {/* 缅文说明 */}
-                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* 缅文说明 - 与中文对齐 */}
+                <div style={{ 
+                  marginTop: '8px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '6px',
+                  paddingLeft: '24px' // 与中文文本对齐（图标18px + gap 6px = 24px）
+                }}>
                   <p style={{
                     fontSize: '13px',
                     color: '#64748b',
