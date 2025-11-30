@@ -226,7 +226,7 @@ const HomePage: React.FC = () => {
       if (bannerScrollRef.current) {
         const containerWidth = bannerScrollRef.current.offsetWidth;
         let nextIndex = currentBannerIndex + 1;
-        if (nextIndex >= 3) {
+        if (nextIndex >= 4) {
           nextIndex = 0;
         }
         
@@ -2967,6 +2967,183 @@ const HomePage: React.FC = () => {
                       pointerEvents: 'none'
                     }}></div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 第四张卡片：新用户引导 */}
+          <div
+            style={{
+              minWidth: '100%',
+              scrollSnapAlign: 'start',
+              height: '280px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onMouseDown={() => setIsBannerPaused(true)}
+            onMouseUp={() => setIsBannerPaused(false)}
+            onMouseLeave={() => setIsBannerPaused(false)}
+            onClick={() => setShowRegisterModal(true)}
+          >
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #eff6ff 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* 背景装饰 */}
+              <div style={{
+                position: 'absolute',
+                top: '-50px',
+                right: '-50px',
+                width: '200px',
+                height: '200px',
+                borderRadius: '50%',
+                border: '20px solid rgba(59,130,246,0.03)'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                bottom: '-30px',
+                left: '-30px',
+                width: '150px',
+                height: '150px',
+                borderRadius: '50%',
+                border: '15px solid rgba(251,191,36,0.03)'
+              }}></div>
+
+              <div style={{ flex: 1, zIndex: 2, paddingLeft: '10px' }}>
+                <h2 style={{
+                  fontSize: '32px',
+                  fontWeight: 'bold',
+                  color: '#0f172a',
+                  margin: '0 0 16px 0',
+                  lineHeight: '1.2',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
+                }}>新用户现在<br/>即可开始下单！</h2>
+                
+                <div style={{ display: 'flex', gap: '12px', flexDirection: 'column', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '16px' }}>🌐</span>
+                    <span style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>Web 上注册账号即可直接下单，无需下载软件</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '16px' }}>📱</span>
+                    <span style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>下载 App 解锁更快捷的下单方式与精准定位追踪</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    padding: '8px 20px',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}>立即注册</div>
+                  <div style={{
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    padding: '8px 20px',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}>下载 App</div>
+                </div>
+              </div>
+              
+              <div style={{
+                flex: '0.8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                position: 'relative'
+              }}>
+                {/* 组合图标展示 */}
+                <div style={{ position: 'relative', width: '140px', height: '180px' }}>
+                  {/* Web Icon */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: '0',
+                    width: '100px',
+                    height: '70px',
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
+                    transform: 'rotate(-5deg)',
+                    zIndex: 2
+                  }}>
+                    <div style={{ fontSize: '28px', marginBottom: '4px' }}>💻</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>Web Client</div>
+                  </div>
+
+                  {/* App Icon */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '20px',
+                    right: '10px',
+                    width: '60px',
+                    height: '100px',
+                    backgroundColor: '#1e293b',
+                    borderRadius: '10px',
+                    border: '2px solid #334155',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 20px rgba(0,0,0,0.15)',
+                    transform: 'rotate(5deg)',
+                    zIndex: 3
+                  }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>App</div>
+                  </div>
+
+                  {/* Floating Elements */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '0',
+                    right: '10px',
+                    backgroundColor: '#dbeafe',
+                    padding: '8px',
+                    borderRadius: '50%',
+                    fontSize: '14px',
+                    zIndex: 1,
+                    animation: 'float 3s ease-in-out infinite'
+                  }}>📦</div>
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '40px',
+                    left: '-10px',
+                    backgroundColor: '#fef3c7',
+                    padding: '8px',
+                    borderRadius: '50%',
+                    fontSize: '14px',
+                    zIndex: 4,
+                    animation: 'float 4s ease-in-out infinite reverse'
+                  }}>📍</div>
                 </div>
               </div>
             </div>
