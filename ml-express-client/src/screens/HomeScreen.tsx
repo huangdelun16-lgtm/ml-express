@@ -623,7 +623,8 @@ export default function HomeScreen({ navigation }: any) {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-            {/* 第四张卡片：新用户引导 */}
+
+            {/* 第四张卡片：新用户注册推广 */}
             <View style={styles.bannerCardWrapper}>
               <TouchableOpacity 
                 style={styles.bannerCard}
@@ -632,121 +633,204 @@ export default function HomeScreen({ navigation }: any) {
                 onPressOut={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
-                  colors={['#ffffff', '#f8fafc', '#eff6ff']}
+                  colors={['#ffffff', '#f8fafc', '#f1f5f9']} // 白色背景，极简风格
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.bannerGradient}
                 >
-                   {/* 背景装饰线条 */}
-                   <View style={{
-                     position: 'absolute',
-                     top: -50,
-                     right: -50,
-                     width: 200,
-                     height: 200,
-                     borderRadius: 100,
-                     borderWidth: 20,
-                     borderColor: 'rgba(59,130,246,0.03)',
-                   }} />
-                   <View style={{
-                     position: 'absolute',
-                     bottom: -30,
-                     left: -30,
-                     width: 150,
-                     height: 150,
-                     borderRadius: 75,
-                     borderWidth: 15,
-                     borderColor: 'rgba(251,191,36,0.03)',
-                   }} />
+                  {/* 背景装饰线条 */}
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    opacity: 0.05,
+                  }}>
+                    <View style={{
+                      position: 'absolute',
+                      top: 20,
+                      left: 20,
+                      width: 100,
+                      height: 1,
+                      backgroundColor: '#2563eb',
+                      transform: [{ rotate: '45deg' }],
+                    }} />
+                    <View style={{
+                      position: 'absolute',
+                      bottom: 30,
+                      right: 30,
+                      width: 80,
+                      height: 1,
+                      backgroundColor: '#f59e0b',
+                      transform: [{ rotate: '-45deg' }],
+                    }} />
+                  </View>
 
                   <View style={styles.bannerContentRow}>
                     <View style={styles.bannerTextArea}>
-                      <Text style={[styles.bannerHeadline, { color: '#0f172a', fontSize: 20, lineHeight: 24 }]}>新用户现在{'\n'}即可开始下单！</Text>
-                      
-                      <View style={{marginTop: 8, gap: 6}}>
-                         <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 6}}>
-                           <Text style={{fontSize: 10, marginTop: 2}}>🌐</Text>
-                           <Text style={{fontSize: 10, color: '#475569', flex: 1, lineHeight: 14}}>
-                             Web 上注册账号即可直接下单，无需下载软件
-                           </Text>
-                         </View>
-                         <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 6}}>
-                           <Text style={{fontSize: 10, marginTop: 2}}>📱</Text>
-                           <Text style={{fontSize: 10, color: '#475569', flex: 1, lineHeight: 14}}>
-                             下载 App 解锁更快捷的下单方式与精准定位追踪
-                           </Text>
-                         </View>
+                      {/* 主标题 */}
+                      <Text style={{
+                        fontSize: 22,
+                        fontWeight: 'bold',
+                        color: '#1e293b',
+                        marginBottom: 12,
+                        lineHeight: 28,
+                      }}>新用户现在即可开始下单！</Text>
+
+                      {/* 副文本 */}
+                      <View style={{ gap: 8, marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 18 }}>🌐</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
+                            Web 上注册账号即可直接下单，无需下载软件
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 18 }}>💻</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
+                            网页版操作简单，无需安装，随时随地都能下单
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 18 }}>📱</Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}>
+                            想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪
+                          </Text>
+                        </View>
                       </View>
 
-                      <View style={{flexDirection: 'row', gap: 8, marginTop: 12}}>
-                        <View style={[styles.bannerCtaButton, { backgroundColor: '#0f172a', paddingVertical: 5, paddingHorizontal: 10 }]}>
-                          <Text style={[styles.bannerCtaText, { color: '#ffffff', fontSize: 10 }]}>立即注册</Text>
-                        </View>
-                        <View style={[styles.bannerCtaButton, { backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', paddingVertical: 5, paddingHorizontal: 10 }]}>
-                          <Text style={[styles.bannerCtaText, { color: '#2563eb', fontSize: 10 }]}>下载 App</Text>
-                        </View>
+                      {/* CTA 按钮 */}
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: '#2563eb',
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 8,
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            shadowColor: '#2563eb',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 8,
+                            elevation: 4,
+                          }}
+                          onPress={() => {
+                            // 可以导航到注册页面
+                            navigation.navigate('Profile');
+                          }}
+                        >
+                          <Text style={{
+                            color: '#ffffff',
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                          }}>立即注册</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: '#f59e0b',
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 8,
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            shadowColor: '#f59e0b',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 8,
+                            elevation: 4,
+                          }}
+                          onPress={() => {
+                            // 可以打开下载链接
+                            Linking.openURL('https://play.google.com/store/apps/details?id=com.marketlinkexpress');
+                          }}
+                        >
+                          <Text style={{
+                            color: '#ffffff',
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                          }}>下载 App</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
 
-                    <View style={[styles.phoneMockupContainer, { alignItems: 'flex-end', paddingRight: 10 }]}>
-                       {/* 图标组合展示 */}
-                       <View style={{
-                         width: 90,
-                         height: 160,
-                         justifyContent: 'center',
-                         alignItems: 'center',
-                       }}>
-                         <View style={{
-                           width: 80,
-                           height: 60,
-                           backgroundColor: 'white',
-                           borderRadius: 8,
-                           borderWidth: 1,
-                           borderColor: '#e2e8f0',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           marginBottom: -10,
-                           zIndex: 1,
-                           shadowColor: '#000',
-                           shadowOffset: { width: 0, height: 4 },
-                           shadowOpacity: 0.1,
-                           shadowRadius: 8,
-                           elevation: 5,
-                           transform: [{ rotate: '-5deg' }]
-                         }}>
-                           <Text style={{fontSize: 24}}>💻</Text>
-                           <Text style={{fontSize: 6, color: '#94a3b8', marginTop: 2}}>Web Client</Text>
-                         </View>
-                         
-                         <View style={{
-                           width: 50,
-                           height: 90,
-                           backgroundColor: '#1e293b',
-                           borderRadius: 8,
-                           borderWidth: 2,
-                           borderColor: '#334155',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           zIndex: 2,
-                           shadowColor: '#000',
-                           shadowOffset: { width: 0, height: 4 },
-                           shadowOpacity: 0.2,
-                           shadowRadius: 10,
-                           elevation: 8,
-                           transform: [{ rotate: '5deg' }, { translateX: 10 }]
-                         }}>
-                            <Text style={{fontSize: 20}}>📱</Text>
-                            <Text style={{fontSize: 6, color: '#94a3b8', marginTop: 4}}>App</Text>
-                         </View>
-
-                         {/* 装饰图标 */}
-                         <View style={[styles.floatingIcon, { top: 0, right: 0, backgroundColor: '#dbeafe' }]}>
-                           <Text style={{fontSize: 12}}>📦</Text>
-                         </View>
-                         <View style={[styles.floatingIcon, { bottom: 20, left: 0, backgroundColor: '#fef3c7' }]}>
-                           <Text style={{fontSize: 12}}>📍</Text>
-                         </View>
-                       </View>
+                    <View style={styles.phoneMockupContainer}>
+                      {/* 功能图标展示 */}
+                      <View style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 12,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        {/* Web浏览器图标 */}
+                        <View style={{
+                          width: 50,
+                          height: 50,
+                          backgroundColor: '#eff6ff',
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#2563eb',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}>
+                          <Text style={{ fontSize: 24 }}>🌐</Text>
+                        </View>
+                        {/* 手机图标 */}
+                        <View style={{
+                          width: 50,
+                          height: 50,
+                          backgroundColor: '#fef3c7',
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#f59e0b',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}>
+                          <Text style={{ fontSize: 24 }}>📱</Text>
+                        </View>
+                        {/* 配送箱图标 */}
+                        <View style={{
+                          width: 50,
+                          height: 50,
+                          backgroundColor: '#f0fdf4',
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#10b981',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}>
+                          <Text style={{ fontSize: 24 }}>📦</Text>
+                        </View>
+                        {/* 位置追踪图标 */}
+                        <View style={{
+                          width: 50,
+                          height: 50,
+                          backgroundColor: '#fef2f2',
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#ef4444',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}>
+                          <Text style={{ fontSize: 24 }}>📍</Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
                 </LinearGradient>

@@ -2972,7 +2972,7 @@ const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* 第四张卡片：新用户引导 */}
+          {/* 第四张卡片：新用户注册推广 */}
           <div
             style={{
               minWidth: '100%',
@@ -2987,12 +2987,11 @@ const HomePage: React.FC = () => {
             onMouseDown={() => setIsBannerPaused(true)}
             onMouseUp={() => setIsBannerPaused(false)}
             onMouseLeave={() => setIsBannerPaused(false)}
-            onClick={() => setShowRegisterModal(true)}
           >
             <div style={{
               width: '100%',
               height: '100%',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #eff6ff 100%)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -3000,73 +2999,175 @@ const HomePage: React.FC = () => {
               position: 'relative',
               overflow: 'hidden'
             }}>
-              {/* 背景装饰 */}
+              {/* 背景装饰线条 */}
               <div style={{
                 position: 'absolute',
-                top: '-50px',
-                right: '-50px',
-                width: '200px',
-                height: '200px',
-                borderRadius: '50%',
-                border: '20px solid rgba(59,130,246,0.03)'
-              }}></div>
-              <div style={{
-                position: 'absolute',
-                bottom: '-30px',
-                left: '-30px',
-                width: '150px',
-                height: '150px',
-                borderRadius: '50%',
-                border: '15px solid rgba(251,191,36,0.03)'
-              }}></div>
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                opacity: 0.05,
+                pointerEvents: 'none'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  left: '20px',
+                  width: '100px',
+                  height: '1px',
+                  backgroundColor: '#2563eb',
+                  transform: 'rotate(45deg)'
+                }}></div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '30px',
+                  right: '30px',
+                  width: '80px',
+                  height: '1px',
+                  backgroundColor: '#f59e0b',
+                  transform: 'rotate(-45deg)'
+                }}></div>
+              </div>
 
-              <div style={{ flex: 1, zIndex: 2, paddingLeft: '10px' }}>
+              <div style={{ flex: 1, zIndex: 2 }}>
+                {/* 主标题 */}
                 <h2 style={{
-                  fontSize: '32px',
+                  fontSize: '28px',
                   fontWeight: 'bold',
-                  color: '#0f172a',
-                  margin: '0 0 16px 0',
-                  lineHeight: '1.2',
+                  color: '#1e293b',
+                  margin: '0 0 12px 0',
+                  lineHeight: '1.3',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
                   display: 'block',
                   visibility: 'visible',
                   opacity: 1
-                }}>新用户现在<br/>即可开始下单！</h2>
-                
-                <div style={{ display: 'flex', gap: '12px', flexDirection: 'column', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '16px' }}>🌐</span>
-                    <span style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>Web 上注册账号即可直接下单，无需下载软件</span>
+                }}>新用户现在即可开始下单！</h2>
+
+                {/* 副文本 */}
+                <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>🌐</span>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#475569',
+                      margin: 0,
+                      lineHeight: '20px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any,
+                      display: 'block',
+                      visibility: 'visible',
+                      opacity: 1
+                    }}>Web 上注册账号即可直接下单，无需下载软件</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '16px' }}>📱</span>
-                    <span style={{ color: '#475569', fontSize: '14px', lineHeight: '1.5', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>下载 App 解锁更快捷的下单方式与精准定位追踪</span>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>💻</span>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#475569',
+                      margin: 0,
+                      lineHeight: '20px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any,
+                      display: 'block',
+                      visibility: 'visible',
+                      opacity: 1
+                    }}>网页版操作简单，无需安装，随时随地都能下单</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <span style={{ fontSize: '18px', lineHeight: '20px' }}>📱</span>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#475569',
+                      margin: 0,
+                      lineHeight: '20px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any,
+                      display: 'block',
+                      visibility: 'visible',
+                      opacity: 1
+                    }}>想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <div style={{
-                    backgroundColor: '#0f172a',
-                    color: '#ffffff',
-                    padding: '8px 20px',
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-                  }}>立即注册</div>
-                  <div style={{
-                    backgroundColor: '#eff6ff',
-                    color: '#2563eb',
-                    border: '1px solid #bfdbfe',
-                    padding: '8px 20px',
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-                  }}>下载 App</div>
+                {/* CTA 按钮 */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button
+                    onClick={() => {
+                      setShowRegisterModal(true);
+                      setIsLoginMode(false);
+                    }}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      flex: 1,
+                      boxShadow: '0 4px 8px rgba(37, 99, 235, 0.3)',
+                      transition: 'all 0.2s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#1d4ed8';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(37, 99, 235, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#2563eb';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(37, 99, 235, 0.3)';
+                    }}
+                  >立即注册</button>
+                  <button
+                    onClick={() => {
+                      window.open('https://play.google.com/store/apps/details?id=com.marketlinkexpress', '_blank');
+                    }}
+                    style={{
+                      backgroundColor: '#f59e0b',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      flex: 1,
+                      boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)',
+                      transition: 'all 0.2s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#d97706';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(245, 158, 11, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f59e0b';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
+                    }}
+                  >下载 App 获取更快体验</button>
                 </div>
               </div>
-              
+
               <div style={{
                 flex: '0.8',
                 display: 'flex',
@@ -3075,74 +3176,63 @@ const HomePage: React.FC = () => {
                 zIndex: 1,
                 position: 'relative'
               }}>
-                {/* 组合图标展示 */}
-                <div style={{ position: 'relative', width: '140px', height: '180px' }}>
-                  {/* Web Icon */}
+                {/* 功能图标展示 */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  maxWidth: '200px'
+                }}>
+                  {/* Web浏览器图标 */}
                   <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    left: '0',
-                    width: '100px',
-                    height: '70px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
+                    width: '50px',
+                    height: '50px',
+                    backgroundColor: '#eff6ff',
+                    borderRadius: '12px',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-                    transform: 'rotate(-5deg)',
-                    zIndex: 2
-                  }}>
-                    <div style={{ fontSize: '28px', marginBottom: '4px' }}>💻</div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>Web Client</div>
-                  </div>
-
-                  {/* App Icon */}
+                    fontSize: '24px',
+                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                  }}>🌐</div>
+                  {/* 手机图标 */}
                   <div style={{
-                    position: 'absolute',
-                    bottom: '20px',
-                    right: '10px',
-                    width: '60px',
-                    height: '100px',
-                    backgroundColor: '#1e293b',
-                    borderRadius: '10px',
-                    border: '2px solid #334155',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 10px 20px rgba(0,0,0,0.15)',
-                    transform: 'rotate(5deg)',
-                    zIndex: 3
-                  }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📱</div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>App</div>
-                  </div>
-
-                  {/* Floating Elements */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '0',
-                    right: '10px',
-                    backgroundColor: '#dbeafe',
-                    padding: '8px',
-                    borderRadius: '50%',
-                    fontSize: '14px',
-                    zIndex: 1,
-                    animation: 'float 3s ease-in-out infinite'
-                  }}>📦</div>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '40px',
-                    left: '-10px',
+                    width: '50px',
+                    height: '50px',
                     backgroundColor: '#fef3c7',
-                    padding: '8px',
-                    borderRadius: '50%',
-                    fontSize: '14px',
-                    zIndex: 4,
-                    animation: 'float 4s ease-in-out infinite reverse'
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)'
+                  }}>📱</div>
+                  {/* 配送箱图标 */}
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
+                  }}>📦</div>
+                  {/* 位置追踪图标 */}
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    backgroundColor: '#fef2f2',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
                   }}>📍</div>
                 </div>
               </div>
