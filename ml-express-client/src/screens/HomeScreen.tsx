@@ -427,7 +427,15 @@ export default function HomeScreen({ navigation }: any) {
             snapToInterval={width - 32}
             decelerationRate="fast"
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
+            scrollEnabled={true}
+            pagingEnabled={true}
+            onMomentumScrollEnd={(event) => {
+              const offsetX = event.nativeEvent.contentOffset.x;
+              const newIndex = Math.round(offsetX / (width - 32));
+              if (newIndex >= 0 && newIndex < TOTAL_BANNERS) {
+                setCurrentBannerIndex(newIndex);
+              }
+            }}
             style={styles.bannerScroll}
             contentContainerStyle={{ width: (width - 32) * 4 }}
           >
@@ -816,11 +824,19 @@ export default function HomeScreen({ navigation }: any) {
         <Modal
           visible={showBannerModal}
           transparent={true}
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setShowBannerModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowBannerModal(false)}
+          >
+            <TouchableOpacity
+              style={styles.modalContent}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
               <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setShowBannerModal(false)}
@@ -830,6 +846,7 @@ export default function HomeScreen({ navigation }: any) {
               
               <ScrollView 
                 style={styles.modalScrollView}
+                contentContainerStyle={styles.modalScrollContent}
                 showsVerticalScrollIndicator={true}
               >
                 {selectedBannerIndex === 0 && (
@@ -947,8 +964,8 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 )}
               </ScrollView>
-            </View>
-          </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
 
         {/* Quick Action Cards - 4 Cards in Grid */}
@@ -1924,12 +1941,13 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: width - 40,
-    maxHeight: Dimensions.get('window').height * 0.8,
+    maxHeight: Dimensions.get('window').height * 0.85,
     backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
     ...theme.shadows.large,
     elevation: 20,
+    position: 'relative',
   },
   modalCloseButton: {
     position: 'absolute',
@@ -1949,8 +1967,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalScrollView: {
-    flex: 1,
     width: '100%',
+    flex: 1,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
   },
   modalBannerContent: {
     width: '100%',
