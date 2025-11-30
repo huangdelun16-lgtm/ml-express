@@ -826,6 +826,7 @@ export default function HomeScreen({ navigation }: any) {
           transparent={true}
           animationType="slide"
           onRequestClose={() => setShowBannerModal(false)}
+          statusBarTranslucent={true}
         >
           <TouchableOpacity
             style={styles.modalOverlay}
@@ -848,6 +849,7 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.modalScrollView}
                 contentContainerStyle={styles.modalScrollContent}
                 showsVerticalScrollIndicator={true}
+                bounces={true}
               >
                 {selectedBannerIndex === 0 && (
                   <View style={styles.modalBannerContent}>
@@ -1948,6 +1950,7 @@ const styles = StyleSheet.create({
     ...theme.shadows.large,
     elevation: 20,
     position: 'relative',
+    zIndex: 1000,
   },
   modalCloseButton: {
     position: 'absolute',
@@ -1983,6 +1986,8 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 50,
     minHeight: 400,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   modalBannerLogo: {
     width: 60,
