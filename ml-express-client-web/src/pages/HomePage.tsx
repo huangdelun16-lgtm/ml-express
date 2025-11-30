@@ -241,6 +241,28 @@ const HomePage: React.FC = () => {
     return () => clearInterval(timer);
   }, [currentBannerIndex, isBannerPaused]);
 
+  // 监听滑动事件，更新当前索引
+  useEffect(() => {
+    const handleScroll = () => {
+      if (bannerScrollRef.current) {
+        const containerWidth = bannerScrollRef.current.offsetWidth;
+        const scrollLeft = bannerScrollRef.current.scrollLeft;
+        const newIndex = Math.round(scrollLeft / containerWidth);
+        if (newIndex >= 0 && newIndex < 4 && newIndex !== currentBannerIndex) {
+          setCurrentBannerIndex(newIndex);
+        }
+      }
+    };
+
+    const scrollElement = bannerScrollRef.current;
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', handleScroll);
+      return () => {
+        scrollElement.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [currentBannerIndex]);
+
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -2436,23 +2458,37 @@ const HomePage: React.FC = () => {
       <div style={{
         position: 'relative',
         zIndex: 5,
-        marginBottom: '24px',
+        marginBottom: '40px',
         padding: '0 16px',
         maxWidth: '1200px',
-        margin: '0 auto 24px auto',
+        margin: '0 auto 40px auto',
         width: '100%'
       }}>
         <div
           ref={bannerScrollRef}
           style={{
             display: 'flex',
-            overflowX: 'hidden',
+            overflowX: 'auto',
             scrollSnapType: 'x mandatory',
             scrollBehavior: 'smooth',
             width: '100%',
             borderRadius: '16px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            position: 'relative'
+            position: 'relative',
+            cursor: 'grab',
+            WebkitOverflowScrolling: 'touch' as any,
+          }}
+          onMouseDown={(e) => {
+            const element = e.currentTarget;
+            element.style.cursor = 'grabbing';
+          }}
+          onMouseUp={(e) => {
+            const element = e.currentTarget;
+            element.style.cursor = 'grab';
+          }}
+          onMouseLeave={(e) => {
+            const element = e.currentTarget;
+            element.style.cursor = 'grab';
           }}
         >
           {/* 第一张卡片：地图追踪 */}
@@ -3192,6 +3228,43 @@ const HomePage: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+          
+          {/* 圆点指示器 - 位于卡片下方中间 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '12px',
+            marginBottom: '8px',
+            gap: '6px',
+            width: '100%',
+            paddingTop: '12px'
+          }}>
+            {[0, 1, 2, 3].map((index) => (
+              <div
+                key={index}
+                style={{
+                  width: currentBannerIndex === index ? '20px' : '6px',
+                  height: '6px',
+                  borderRadius: '3px',
+                  backgroundColor: currentBannerIndex === index ? '#3b82f6' : '#cbd5e1',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  if (bannerScrollRef.current) {
+                    const containerWidth = bannerScrollRef.current.offsetWidth;
+                    bannerScrollRef.current.scrollTo({
+                      left: index * containerWidth,
+                      behavior: 'smooth'
+                    });
+                    setCurrentBannerIndex(index);
+                  }
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>
