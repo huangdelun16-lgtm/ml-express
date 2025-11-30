@@ -421,24 +421,6 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* 3D 风格广告横幅 (自动轮播) */}
         <View style={styles.bannerContainer}>
-          {/* 广告卡片指示器 */}
-          <View style={styles.bannerIndicatorContainer}>
-            <Text style={styles.bannerIndicatorText}>
-              {currentBannerIndex + 1} / {TOTAL_BANNERS}
-            </Text>
-            <View style={styles.bannerIndicatorDots}>
-              {[0, 1, 2, 3].map((index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.bannerIndicatorDot,
-                    currentBannerIndex === index && styles.bannerIndicatorDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-          
           <ScrollView
             ref={bannerScrollRef}
             horizontal
@@ -454,12 +436,12 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity 
                 style={styles.bannerCard}
                 activeOpacity={0.9}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
                 onPress={() => {
                   setSelectedBannerIndex(0);
                   setShowBannerModal(true);
                 }}
+                onLongPress={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#3b82f6', '#60a5fa', '#ffffff']}
@@ -513,12 +495,12 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity 
                 style={styles.bannerCard}
                 activeOpacity={0.9}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
                 onPress={() => {
                   setSelectedBannerIndex(1);
                   setShowBannerModal(true);
                 }}
+                onLongPress={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#f3f4f6', '#ffffff', '#e5e7eb']} // 浅灰色调
@@ -576,12 +558,12 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity 
                 style={styles.bannerCard}
                 activeOpacity={0.9}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
                 onPress={() => {
                   setSelectedBannerIndex(2);
                   setShowBannerModal(true);
                 }}
+                onLongPress={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#e2e8f0', '#f8fafc', '#ffffff']} // 极简企业灰白调
@@ -653,12 +635,12 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity 
                 style={styles.bannerCard}
                 activeOpacity={0.9}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
                 onPress={() => {
                   setSelectedBannerIndex(3);
                   setShowBannerModal(true);
                 }}
+                onLongPress={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#ffffff', '#f8fafc', '#f1f5f9']} // 白色背景，极简风格
@@ -813,6 +795,21 @@ export default function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
           </ScrollView>
+          
+          {/* 圆点指示器 - 位于卡片下方中间 */}
+          <View style={styles.bannerIndicatorContainer}>
+            <View style={styles.bannerIndicatorDots}>
+              {[0, 1, 2, 3].map((index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.bannerIndicatorDot,
+                    currentBannerIndex === index && styles.bannerIndicatorDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* 广告详情Modal */}
@@ -1923,10 +1920,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
     width: width - 40,
-    maxHeight: '80%',
+    maxHeight: Dimensions.get('window').height * 0.8,
     backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
@@ -1952,15 +1950,18 @@ const styles = StyleSheet.create({
   },
   modalScrollView: {
     flex: 1,
+    width: '100%',
   },
   modalBannerContent: {
     width: '100%',
     minHeight: 400,
+    paddingBottom: 20,
   },
   modalBannerGradient: {
-    flex: 1,
+    width: '100%',
     padding: 24,
     paddingTop: 50,
+    minHeight: 400,
   },
   modalBannerLogo: {
     width: 60,
