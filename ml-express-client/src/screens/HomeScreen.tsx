@@ -73,6 +73,8 @@ export default function HomeScreen({ navigation }: any) {
   const [isBannerPaused, setIsBannerPaused] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [selectedBannerIndex, setSelectedBannerIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
   const TOTAL_BANNERS = 4;
 
   // 自动轮播逻辑
@@ -429,12 +431,17 @@ export default function HomeScreen({ navigation }: any) {
             showsHorizontalScrollIndicator={false}
             scrollEnabled={true}
             pagingEnabled={true}
+            onScrollBeginDrag={() => setIsScrolling(true)}
+            onScrollEndDrag={() => {
+              setTimeout(() => setIsScrolling(false), 100);
+            }}
             onMomentumScrollEnd={(event) => {
               const offsetX = event.nativeEvent.contentOffset.x;
               const newIndex = Math.round(offsetX / (width - 32));
               if (newIndex >= 0 && newIndex < TOTAL_BANNERS) {
                 setCurrentBannerIndex(newIndex);
               }
+              setTimeout(() => setIsScrolling(false), 100);
             }}
             style={styles.bannerScroll}
             contentContainerStyle={{ width: (width - 32) * 4 }}
@@ -445,12 +452,13 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.bannerCard}
                 activeOpacity={0.9}
                 onPress={() => {
-                  console.log('Banner 0 clicked');
-                  setSelectedBannerIndex(0);
-                  setShowBannerModal(true);
+                  if (!isScrolling) {
+                    console.log('Banner 0 clicked');
+                    setSelectedBannerIndex(0);
+                    setShowBannerModal(true);
+                  }
                 }}
-                onLongPress={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
+                delayPressIn={150}
               >
                 <LinearGradient
                   colors={['#3b82f6', '#60a5fa', '#ffffff']}
@@ -505,11 +513,13 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.bannerCard}
                 activeOpacity={0.9}
                 onPress={() => {
-                  setSelectedBannerIndex(1);
-                  setShowBannerModal(true);
+                  if (!isScrolling) {
+                    console.log('Banner 1 clicked');
+                    setSelectedBannerIndex(1);
+                    setShowBannerModal(true);
+                  }
                 }}
-                onLongPress={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
+                delayPressIn={150}
               >
                 <LinearGradient
                   colors={['#f3f4f6', '#ffffff', '#e5e7eb']} // 浅灰色调
@@ -568,11 +578,13 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.bannerCard}
                 activeOpacity={0.9}
                 onPress={() => {
-                  setSelectedBannerIndex(2);
-                  setShowBannerModal(true);
+                  if (!isScrolling) {
+                    console.log('Banner 2 clicked');
+                    setSelectedBannerIndex(2);
+                    setShowBannerModal(true);
+                  }
                 }}
-                onLongPress={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
+                delayPressIn={150}
               >
                 <LinearGradient
                   colors={['#e2e8f0', '#f8fafc', '#ffffff']} // 极简企业灰白调
@@ -645,11 +657,13 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.bannerCard}
                 activeOpacity={0.9}
                 onPress={() => {
-                  setSelectedBannerIndex(3);
-                  setShowBannerModal(true);
+                  if (!isScrolling) {
+                    console.log('Banner 3 clicked');
+                    setSelectedBannerIndex(3);
+                    setShowBannerModal(true);
+                  }
                 }}
-                onLongPress={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
+                delayPressIn={150}
               >
                 <LinearGradient
                   colors={['#ffffff', '#f8fafc', '#f1f5f9']} // 白色背景，极简风格
