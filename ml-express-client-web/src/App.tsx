@@ -6,6 +6,7 @@ import TrackingPage from './pages/TrackingPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProfilePage from './pages/ProfilePage';
+import DeleteAccountPage from './pages/DeleteAccountPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
@@ -84,6 +85,7 @@ function App() {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/delete-account" element={<DeleteAccountPage />} />
             </Routes>
           </div>
         </Router>
