@@ -226,7 +226,7 @@ const HomePage: React.FC = () => {
       if (bannerScrollRef.current) {
         const containerWidth = bannerScrollRef.current.offsetWidth;
         let nextIndex = currentBannerIndex + 1;
-        if (nextIndex >= 4) {
+        if (nextIndex >= 5) {
           nextIndex = 0;
         }
         
@@ -248,7 +248,7 @@ const HomePage: React.FC = () => {
         const containerWidth = bannerScrollRef.current.offsetWidth;
         const scrollLeft = bannerScrollRef.current.scrollLeft;
         const newIndex = Math.round(scrollLeft / containerWidth);
-        if (newIndex >= 0 && newIndex < 4 && newIndex !== currentBannerIndex) {
+        if (newIndex >= 0 && newIndex < 5 && newIndex !== currentBannerIndex) {
           setCurrentBannerIndex(newIndex);
         }
       }
@@ -3229,6 +3229,207 @@ const HomePage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* 第五张卡片：缅甸风格定位广告 */}
+          <div
+            style={{
+              minWidth: '100%',
+              scrollSnapAlign: 'start',
+              height: '280px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onMouseDown={() => setIsBannerPaused(true)}
+            onMouseUp={() => setIsBannerPaused(false)}
+            onMouseLeave={() => setIsBannerPaused(false)}
+          >
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 40%, #ffffff 80%, #fef3c7 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* 背景装饰 - 柔和光影 */}
+              <div style={{
+                position: 'absolute',
+                top: '-50px',
+                right: '-30px',
+                width: '150px',
+                height: '150px',
+                borderRadius: '75px',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                opacity: 0.6
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                bottom: '-40px',
+                left: '-20px',
+                width: '120px',
+                height: '120px',
+                borderRadius: '60px',
+                backgroundColor: 'rgba(254, 243, 199, 0.3)',
+                opacity: 0.5
+              }}></div>
+
+              <div style={{ flex: 1, zIndex: 2 }}>
+                {/* 定位图标 - 大号带发光效果 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '30px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 15px rgba(59, 130, 246, 0.5)',
+                    fontSize: '32px'
+                  }}>📍</div>
+                </div>
+
+                {/* 缅文大标题 */}
+                <h2 style={{
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  margin: '0 0 8px 0',
+                  lineHeight: '1.4',
+                  textAlign: 'center',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
+                }}>
+                  ဘယ်နေရာပဲရောက်ရောက်<br/>
+                  အချိန်ကုန်သက်သာဖို့ 📍ပွင့်ထောက်ပြီး<br/>
+                  Market Link နဲ့ ပစ္စည်းပို့လိုက်စို့！
+                </h2>
+
+                {/* 中文副标题 */}
+                <p style={{
+                  fontSize: '12px',
+                  color: '#475569',
+                  margin: '0 0 16px 0',
+                  lineHeight: '1.5',
+                  textAlign: 'center',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  WebkitFontSmoothing: 'antialiased' as any,
+                  MozOsxFontSmoothing: 'grayscale' as any,
+                  WebkitTextSizeAdjust: '100%' as any,
+                  display: 'block',
+                  visibility: 'visible',
+                  opacity: 1
+                }}>
+                  无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
+                </p>
+
+                {/* 操作按钮 */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <button
+                    onClick={() => {
+                      setShowOrderForm(true);
+                    }}
+                    style={{
+                      backgroundColor: '#fbbf24',
+                      color: '#1e3a8a',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '25px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)',
+                      transition: 'all 0.2s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      WebkitFontSmoothing: 'antialiased' as any,
+                      MozOsxFontSmoothing: 'grayscale' as any,
+                      WebkitTextSizeAdjust: '100%' as any
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f59e0b';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(245, 158, 11, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fbbf24';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
+                    }}
+                  >အော်ဒါတင်မယ်</button>
+                </div>
+              </div>
+
+              <div style={{
+                flex: '0.8',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+                position: 'relative'
+              }}>
+                {/* 右侧插画区域 - 骑手和路线 */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}>
+                  {/* 骑手插画 */}
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '40px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '40px',
+                    marginBottom: '8px'
+                  }}>🛵</div>
+                  
+                  {/* 路线节点 */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginTop: '4px'
+                  }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '4px', backgroundColor: '#3b82f6' }}></div>
+                    <div style={{ width: '20px', height: '2px', backgroundColor: '#60a5fa' }}></div>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '4px', backgroundColor: '#fbbf24' }}></div>
+                    <div style={{ width: '20px', height: '2px', backgroundColor: '#60a5fa' }}></div>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '4px', backgroundColor: '#10b981' }}></div>
+                  </div>
+
+                  {/* 微笑图标 */}
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '24px'
+                  }}>😊</div>
+                </div>
+              </div>
+            </div>
+          </div>
           
           {/* 圆点指示器 - 位于卡片下方中间 */}
           <div style={{
@@ -3242,7 +3443,7 @@ const HomePage: React.FC = () => {
             width: '100%',
             paddingTop: '12px'
           }}>
-            {[0, 1, 2, 3].map((index) => (
+            {[0, 1, 2, 3, 4].map((index) => (
               <div
                 key={index}
                 style={{

@@ -74,7 +74,7 @@ export default function HomeScreen({ navigation }: any) {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [selectedBannerIndex, setSelectedBannerIndex] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
-  const TOTAL_BANNERS = 4;
+  const TOTAL_BANNERS = 5;
 
   // 自动轮播逻辑
   useEffect(() => {
@@ -820,12 +820,198 @@ export default function HomeScreen({ navigation }: any) {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+
+            {/* 第五张卡片：缅甸风格定位广告 */}
+            <View style={styles.bannerCardWrapper}>
+              <TouchableOpacity 
+                style={styles.bannerCard}
+                activeOpacity={0.9}
+                onPress={() => {
+                  if (!isScrolling) {
+                    setSelectedBannerIndex(4);
+                    setShowBannerModal(true);
+                  }
+                }}
+                onPressIn={() => setIsBannerPaused(true)}
+                onPressOut={() => setIsBannerPaused(false)}
+                delayPressIn={150}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#60a5fa', '#ffffff', '#fef3c7']} // 蓝色到白色到黄色
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0, 0.4, 0.8, 1]}
+                  style={styles.bannerGradient}
+                >
+                  {/* 背景装饰 - 柔和光影 */}
+                  <View style={{
+                    position: 'absolute',
+                    top: -50,
+                    right: -30,
+                    width: 150,
+                    height: 150,
+                    borderRadius: 75,
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    opacity: 0.6,
+                  }} />
+                  <View style={{
+                    position: 'absolute',
+                    bottom: -40,
+                    left: -20,
+                    width: 120,
+                    height: 120,
+                    borderRadius: 60,
+                    backgroundColor: 'rgba(254, 243, 199, 0.3)',
+                    opacity: 0.5,
+                  }} />
+
+                  <View style={styles.bannerContentRow}>
+                    <View style={styles.bannerTextArea}>
+                      {/* 定位图标 - 大号带发光效果 */}
+                      <View style={{
+                        alignSelf: 'center',
+                        marginBottom: 12,
+                        width: 60,
+                        height: 60,
+                        borderRadius: 30,
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#3b82f6',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 15,
+                        elevation: 5,
+                      }}>
+                        <Text style={{ fontSize: 32 }}>📍</Text>
+                      </View>
+
+                      {/* 缅文大标题 */}
+                      <Text style={{
+                        fontSize: 18,
+                        fontWeight: 'bold',
+                        color: '#1e293b',
+                        marginBottom: 8,
+                        lineHeight: 24,
+                        textAlign: 'center',
+                      }}>
+                        ဘယ်နေရာပဲရောက်ရောက်{'\n'}
+                        အချိန်ကုန်သက်သာဖို့ 📍ပွင့်ထောက်ပြီး{'\n'}
+                        Market Link နဲ့ ပစ္စည်းပို့လိုက်စို့！
+                      </Text>
+
+                      {/* 中文副标题 */}
+                      <Text style={{
+                        fontSize: 11,
+                        color: '#475569',
+                        marginBottom: 16,
+                        lineHeight: 16,
+                        textAlign: 'center',
+                      }}>
+                        无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
+                      </Text>
+
+                      {/* 操作按钮 */}
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#fbbf24',
+                          paddingHorizontal: 20,
+                          paddingVertical: 10,
+                          borderRadius: 25,
+                          alignSelf: 'center',
+                          shadowColor: '#f59e0b',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 8,
+                          elevation: 5,
+                        }}
+                        onPress={() => {
+                          navigation.navigate('PlaceOrder');
+                        }}
+                      >
+                        <Text style={{
+                          color: '#1e3a8a',
+                          fontSize: 13,
+                          fontWeight: 'bold',
+                        }}>အော်ဒါတင်မယ်</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.phoneMockupContainer}>
+                      {/* 右侧插画区域 - 骑手和路线 */}
+                      <View style={{
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                      }}>
+                        {/* 骑手插画 */}
+                        <View style={{
+                          width: 80,
+                          height: 80,
+                          borderRadius: 40,
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: 8,
+                        }}>
+                          <Text style={{ fontSize: 40 }}>🛵</Text>
+                        </View>
+                        
+                        {/* 路线节点 */}
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          marginTop: 4,
+                        }}>
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: '#3b82f6',
+                          }} />
+                          <View style={{
+                            width: 20,
+                            height: 2,
+                            backgroundColor: '#60a5fa',
+                          }} />
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: '#fbbf24',
+                          }} />
+                          <View style={{
+                            width: 20,
+                            height: 2,
+                            backgroundColor: '#60a5fa',
+                          }} />
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: '#10b981',
+                          }} />
+                        </View>
+
+                        {/* 微笑图标 */}
+                        <View style={{
+                          marginTop: 8,
+                        }}>
+                          <Text style={{ fontSize: 24 }}>😊</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
           
           {/* 圆点指示器 - 位于卡片下方中间 */}
           <View style={styles.bannerIndicatorContainer}>
             <View style={styles.bannerIndicatorDots}>
-              {[0, 1, 2, 3].map((index) => (
+              {[0, 1, 2, 3, 4].map((index) => (
                 <View
                   key={index}
                   style={[
@@ -969,6 +1155,119 @@ export default function HomeScreen({ navigation }: any) {
                       <Text style={[styles.modalBannerDescription, { color: '#64748b', marginTop: 16, textAlign: 'center' }]}>
                         无论您选择网页版还是App，都能享受我们专业的配送服务。立即注册，开始您的便捷配送之旅！
                       </Text>
+                    </LinearGradient>
+                  </View>
+                )}
+                
+                {selectedBannerIndex === 4 && (
+                  <View style={styles.modalBannerContent}>
+                    <LinearGradient
+                      colors={['#3b82f6', '#60a5fa', '#ffffff', '#fef3c7']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      locations={[0, 0.4, 0.8, 1]}
+                      style={styles.modalBannerGradient}
+                    >
+                      {/* 定位图标 - 大号带发光效果 */}
+                      <View style={{
+                        alignSelf: 'center',
+                        marginBottom: 20,
+                        width: 80,
+                        height: 80,
+                        borderRadius: 40,
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#3b82f6',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 20,
+                        elevation: 5,
+                      }}>
+                        <Text style={{ fontSize: 48 }}>📍</Text>
+                      </View>
+
+                      {/* 缅文大标题 */}
+                      <Text style={[styles.modalBannerHeadline, { 
+                        color: '#1e293b', 
+                        fontSize: 24,
+                        marginBottom: 16,
+                        lineHeight: 32,
+                      }]}>
+                        ဘယ်နေရာပဲရောက်ရောက်{'\n'}
+                        အချိန်ကုန်သက်သာဖို့ 📍ပွင့်ထောက်ပြီး{'\n'}
+                        Market Link နဲ့ ပစ္စည်းပို့လိုက်စို့！
+                      </Text>
+
+                      {/* 中文副标题 */}
+                      <Text style={[styles.modalBannerSubHeadline, { 
+                        color: '#475569',
+                        marginBottom: 24,
+                      }]}>
+                        无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
+                      </Text>
+
+                      {/* 插画区域 */}
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 16,
+                        marginBottom: 24,
+                      }}>
+                        {/* 骑手 */}
+                        <View style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 30,
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Text style={{ fontSize: 32 }}>🛵</Text>
+                        </View>
+                        
+                        {/* 路线 */}
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6' }} />
+                          <View style={{ width: 30, height: 2, backgroundColor: '#60a5fa' }} />
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fbbf24' }} />
+                          <View style={{ width: 30, height: 2, backgroundColor: '#60a5fa' }} />
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                        </View>
+
+                        {/* 包裹 */}
+                        <View style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 30,
+                          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Text style={{ fontSize: 32 }}>📦</Text>
+                        </View>
+                      </View>
+
+                      {/* 描述文字 */}
+                      <Text style={[styles.modalBannerDescription, { 
+                        color: '#475569',
+                        marginTop: 16,
+                      }]}>
+                        开启定位功能，我们的智能系统会自动为您匹配最近的配送员，优化配送路线，让您的包裹以最快速度送达。无论您在城市的哪个角落，Market Link都能为您提供便捷、快速的配送服务。
+                      </Text>
+
+                      {/* 微笑图标 */}
+                      <View style={{
+                        marginTop: 20,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ fontSize: 32 }}>😊</Text>
+                      </View>
                     </LinearGradient>
                   </View>
                 )}
