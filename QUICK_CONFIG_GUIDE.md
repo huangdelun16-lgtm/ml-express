@@ -46,7 +46,7 @@ netlify deploy --prod
 1. 在 Netlify Dashboard 中选择站点：**admin-ml-express**
 2. **Site settings** → **Environment variables**
 3. 找到 `REACT_APP_GOOGLE_MAPS_API_KEY`
-4. 点击 **Edit**，更新为：`AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
+4. 点击 **Edit**，更新为：[您的Website API Key]
 5. 点击 **Save**
 6. **Deploys** → **Trigger deploy** → **Deploy site**
 
