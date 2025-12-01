@@ -910,31 +910,6 @@ export default function HomeScreen({ navigation }: any) {
                       }}>
                         无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
                       </Text>
-
-                      {/* 操作按钮 */}
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#fbbf24',
-                          paddingHorizontal: 20,
-                          paddingVertical: 10,
-                          borderRadius: 25,
-                          alignSelf: 'center',
-                          shadowColor: '#f59e0b',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 8,
-                          elevation: 5,
-                        }}
-                        onPress={() => {
-                          navigation.navigate('PlaceOrder');
-                        }}
-                      >
-                        <Text style={{
-                          color: '#1e3a8a',
-                          fontSize: 13,
-                          fontWeight: 'bold',
-                        }}>အော်ဒါတင်မယ်</Text>
-                      </TouchableOpacity>
                     </View>
 
                     <View style={styles.phoneMockupContainer}>

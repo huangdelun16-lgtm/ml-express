@@ -3338,43 +3338,6 @@ const HomePage: React.FC = () => {
                   无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
                 </p>
 
-                {/* 操作按钮 */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}>
-                  <button
-                    onClick={() => {
-                      setShowOrderForm(true);
-                    }}
-                    style={{
-                      backgroundColor: '#fbbf24',
-                      color: '#1e3a8a',
-                      border: 'none',
-                      padding: '10px 20px',
-                      borderRadius: '25px',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 8px rgba(245, 158, 11, 0.3)',
-                      transition: 'all 0.2s ease',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      WebkitFontSmoothing: 'antialiased' as any,
-                      MozOsxFontSmoothing: 'grayscale' as any,
-                      WebkitTextSizeAdjust: '100%' as any
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f59e0b';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 6px 12px rgba(245, 158, 11, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fbbf24';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
-                    }}
-                  >အော်ဒါတင်မယ်</button>
-                </div>
               </div>
 
               <div style={{
