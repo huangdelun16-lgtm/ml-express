@@ -5,7 +5,7 @@ import { packageService, testConnection, userService, systemSettingsService, sup
 import QRCode from 'qrcode';
 
 // Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
