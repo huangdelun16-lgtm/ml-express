@@ -5,21 +5,12 @@ const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // 验证 API key 是否有效
-if (!supabaseKey || supabaseKey.trim() === '') {
-  console.error('❌ 错误：Supabase API Key 未配置！');
-  console.error('请在 Netlify Dashboard 中配置环境变量：REACT_APP_SUPABASE_ANON_KEY');
-}
-
-if (!supabaseUrl || supabaseUrl.trim() === '') {
-  console.error('❌ 错误：Supabase URL 未配置！');
-  console.error('请在 Netlify Dashboard 中配置环境变量：REACT_APP_SUPABASE_URL');
-}
-
-if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
-  console.warn('⚠️ 警告：使用硬编码的 Supabase 密钥。生产环境应使用环境变量。');
-  console.warn('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
-  console.warn('  - REACT_APP_SUPABASE_URL');
-  console.warn('  - REACT_APP_SUPABASE_ANON_KEY');
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ 错误：Supabase 环境变量未配置！');
+  console.error('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
+  console.error('  - REACT_APP_SUPABASE_URL');
+  console.error('  - REACT_APP_SUPABASE_ANON_KEY');
+  throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
