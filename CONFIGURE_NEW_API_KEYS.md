@@ -6,8 +6,10 @@
 
 ## 📋 新的 API Keys
 
-- **Website API Key**: `AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
-- **Android App API Key**: `AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc`
+⚠️ **安全提示**：API Keys 已从本文档中移除，请从安全的位置获取（如密码管理器或环境变量）。
+
+- **Website API Key**: `请从安全位置获取`
+- **Android App API Key**: `请从安全位置获取`
 
 ---
 
@@ -28,7 +30,7 @@
 
 **站点**: `client-ml-express`  
 **变量名**: `REACT_APP_GOOGLE_MAPS_API_KEY`  
-**值**: `AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
+**值**: `请使用您的Website API Key`
 
 **配置步骤**：
 1. 登录 [Netlify Dashboard](https://app.netlify.com)
@@ -45,7 +47,7 @@
 
 **站点**: `admin-ml-express`（或您的后台管理站点名）  
 **变量名**: `REACT_APP_GOOGLE_MAPS_API_KEY`  
-**值**: `AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
+**值**: `请使用您的Website API Key`
 
 **配置步骤**：
 1. 在 Netlify Dashboard 中选择站点：**admin-ml-express**
@@ -60,7 +62,7 @@
 ### 3. EAS Secrets（客户端 App）✅ 已完成
 
 **变量名**: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`  
-**值**: `AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc`
+**值**: `请使用您的Android App API Key`
 
 **状态**: ✅ **已配置完成**
 

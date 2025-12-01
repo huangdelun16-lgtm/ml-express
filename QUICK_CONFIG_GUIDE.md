@@ -7,8 +7,10 @@
 
 ## 📋 新的 API Keys
 
-- **Website API Key**: `AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
-- **Android App API Key**: `AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc`
+⚠️ **安全提示**：API Keys 已从本文档中移除，请从安全的位置获取（如密码管理器或环境变量）。
+
+- **Website API Key**: `请从安全位置获取`
+- **Android App API Key**: `请从安全位置获取`
 
 ---
 
@@ -131,7 +133,7 @@ eas secret:list
 
 应该看到：
 ```
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: [您的Android App API Key]
 ```
 
 ---
