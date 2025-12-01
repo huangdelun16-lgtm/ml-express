@@ -33,3 +33,12 @@ ml-express-client-web/build/
 .vscode/
 *.swp
 *~
+
+# Sensitive files and keys
+*.key
+*.pem
+*.p12
+*.keystore
+*.jks
+vercel.json
+!vercel.json.example
