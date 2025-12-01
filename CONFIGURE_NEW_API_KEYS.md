@@ -37,7 +37,7 @@
 2. 选择站点：**client-ml-express**
 3. 进入 **Site settings** → **Environment variables**
 4. 找到 `REACT_APP_GOOGLE_MAPS_API_KEY`
-5. 点击 **Edit**，更新值为：`AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
+5. 点击 **Edit**，更新值为：[您的Website API Key]
 6. 点击 **Save**
 7. 触发重新部署：**Deploys** → **Trigger deploy** → **Deploy site**
 
@@ -83,8 +83,8 @@ eas secret:list
 本地 `.env` 文件内容：
 ```bash
 # Google Maps API Keys
-REACT_APP_GOOGLE_MAPS_API_KEY=AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc
+REACT_APP_GOOGLE_MAPS_API_KEY=[您的Website API Key]
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=[您的Android App API Key]
 ```
 
 ⚠️ **注意**：`.env` 文件已在 `.gitignore` 中，不会被提交到 Git。

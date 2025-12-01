@@ -25,14 +25,14 @@
 2. 选择站点：**client-ml-express**
 3. **Site settings** → **Environment variables**
 4. 找到 `REACT_APP_GOOGLE_MAPS_API_KEY`
-5. 点击 **Edit**，更新为：`AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM`
+5. 点击 **Edit**，更新为：[您的Website API Key]
 6. 点击 **Save**
 7. **Deploys** → **Trigger deploy** → **Deploy site**
 
 **方法B：通过 CLI**
 ```bash
 cd ml-express-client-web
-netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM"
+netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "[您的Website API Key]"
 netlify deploy --prod
 ```
 
@@ -53,7 +53,7 @@ netlify deploy --prod
 **方法B：通过 CLI**
 ```bash
 cd /path/to/admin/project
-netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "AIzaSyDEGSFNKgfzTTOtxzB1wJwRQ7FwiAv3ReM"
+netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "[您的Website API Key]"
 netlify deploy --prod
 ```
 
@@ -66,13 +66,13 @@ netlify deploy --prod
 **方法A：通过 CLI（推荐）**
 ```bash
 cd ml-express-client
-eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc --type string --force
+eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value "[您的Android App API Key]" --type string --force
 ```
 
 **方法B：通过 Web 界面**
 1. 访问：https://expo.dev/accounts/amt349/projects/ml-express-client/secrets
 2. 找到或创建 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`
-3. 更新值为：`AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc`
+3. 更新值为：[您的Android App API Key]
 4. 保存
 
 **验证配置**：
