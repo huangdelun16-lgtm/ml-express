@@ -12,7 +12,6 @@ import {
   Animated,
   RefreshControl,
   Alert,
-  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
@@ -71,9 +70,6 @@ export default function HomeScreen({ navigation }: any) {
   const bannerScrollRef = useRef<ScrollView>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [isBannerPaused, setIsBannerPaused] = useState(false);
-  const [showBannerModal, setShowBannerModal] = useState(false);
-  const [selectedBannerIndex, setSelectedBannerIndex] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
   const TOTAL_BANNERS = 5;
 
   // 自动轮播逻辑
@@ -430,35 +426,23 @@ export default function HomeScreen({ navigation }: any) {
             showsHorizontalScrollIndicator={false}
             scrollEnabled={true}
             pagingEnabled={true}
-            onScrollBeginDrag={() => setIsScrolling(true)}
-            onScrollEndDrag={() => {
-              setTimeout(() => setIsScrolling(false), 100);
-            }}
             onMomentumScrollEnd={(event) => {
               const offsetX = event.nativeEvent.contentOffset.x;
               const newIndex = Math.round(offsetX / (width - 32));
               if (newIndex >= 0 && newIndex < TOTAL_BANNERS) {
                 setCurrentBannerIndex(newIndex);
               }
-              setTimeout(() => setIsScrolling(false), 100);
             }}
             style={styles.bannerScroll}
             contentContainerStyle={{ width: (width - 32) * TOTAL_BANNERS }}
           >
             {/* 第一张卡片：地图追踪 */}
             <View style={styles.bannerCardWrapper}>
-              <TouchableOpacity 
+              <View 
                 style={styles.bannerCard}
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!isScrolling) {
-                    setSelectedBannerIndex(0);
-                    setShowBannerModal(true);
-                  }
-                }}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
-                delayPressIn={150}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={() => setIsBannerPaused(true)}
+                onResponderRelease={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#3b82f6', '#60a5fa', '#ffffff']}
@@ -504,23 +488,16 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* 第二张卡片：地址填写 (新设计) */}
             <View style={styles.bannerCardWrapper}>
-              <TouchableOpacity 
+              <View 
                 style={styles.bannerCard}
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!isScrolling) {
-                    setSelectedBannerIndex(1);
-                    setShowBannerModal(true);
-                  }
-                }}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
-                delayPressIn={150}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={() => setIsBannerPaused(true)}
+                onResponderRelease={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#f3f4f6', '#ffffff', '#e5e7eb']} // 浅灰色调
@@ -570,23 +547,16 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* 第三张卡片：上线促销 (新设计) */}
             <View style={styles.bannerCardWrapper}>
-              <TouchableOpacity 
+              <View 
                 style={styles.bannerCard}
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!isScrolling) {
-                    setSelectedBannerIndex(2);
-                    setShowBannerModal(true);
-                  }
-                }}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
-                delayPressIn={150}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={() => setIsBannerPaused(true)}
+                onResponderRelease={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#e2e8f0', '#f8fafc', '#ffffff']} // 极简企业灰白调
@@ -650,23 +620,16 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* 第四张卡片：新用户注册推广 */}
             <View style={styles.bannerCardWrapper}>
-              <TouchableOpacity 
+              <View 
                 style={styles.bannerCard}
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!isScrolling) {
-                    setSelectedBannerIndex(3);
-                    setShowBannerModal(true);
-                  }
-                }}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
-                delayPressIn={150}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={() => setIsBannerPaused(true)}
+                onResponderRelease={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#ffffff', '#f8fafc', '#f1f5f9']} // 白色背景，极简风格
@@ -818,23 +781,16 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </TouchableOpacity>
+              </View>
             </View>
 
             {/* 第五张卡片：缅甸风格定位广告 */}
             <View style={styles.bannerCardWrapper}>
-              <TouchableOpacity 
+              <View 
                 style={styles.bannerCard}
-                activeOpacity={0.9}
-                onPress={() => {
-                  if (!isScrolling) {
-                    setSelectedBannerIndex(4);
-                    setShowBannerModal(true);
-                  }
-                }}
-                onPressIn={() => setIsBannerPaused(true)}
-                onPressOut={() => setIsBannerPaused(false)}
-                delayPressIn={150}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={() => setIsBannerPaused(true)}
+                onResponderRelease={() => setIsBannerPaused(false)}
               >
                 <LinearGradient
                   colors={['#3b82f6', '#60a5fa', '#ffffff', '#fef3c7']} // 蓝色到白色到黄色
@@ -979,7 +935,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
           
@@ -998,258 +954,6 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </View>
         </View>
-
-        {/* 广告详情Modal */}
-        <Modal
-          visible={showBannerModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowBannerModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowBannerModal(false)}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-              
-              <ScrollView 
-                style={styles.modalScrollView}
-                showsVerticalScrollIndicator={true}
-              >
-                {selectedBannerIndex === 0 && (
-                  <View style={styles.modalBannerContent}>
-                    <LinearGradient
-                      colors={['#3b82f6', '#60a5fa', '#ffffff']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      locations={[0, 0.6, 1]}
-                      style={styles.modalBannerGradient}
-                    >
-                      <Image 
-                        source={require('../../assets/logo.png')} 
-                        style={styles.modalBannerLogo} 
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.modalBannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
-                      <Text style={styles.modalBannerSubHeadline}>5分钟接单 · 实时定位</Text>
-                      <Text style={styles.modalBannerBurmeseText}>
-                        မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း
-                      </Text>
-                      <Text style={styles.modalBannerDescription}>
-                        通过我们的实时地图追踪系统，您可以随时查看包裹的配送状态。专业的配送团队确保您的包裹安全、快速地送达目的地。
-                      </Text>
-                    </LinearGradient>
-                  </View>
-                )}
-                
-                {selectedBannerIndex === 1 && (
-                  <View style={styles.modalBannerContent}>
-                    <LinearGradient
-                      colors={['#f3f4f6', '#ffffff', '#e5e7eb']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modalBannerGradient}
-                    >
-                      <Text style={[styles.modalBannerHeadline, { color: '#1f2937' }]}>一键填写地址{'\n'}极速上门取件</Text>
-                      <Text style={[styles.modalBannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 全城服务 · 30分钟送达</Text>
-                      <Text style={[styles.modalBannerBurmeseText, { color: '#6b7280' }]}>
-                        မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း
-                      </Text>
-                      <Text style={[styles.modalBannerDescription, { color: '#475569' }]}>
-                        只需简单填写取件和送达地址，我们的系统会自动为您匹配最近的配送员。智能路线规划确保最快速度完成配送任务。
-                      </Text>
-                    </LinearGradient>
-                  </View>
-                )}
-                
-                {selectedBannerIndex === 2 && (
-                  <View style={styles.modalBannerContent}>
-                    <LinearGradient
-                      colors={['#e2e8f0', '#f8fafc', '#ffffff']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modalBannerGradient}
-                    >
-                      <View style={styles.modalBannerTag}>
-                        <Text style={styles.modalBannerTagText}>NEW LAUNCH</Text>
-                      </View>
-                      <Text style={[styles.modalBannerHeadline, { color: '#2563eb', fontSize: 24 }]}>MDY同城2000MMK/一趟</Text>
-                      <Text style={[styles.modalBannerSubHeadline, { color: '#64748b' }]}>曼德勒市内统一价 · 活动仅1个月</Text>
-                      <Text style={[styles.modalBannerBurmeseText, { color: '#475569' }]}>
-                        📅 2026年1月1日正式启动
-                      </Text>
-                      <Text style={[styles.modalBannerDescription, { color: '#64748b', fontStyle: 'italic' }]}>
-                        Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်
-                      </Text>
-                      <Text style={[styles.modalBannerDescription, { color: '#475569', marginTop: 12 }]}>
-                        为庆祝新系统上线，我们推出限时优惠活动。曼德勒市内所有订单统一价格2000缅币，无论距离远近，让您享受最优惠的配送服务。
-                      </Text>
-                    </LinearGradient>
-                  </View>
-                )}
-                
-                {selectedBannerIndex === 3 && (
-                  <View style={styles.modalBannerContent}>
-                    <LinearGradient
-                      colors={['#ffffff', '#f8fafc', '#f1f5f9']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modalBannerGradient}
-                    >
-                      <Text style={[styles.modalBannerHeadline, { color: '#1e293b', fontSize: 24 }]}>新用户现在即可开始下单！</Text>
-                      
-                      <View style={styles.modalBannerFeatureList}>
-                        <View style={styles.modalBannerFeatureItem}>
-                          <Text style={styles.modalBannerFeatureIcon}>🌐</Text>
-                          <View style={styles.modalBannerFeatureText}>
-                            <Text style={[styles.modalBannerDescription, { color: '#475569', marginBottom: 4 }]}>
-                              Web 上注册账号即可直接下单，无需下载软件
-                            </Text>
-                            <Text style={[styles.modalBannerBurmeseText, { color: '#64748b', fontSize: 12 }]}>
-                              Webပေါ်မှတ်ပုံတင်ပြီး လျင်မြန်စွာ Orderတင်နိုင်သည်
-                            </Text>
-                          </View>
-                        </View>
-                        
-                        <View style={styles.modalBannerFeatureItem}>
-                          <Text style={styles.modalBannerFeatureIcon}>📱</Text>
-                          <View style={styles.modalBannerFeatureText}>
-                            <Text style={[styles.modalBannerDescription, { color: '#475569', marginBottom: 4 }]}>
-                              想要更方便？下载 App 解锁更快捷的下单方式、更流畅的操作体验、更精准的定位追踪
-                            </Text>
-                            <Text style={[styles.modalBannerBurmeseText, { color: '#64748b', fontSize: 12 }]}>
-                              AppကိုDownload အသုံးပြုခြင်းဖြင့် ပိုမိုလုံခြုံလျင်မြန်သော အတွေအကြုံကိုရယူလိုက်ပါ
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                      
-                      <Text style={[styles.modalBannerDescription, { color: '#64748b', marginTop: 16, textAlign: 'center' }]}>
-                        无论您选择网页版还是App，都能享受我们专业的配送服务。立即注册，开始您的便捷配送之旅！
-                      </Text>
-                    </LinearGradient>
-                  </View>
-                )}
-                
-                {selectedBannerIndex === 4 && (
-                  <View style={styles.modalBannerContent}>
-                    <LinearGradient
-                      colors={['#3b82f6', '#60a5fa', '#ffffff', '#fef3c7']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      locations={[0, 0.4, 0.8, 1]}
-                      style={styles.modalBannerGradient}
-                    >
-                      {/* 定位图标 - 大号带发光效果 */}
-                      <View style={{
-                        alignSelf: 'center',
-                        marginBottom: 20,
-                        width: 80,
-                        height: 80,
-                        borderRadius: 40,
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        shadowColor: '#3b82f6',
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 20,
-                        elevation: 5,
-                      }}>
-                        <Text style={{ fontSize: 48 }}>📍</Text>
-                      </View>
-
-                      {/* 缅文大标题 */}
-                      <Text style={[styles.modalBannerHeadline, { 
-                        color: '#1e293b', 
-                        fontSize: 24,
-                        marginBottom: 16,
-                        lineHeight: 32,
-                      }]}>
-                        ဘယ်နေရာပဲရောက်ရောက်{'\n'}
-                        အချိန်ကုန်သက်သာဖို့ 📍ပွင့်ထောက်ပြီး{'\n'}
-                        Market Link နဲ့ ပစ္စည်းပို့လိုက်စို့！
-                      </Text>
-
-                      {/* 中文副标题 */}
-                      <Text style={[styles.modalBannerSubHeadline, { 
-                        color: '#475569',
-                        marginBottom: 24,
-                      }]}>
-                        无论你在城市的哪个位置，只要开启定位，就能节省时间，更快送达。
-                      </Text>
-
-                      {/* 插画区域 */}
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 16,
-                        marginBottom: 24,
-                      }}>
-                        {/* 骑手 */}
-                        <View style={{
-                          width: 60,
-                          height: 60,
-                          borderRadius: 30,
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          <Text style={{ fontSize: 32 }}>🛵</Text>
-                        </View>
-                        
-                        {/* 路线 */}
-                        <View style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}>
-                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6' }} />
-                          <View style={{ width: 30, height: 2, backgroundColor: '#60a5fa' }} />
-                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fbbf24' }} />
-                          <View style={{ width: 30, height: 2, backgroundColor: '#60a5fa' }} />
-                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
-                        </View>
-
-                        {/* 包裹 */}
-                        <View style={{
-                          width: 60,
-                          height: 60,
-                          borderRadius: 30,
-                          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          <Text style={{ fontSize: 32 }}>📦</Text>
-                        </View>
-                      </View>
-
-                      {/* 描述文字 */}
-                      <Text style={[styles.modalBannerDescription, { 
-                        color: '#475569',
-                        marginTop: 16,
-                      }]}>
-                        开启定位功能，我们的智能系统会自动为您匹配最近的配送员，优化配送路线，让您的包裹以最快速度送达。无论您在城市的哪个角落，Market Link都能为您提供便捷、快速的配送服务。
-                      </Text>
-
-                      {/* 微笑图标 */}
-                      <View style={{
-                        marginTop: 20,
-                        alignItems: 'center',
-                      }}>
-                        <Text style={{ fontSize: 32 }}>😊</Text>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
 
         {/* Quick Action Cards - 4 Cards in Grid */}
         <View style={styles.quickActionsContainer}>
