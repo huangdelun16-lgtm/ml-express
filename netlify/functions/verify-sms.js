@@ -4,22 +4,24 @@
 // 注意：这是简化版本，生产环境应使用 Supabase 或其他数据库存储验证码
 // Netlify Functions 是无状态的，无法在多次调用之间共享内存
 
-exports.handler = async (event, context) => {
-  // 设置 CORS 头
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+// 引入 CORS 工具函数
+const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
-  // 处理 OPTIONS 预检请求
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+exports.handler = async (event, context) => {
+  // 处理 CORS 预检请求
+  const preflightResponse = handleCorsPreflight(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  });
+  if (preflightResponse) {
+    return preflightResponse;
   }
+
+  // 获取 CORS 响应头
+  const headers = getCorsHeaders(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  });
 
   // 只允许 POST 请求
   if (event.httpMethod !== 'POST') {

@@ -178,16 +178,24 @@ function buildHtml(template, data, inlineCid) {
 `;
 }
 
-exports.handler = async (event) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+// 引入 CORS 工具函数
+const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+exports.handler = async (event) => {
+  // 处理 CORS 预检请求
+  const preflightResponse = handleCorsPreflight(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  });
+  if (preflightResponse) {
+    return preflightResponse;
   }
+
+  // 获取 CORS 响应头
+  const headers = getCorsHeaders(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+  });
 
   if (event.httpMethod !== 'POST') {
     return {

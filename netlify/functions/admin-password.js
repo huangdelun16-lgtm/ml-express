@@ -118,26 +118,27 @@ async function verifyLogin(username, password) {
   }
 }
 
+// 引入 CORS 工具函数
+const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+
 /**
  * Netlify Function 主处理函数
  */
 exports.handler = async (event, context) => {
-  // 处理 CORS
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
-  // 处理 OPTIONS 请求（CORS 预检）
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  // 处理 CORS 预检请求
+  const preflightResponse = handleCorsPreflight(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  });
+  if (preflightResponse) {
+    return preflightResponse;
   }
+
+  // 获取 CORS 响应头
+  const headers = getCorsHeaders(event, {
+    allowedMethods: ['POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  });
 
   // 只接受 POST 请求
   if (event.httpMethod !== 'POST') {

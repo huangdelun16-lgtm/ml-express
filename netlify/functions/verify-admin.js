@@ -180,26 +180,27 @@ function generateAdminToken(username, role) {
   return `${payload}:${signature}`;
 }
 
+// 引入 CORS 工具函数
+const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+
 /**
  * Netlify Function 主处理函数
  */
 exports.handler = async (event, context) => {
-  // 处理 CORS
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
-  // 处理 OPTIONS 请求（CORS 预检）
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  // 处理 CORS 预检请求
+  const preflightResponse = handleCorsPreflight(event, {
+    allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  });
+  if (preflightResponse) {
+    return preflightResponse;
   }
+
+  // 获取 CORS 响应头
+  const headers = getCorsHeaders(event, {
+    allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  });
 
   try {
     const { action, token, requiredRoles } = JSON.parse(event.body || '{}');
