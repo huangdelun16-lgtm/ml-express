@@ -34,8 +34,13 @@ if (supabase && supabaseUrl && supabaseKey) {
  */
 function generateHMACSignature(data) {
   // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
-  // 生产环境必须设置 JWT_SECRET
+  // 生产环境必须设置 JWT_SECRET（服务端）和 REACT_APP_JWT_SECRET（客户端）
+  // 注意：客户端和服务端必须使用相同的密钥！
   const secret = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
+  
+  if (!secret || secret === 'default-dev-secret-change-in-production') {
+    console.warn('⚠️ 警告：使用默认 JWT_SECRET，生产环境不安全！请在 Netlify 环境变量中配置 JWT_SECRET');
+  }
   
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(data);
