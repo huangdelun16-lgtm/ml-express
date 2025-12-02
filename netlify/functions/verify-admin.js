@@ -1,7 +1,10 @@
 /**
  * 验证管理员权限的 Netlify Function
  * 用于保护所有后台 API 请求
+ * 使用 HMAC-SHA256 签名确保 Token 安全
  */
+
+const crypto = require('crypto');
 
 // 注意：Netlify Functions 需要 @supabase/supabase-js 在根目录的 package.json 中
 // 如果函数无法找到模块，请确保已安装依赖
@@ -30,7 +33,6 @@ if (supabase && supabaseUrl && supabaseKey) {
  * @returns {string} Base64 编码的签名
  */
 function generateHMACSignature(data) {
-  const crypto = require('crypto');
   // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
   // 生产环境必须设置 JWT_SECRET
   const secret = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
