@@ -1165,6 +1165,7 @@ export const adminAccountService = {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include', // 重要：包含 Cookie（登录成功后设置）
         body: JSON.stringify({
           action: 'login',
           username,
@@ -1332,6 +1333,7 @@ export const adminAccountService = {
             headers: {
               'Content-Type': 'application/json'
             },
+            credentials: 'include', // 包含 Cookie（如果需要认证）
             body: JSON.stringify({
               action: 'hash',
               plainPassword: updateData.password
