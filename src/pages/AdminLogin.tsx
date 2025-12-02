@@ -19,7 +19,7 @@ const AdminLogin: React.FC = () => {
       
       if (account) {
         // 登录成功，生成并保存 Token
-        saveToken(account.username, account.role, account.employee_name);
+        await saveToken(account.username, account.role, account.employee_name);
         
         // 记录登录日志
         await auditLogService.log({
@@ -34,7 +34,7 @@ const AdminLogin: React.FC = () => {
       } else {
         // 如果数据库登录失败，回退到硬编码验证（兼容模式，仅用于紧急情况）
         if (username === 'admin' && password === 'admin') {
-          saveToken('admin', 'admin', '管理员');
+          await saveToken('admin', 'admin', '管理员');
           
           // 记录登录日志
           await auditLogService.log({

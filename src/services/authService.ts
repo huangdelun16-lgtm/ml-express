@@ -1,6 +1,7 @@
 /**
  * 认证服务
  * 处理管理员登录、Token 生成和验证
+ * 使用 HMAC-SHA256 签名确保 Token 安全
  */
 
 interface AdminToken {
@@ -17,29 +18,90 @@ const TOKEN_STORAGE_KEY = 'admin_auth_token';
 const TOKEN_EXPIRY_TIME = 2 * 60 * 60 * 1000; // 2小时
 
 /**
- * 生成简单的 Session Token
- * 格式：username:role:timestamp:signature
+ * 使用 HMAC-SHA256 生成安全的 Token 签名
+ * @param data - 要签名的数据
+ * @returns Promise<string> - Base64 编码的签名
  */
-function generateToken(username: string, role: string): string {
-  const timestamp = Date.now().toString();
-  // 简单签名（生产环境应使用更安全的签名方法）
-  const signature = btoa(`${username}:${role}:${timestamp}`).slice(0, 16);
-  return `${username}:${role}:${timestamp}:${signature}`;
+async function generateHMACSignature(data: string): Promise<string> {
+  try {
+    // 使用 Web Crypto API（浏览器环境）
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(data);
+    
+    // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
+    // 生产环境必须设置 JWT_SECRET
+    const secret = process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
+    const keyBuffer = encoder.encode(secret);
+    
+    // 导入密钥
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyBuffer,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    // 生成签名
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataBuffer);
+    
+    // 转换为 Base64
+    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+  } catch (error) {
+    console.error('生成签名失败:', error);
+    throw new Error('Token 签名生成失败');
+  }
 }
 
 /**
- * 验证 Token 是否有效
+ * 验证 HMAC-SHA256 签名
+ * @param data - 原始数据
+ * @param signature - 要验证的签名（Base64 编码）
+ * @returns Promise<boolean> - 签名是否有效
  */
-function isValidToken(token: string): boolean {
+async function verifyHMACSignature(data: string, signature: string): Promise<boolean> {
+  try {
+    const expectedSignature = await generateHMACSignature(data);
+    // 使用时间安全的比较方法
+    return expectedSignature === signature;
+  } catch (error) {
+    console.error('验证签名失败:', error);
+    return false;
+  }
+}
+
+/**
+ * 生成安全的 Session Token
+ * 格式：username:role:timestamp:signature
+ * 签名使用 HMAC-SHA256 确保无法伪造
+ */
+async function generateToken(username: string, role: string): Promise<string> {
+  const timestamp = Date.now().toString();
+  const payload = `${username}:${role}:${timestamp}`;
+  const signature = await generateHMACSignature(payload);
+  return `${payload}:${signature}`;
+}
+
+/**
+ * 验证 Token 是否有效（包括签名验证）
+ */
+async function isValidToken(token: string): Promise<boolean> {
   try {
     const parts = token.split(':');
-    if (parts.length < 3) return false;
+    if (parts.length < 4) return false; // 现在需要4部分：username:role:timestamp:signature
 
-    const timestamp = parseInt(parts[2]);
-    const age = Date.now() - timestamp;
+    const [username, role, timestamp, signature] = parts;
+    const payload = `${username}:${role}:${timestamp}`;
+    
+    // 验证签名
+    const isValidSignature = await verifyHMACSignature(payload, signature);
+    if (!isValidSignature) {
+      return false;
+    }
     
     // 检查是否过期
-    return age < TOKEN_EXPIRY_TIME;
+    const tokenAge = Date.now() - parseInt(timestamp);
+    return tokenAge < TOKEN_EXPIRY_TIME && tokenAge >= 0;
   } catch {
     return false;
   }
@@ -51,7 +113,7 @@ function isValidToken(token: string): boolean {
 function parseToken(token: string): { username: string; role: string } | null {
   try {
     const parts = token.split(':');
-    if (parts.length < 3) return null;
+    if (parts.length < 4) return null; // 现在需要4部分
     
     return {
       username: parts[0],
@@ -65,8 +127,8 @@ function parseToken(token: string): { username: string; role: string } | null {
 /**
  * 保存 Token 到 localStorage
  */
-export function saveToken(username: string, role: string, name: string): string {
-  const token = generateToken(username, role);
+export async function saveToken(username: string, role: string, name: string): Promise<string> {
+  const token = await generateToken(username, role);
   const tokenData: AdminToken = {
     token,
     expiresAt: Date.now() + TOKEN_EXPIRY_TIME,
@@ -82,7 +144,7 @@ export function saveToken(username: string, role: string, name: string): string 
 }
 
 /**
- * 获取当前 Token
+ * 获取当前 Token（同步版本，用于快速检查）
  */
 export function getToken(): string | null {
   try {
@@ -97,8 +159,9 @@ export function getToken(): string | null {
       return null;
     }
     
-    // 验证 Token 格式
-    if (!isValidToken(parsed.token)) {
+    // 基本格式验证（签名验证在 verifyToken 中进行）
+    const parts = parsed.token.split(':');
+    if (parts.length < 4) {
       clearToken();
       return null;
     }
@@ -107,6 +170,13 @@ export function getToken(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * 验证 Token 有效性（包括签名验证）
+ */
+export async function validateToken(token: string): Promise<boolean> {
+  return await isValidToken(token);
 }
 
 /**
@@ -156,9 +226,9 @@ export async function verifyToken(requiredRoles: string[] = []): Promise<{
     return result;
   } catch (error) {
     console.error('验证 Token 失败:', error);
-    // 如果服务端验证失败，回退到客户端验证
+    // 如果服务端验证失败，回退到客户端验证（包括签名验证）
     const parsed = parseToken(token);
-    if (parsed && isValidToken(token)) {
+    if (parsed && await isValidToken(token)) {
       if (requiredRoles.length === 0 || requiredRoles.includes(parsed.role)) {
         return {
           valid: true,

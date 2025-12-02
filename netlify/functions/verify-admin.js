@@ -25,6 +25,37 @@ if (supabase && supabaseUrl && supabaseKey) {
 }
 
 /**
+ * 使用 HMAC-SHA256 生成安全的 Token 签名
+ * @param {string} data - 要签名的数据
+ * @returns {string} Base64 编码的签名
+ */
+function generateHMACSignature(data) {
+  const crypto = require('crypto');
+  // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
+  // 生产环境必须设置 JWT_SECRET
+  const secret = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
+  
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(data);
+  return hmac.digest('base64');
+}
+
+/**
+ * 验证 HMAC-SHA256 签名
+ * @param {string} data - 原始数据
+ * @param {string} signature - 要验证的签名（Base64 编码）
+ * @returns {boolean} 签名是否有效
+ */
+function verifyHMACSignature(data, signature) {
+  const expectedSignature = generateHMACSignature(data);
+  // 使用时间安全的比较方法（避免时序攻击）
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedSignature),
+    Buffer.from(signature)
+  );
+}
+
+/**
  * 验证管理员 Token
  * @param {string} token - JWT Token 或 Session Token
  * @param {string[]} requiredRoles - 需要的角色列表
@@ -36,19 +67,31 @@ async function verifyAdminToken(token, requiredRoles = []) {
       return { valid: false, error: '缺少认证令牌' };
     }
 
-    // 解析 Token（简单实现，生产环境应使用 JWT）
+    // 解析 Token（使用 HMAC-SHA256 签名）
     // Token 格式：username:role:timestamp:signature
     const parts = token.split(':');
-    if (parts.length < 3) {
+    if (parts.length < 4) {
       return { valid: false, error: '无效的令牌格式' };
     }
 
-    const [username, role, timestamp] = parts;
+    const [username, role, timestamp, signature] = parts;
+    const payload = `${username}:${role}:${timestamp}`;
+    
+    // 验证签名
+    try {
+      const isValidSignature = verifyHMACSignature(payload, signature);
+      if (!isValidSignature) {
+        return { valid: false, error: '令牌签名无效' };
+      }
+    } catch (signatureError) {
+      console.error('签名验证错误:', signatureError);
+      return { valid: false, error: '令牌签名验证失败' };
+    }
     
     // 检查 Token 是否过期（2小时）
     const tokenAge = Date.now() - parseInt(timestamp);
     const TWO_HOURS = 2 * 60 * 60 * 1000;
-    if (tokenAge > TWO_HOURS) {
+    if (tokenAge > TWO_HOURS || tokenAge < 0) {
       return { valid: false, error: '令牌已过期' };
     }
 
@@ -107,16 +150,16 @@ async function verifyAdminToken(token, requiredRoles = []) {
 }
 
 /**
- * 生成管理员 Token
+ * 生成管理员 Token（使用 HMAC-SHA256 签名）
  * @param {string} username - 用户名
  * @param {string} role - 角色
  * @returns {string} Token
  */
 function generateAdminToken(username, role) {
   const timestamp = Date.now().toString();
-  // 简单签名（生产环境应使用更安全的签名方法）
-  const signature = Buffer.from(`${username}:${role}:${timestamp}`).toString('base64').slice(0, 16);
-  return `${username}:${role}:${timestamp}:${signature}`;
+  const payload = `${username}:${role}:${timestamp}`;
+  const signature = generateHMACSignature(payload);
+  return `${payload}:${signature}`;
 }
 
 /**
