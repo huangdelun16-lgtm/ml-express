@@ -24,14 +24,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // 首先检查本地是否有 Token（快速检查）
-        if (!checkAuth()) {
-          setIsAuthenticated(false);
-          setIsChecking(false);
-          return;
-        }
-
-        // 调用服务端验证 Token（重要：这是真正的安全验证）
+        // 调用服务端验证 Token（Token 通过 httpOnly Cookie 自动发送）
         const result = await verifyToken(requiredRoles);
         
         if (result.valid) {

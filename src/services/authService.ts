@@ -137,51 +137,39 @@ function parseToken(token: string): { username: string; role: string } | null {
 }
 
 /**
- * 保存 Token 到 localStorage
+ * 保存 Token（通过服务器设置 httpOnly Cookie）
+ * ⚠️ 注意：不再使用 localStorage，改为服务器设置 httpOnly Cookie
  */
 export async function saveToken(username: string, role: string, name: string): Promise<string> {
-  const token = await generateToken(username, role);
-  const tokenData: AdminToken = {
-    token,
-    expiresAt: Date.now() + TOKEN_EXPIRY_TIME,
-    user: { username, role, name }
-  };
+  // Token 现在由服务器通过 httpOnly Cookie 设置
+  // 客户端只保存非敏感的用户信息（用于显示）
+  const userInfo = { username, role, name };
   
-  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokenData));
-  localStorage.setItem('currentUser', username);
-  localStorage.setItem('currentUserName', name);
-  localStorage.setItem('currentUserRole', role);
+  // 只保存非敏感的用户信息到 sessionStorage（页面关闭后清除）
+  // 敏感数据（Token）由服务器通过 httpOnly Cookie 管理
+  try {
+    sessionStorage.setItem('currentUser', username);
+    sessionStorage.setItem('currentUserName', name);
+    sessionStorage.setItem('currentUserRole', role);
+  } catch (error) {
+    // sessionStorage 可能不可用（某些隐私模式）
+    logger.warn('无法保存用户信息到 sessionStorage:', error);
+  }
   
-  return token;
+  // 返回空字符串，因为 Token 现在由服务器管理
+  return '';
 }
 
 /**
- * 获取当前 Token（同步版本，用于快速检查）
+ * 获取当前 Token
+ * ⚠️ 注意：httpOnly Cookie 无法通过 JavaScript 读取
+ * Token 现在由服务器通过 Cookie 自动发送，客户端不需要读取
  */
 export function getToken(): string | null {
-  try {
-    const tokenData = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!tokenData) return null;
-    
-    const parsed: AdminToken = JSON.parse(tokenData);
-    
-    // 检查是否过期
-    if (Date.now() > parsed.expiresAt) {
-      clearToken();
-      return null;
-    }
-    
-    // 基本格式验证（签名验证在 verifyToken 中进行）
-    const parts = parsed.token.split(':');
-    if (parts.length < 4) {
-      clearToken();
-      return null;
-    }
-    
-    return parsed.token;
-  } catch {
-    return null;
-  }
+  // httpOnly Cookie 无法通过 JavaScript 读取
+  // Token 会在请求时自动通过 Cookie 发送
+  // 这里返回 null，让 verifyToken 通过 API 调用获取
+  return null;
 }
 
 /**
@@ -193,38 +181,55 @@ export async function validateToken(token: string): Promise<boolean> {
 
 /**
  * 清除 Token
+ * 调用服务器 API 清除 httpOnly Cookie
  */
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  localStorage.removeItem('currentUser');
-  localStorage.removeItem('currentUserName');
-  localStorage.removeItem('currentUserRole');
+export async function clearToken(): Promise<void> {
+  // 清除 sessionStorage 中的用户信息
+  try {
+    sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('currentUserName');
+    sessionStorage.removeItem('currentUserRole');
+  } catch (error) {
+    logger.warn('清除 sessionStorage 失败:', error);
+  }
+  
+  // 调用服务器 API 清除 httpOnly Cookie
+  try {
+    await fetch('/.netlify/functions/verify-admin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'logout'
+      }),
+      credentials: 'include' // 重要：包含 Cookie
+    });
+  } catch (error) {
+    logger.error('清除 Cookie 失败:', error);
+  }
 }
 
 /**
  * 验证 Token（调用服务端验证）
+ * Token 现在通过 httpOnly Cookie 自动发送
  */
 export async function verifyToken(requiredRoles: string[] = []): Promise<{
   valid: boolean;
   user?: { username: string; role: string; name: string };
   error?: string;
 }> {
-  const token = getToken();
-  
-  if (!token) {
-    return { valid: false, error: '未找到认证令牌' };
-  }
-
   try {
     // 调用 Netlify Function 验证 Token
+    // Token 会通过 httpOnly Cookie 自动发送
     const response = await fetch('/.netlify/functions/verify-admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // 重要：包含 Cookie
       body: JSON.stringify({
         action: 'verify',
-        token,
         requiredRoles
       })
     });
@@ -232,53 +237,46 @@ export async function verifyToken(requiredRoles: string[] = []): Promise<{
     const result = await response.json();
     
     if (!result.valid) {
-      clearToken();
+      await clearToken();
     }
     
     return result;
   } catch (error) {
-    console.error('验证 Token 失败:', error);
-    // 如果服务端验证失败，回退到客户端验证（包括签名验证）
-    const parsed = parseToken(token);
-    if (parsed && await isValidToken(token)) {
-      if (requiredRoles.length === 0 || requiredRoles.includes(parsed.role)) {
-        return {
-          valid: true,
-          user: {
-            username: parsed.username,
-            role: parsed.role,
-            name: localStorage.getItem('currentUserName') || ''
-          }
-        };
-      }
-    }
-    
-    clearToken();
+    logger.error('验证 Token 失败:', error);
+    await clearToken();
     return { valid: false, error: '验证失败' };
   }
 }
 
 /**
  * 检查用户是否已登录
+ * ⚠️ 注意：httpOnly Cookie 无法通过 JavaScript 检查
+ * 需要通过 API 调用验证
  */
-export function isAuthenticated(): boolean {
-  return getToken() !== null;
+export async function isAuthenticated(): Promise<boolean> {
+  const result = await verifyToken([]);
+  return result.valid;
 }
 
 /**
  * 获取当前用户信息
+ * 从 sessionStorage 读取（非敏感信息）
  */
 export function getCurrentUser(): { username: string; role: string; name: string } | null {
-  const token = getToken();
-  if (!token) return null;
-  
-  const parsed = parseToken(token);
-  if (!parsed) return null;
-  
-  return {
-    username: parsed.username,
-    role: parsed.role,
-    name: localStorage.getItem('currentUserName') || ''
-  };
+  try {
+    const username = sessionStorage.getItem('currentUser');
+    const role = sessionStorage.getItem('currentUserRole');
+    const name = sessionStorage.getItem('currentUserName');
+    
+    if (!username || !role) return null;
+    
+    return {
+      username,
+      role,
+      name: name || ''
+    };
+  } catch {
+    return null;
+  }
 }
 

@@ -206,17 +206,62 @@ exports.handler = async (event, context) => {
     const { action, token, requiredRoles } = JSON.parse(event.body || '{}');
 
     if (action === 'verify') {
+      // 优先从 Cookie 获取 Token（更安全）
+      const cookieToken = event.headers?.cookie
+        ?.split(';')
+        .find(c => c.trim().startsWith('admin_auth_token='))
+        ?.split('=')[1];
+      
+      // 使用 Cookie 中的 Token 或请求体中的 Token
+      const tokenToVerify = cookieToken || token;
+      
+      if (!tokenToVerify) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ valid: false, error: '未找到认证令牌' })
+        };
+      }
+      
       // 验证 Token
-      const result = await verifyAdminToken(token, requiredRoles || []);
+      const result = await verifyAdminToken(tokenToVerify, requiredRoles || []);
+      
+      // 如果验证失败，清除 Cookie
+      if (!result.valid) {
+        headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';
+      }
+      
       return {
         statusCode: result.valid ? 200 : 401,
         headers,
         body: JSON.stringify(result)
       };
+    } else if (action === 'logout') {
+      // 清除 httpOnly Cookie
+      headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, message: '已登出' })
+      };
     } else if (action === 'generate') {
-      // 生成 Token（仅用于登录时）
+      // 生成 Token（仅用于登录时，现在由 admin-password 函数处理）
       const { username, role } = JSON.parse(event.body);
       const newToken = generateAdminToken(username, role);
+      
+      // 设置 httpOnly Cookie
+      const cookieMaxAge = 2 * 60 * 60; // 2小时
+      const cookieOptions = [
+        `admin_auth_token=${newToken}`,
+        `Max-Age=${cookieMaxAge}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        process.env.NODE_ENV === 'production' ? 'Secure' : ''
+      ].filter(Boolean).join('; ');
+      
+      headers['Set-Cookie'] = cookieOptions;
+      
       return {
         statusCode: 200,
         headers,

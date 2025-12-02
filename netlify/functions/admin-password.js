@@ -230,6 +230,27 @@ exports.handler = async (event, context) => {
         };
       }
       const result = await verifyLogin(username, password);
+      
+      // 如果登录成功，设置 httpOnly Cookie
+      if (result.success && result.account) {
+        // 生成 Token（用于设置 Cookie）
+        const { generateAdminToken } = require('./verify-admin');
+        const token = generateAdminToken(result.account.username, result.account.role);
+        
+        // 设置 httpOnly Cookie（2小时过期）
+        const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
+        const cookieOptions = [
+          `admin_auth_token=${token}`,
+          `Max-Age=${cookieMaxAge}`,
+          'Path=/',
+          'HttpOnly', // 防止 JavaScript 访问
+          'SameSite=Strict', // 防止 CSRF
+          process.env.NODE_ENV === 'production' ? 'Secure' : '' // 仅 HTTPS
+        ].filter(Boolean).join('; ');
+        
+        headers['Set-Cookie'] = cookieOptions;
+      }
+      
       return {
         statusCode: result.success ? 200 : 401,
         headers,
