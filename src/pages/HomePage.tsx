@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, testConnection, userService, systemSettingsService, supabase } from '../services/supabase';
 import QRCode from 'qrcode';
+import { logger } from '../utils/logger';
+import { setTextContent } from '../utils/xssSanitizer';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
-  console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
+  logger.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
@@ -26,7 +28,7 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Google Maps Error:', error, errorInfo);
+    logger.error('Google Maps Error:', error, errorInfo);
   }
 
   render() {
@@ -175,7 +177,7 @@ const HomePage: React.FC = () => {
       try {
         setCurrentUser(JSON.parse(savedUser));
       } catch (error) {
-        console.error('加载用户信息失败:', error);
+        logger.error('加载用户信息失败:', error);
       }
     }
   };
@@ -201,7 +203,7 @@ const HomePage: React.FC = () => {
         freeKmThreshold: parseFloat(settingsMap['pricing.free_km_threshold']) || 3
       });
     } catch (error) {
-      console.error('加载价格设置失败:', error);
+      logger.error('加载价格设置失败:', error);
       // 使用默认值
     }
   };
@@ -389,7 +391,7 @@ const HomePage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('注册/登录失败:', error);
+      logger.error('注册/登录失败:', error);
       alert(language === 'zh' ? '操作失败，请检查网络连接' : 
             language === 'en' ? 'Operation failed, please check network connection' : 
             'လုပ်ဆောင်ချက် မအောင်မြင်ပါ');
@@ -437,7 +439,7 @@ const HomePage: React.FC = () => {
           }
           alert(result.message);
         } else {
-          console.error('❌ 邮箱服务返回失败:', result);
+          logger.error('❌ 邮箱服务返回失败:', result);
           alert(result.message);
         }
         
@@ -479,8 +481,8 @@ const HomePage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('发送验证码失败:', error);
-      console.error('错误详情:', JSON.stringify(error, null, 2));
+      logger.error('发送验证码失败:', error);
+      logger.error('错误详情:', JSON.stringify(error, null, 2));
       alert(language === 'zh' ? '发送失败，请重试' : 
             language === 'en' ? 'Failed to send, please try again' : 
             'ပို့ဆောင်မှု မအောင်မြင်ပါ');
@@ -551,7 +553,7 @@ const HomePage: React.FC = () => {
       setSelectedLocation({ lat, lng, address: fullAddress });
       
     } catch (error) {
-      console.error('地址获取失败:', error);
+      logger.error('地址获取失败:', error);
       // 出错时使用城市名称和坐标
       const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
       const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
@@ -606,7 +608,7 @@ const HomePage: React.FC = () => {
       
       setQrCodeDataUrl(qrCodeUrl);
     } catch (error) {
-      console.error('二维码生成失败:', error);
+      logger.error('二维码生成失败:', error);
       alert('二维码生成失败，但订单已创建成功。订单号：' + orderId);
     }
   };
@@ -627,7 +629,7 @@ const HomePage: React.FC = () => {
       // 模拟发送给客户
       alert(t.errors.qrDownloaded);
     } catch (error) {
-      console.error(t.errors.downloadFailed, error);
+      logger.error(t.errors.downloadFailed, error);
       alert(t.errors.downloadFailed);
     } finally {
       setDownloading(false);
@@ -654,10 +656,10 @@ const HomePage: React.FC = () => {
       try {
         const isConnected = await testConnection();
         if (!isConnected) {
-          console.warn(t.errors.dbConnectionFailed);
+          logger.warn(t.errors.dbConnectionFailed);
         }
       } catch (error) {
-        console.error(t.errors.connectionTestError, error);
+        logger.error(t.errors.connectionTestError, error);
       }
     };
     
@@ -687,7 +689,7 @@ const HomePage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error(t.errors.saveCustomerFailed, error);
+      logger.error(t.errors.saveCustomerFailed, error);
     }
   };
 
@@ -1112,13 +1114,13 @@ const HomePage: React.FC = () => {
   const calculateDistance = async (origin: string, destination: string): Promise<number> => {
     try {
       if (!window.google || !window.google.maps) {
-        console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
+        logger.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
         alert(t.errors.distanceCalculationFailed + '\n' + '使用默认距离: 5 km');
         return 5;
       }
 
       if (!origin || !destination) {
-        console.error('❌ 地址信息不完整');
+        logger.error('❌ 地址信息不完整');
         throw new Error('地址信息不完整');
       }
 
@@ -1126,7 +1128,7 @@ const HomePage: React.FC = () => {
       
       return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
-          console.warn('⏱️ 距离计算超时，使用默认值');
+          logger.warn('⏱️ 距离计算超时，使用默认值');
           resolve(5);
         }, 10000); // 10秒超时
 
@@ -1149,30 +1151,30 @@ const HomePage: React.FC = () => {
                 const roundedDistance = Math.round(distanceInKm * 10) / 10;
                 resolve(roundedDistance);
               } else if (element?.status === 'ZERO_RESULTS') {
-                console.warn('⚠️ 无法找到路线，使用默认距离');
+                logger.warn('⚠️ 无法找到路线，使用默认距离');
                 alert('无法计算两地之间的距离，可能地址不够详细\n使用默认距离: 5 km');
                 resolve(5);
               } else {
-                console.warn('⚠️ 距离计算状态异常:', element?.status);
+                logger.warn('⚠️ 距离计算状态异常:', element?.status);
                 resolve(5);
               }
             } else if (status === 'OVER_QUERY_LIMIT') {
-              console.error('❌ Google Maps API 查询限额已达上限');
+              logger.error('❌ Google Maps API 查询限额已达上限');
               alert('系统繁忙，使用默认距离: 5 km');
               resolve(5);
             } else if (status === 'REQUEST_DENIED') {
-              console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
+              logger.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
               alert('地图服务配置错误，使用默认距离: 5 km');
               resolve(5);
             } else {
-              console.warn('⚠️ 距离计算失败，状态:', status);
+              logger.warn('⚠️ 距离计算失败，状态:', status);
               resolve(5);
             }
           }
         );
       });
     } catch (error) {
-      console.error('❌ 距离计算异常:', error);
+      logger.error('❌ 距离计算异常:', error);
       const errorMsg = error instanceof Error ? error.message : '未知错误';
       alert(t.errors.distanceCalculationFailed + '\n' + errorMsg + '\n使用默认距离: 5 km');
       return 5;
@@ -1292,7 +1294,7 @@ const HomePage: React.FC = () => {
       );
       
     } catch (error) {
-      console.error('计算费用失败:', error);
+      logger.error('计算费用失败:', error);
       alert(language === 'zh' ? '计算失败，请重试' : 
             language === 'en' ? 'Calculation failed, please try again' : 
             'တွက်ချက်မှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ');
@@ -1324,7 +1326,7 @@ const HomePage: React.FC = () => {
       
       setPaymentQRCode(qrDataUrl);
     } catch (error) {
-      console.error('生成收款二维码失败:', error);
+      logger.error('生成收款二维码失败:', error);
       alert('生成二维码失败，请刷新页面重试');
     }
   };
@@ -1414,7 +1416,7 @@ const HomePage: React.FC = () => {
       // 7. 显示支付模态框
       setShowPaymentModal(true);
     } catch (error) {
-      console.error('订单处理失败:', error);
+      logger.error('订单处理失败:', error);
       const errorMessage = error instanceof Error ? error.message : '未知错误';
       alert(`订单处理失败: ${errorMessage}\n\n请检查：\n1. 地址是否填写完整\n2. 网络连接是否正常\n3. 稍后重试`);
       setShowOrderForm(true);
@@ -2787,7 +2789,7 @@ const HomePage: React.FC = () => {
                     
                     setShowOrderSuccessModal(true);
                   } else {
-                    console.error('包裹创建失败，检查控制台获取详细错误信息');
+                    logger.error('包裹创建失败，检查控制台获取详细错误信息');
                     alert('包裹创建失败，请检查网络连接或联系客服。\n错误信息已记录在控制台。');
                   }
                 }}
@@ -3335,7 +3337,7 @@ const HomePage: React.FC = () => {
                       // 更新选中位置
                       setSelectedLocation({ lat, lng, address: fullAddress });
                     } catch (error) {
-                      console.error('地址获取失败:', error);
+                      logger.error('地址获取失败:', error);
                             const currentCity = myanmarCities[selectedCity as keyof typeof myanmarCities];
                             const fallbackAddress = `${currentCity.name}, 坐标: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             
@@ -3381,8 +3383,8 @@ const HomePage: React.FC = () => {
 
                   // 显示加载状态
                   const button = e.currentTarget as HTMLButtonElement;
-                  const originalContent = button.innerHTML;
-                  button.innerHTML = '🔄';
+                  const originalContent = button.textContent || '';
+                  setTextContent(button, '🔄');
                   button.style.opacity = '0.7';
                   button.disabled = true;
 
@@ -3440,7 +3442,7 @@ const HomePage: React.FC = () => {
                         throw new Error('无法获取地址信息');
                       }
                     } catch (geocodeError) {
-                      console.error('逆地理编码失败:', geocodeError);
+                      logger.error('逆地理编码失败:', geocodeError);
                       // 如果逆地理编码失败，至少显示坐标
                       const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
                       if (addressInput) {
@@ -3452,7 +3454,7 @@ const HomePage: React.FC = () => {
                     }
                     
                   } catch (error: any) {
-                    console.error('定位失败:', error);
+                    logger.error('定位失败:', error);
                     
                     let errorMessage = '无法获取您的位置';
                     
@@ -3475,7 +3477,7 @@ const HomePage: React.FC = () => {
                     alert(errorMessage);
                   } finally {
                     // 恢复按钮状态
-                    button.innerHTML = originalContent;
+                    setTextContent(button, originalContent);
                     button.style.opacity = '1';
                     button.disabled = false;
                   }
@@ -3604,7 +3606,7 @@ const HomePage: React.FC = () => {
                       } else if (mapSelectionType === 'receiver') {
                         setReceiverAddressText(completeAddress);
                       }
-                      console.warn('⚠️ 未能获取坐标信息');
+                      logger.warn('⚠️ 未能获取坐标信息');
                     }
 
                     alert(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
@@ -4436,7 +4438,7 @@ const HomePage: React.FC = () => {
 
 // 添加旋转动画的CSS样式
 const style = document.createElement('style');
-style.innerHTML = `
+style.textContent = `
   @keyframes spin {
     from {
       transform: rotate(0deg);

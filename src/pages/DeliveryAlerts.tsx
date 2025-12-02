@@ -419,13 +419,17 @@ export default function DeliveryAlerts() {
     const severityIcon = severityEmoji[newAlert.severity as string] || '🚨';
     const alertTypeIcon = alertTypeEmoji[newAlert.alert_type as string] || '⚠️';
     
-    notification.innerHTML = `
+    // 使用安全的 HTML 设置（已清理 XSS）
+    import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
+    const safeTitle = escapeHtml(newAlert.title || '');
+    const safeCourierName = escapeHtml(newAlert.courier_name || '');
+    notification.innerHTML = sanitizeHtml(`
       <div style="display: flex; align-items: center; gap: 12px;">
         <div style="font-size: 24px;">${severityIcon}</div>
         <div>
           <div style="font-weight: 600; font-size: 16px;">新警报</div>
-          <div style="font-size: 14px; opacity: 0.9;">${alertTypeIcon} ${newAlert.title || ''}</div>
-          <div style="font-size: 12px; opacity: 0.8;">骑手: ${newAlert.courier_name || ''}</div>
+          <div style="font-size: 14px; opacity: 0.9;">${alertTypeIcon} ${safeTitle}</div>
+          <div style="font-size: 12px; opacity: 0.8;">骑手: ${safeCourierName}</div>
         </div>
       </div>
     `;
