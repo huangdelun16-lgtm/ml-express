@@ -49,12 +49,23 @@ function generateHMACSignature(data) {
  * @returns {boolean} 签名是否有效
  */
 function verifyHMACSignature(data, signature) {
-  const expectedSignature = generateHMACSignature(data);
-  // 使用时间安全的比较方法（避免时序攻击）
-  return crypto.timingSafeEqual(
-    Buffer.from(expectedSignature),
-    Buffer.from(signature)
-  );
+  try {
+    const expectedSignature = generateHMACSignature(data);
+    
+    // 如果签名长度不同，直接返回 false
+    if (expectedSignature.length !== signature.length) {
+      return false;
+    }
+    
+    // 使用时间安全的比较方法（避免时序攻击）
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedSignature),
+      Buffer.from(signature)
+    );
+  } catch (error) {
+    console.error('签名验证错误:', error);
+    return false;
+  }
 }
 
 /**

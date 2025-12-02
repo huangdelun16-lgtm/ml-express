@@ -52,7 +52,15 @@ const AdminLogin: React.FC = () => {
       }
     } catch (error) {
       console.error('登录异常:', error);
-      alert('登录失败，请检查网络连接');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('错误详情:', errorMessage);
+      
+      // 如果是 Token 签名生成失败，提供更详细的错误信息
+      if (errorMessage.includes('Token 签名生成失败')) {
+        alert('登录失败：Token 生成错误。请检查浏览器控制台获取详细信息，或联系管理员。');
+      } else {
+        alert('登录失败，请检查网络连接。错误：' + errorMessage);
+      }
     } finally {
       setLoading(false);
     }

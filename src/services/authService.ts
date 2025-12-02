@@ -29,8 +29,14 @@ async function generateHMACSignature(data: string): Promise<string> {
     const dataBuffer = encoder.encode(data);
     
     // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
-    // 生产环境必须设置 JWT_SECRET
+    // 生产环境必须设置 REACT_APP_JWT_SECRET（客户端）和 JWT_SECRET（服务端）
+    // 注意：客户端和服务端必须使用相同的密钥！
     const secret = process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
+    
+    if (!secret || secret === 'default-dev-secret-change-in-production') {
+      console.warn('⚠️ 警告：使用默认 JWT_SECRET，生产环境不安全！请在 Netlify 环境变量中配置 REACT_APP_JWT_SECRET');
+    }
+    
     const keyBuffer = encoder.encode(secret);
     
     // 导入密钥
@@ -51,7 +57,11 @@ async function generateHMACSignature(data: string): Promise<string> {
     return btoa(String.fromCharCode.apply(null, charCodes));
   } catch (error) {
     console.error('生成签名失败:', error);
-    throw new Error('Token 签名生成失败');
+    // 提供更详细的错误信息
+    if (error instanceof Error) {
+      console.error('错误详情:', error.message);
+    }
+    throw new Error('Token 签名生成失败: ' + (error instanceof Error ? error.message : String(error)));
   }
 }
 
