@@ -71,11 +71,12 @@ function getCorsHeaders(event, options = {}) {
   }
   
   // 返回完整的 CORS 头
+  // 注意：如果使用 Cookie，必须设置 Access-Control-Allow-Credentials: true
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': allowedMethods.join(', '),
     'Access-Control-Allow-Headers': allowedHeaders.join(', '),
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Credentials': 'true', // 允许发送 Cookie
     'Content-Type': 'application/json'
   };
 }

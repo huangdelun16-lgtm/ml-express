@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { verifyToken, isAuthenticated as checkAuth } from '../services/authService';
+import { verifyToken } from '../services/authService';
+import { logger } from '../utils/logger';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -35,7 +36,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           setError(result.error || '权限验证失败，请重新登录');
         }
       } catch (error) {
-        console.error('权限检查失败:', error);
+        logger.error('权限检查失败:', error);
         setIsAuthenticated(false);
         setError('验证过程出错，请重新登录');
       } finally {

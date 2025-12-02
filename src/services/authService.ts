@@ -34,7 +34,7 @@ async function generateHMACSignature(data: string): Promise<string> {
     const secret = process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
     
     if (!secret || secret === 'default-dev-secret-change-in-production') {
-      console.warn('⚠️ 警告：使用默认 JWT_SECRET，生产环境不安全！请在 Netlify 环境变量中配置 REACT_APP_JWT_SECRET');
+      logger.warn('⚠️ 警告：使用默认 JWT_SECRET，生产环境不安全！请在 Netlify 环境变量中配置 REACT_APP_JWT_SECRET');
     }
     
     const keyBuffer = encoder.encode(secret);
@@ -56,10 +56,10 @@ async function generateHMACSignature(data: string): Promise<string> {
     const charCodes = Array.from(uint8Array);
     return btoa(String.fromCharCode.apply(null, charCodes));
   } catch (error) {
-    console.error('生成签名失败:', error);
+    logger.error('生成签名失败:', error);
     // 提供更详细的错误信息
     if (error instanceof Error) {
-      console.error('错误详情:', error.message);
+      logger.error('错误详情:', error.message);
     }
     throw new Error('Token 签名生成失败: ' + (error instanceof Error ? error.message : String(error)));
   }
@@ -77,7 +77,7 @@ async function verifyHMACSignature(data: string, signature: string): Promise<boo
     // 使用时间安全的比较方法
     return expectedSignature === signature;
   } catch (error) {
-    console.error('验证签名失败:', error);
+    logger.error('验证签名失败:', error);
     return false;
   }
 }
