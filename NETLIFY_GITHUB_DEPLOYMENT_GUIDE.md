@@ -99,7 +99,7 @@ git push origin main
 #### 变量 2: REACT_APP_SUPABASE_ANON_KEY
 
 - **Key**: `REACT_APP_SUPABASE_ANON_KEY`
-- **Value**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY`
+- **Value**: `[请从 Supabase Dashboard → Settings → API → API Keys 获取 Anon Key]`
 - **Scopes**: 
   - ✅ Production
   - ✅ Deploy previews

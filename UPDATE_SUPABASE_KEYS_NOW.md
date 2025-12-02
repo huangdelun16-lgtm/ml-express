@@ -1,9 +1,11 @@
 # 🔑 立即更新 Supabase 密钥配置
 
-## ✅ 已获取的新密钥
+## ✅ 需要配置的新密钥
 
-- ✅ **新的 Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY`
-- ✅ **新的 Service Role Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw`
+**⚠️ 重要**: 请从 Supabase Dashboard → Settings → API → API Keys 获取实际的密钥值！
+
+- ✅ **新的 Anon Key**: `[请从 Supabase Dashboard 获取]`
+- ✅ **新的 Service Role Key**: `[请从 Supabase Dashboard 获取]`
 
 ---
 
@@ -14,8 +16,8 @@
 #### 客户端 Web (market-link-express.com)
 
 **需要更新的变量**:
-- `REACT_APP_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY`
-- `SUPABASE_SERVICE_ROLE` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw`
+- `REACT_APP_SUPABASE_ANON_KEY` = `[请从 Supabase Dashboard 获取 Anon Key]`
+- `SUPABASE_SERVICE_ROLE` = `[请从 Supabase Dashboard 获取 Service Role Key]`
 
 **操作步骤**:
 1. 登录 Netlify Dashboard
@@ -28,8 +30,8 @@
 #### 后台管理 Web (admin-market-link-express.com)
 
 **需要更新的变量**（同上）:
-- `REACT_APP_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY`
-- `SUPABASE_SERVICE_ROLE` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw`
+- `REACT_APP_SUPABASE_ANON_KEY` = `[请从 Supabase Dashboard 获取 Anon Key]`
+- `SUPABASE_SERVICE_ROLE` = `[请从 Supabase Dashboard 获取 Service Role Key]`
 
 **操作步骤**（同上）:
 1. 在 Netlify Dashboard 中选择后台管理站点
@@ -45,7 +47,7 @@
 cd ml-express-client
 
 # 更新 Supabase Anon Key
-eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY" --force
+eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "[请从 Supabase Dashboard 获取 Anon Key]" --visibility sensitive
 
 # 验证更新
 eas secret:list
@@ -59,9 +61,11 @@ eas secret:list
 
 更新本地 `.env` 文件：
 ```bash
-REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
+REACT_APP_SUPABASE_ANON_KEY=[请从 Supabase Dashboard 获取 Anon Key]
+EXPO_PUBLIC_SUPABASE_ANON_KEY=[请从 Supabase Dashboard 获取 Anon Key]
 ```
+
+**⚠️ 重要**: 请将 `[请从 Supabase Dashboard 获取 Anon Key]` 替换为实际的密钥值！
 
 ---
 

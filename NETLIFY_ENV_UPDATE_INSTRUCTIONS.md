@@ -3,14 +3,10 @@
 ## 📋 需要更新的密钥
 
 ### 新的 Anon Key
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
-```
+**⚠️ 请从 Supabase Dashboard → Settings → API → API Keys 获取**
 
 ### 新的 Service Role Key
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw
-```
+**⚠️ 请从 Supabase Dashboard → Settings → API → API Keys 获取**
 
 ---
 
@@ -29,19 +25,13 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx
 3. **更新变量 1: REACT_APP_SUPABASE_ANON_KEY**
    - 找到 `REACT_APP_SUPABASE_ANON_KEY`
    - 点击 **Edit**
-   - 更新值为：
-     ```
-     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
-     ```
+   - 更新值为：`[请从 Supabase Dashboard 获取 Anon Key]`
    - 点击 **Save**
 
 4. **更新变量 2: SUPABASE_SERVICE_ROLE**
    - 找到 `SUPABASE_SERVICE_ROLE`（如果没有，点击 **Add variable**）
    - 点击 **Edit** 或 **Add variable**
-   - 更新/添加值为：
-     ```
-     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw
-     ```
+   - 更新/添加值为：`[请从 Supabase Dashboard 获取 Service Role Key]`
    - 点击 **Save**
 
 5. **重新部署**

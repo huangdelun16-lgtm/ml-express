@@ -28,7 +28,7 @@
 **文件**: `ml-express-mobile-app/services/supabase.ts`
 ```typescript
 // ❌ 问题：硬编码 Anon Key
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
+const supabaseKey = '[已泄漏的密钥，已移除]';
 ```
 
 **修复建议**:

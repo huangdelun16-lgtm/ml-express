@@ -19,12 +19,12 @@
 
 1. **REACT_APP_SUPABASE_ANON_KEY**
    ```
-   值: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
+   值: [请从 Supabase Dashboard → Settings → API → API Keys 获取 Anon Key]
    ```
 
 2. **SUPABASE_SERVICE_ROLE**
    ```
-   值: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTA0MzAwMCwiZXhwIjoyMDc0NjE5MDAwfQ.mpPnGHff2JL4bbCg4nsE7503FmCnTxlQEpZM3uv0jNw
+   值: [请从 Supabase Dashboard → Settings → API → API Keys 获取 Service Role Key]
    ```
 
 **操作步骤**:

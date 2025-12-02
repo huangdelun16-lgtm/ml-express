@@ -6,9 +6,11 @@
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc
+EXPO_PUBLIC_SUPABASE_ANON_KEY=[请从 Supabase Dashboard → Settings → API → API Keys 获取]
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=[请从 Google Cloud Console 获取]
 ```
+
+**⚠️ 重要**: 请从 Supabase Dashboard 和 Google Cloud Console 获取实际的密钥值，不要使用示例值！
 
 ---
 
@@ -83,12 +85,12 @@ npx expo start --clear
 
 ### EXPO_PUBLIC_SUPABASE_ANON_KEY
 - **用途**: Supabase Anon Key（客户端使用）
-- **值**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`（新的 Anon Key）
+- **值**: `[请从 Supabase Dashboard → Settings → API → API Keys 获取]`
 - **必需**: ✅ 是
 
 ### EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
 - **用途**: Google Maps API Key（用于地图功能）
-- **值**: `AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc`
+- **值**: `[请从 Google Cloud Console 获取]`
 - **必需**: ✅ 是（如果使用地图功能）
 
 ---
