@@ -2,7 +2,14 @@
  * 认证服务
  * 处理管理员登录、Token 生成和验证
  * 使用 HMAC-SHA256 签名确保 Token 安全
+ * 
+ * ⚠️ 安全改进：
+ * - Token 现在通过 httpOnly Cookie 存储（防止 XSS 攻击）
+ * - 客户端无法直接读取 Token
+ * - 所有认证请求自动包含 Cookie
  */
+
+import { logger } from '../utils/logger';
 
 interface AdminToken {
   token: string;
