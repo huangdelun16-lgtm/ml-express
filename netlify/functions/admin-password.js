@@ -30,22 +30,39 @@ async function hashPassword(password) {
  * 验证密码
  * @param {string} password - 用户输入的明文密码
  * @param {string} hashedPassword - 数据库中存储的加密密码
- * @returns {Promise<boolean>} 密码是否匹配
+ * @returns {Promise<{valid: boolean, needsMigration: boolean, error?: string}>} 验证结果
  */
 async function verifyPassword(password, hashedPassword) {
   try {
-    // 如果密码是明文（旧数据），先检查是否直接匹配（向后兼容）
-    if (!hashedPassword.startsWith('$2a$') && !hashedPassword.startsWith('$2b$') && !hashedPassword.startsWith('$2y$')) {
-      // 这是明文密码，直接比较（仅用于迁移期间）
-      return password === hashedPassword;
+    // 检查密码格式是否为加密格式
+    const isHashed = hashedPassword && (
+      hashedPassword.startsWith('$2a$') || 
+      hashedPassword.startsWith('$2b$') || 
+      hashedPassword.startsWith('$2y$')
+    );
+    
+    // 如果密码是明文，拒绝验证并要求迁移
+    if (!isHashed) {
+      return {
+        valid: false,
+        needsMigration: true,
+        error: '密码格式已过期，请重置密码'
+      };
     }
     
     // 使用 bcrypt 验证加密密码
     const isValid = await bcrypt.compare(password, hashedPassword);
-    return isValid;
+    return {
+      valid: isValid,
+      needsMigration: false
+    };
   } catch (error) {
     console.error('密码验证失败:', error);
-    return false;
+    return {
+      valid: false,
+      needsMigration: false,
+      error: '密码验证过程出错'
+    };
   }
 }
 
@@ -78,32 +95,30 @@ async function verifyLogin(username, password) {
 
     const account = accounts[0];
     
-    // 验证密码
-    const passwordValid = await verifyPassword(password, account.password);
+    // 检查密码格式
+    const isPasswordHashed = account.password && (
+      account.password.startsWith('$2a$') || 
+      account.password.startsWith('$2b$') || 
+      account.password.startsWith('$2y$')
+    );
     
-    if (!passwordValid) {
-      return { success: false, error: '密码错误' };
+    // 如果密码是明文，拒绝登录并要求重置密码
+    if (!isPasswordHashed) {
+      return { 
+        success: false, 
+        error: '密码格式已过期，请联系管理员重置密码',
+        requiresPasswordReset: true
+      };
     }
-
-    // 如果密码是明文，自动加密并更新（迁移）
-    if (!account.password.startsWith('$2a$') && !account.password.startsWith('$2b$') && !account.password.startsWith('$2y$')) {
-      const hashedPassword = await hashPassword(password);
-      
-      // 更新数据库中的密码为加密版本
-      const updateResponse = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?id=eq.${account.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ password: hashedPassword })
-      });
-
-      if (!updateResponse.ok) {
-        console.warn('密码加密更新失败，但登录成功');
-      }
+    
+    // 验证密码
+    const passwordResult = await verifyPassword(password, account.password);
+    
+    if (!passwordResult.valid) {
+      return { 
+        success: false, 
+        error: passwordResult.error || '密码错误' 
+      };
     }
 
     // 返回账户信息（不包含密码）
@@ -176,11 +191,34 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ error: '缺少密码参数' })
         };
       }
-      const isValid = await verifyPassword(plainPassword, password);
+      // 检查密码格式
+      const isPasswordHashed = password && (
+        password.startsWith('$2a$') || 
+        password.startsWith('$2b$') || 
+        password.startsWith('$2y$')
+      );
+      
+      if (!isPasswordHashed) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            valid: false, 
+            error: '密码格式已过期，需要重置密码',
+            requiresPasswordReset: true
+          })
+        };
+      }
+      
+      const passwordResult = await verifyPassword(plainPassword, password);
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ valid: isValid })
+        body: JSON.stringify({ 
+          valid: passwordResult.valid,
+          needsMigration: passwordResult.needsMigration,
+          error: passwordResult.error
+        })
       };
     } else if (action === 'login') {
       // 验证登录

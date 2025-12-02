@@ -100,6 +100,13 @@ async function migratePasswords() {
         continue;
       }
       
+      // 如果没有密码，跳过
+      if (!account.password || account.password.trim() === '') {
+        console.log(`⚠️  跳过 ${account.username}（无密码，需要手动设置）`);
+        skippedCount++;
+        continue;
+      }
+      
       // 加密密码
       try {
         const hashedPassword = await bcrypt.hash(account.password, 10);
