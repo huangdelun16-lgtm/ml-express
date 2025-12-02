@@ -76,17 +76,31 @@ ORDER BY
 
 #### 方式 A: 使用强制迁移脚本（推荐）
 
+**⚠️ 重要**: 这些脚本在**本地运行**，不需要在 Netlify 上运行！
+
 **前提条件**:
-1. 配置环境变量：
+1. 确保已安装 Node.js 和项目依赖：
+   ```bash
+   npm install
+   ```
+
+2. 配置环境变量（在本地终端）：
    ```bash
    export REACT_APP_SUPABASE_URL="your-supabase-url"
    export SUPABASE_SERVICE_ROLE="your-service-role-key"
    ```
+   
+   **获取 Service Role Key**:
+   - 登录 Supabase Dashboard
+   - Settings → API → Project API keys
+   - 复制 `service_role` key（⚠️ 敏感密钥，不要泄露）
 
-2. 运行脚本：
+3. 运行脚本（在本地）：
    ```bash
    node scripts/force-migrate-passwords.js
    ```
+   
+   **详细说明**: 请参考 `PASSWORD_MIGRATION_RUN_GUIDE.md`
 
 **脚本功能**:
 - 自动扫描所有账号
