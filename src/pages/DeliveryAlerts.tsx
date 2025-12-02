@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { deliveryAlertService } from '../services/deliveryAlertService';
+import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
 
 interface DeliveryAlert {
   id: string;
@@ -419,8 +420,7 @@ export default function DeliveryAlerts() {
     const severityIcon = severityEmoji[newAlert.severity as string] || '🚨';
     const alertTypeIcon = alertTypeEmoji[newAlert.alert_type as string] || '⚠️';
     
-    // 使用安全的 HTML 设置（已清理 XSS）
-    import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
+    // 使用安全的 HTML 设置（清理 XSS）
     const safeTitle = escapeHtml(newAlert.title || '');
     const safeCourierName = escapeHtml(newAlert.courier_name || '');
     notification.innerHTML = sanitizeHtml(`
