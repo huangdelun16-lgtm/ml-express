@@ -45,8 +45,10 @@ async function generateHMACSignature(data: string): Promise<string> {
     // 生成签名
     const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataBuffer);
     
-    // 转换为 Base64
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+    // 转换为 Base64（兼容 TypeScript 编译）
+    const uint8Array = new Uint8Array(signature);
+    const charCodes = Array.from(uint8Array);
+    return btoa(String.fromCharCode.apply(null, charCodes));
   } catch (error) {
     console.error('生成签名失败:', error);
     throw new Error('Token 签名生成失败');
