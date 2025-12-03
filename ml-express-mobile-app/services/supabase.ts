@@ -3,7 +3,8 @@ import Constants from 'expo-constants';
 
 // 使用环境变量配置 Supabase
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+// 注意：确保 URL 和 ANON_KEY 匹配同一个 Supabase 项目
+const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 // Netlify URL 用于调用 admin-password function
 // 优先使用自定义域名，回退到默认 Netlify 域名

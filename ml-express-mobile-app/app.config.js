@@ -69,7 +69,8 @@ module.exports = {
         projectId: "9831d961-9124-46ed-8581-bf406616439f"
       },
       // 环境变量（从 .env 文件读取，或从 EAS Secrets 获取）
-      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+      // 注意：确保 URL 和 ANON_KEY 匹配同一个 Supabase 项目
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
       netlifyUrl: process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.com'
