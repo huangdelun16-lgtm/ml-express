@@ -72,7 +72,7 @@ module.exports = {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-      netlifyUrl: process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://market-link-express.netlify.app'
+      netlifyUrl: process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.com'
     },
     owner: "amt349",
     privacy: "public",
