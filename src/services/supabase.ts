@@ -360,7 +360,7 @@ export const packageService = {
     return data;
   },
 
-  // 获取特定店铺的入库包裹
+  // 获取特定店铺的入库包裹（已送达的）
   async getPackagesByStore(storeId: string): Promise<Package[]> {
     try {
       const { data, error } = await supabase
@@ -376,6 +376,92 @@ export const packageService = {
       }
 
       return data || [];
+    } catch (err) {
+      console.error(`获取店铺 ${storeId} 包裹异常:`, err);
+      return [];
+    }
+  },
+
+  // 获取与店铺相关的所有包裹（包括提交和送达的）
+  async getPackagesByStoreId(storeId: string): Promise<Package[]> {
+    try {
+      // 先获取店铺信息以获取坐标
+      const { data: storeData, error: storeError } = await supabase
+        .from('delivery_stores')
+        .select('latitude, longitude, store_name')
+        .eq('id', storeId)
+        .single();
+
+      if (storeError || !storeData) {
+        console.error(`获取店铺信息失败:`, storeError);
+        // 如果获取店铺信息失败，只查询送达店铺的包裹
+        const { data, error } = await supabase
+          .from('packages')
+          .select('*')
+          .eq('delivery_store_id', storeId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error(`获取店铺 ${storeId} 包裹失败:`, error);
+          return [];
+        }
+
+        return data || [];
+      }
+
+      // 计算距离函数（公里）
+      const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+        const R = 6371; // 地球半径（公里）
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      // 查询所有包裹
+      const { data: allPackages, error } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error(`获取包裹列表失败:`, error);
+        return [];
+      }
+
+      if (!allPackages) {
+        return [];
+      }
+
+      // 筛选与店铺相关的包裹：
+      // 1. 送达店铺ID匹配
+      // 2. 或者寄件地址在店铺附近（5公里内）
+      const relatedPackages = allPackages.filter(pkg => {
+        // 检查是否是送达店铺
+        if (pkg.delivery_store_id === storeId) {
+          return true;
+        }
+
+        // 检查寄件地址是否在店铺附近（5公里内）
+        if (pkg.sender_latitude && pkg.sender_longitude) {
+          const distance = calculateDistance(
+            storeData.latitude,
+            storeData.longitude,
+            pkg.sender_latitude,
+            pkg.sender_longitude
+          );
+          if (distance <= 5) { // 5公里内
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      return relatedPackages;
     } catch (err) {
       console.error(`获取店铺 ${storeId} 包裹异常:`, err);
       return [];

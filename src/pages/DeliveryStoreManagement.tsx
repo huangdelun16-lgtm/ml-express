@@ -247,6 +247,12 @@ const DeliveryStoreManagement: React.FC = () => {
   const [loadingStorage, setLoadingStorage] = useState(false);
   const [currentStorageStore, setCurrentStorageStore] = useState<DeliveryStore | null>(null);
   
+  // 店铺包裹查看相关状态
+  const [showStorePackagesModal, setShowStorePackagesModal] = useState(false);
+  const [storePackages, setStorePackages] = useState<Package[]>([]);
+  const [loadingStorePackages, setLoadingStorePackages] = useState(false);
+  const [currentViewStore, setCurrentViewStore] = useState<DeliveryStore | null>(null);
+  
   // 添加重试状态
   const [retryCount, setRetryCount] = useState(0);
   
@@ -1483,22 +1489,25 @@ const DeliveryStoreManagement: React.FC = () => {
                         {selectedStore.status === 'maintenance' && '🟡 维护中'}
                       </div>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // 关闭地图弹窗
                           setSelectedStore(null);
-                          // 选中店铺并滚动到店铺列表中的该店铺
-                          const storeElement = document.querySelector(`[data-store-id="${selectedStore.id}"]`);
-                          if (storeElement) {
-                            storeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            // 高亮显示
-                            setTimeout(() => {
-                              const card = storeElement as HTMLElement;
-                              const originalBackground = card.style.background;
-                              card.style.background = 'rgba(49, 130, 206, 0.5)';
-                              setTimeout(() => {
-                                card.style.background = originalBackground;
-                              }, 2000);
-                            }, 500);
+                          // 打开店铺包裹查看模态框
+                          if (selectedStore && selectedStore.id) {
+                            setCurrentViewStore(selectedStore);
+                            setShowStorePackagesModal(true);
+                            setLoadingStorePackages(true);
+                            
+                            try {
+                              const packages = await packageService.getPackagesByStoreId(selectedStore.id);
+                              setStorePackages(packages);
+                            } catch (error) {
+                              console.error('加载店铺包裹失败:', error);
+                              setErrorMessage('加载店铺包裹失败，请重试');
+                              setStorePackages([]);
+                            } finally {
+                              setLoadingStorePackages(false);
+                            }
                           }
                         }}
                         style={{
@@ -2929,6 +2938,258 @@ const DeliveryStoreManagement: React.FC = () => {
                 关闭
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 店铺包裹查看模态框 */}
+      {showStorePackagesModal && currentViewStore && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            width: '90%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div>
+                <h2 style={{
+                  margin: 0,
+                  color: '#A5C7FF',
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold'
+                }}>
+                  📦 {currentViewStore.store_name} - 包裹列表
+                </h2>
+                <p style={{
+                  margin: '0.5rem 0 0 0',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.9rem'
+                }}>
+                  {currentViewStore.store_code} | {storePackages.length} 个包裹
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowStorePackagesModal(false);
+                  setCurrentViewStore(null);
+                  setStorePackages([]);
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 包裹列表 */}
+            {loadingStorePackages ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                color: 'rgba(255, 255, 255, 0.8)'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                <p>加载包裹数据中...</p>
+              </div>
+            ) : storePackages.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                color: 'rgba(255, 255, 255, 0.7)'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+                <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>暂无包裹数据</p>
+                <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                  该店铺还没有相关的包裹记录
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+                maxHeight: '60vh',
+                overflowY: 'auto',
+                paddingRight: '0.5rem'
+              }}>
+                {storePackages.map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'start',
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          marginBottom: '0.5rem'
+                        }}>
+                          <h3 style={{
+                            margin: 0,
+                            color: '#A5C7FF',
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold'
+                          }}>
+                            📦 {pkg.id}
+                          </h3>
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            background: pkg.status === '已送达' ? 'rgba(72, 187, 120, 0.3)' :
+                                       pkg.status === '配送中' ? 'rgba(59, 130, 246, 0.3)' :
+                                       pkg.status === '待取件' ? 'rgba(251, 191, 36, 0.3)' :
+                                       'rgba(156, 163, 175, 0.3)',
+                            color: pkg.status === '已送达' ? '#48bb78' :
+                                   pkg.status === '配送中' ? '#3b82f6' :
+                                   pkg.status === '待取件' ? '#fbbf24' :
+                                   '#9ca3af'
+                          }}>
+                            {pkg.status}
+                          </span>
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '0.75rem',
+                          fontSize: '0.9rem',
+                          color: 'rgba(255, 255, 255, 0.9)'
+                        }}>
+                          <div>
+                            <span style={{ opacity: 0.7 }}>寄件人:</span> {pkg.sender_name}
+                          </div>
+                          <div>
+                            <span style={{ opacity: 0.7 }}>电话:</span> {pkg.sender_phone}
+                          </div>
+                          <div>
+                            <span style={{ opacity: 0.7 }}>收件人:</span> {pkg.receiver_name}
+                          </div>
+                          <div>
+                            <span style={{ opacity: 0.7 }}>电话:</span> {pkg.receiver_phone}
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ opacity: 0.7 }}>地址:</span> {pkg.receiver_address}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        textAlign: 'right',
+                        marginLeft: '1rem'
+                      }}>
+                        <div style={{
+                          fontSize: '1.2rem',
+                          fontWeight: 'bold',
+                          color: '#48bb78',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {pkg.price} 元
+                        </div>
+                        <div style={{
+                          fontSize: '0.8rem',
+                          color: 'rgba(255, 255, 255, 0.6)',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {pkg.package_type}
+                        </div>
+                        <div style={{
+                          fontSize: '0.8rem',
+                          color: 'rgba(255, 255, 255, 0.6)'
+                        }}>
+                          {pkg.weight} kg
+                        </div>
+                        {pkg.create_time && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            marginTop: '0.5rem'
+                          }}>
+                            {new Date(pkg.create_time).toLocaleDateString('zh-CN')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {pkg.description && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.5rem',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
+                        color: 'rgba(255, 255, 255, 0.8)'
+                      }}>
+                        <span style={{ opacity: 0.7 }}>备注:</span> {pkg.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
