@@ -238,9 +238,13 @@ exports.handler = async (event, context) => {
         const token = generateAdminToken(result.account.username, result.account.role);
         
         // 检测是否为 HTTPS（通过请求头判断）
-        const isHttps = event.headers?.['x-forwarded-proto'] === 'https' || 
-                       event.headers?.['X-Forwarded-Proto'] === 'https' ||
-                       process.env.NODE_ENV === 'production';
+        const protoHeader = event.headers?.['x-forwarded-proto'] || event.headers?.['X-Forwarded-Proto'];
+        const isHttps = (protoHeader && protoHeader.includes('https')) || process.env.NODE_ENV === 'production';
+
+        // 计算 Cookie 域名
+        const hostHeader = event.headers?.host || event.headers?.Host || '';
+        const requestHost = hostHeader.split(':')[0];
+        const cookieDomain = process.env.COOKIE_DOMAIN || requestHost || 'admin-market-link-express.com';
         
         // 设置 httpOnly Cookie（2小时过期）
         const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
@@ -248,9 +252,11 @@ exports.handler = async (event, context) => {
           `admin_auth_token=${token}`,
           `Max-Age=${cookieMaxAge}`,
           'Path=/',
+          `Domain=${cookieDomain}`,
           'HttpOnly', // 防止 JavaScript 访问
-          isHttps ? 'Secure' : '', // HTTPS 时设置 Secure
-          isHttps ? 'SameSite=None' : 'SameSite=Lax' // HTTPS 使用 None，HTTP 使用 Lax
+          isHttps ? 'Secure' : '',
+          // Windows 浏览器在 HTTPS 下也可以使用 Lax，稳定性更好
+          'SameSite=Lax'
         ].filter(Boolean).join('; ');
         
         headers['Set-Cookie'] = cookieOptions;
@@ -259,6 +265,7 @@ exports.handler = async (event, context) => {
         if (process.env.NODE_ENV !== 'production') {
           console.log('Cookie 设置:', cookieOptions);
           console.log('Token 生成成功:', token.substring(0, 20) + '...');
+          console.log('请求 Host:', hostHeader, 'Proto:', protoHeader);
         }
       }
       
