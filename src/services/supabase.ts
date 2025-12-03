@@ -49,6 +49,9 @@ export interface Package {
   sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
   transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  // 费用明细字段
+  store_fee?: string | number; // 待付款（店铺填写）
+  delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
 }
 
 export interface FinanceRecord {
