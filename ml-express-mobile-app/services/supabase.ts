@@ -19,13 +19,19 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // 创建自定义 fetch 函数，添加超时支持（兼容 React Native）
-const fetchWithTimeout = (url: string, options: any = {}) => {
+const fetchWithTimeout: typeof fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const timeout = 30000; // 30 秒超时
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   
-  return fetch(url, {
-    ...options,
+  // 合并已有的 signal（如果有）
+  const existingSignal = init?.signal;
+  if (existingSignal) {
+    existingSignal.addEventListener('abort', () => controller.abort());
+  }
+  
+  return fetch(input, {
+    ...init,
     signal: controller.signal
   }).then((response) => {
     clearTimeout(timeoutId);
