@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://market-link-express.netlify.app';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Supabase 配置缺失:');
@@ -132,28 +133,93 @@ export interface DeliveryStore {
 export const adminAccountService = {
   async login(username: string, password: string): Promise<AdminAccount | null> {
     try {
-      const { data, error } = await supabase
+      // 方法1: 尝试使用 Netlify Function 验证密码（推荐，支持加密密码）
+      try {
+        // 使用配置的 Netlify URL 调用登录验证函数
+        const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'login',
+            username: username,
+            password: password
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.account) {
+            // 登录成功，从数据库获取完整账号信息
+            const { data, error } = await supabase
+              .from('admin_accounts')
+              .select('*')
+              .eq('username', username)
+              .eq('status', 'active')
+              .single();
+
+            if (error || !data) {
+              console.error('获取账号信息失败:', error);
+              return null;
+            }
+
+            // 更新最后登录时间
+            await supabase
+              .from('admin_accounts')
+              .update({ last_login: new Date().toISOString() })
+              .eq('id', data.id);
+
+            return data;
+          } else {
+            console.error('登录失败:', result.error || '未知错误');
+            return null;
+          }
+        }
+      } catch (netlifyError) {
+        console.warn('Netlify Function 验证失败，尝试直接数据库验证:', netlifyError);
+      }
+
+      // 方法2: 直接数据库验证（向后兼容，仅用于明文密码）
+      // 先获取账号信息
+      const { data: accountData, error: fetchError } = await supabase
         .from('admin_accounts')
         .select('*')
         .eq('username', username)
-        .eq('password', password)
         .eq('status', 'active')
         .single();
 
-      if (error) {
-        console.error('登录失败:', error);
+      if (fetchError || !accountData) {
+        console.error('账号不存在或已停用:', fetchError);
+        return null;
+      }
+
+      // 检查密码是否加密
+      const isPasswordHashed = accountData.password && (
+        accountData.password.startsWith('$2a$') || 
+        accountData.password.startsWith('$2b$') || 
+        accountData.password.startsWith('$2y$')
+      );
+
+      if (isPasswordHashed) {
+        // 密码已加密，无法在客户端验证，必须使用 Netlify Function
+        console.error('密码已加密，请使用 Netlify Function 验证');
+        return null;
+      }
+
+      // 密码是明文，直接比较（向后兼容，但不推荐）
+      if (accountData.password !== password) {
+        console.error('密码错误');
         return null;
       }
 
       // 更新最后登录时间
-      if (data?.id) {
-        await supabase
-          .from('admin_accounts')
-          .update({ last_login: new Date().toISOString() })
-          .eq('id', data.id);
-      }
+      await supabase
+        .from('admin_accounts')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', accountData.id);
 
-      return data;
+      return accountData;
     } catch (err) {
       console.error('登录异常:', err);
       return null;

@@ -71,7 +71,8 @@ module.exports = {
       // 环境变量（从 .env 文件读取，或从 EAS Secrets 获取）
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+      netlifyUrl: process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://market-link-express.netlify.app'
     },
     owner: "amt349",
     privacy: "public",
