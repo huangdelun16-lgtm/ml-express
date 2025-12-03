@@ -432,7 +432,7 @@ export default function DeliveryAlerts() {
           <div style="font-size: 12px; opacity: 0.8;">骑手: ${safeCourierName}</div>
         </div>
       </div>
-    `;
+    `);
 
     document.body.appendChild(notification);
 
