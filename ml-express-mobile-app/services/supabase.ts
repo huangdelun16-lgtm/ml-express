@@ -163,27 +163,63 @@ export const adminAccountService = {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.account) {
-            // 登录成功，从数据库获取完整账号信息
-            const { data, error } = await supabase
-              .from('admin_accounts')
-              .select('*')
-              .eq('username', username)
-              .eq('status', 'active')
-              .single();
+            // 登录成功，Netlify Function 已经返回了账号信息（不包含密码）
+            const accountFromNetlify = result.account;
+            
+            // 尝试从数据库获取完整账号信息（包括密码字段，虽然我们不会使用它）
+            // 如果数据库查询失败，使用 Netlify Function 返回的账号信息
+            try {
+              const { data, error } = await supabase
+                .from('admin_accounts')
+                .select('*')
+                .eq('username', username)
+                .eq('status', 'active')
+                .single();
 
-            if (error || !data) {
-              console.error('获取账号信息失败:', error);
-              return null;
+              if (error || !data) {
+                console.warn('获取完整账号信息失败，使用 Netlify Function 返回的信息:', error);
+                // 使用 Netlify Function 返回的账号信息，但需要添加一些默认值
+                const accountData: AdminAccount = {
+                  ...accountFromNetlify,
+                  password: '', // 密码字段为空，因为 Netlify Function 不返回密码
+                  id: accountFromNetlify.id || '',
+                  status: accountFromNetlify.status || 'active',
+                  created_at: accountFromNetlify.created_at || new Date().toISOString(),
+                  updated_at: accountFromNetlify.updated_at || new Date().toISOString()
+                } as AdminAccount;
+                
+                netlifyLoginSuccess = true;
+                return accountData;
+              }
+
+              // 更新最后登录时间（如果可能）
+              try {
+                await supabase
+                  .from('admin_accounts')
+                  .update({ last_login: new Date().toISOString() })
+                  .eq('id', data.id);
+              } catch (updateError) {
+                console.warn('更新最后登录时间失败:', updateError);
+                // 不影响登录流程
+              }
+
+              netlifyLoginSuccess = true;
+              return data;
+            } catch (dbError: any) {
+              console.warn('数据库查询失败，使用 Netlify Function 返回的信息:', dbError);
+              // 使用 Netlify Function 返回的账号信息
+              const accountData: AdminAccount = {
+                ...accountFromNetlify,
+                password: '',
+                id: accountFromNetlify.id || '',
+                status: accountFromNetlify.status || 'active',
+                created_at: accountFromNetlify.created_at || new Date().toISOString(),
+                updated_at: accountFromNetlify.updated_at || new Date().toISOString()
+              } as AdminAccount;
+              
+              netlifyLoginSuccess = true;
+              return accountData;
             }
-
-            // 更新最后登录时间
-            await supabase
-              .from('admin_accounts')
-              .update({ last_login: new Date().toISOString() })
-              .eq('id', data.id);
-
-            netlifyLoginSuccess = true;
-            return data;
           } else {
             console.error('登录失败:', result.error || '未知错误');
             // Netlify Function 返回了明确的错误，直接返回
@@ -191,6 +227,13 @@ export const adminAccountService = {
           }
         } else {
           console.warn('Netlify Function 返回错误状态:', response.status);
+          // 尝试读取错误信息
+          try {
+            const errorResult = await response.json();
+            console.warn('Netlify Function 错误详情:', errorResult);
+          } catch (e) {
+            // 忽略 JSON 解析错误
+          }
         }
       } catch (netlifyError: any) {
         // 网络错误或其他错误，继续尝试直接数据库验证
