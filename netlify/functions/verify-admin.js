@@ -236,6 +236,7 @@ exports.handler = async (event, context) => {
       }
       
       if (!tokenToVerify) {
+        console.error('验证失败: 未找到 Token。Cookie Header:', cookieHeader);
         return {
           statusCode: 401,
           headers,
