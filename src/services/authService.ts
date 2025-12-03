@@ -152,15 +152,19 @@ export async function saveToken(username: string, role: string, name: string): P
   // 客户端只保存非敏感的用户信息（用于显示）
   const userInfo = { username, role, name };
   
-  // 只保存非敏感的用户信息到 sessionStorage（页面关闭后清除）
+  // 只保存非敏感的用户信息到 sessionStorage 和 localStorage（页面关闭后清除 sessionStorage，但保留 localStorage 以兼容）
   // 敏感数据（Token）由服务器通过 httpOnly Cookie 管理
   try {
     sessionStorage.setItem('currentUser', username);
     sessionStorage.setItem('currentUserName', name);
     sessionStorage.setItem('currentUserRole', role);
+    // 同时保存到 localStorage 以保持兼容性（特别是 Windows 浏览器）
+    localStorage.setItem('currentUser', username);
+    localStorage.setItem('currentUserName', name);
+    localStorage.setItem('currentUserRole', role);
   } catch (error) {
     // sessionStorage 可能不可用（某些隐私模式）
-    logger.warn('无法保存用户信息到 sessionStorage:', error);
+    logger.warn('无法保存用户信息到存储:', error);
   }
   
   // 返回空字符串，因为 Token 现在由服务器管理

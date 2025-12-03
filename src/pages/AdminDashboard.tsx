@@ -8,10 +8,10 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage } = useLanguage();
   
-  // 获取当前用户角色
-  const currentUserRole = localStorage.getItem('currentUserRole') || 'operator';
-  const currentUserName = localStorage.getItem('currentUserName') || '用户';
-  const currentUser = localStorage.getItem('currentUser') || '';
+  // 获取当前用户角色（从 sessionStorage 读取，因为 saveToken 保存到 sessionStorage）
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
+  const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
+  const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
 
   // 用户编辑模态框状态
 const [showUserEditModal, setShowUserEditModal] = useState(false);
@@ -68,7 +68,9 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       const success = await adminAccountService.updateAccount(currentAccount.id!, updateData);
       
       if (success) {
-        // 更新本地存储
+        // 更新本地存储（同时更新 sessionStorage 和 localStorage 以保持兼容）
+        sessionStorage.setItem('currentUser', userEditFormData.username);
+        sessionStorage.setItem('currentUserName', userEditFormData.employee_name);
         localStorage.setItem('currentUser', userEditFormData.username);
         localStorage.setItem('currentUserName', userEditFormData.employee_name);
         
