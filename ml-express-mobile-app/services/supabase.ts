@@ -5,7 +5,9 @@ import Constants from 'expo-constants';
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://market-link-express.netlify.app';
+// Netlify URL 用于调用 admin-password function
+// 优先使用自定义域名，回退到默认 Netlify 域名
+const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.com';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Supabase 配置缺失:');
