@@ -1386,9 +1386,12 @@ const [packages, setPackages] = useState<Package[]>([]);
                           fontWeight: 'bold',
                           marginLeft: '0.5rem'
                         }}>
-                          {store.store_type === 'hub' ? '🏢 总店' : 
-                           store.store_type === 'branch' ? '🏪 分店' : 
-                           store.store_type === 'pickup_point' ? '📦 自提点' : '🚚 中转站'}
+                          {store.store_type === 'restaurant' ? '🍽️ 餐厅' : 
+                           store.store_type === 'tea_shop' ? '🍵 茶铺' : 
+                           store.store_type === 'drinks_snacks' ? '🥤 饮料和小吃' : 
+                           store.store_type === 'grocery' ? '🛒 杂货店' : 
+                           store.store_type === 'transit_station' ? '🚚 中转站' : 
+                           store.store_type}
                         </span>
                       </div>
                       <span style={{
