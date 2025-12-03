@@ -99,17 +99,24 @@ async function verifyAdminToken(token, requiredRoles = []) {
     try {
       const expectedSignature = generateHMACSignature(payload);
       
-      // 无论环境如何，只要验证失败就打印详细日志（临时调试用）
-      const isValidSignature = verifyHMACSignature(payload, signature);
+      // 修复：移除 Base64 填充字符 '=' 再进行比较，避免传输过程中的 padding 差异
+      const safeExpected = expectedSignature.replace(/=+$/, '');
+      const safeReceived = signature.replace(/=+$/, '');
+      
+      // 使用时间安全的比较方法（避免时序攻击）
+      const isValidSignature = crypto.timingSafeEqual(
+        Buffer.from(safeExpected),
+        Buffer.from(safeReceived)
+      );
       
       if (!isValidSignature) {
         console.error('签名验证失败详情:', {
           payload,
           receivedSignature: signature,
           expectedSignature: expectedSignature,
-          secretLength: (process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || '').length,
-          env_JWT_SECRET_Exists: !!process.env.JWT_SECRET,
-          env_REACT_APP_JWT_SECRET_Exists: !!process.env.REACT_APP_JWT_SECRET
+          safeReceived,
+          safeExpected,
+          secretLength: (process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || '').length
         });
         return { valid: false, error: '令牌签名无效' };
       }
