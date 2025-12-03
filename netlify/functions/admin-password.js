@@ -165,7 +165,6 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Force redeploy check - timestamp: 2024-12-03
     const { action, username, password, plainPassword } = JSON.parse(event.body || '{}');
 
     if (action === 'hash') {
@@ -266,6 +265,13 @@ exports.handler = async (event, context) => {
         if (process.env.NODE_ENV !== 'production') {
           console.log('Cookie 设置:', cookieOptions);
           console.log('Token 生成成功:', token.substring(0, 20) + '...');
+          // 打印完整 Token 信息以便调试
+          const [u, r, t, s] = token.split(':');
+          console.log('生成签名 DEBUG:', {
+            payload: `${u}:${r}:${t}`,
+            signature: s,
+            secretLength: (process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || '').length
+          });
           console.log('请求 Host:', hostHeader, 'Proto:', protoHeader);
         }
       }
@@ -296,4 +302,3 @@ exports.handler = async (event, context) => {
 exports.hashPassword = hashPassword;
 exports.verifyPassword = verifyPassword;
 exports.verifyLogin = verifyLogin;
-
