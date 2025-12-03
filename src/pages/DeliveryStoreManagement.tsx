@@ -920,6 +920,22 @@ const DeliveryStoreManagement: React.FC = () => {
                   required
                 />
               </div>
+              {!isEditing && (
+                <div>
+                  <label style={labelStyle}>创建合伙时间</label>
+                  <input
+                    type="text"
+                    value={new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                    readOnly
+                    style={{
+                      ...inputStyle,
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      cursor: 'not-allowed',
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>纬度 *</label>
                 <input
@@ -1075,6 +1091,7 @@ const DeliveryStoreManagement: React.FC = () => {
               {stores.map((store) => (
                 <div
                   key={store.id}
+                  data-store-id={store.id}
                   onClick={() => handleStoreClick(store)}
                   style={{
                     background: selectedStore?.id === store.id ? 'rgba(49, 130, 206, 0.3)' : 'rgba(255,255,255,0.1)',
@@ -1458,12 +1475,57 @@ const DeliveryStoreManagement: React.FC = () => {
                         borderRadius: '4px',
                         fontSize: '12px',
                         color: selectedStore.status === 'active' ? '#22543d' : '#742a2a',
-                        fontWeight: '500'
+                        fontWeight: '500',
+                        marginBottom: '8px'
                       }}>
                         {selectedStore.status === 'active' && '🟢 营业中'}
                         {selectedStore.status === 'inactive' && '🔴 暂停营业'}
                         {selectedStore.status === 'maintenance' && '🟡 维护中'}
                       </div>
+                      <button
+                        onClick={() => {
+                          // 关闭地图弹窗
+                          setSelectedStore(null);
+                          // 选中店铺并滚动到店铺列表中的该店铺
+                          const storeElement = document.querySelector(`[data-store-id="${selectedStore.id}"]`);
+                          if (storeElement) {
+                            storeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // 高亮显示
+                            setTimeout(() => {
+                              const card = storeElement as HTMLElement;
+                              const originalBackground = card.style.background;
+                              card.style.background = 'rgba(49, 130, 206, 0.5)';
+                              setTimeout(() => {
+                                card.style.background = originalBackground;
+                              }, 2000);
+                            }, 500);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          padding: '8px 16px',
+                          background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 2px 4px rgba(56, 161, 105, 0.3)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(56, 161, 105, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(56, 161, 105, 0.3)';
+                        }}
+                      >
+                        🔍 进店查看
+                      </button>
                     </div>
                   </InfoWindow>
                 )}
