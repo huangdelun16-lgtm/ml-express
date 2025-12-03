@@ -329,8 +329,11 @@ export const packageService = {
   async getAllPackages(retryCount = 2): Promise<Package[]> {
     let lastError: any = null;
     
+    console.log('📦 开始获取包裹列表，Supabase URL:', supabaseUrl);
+    
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       try {
+        console.log(`📦 尝试获取包裹列表 (${attempt + 1}/${retryCount + 1})...`);
         const { data, error } = await supabase
           .from('packages')
           .select('*')
@@ -338,11 +341,19 @@ export const packageService = {
         
         if (error) {
           lastError = error;
+          console.error('❌ Supabase 查询错误:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          
           // 如果是网络错误且还有重试次数，等待后重试
           if (attempt < retryCount && (
             error.message?.includes('Network') || 
             error.message?.includes('connection') ||
-            error.message?.includes('gateway')
+            error.message?.includes('gateway') ||
+            error.message?.includes('fetch')
           )) {
             console.warn(`获取包裹列表失败 (尝试 ${attempt + 1}/${retryCount + 1}):`, error.message);
             // 等待时间递增：1秒、2秒
@@ -353,15 +364,23 @@ export const packageService = {
           throw error;
         }
         
+        console.log(`✅ 成功获取包裹列表，共 ${data?.length || 0} 个包裹`);
         return data || [];
       } catch (err: any) {
         lastError = err;
+        console.error('❌ 获取包裹列表异常:', {
+          name: err?.name,
+          message: err?.message,
+          stack: err?.stack?.substring(0, 200)
+        });
+        
         // 如果是网络错误且还有重试次数，等待后重试
         if (attempt < retryCount && (
           err?.message?.includes('Network') || 
           err?.message?.includes('connection') ||
           err?.message?.includes('gateway') ||
-          err?.message?.includes('Network connection lost')
+          err?.message?.includes('Network connection lost') ||
+          err?.message?.includes('fetch')
         )) {
           console.warn(`获取包裹列表异常 (尝试 ${attempt + 1}/${retryCount + 1}):`, err?.message);
           // 等待时间递增：1秒、2秒
