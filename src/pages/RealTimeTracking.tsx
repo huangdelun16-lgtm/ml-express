@@ -1340,7 +1340,7 @@ const [packages, setPackages] = useState<Package[]>([]);
             // 快递店管理内容
             <div>
               <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
-                🏪 快递店列表 ({stores.length})
+                🏪 合伙店铺列表 ({stores.length})
               </h3>
               
               {loadingStores ? (
