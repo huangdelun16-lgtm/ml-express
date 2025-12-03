@@ -134,8 +134,13 @@ export const adminAccountService = {
   async login(username: string, password: string): Promise<AdminAccount | null> {
     try {
       // 方法1: 尝试使用 Netlify Function 验证密码（推荐，支持加密密码）
+      let netlifyLoginSuccess = false;
       try {
         // 使用配置的 Netlify URL 调用登录验证函数
+        // 添加超时设置（10秒）
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
         const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
           method: 'POST',
           headers: {
@@ -145,8 +150,11 @@ export const adminAccountService = {
             action: 'login',
             username: username,
             password: password
-          })
+          }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const result = await response.json();
@@ -170,14 +178,28 @@ export const adminAccountService = {
               .update({ last_login: new Date().toISOString() })
               .eq('id', data.id);
 
+            netlifyLoginSuccess = true;
             return data;
           } else {
             console.error('登录失败:', result.error || '未知错误');
+            // Netlify Function 返回了明确的错误，直接返回
             return null;
           }
+        } else {
+          console.warn('Netlify Function 返回错误状态:', response.status);
         }
-      } catch (netlifyError) {
-        console.warn('Netlify Function 验证失败，尝试直接数据库验证:', netlifyError);
+      } catch (netlifyError: any) {
+        // 网络错误或其他错误，继续尝试直接数据库验证
+        if (netlifyError.name === 'AbortError') {
+          console.warn('Netlify Function 请求超时，尝试直接数据库验证');
+        } else {
+          console.warn('Netlify Function 验证失败，尝试直接数据库验证:', netlifyError.message);
+        }
+      }
+
+      // 如果 Netlify Function 验证成功，不需要继续
+      if (netlifyLoginSuccess) {
+        return null;
       }
 
       // 方法2: 直接数据库验证（向后兼容，仅用于明文密码）
@@ -189,8 +211,17 @@ export const adminAccountService = {
         .eq('status', 'active')
         .single();
 
-      if (fetchError || !accountData) {
-        console.error('账号不存在或已停用:', fetchError);
+      if (fetchError) {
+        console.error('查询账号失败:', fetchError);
+        // 如果是网络错误，提供更友好的提示
+        if (fetchError.message && fetchError.message.includes('Network')) {
+          throw new Error('网络连接失败，请检查网络设置');
+        }
+        return null;
+      }
+
+      if (!accountData) {
+        console.error('账号不存在或已停用');
         return null;
       }
 
@@ -202,9 +233,10 @@ export const adminAccountService = {
       );
 
       if (isPasswordHashed) {
-        // 密码已加密，无法在客户端验证，必须使用 Netlify Function
-        console.error('密码已加密，请使用 Netlify Function 验证');
-        return null;
+        // 密码已加密，无法在客户端验证
+        // 如果 Netlify Function 不可用，提示用户
+        console.error('密码已加密，但 Netlify Function 不可用。请检查网络连接或联系管理员。');
+        throw new Error('无法验证密码：网络连接失败。请检查网络设置或联系管理员。');
       }
 
       // 密码是明文，直接比较（向后兼容，但不推荐）
@@ -220,9 +252,10 @@ export const adminAccountService = {
         .eq('id', accountData.id);
 
       return accountData;
-    } catch (err) {
+    } catch (err: any) {
       console.error('登录异常:', err);
-      return null;
+      // 重新抛出错误，让 UI 层可以显示错误信息
+      throw err;
     }
   }
 };

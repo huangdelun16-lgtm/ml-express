@@ -132,9 +132,11 @@ export default function LoginScreen({ navigation }: any) {
       } else {
         Alert.alert('登录失败', '用户名或密码错误，或账号已被停用');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('登录异常:', error);
-      Alert.alert('登录失败', '请检查网络连接');
+      // 显示更详细的错误信息
+      const errorMessage = error?.message || '请检查网络连接';
+      Alert.alert('登录失败', errorMessage);
     } finally {
       setLoading(false);
     }
