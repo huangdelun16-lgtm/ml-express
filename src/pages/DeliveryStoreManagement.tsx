@@ -3122,12 +3122,6 @@ const DeliveryStoreManagement: React.FC = () => {
                           color: 'rgba(255, 255, 255, 0.9)'
                         }}>
                           <div>
-                            <span style={{ opacity: 0.7 }}>寄件人:</span> {pkg.sender_name}
-                          </div>
-                          <div>
-                            <span style={{ opacity: 0.7 }}>电话:</span> {pkg.sender_phone}
-                          </div>
-                          <div>
                             <span style={{ opacity: 0.7 }}>收件人:</span> {pkg.receiver_name}
                           </div>
                           <div>
@@ -3137,29 +3131,84 @@ const DeliveryStoreManagement: React.FC = () => {
                             <span style={{ opacity: 0.7 }}>地址:</span> {pkg.receiver_address}
                           </div>
                         </div>
+                        {/* 代收款金额 - 突出显示 */}
+                        <div style={{
+                          marginTop: '0.75rem',
+                          padding: '0.75rem',
+                          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%)',
+                          borderRadius: '8px',
+                          border: '2px solid rgba(251, 191, 36, 0.5)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}>
+                            <span style={{
+                              fontSize: '1.5rem',
+                              fontWeight: 'bold'
+                            }}>💰</span>
+                            <div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                marginBottom: '0.25rem'
+                              }}>
+                                代收款
+                              </div>
+                              <div style={{
+                                fontSize: '1.5rem',
+                                fontWeight: 'bold',
+                                color: '#fbbf24',
+                                textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                              }}>
+                                {pkg.price || '0'} 元
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{
+                            textAlign: 'right'
+                          }}>
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: 'rgba(255, 255, 255, 0.8)',
+                              marginBottom: '0.25rem'
+                            }}>
+                              支付方式
+                            </div>
+                            <div style={{
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              color: pkg.payment_method === 'qr' ? '#3b82f6' : '#10b981',
+                              padding: '0.25rem 0.75rem',
+                              background: pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                              borderRadius: '6px',
+                              border: `1px solid ${pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+                            }}>
+                              {pkg.payment_method === 'qr' ? '📱 二维码支付' : pkg.payment_method === 'cash' ? '💵 现金支付' : '未设置'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div style={{
                         textAlign: 'right',
-                        marginLeft: '1rem'
+                        marginLeft: '1rem',
+                        minWidth: '120px'
                       }}>
-                        <div style={{
-                          fontSize: '1.2rem',
-                          fontWeight: 'bold',
-                          color: '#48bb78',
-                          marginBottom: '0.25rem'
-                        }}>
-                          {pkg.price} 元
-                        </div>
                         <div style={{
                           fontSize: '0.8rem',
                           color: 'rgba(255, 255, 255, 0.6)',
-                          marginBottom: '0.25rem'
+                          marginBottom: '0.5rem'
                         }}>
                           {pkg.package_type}
                         </div>
                         <div style={{
                           fontSize: '0.8rem',
-                          color: 'rgba(255, 255, 255, 0.6)'
+                          color: 'rgba(255, 255, 255, 0.6)',
+                          marginBottom: '0.5rem'
                         }}>
                           {pkg.weight} kg
                         </div>
