@@ -165,6 +165,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Force redeploy check - timestamp: 2024-12-03
     const { action, username, password, plainPassword } = JSON.parse(event.body || '{}');
 
     if (action === 'hash') {
@@ -241,31 +242,31 @@ exports.handler = async (event, context) => {
         const protoHeader = event.headers?.['x-forwarded-proto'] || event.headers?.['X-Forwarded-Proto'];
         const isHttps = (protoHeader && protoHeader.includes('https')) || process.env.NODE_ENV === 'production';
 
-        const cookieDomain = resolveCookieDomain(event);
+        // 计算 Cookie 域名
+        const hostHeader = event.headers?.host || event.headers?.Host || '';
+        const requestHost = hostHeader.split(':')[0];
+        const cookieDomain = process.env.COOKIE_DOMAIN || requestHost || 'admin-market-link-express.com';
         
         // 设置 httpOnly Cookie（2小时过期）
         const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
-        const cookieParts = [
+        const cookieOptions = [
           `admin_auth_token=${token}`,
           `Max-Age=${cookieMaxAge}`,
           'Path=/',
-          'HttpOnly',
+          `Domain=${cookieDomain}`,
+          'HttpOnly', // 防止 JavaScript 访问
           isHttps ? 'Secure' : '',
+          // Windows 浏览器在 HTTPS 下也可以使用 Lax，稳定性更好
           'SameSite=Lax'
-        ];
-
-        if (cookieDomain) {
-          cookieParts.splice(3, 0, `Domain=${cookieDomain}`);
-        }
-
-        const cookieOptions = cookieParts.filter(Boolean).join('; ');
+        ].filter(Boolean).join('; ');
+        
         headers['Set-Cookie'] = cookieOptions;
         
         // 调试日志（仅在开发环境）
         if (process.env.NODE_ENV !== 'production') {
           console.log('Cookie 设置:', cookieOptions);
           console.log('Token 生成成功:', token.substring(0, 20) + '...');
-          console.log('Proto Header:', protoHeader || 'unknown');
+          console.log('请求 Host:', hostHeader, 'Proto:', protoHeader);
         }
       }
       
@@ -295,3 +296,4 @@ exports.handler = async (event, context) => {
 exports.hashPassword = hashPassword;
 exports.verifyPassword = verifyPassword;
 exports.verifyLogin = verifyLogin;
+
