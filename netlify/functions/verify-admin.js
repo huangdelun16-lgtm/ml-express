@@ -97,8 +97,18 @@ async function verifyAdminToken(token, requiredRoles = []) {
     
     // 验证签名
     try {
+      const expectedSignature = generateHMACSignature(payload);
       const isValidSignature = verifyHMACSignature(payload, signature);
+      
       if (!isValidSignature) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('签名不匹配 debug:', {
+            payload,
+            receivedSignature: signature,
+            expectedSignature: expectedSignature,
+            secretLength: (process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || '').length
+          });
+        }
         return { valid: false, error: '令牌签名无效' };
       }
     } catch (signatureError) {
