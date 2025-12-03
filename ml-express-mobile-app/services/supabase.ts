@@ -18,48 +18,13 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
-// 创建自定义 fetch 函数，添加超时支持（兼容 React Native）
-const fetchWithTimeout: typeof fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-  const timeout = 30000; // 30 秒超时
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  // 合并已有的 signal（如果有）
-  const existingSignal = init?.signal;
-  if (existingSignal) {
-    existingSignal.addEventListener('abort', () => controller.abort());
-  }
-  
-  return fetch(input, {
-    ...init,
-    signal: controller.signal
-  }).then((response) => {
-    clearTimeout(timeoutId);
-    return response;
-  }).catch((error) => {
-    clearTimeout(timeoutId);
-    // 如果是超时错误，提供更清晰的错误信息
-    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-      throw new Error('请求超时，请检查网络连接');
-    }
-    throw error;
-  });
-};
-
-// 创建 Supabase 客户端，添加超时和重试配置
+// 创建 Supabase 客户端
+// 使用默认配置，让 Supabase 客户端自己处理网络请求
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false, // 移动 app 不使用持久化 session
     autoRefreshToken: false,
     detectSessionInUrl: false
-  },
-  global: {
-    headers: {
-      'apikey': supabaseKey,
-      'Authorization': `Bearer ${supabaseKey}`
-    },
-    // 使用自定义 fetch 函数，添加超时支持
-    fetch: fetchWithTimeout
   },
   db: {
     schema: 'public'
