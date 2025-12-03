@@ -207,19 +207,29 @@ exports.handler = async (event, context) => {
 
     if (action === 'verify') {
       // 优先从 Cookie 获取 Token（更安全）
-      const cookieToken = event.headers?.cookie
-        ?.split(';')
-        .find(c => c.trim().startsWith('admin_auth_token='))
-        ?.split('=')[1];
+      const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
+      const cookieToken = cookieHeader
+        .split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('admin_auth_token='))
+        ?.split('=')[1]
+        ?.trim();
       
       // 使用 Cookie 中的 Token 或请求体中的 Token
       const tokenToVerify = cookieToken || token;
+      
+      // 调试日志（仅在开发环境）
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Cookie Header:', cookieHeader);
+        console.log('Cookie Token Found:', !!cookieToken);
+        console.log('Token to Verify:', tokenToVerify ? tokenToVerify.substring(0, 20) + '...' : 'none');
+      }
       
       if (!tokenToVerify) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ valid: false, error: '未找到认证令牌' })
+          body: JSON.stringify({ valid: false, error: '未找到认证令牌', debug: process.env.NODE_ENV !== 'production' ? { cookieHeader, hasCookie: !!cookieToken } : undefined })
         };
       }
       

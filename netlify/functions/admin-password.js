@@ -237,6 +237,11 @@ exports.handler = async (event, context) => {
         const { generateAdminToken } = require('./verify-admin');
         const token = generateAdminToken(result.account.username, result.account.role);
         
+        // 检测是否为 HTTPS（通过请求头判断）
+        const isHttps = event.headers?.['x-forwarded-proto'] === 'https' || 
+                       event.headers?.['X-Forwarded-Proto'] === 'https' ||
+                       process.env.NODE_ENV === 'production';
+        
         // 设置 httpOnly Cookie（2小时过期）
         const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
         const cookieOptions = [
@@ -244,11 +249,17 @@ exports.handler = async (event, context) => {
           `Max-Age=${cookieMaxAge}`,
           'Path=/',
           'HttpOnly', // 防止 JavaScript 访问
-          'SameSite=Strict', // 防止 CSRF
-          process.env.NODE_ENV === 'production' ? 'Secure' : '' // 仅 HTTPS
+          isHttps ? 'Secure' : '', // HTTPS 时设置 Secure
+          isHttps ? 'SameSite=None' : 'SameSite=Lax' // HTTPS 使用 None，HTTP 使用 Lax
         ].filter(Boolean).join('; ');
         
         headers['Set-Cookie'] = cookieOptions;
+        
+        // 调试日志（仅在开发环境）
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Cookie 设置:', cookieOptions);
+          console.log('Token 生成成功:', token.substring(0, 20) + '...');
+        }
       }
       
       return {
