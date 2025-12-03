@@ -3141,7 +3141,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         {/* 代收款金额 - 突出显示 */}
                         <div style={{
                           marginTop: '0.75rem',
-                          padding: '1rem',
+                          padding: '0.75rem',
                           background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%)',
                           borderRadius: '8px',
                           border: '2px solid rgba(251, 191, 36, 0.5)'
@@ -3149,28 +3149,30 @@ const DeliveryStoreManagement: React.FC = () => {
                           <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: '0.75rem'
+                            alignItems: 'center',
+                            gap: '1rem'
                           }}>
+                            {/* 左侧：总金额 */}
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '0.5rem'
+                              gap: '0.4rem',
+                              flex: '0 0 auto'
                             }}>
                               <span style={{
-                                fontSize: '1.5rem',
+                                fontSize: '1.2rem',
                                 fontWeight: 'bold'
                               }}>💰</span>
                               <div>
                                 <div style={{
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.7rem',
                                   color: 'rgba(255, 255, 255, 0.8)',
-                                  marginBottom: '0.25rem'
+                                  marginBottom: '0.15rem'
                                 }}>
                                   总金额
                                 </div>
                                 <div style={{
-                                  fontSize: '1.5rem',
+                                  fontSize: '1.2rem',
                                   fontWeight: 'bold',
                                   color: '#fbbf24',
                                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
@@ -3178,96 +3180,98 @@ const DeliveryStoreManagement: React.FC = () => {
                                   {(() => {
                                     const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
                                     const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
-                                    const total = storeFee + deliveryFee;
+                                    const priceValue = parseFloat(pkg.price?.toString() || '0');
+                                    // 如果 delivery_fee 为 0，使用 price 作为跑腿费
+                                    const actualDeliveryFee = deliveryFee > 0 ? deliveryFee : priceValue;
+                                    const total = storeFee + actualDeliveryFee;
                                     return total > 0 ? total.toFixed(2) : (pkg.price || '0');
-                                  })()} 元
+                                  })()} MMK
                                 </div>
                               </div>
                             </div>
+                            
+                            {/* 中间：费用明细 - 横向布局 */}
                             <div style={{
-                              textAlign: 'right'
+                              display: 'flex',
+                              flex: '1',
+                              gap: '1rem',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0 0.75rem',
+                              borderLeft: '1px solid rgba(251, 191, 36, 0.3)',
+                              borderRight: '1px solid rgba(251, 191, 36, 0.3)'
                             }}>
                               <div style={{
-                                fontSize: '0.75rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                flex: '1'
+                              }}>
+                                <div style={{
+                                  fontSize: '0.65rem',
+                                  color: 'rgba(255, 255, 255, 0.7)'
+                                }}>
+                                  待付款（店铺填写）
+                                </div>
+                                <div style={{
+                                  fontSize: '0.85rem',
+                                  color: '#fbbf24',
+                                  fontWeight: '600'
+                                }}>
+                                  {parseFloat(pkg.store_fee?.toString() || '0').toFixed(2)} MMK
+                                </div>
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                flex: '1'
+                              }}>
+                                <div style={{
+                                  fontSize: '0.65rem',
+                                  color: 'rgba(255, 255, 255, 0.7)'
+                                }}>
+                                  跑腿费（系统自动生成）
+                                </div>
+                                <div style={{
+                                  fontSize: '0.85rem',
+                                  color: '#3b82f6',
+                                  fontWeight: '600'
+                                }}>
+                                  {(() => {
+                                    const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
+                                    const priceValue = parseFloat(pkg.price?.toString() || '0');
+                                    // 如果 delivery_fee 为 0，使用 price 作为跑腿费
+                                    return (deliveryFee > 0 ? deliveryFee : priceValue).toFixed(2);
+                                  })()} MMK
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* 右侧：支付方式 */}
+                            <div style={{
+                              textAlign: 'right',
+                              flex: '0 0 auto'
+                            }}>
+                              <div style={{
+                                fontSize: '0.7rem',
                                 color: 'rgba(255, 255, 255, 0.8)',
-                                marginBottom: '0.25rem'
+                                marginBottom: '0.15rem'
                               }}>
                                 支付方式
                               </div>
                               <div style={{
-                                fontSize: '0.9rem',
+                                fontSize: '0.75rem',
                                 fontWeight: '600',
                                 color: pkg.payment_method === 'qr' ? '#3b82f6' : '#10b981',
-                                padding: '0.25rem 0.75rem',
+                                padding: '0.2rem 0.6rem',
                                 background: pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                                 borderRadius: '6px',
-                                border: `1px solid ${pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+                                border: `1px solid ${pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                                whiteSpace: 'nowrap'
                               }}>
                                 {pkg.payment_method === 'qr' ? '📱 二维码支付' : pkg.payment_method === 'cash' ? '💵 现金支付' : '未设置'}
                               </div>
-                            </div>
-                          </div>
-                          {/* 费用明细 */}
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.5rem',
-                            paddingTop: '0.75rem',
-                            borderTop: '1px solid rgba(251, 191, 36, 0.3)'
-                          }}>
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              fontSize: '0.85rem'
-                            }}>
-                              <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>待付款（店铺填写）:</span>
-                              <span style={{ 
-                                color: '#fbbf24', 
-                                fontWeight: '600',
-                                fontSize: '0.95rem'
-                              }}>
-                                {parseFloat(pkg.store_fee?.toString() || '0').toFixed(2)} 元
-                              </span>
-                            </div>
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              fontSize: '0.85rem'
-                            }}>
-                              <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>跑腿费（系统自动生成）:</span>
-                              <span style={{ 
-                                color: '#3b82f6', 
-                                fontWeight: '600',
-                                fontSize: '0.95rem'
-                              }}>
-                                {parseFloat(pkg.delivery_fee?.toString() || '0').toFixed(2)} 元
-                              </span>
-                            </div>
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              fontSize: '0.9rem',
-                              fontWeight: 'bold',
-                              paddingTop: '0.5rem',
-                              borderTop: '1px solid rgba(251, 191, 36, 0.3)',
-                              marginTop: '0.25rem'
-                            }}>
-                              <span style={{ color: 'rgba(255, 255, 255, 0.95)' }}>总金额:</span>
-                              <span style={{ 
-                                color: '#fbbf24', 
-                                fontSize: '1.1rem',
-                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
-                              }}>
-                                {(() => {
-                                  const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
-                                  const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
-                                  const total = storeFee + deliveryFee;
-                                  return total > 0 ? total.toFixed(2) : (pkg.price || '0');
-                                })()} 元
-                              </span>
                             </div>
                           </div>
                         </div>
