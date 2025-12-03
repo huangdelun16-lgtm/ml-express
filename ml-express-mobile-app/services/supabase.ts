@@ -146,7 +146,9 @@ export const adminAccountService = {
         const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            // 不设置 Origin 头，让浏览器/React Native 自动处理
+            // 如果需要，可以添加自定义 Origin
           },
           body: JSON.stringify({
             action: 'login',

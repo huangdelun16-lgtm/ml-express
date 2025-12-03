@@ -25,6 +25,12 @@ function getAllowedOrigins() {
     'http://localhost:3000',      // 本地开发（admin）
     'http://localhost:3001',      // 本地开发（client）
     'http://localhost:8888',      // Netlify Dev
+    // 移动 app 开发环境（Expo）
+    'exp://localhost:8081',
+    'exp://192.168.100.184:8081',
+    'http://192.168.100.184:8081',
+    // 允许所有 exp:// 开头的 Origin（Expo 开发服务器）
+    // 注意：在生产环境中应该限制为特定的 Origin
   ];
 }
 
@@ -35,11 +41,34 @@ function getAllowedOrigins() {
  */
 function isOriginAllowed(origin) {
   if (!origin) {
-    return false;
+    // 如果没有 Origin 头（可能是移动 app 或直接请求），允许通过
+    // 但要注意安全性，在生产环境中可能需要更严格的检查
+    return true;
   }
   
   const allowedOrigins = getAllowedOrigins();
-  return allowedOrigins.includes(origin);
+  
+  // 检查精确匹配
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+  
+  // 允许所有 exp:// 开头的 Origin（Expo 开发服务器）
+  if (origin.startsWith('exp://')) {
+    return true;
+  }
+  
+  // 允许所有 http://192.168.x.x:8081 格式的 Origin（本地网络 Expo 服务器）
+  if (/^http:\/\/192\.168\.\d+\.\d+:8081$/.test(origin)) {
+    return true;
+  }
+  
+  // 允许所有 http://localhost:8081 格式的 Origin（本地 Expo 服务器）
+  if (/^http:\/\/localhost:\d+$/.test(origin)) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
