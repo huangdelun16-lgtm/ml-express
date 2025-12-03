@@ -110,8 +110,8 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager'] // 仅管理员和经理可访问
     },
     {
-      title: language === 'zh' ? '快递店管理' : language === 'en' ? 'Delivery Store Management' : 'ပို့ဆောင်ရေးစတိုးစီမံခန့်ခွဲမှု',
-      description: language === 'zh' ? '配送网点、自提点和分拣中心' : language === 'en' ? 'Distribution points, pickup points and sorting centers' : 'ဖြန့်ဖြူးရေးအမှတ်များ၊ ကောက်ယူရေးအမှတ်များနှင့်ခွဲခြားစိစစ်ရေးဌာန',
+      title: language === 'zh' ? '合伙店铺' : language === 'en' ? 'Partner Stores' : 'လုပ်ဖော်ကိုင်ဖက်ဆိုင်များ',
+      description: language === 'zh' ? '管理合伙店铺位置和信息' : language === 'en' ? 'Manage partner store locations and information' : 'လုပ်ဖော်ကိုင်ဖက်ဆိုင်တည်နေရာနှင့်အချက်အလက်များစီမံခန့်ခွဲမှု',
       color: '#38a169',
       icon: '🏪',
       roles: ['admin', 'manager'] // 管理员和经理可访问
@@ -157,7 +157,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       navigate('/admin/users');
     } else if (title === '快递员管理' || title === 'Courier Management' || title === 'ကောင်ရီယာစီမံခန့်ခွဲမှု') {
       navigate('/admin/couriers');
-    } else if (title === '快递店管理' || title === 'Delivery Store Management' || title === 'ပို့ဆောင်ရေးစတိုးစီမံခန့်ခွဲမှု') {
+    } else if (title === '合伙店铺' || title === 'Partner Stores' || title === 'လုပ်ဖော်ကိုင်ဖက်ဆိုင်များ') {
       navigate('/admin/delivery-stores');
     } else if (title === '财务管理' || title === 'Finance Management' || title === 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု') {
       navigate('/admin/finance');

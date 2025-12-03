@@ -878,7 +878,7 @@ const [packages, setPackages] = useState<Package[]>([]);
                   transition: 'all 0.2s'
                 }}
               >
-                🏪 快递店管理
+                🏪 合伙店铺
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import QRCode from 'qrcode';
 
@@ -75,7 +75,16 @@ const DeliveryStoreManagement: React.FC = () => {
   const [selectedStore, setSelectedStore] = useState<DeliveryStore | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 21.9588, lng: 96.0891 }); // 默认曼德勒
   const [selectedCity, setSelectedCity] = useState<'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse'>('mandalay'); // 默认曼德勒
-  const [allStores, setAllStores] = useState<DeliveryStore[]>([]); // 存储所有快递店
+  const [allStores, setAllStores] = useState<DeliveryStore[]>([]); // 存储所有合伙店铺
+  
+  // Google Places API 相关状态
+  const [placeSearchInput, setPlaceSearchInput] = useState('');
+  const [placeSuggestions, setPlaceSuggestions] = useState<any[]>([]);
+  const [showPlaceSuggestions, setShowPlaceSuggestions] = useState(false);
+  const [isLoadingPlaceDetails, setIsLoadingPlaceDetails] = useState(false);
+  const autocompleteServiceRef = useRef<any>(null);
+  const placesServiceRef = useRef<any>(null);
+  const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
   
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -88,7 +97,99 @@ const DeliveryStoreManagement: React.FC = () => {
     muse: { name: '木姐', nameEn: 'Muse', lat: 23.9833, lng: 97.9000, radius: 0.3 }
   };
 
-  // 根据坐标判断快递店属于哪个城市
+  // Google Places API 自动完成搜索
+  const searchPlaces = useCallback(async (input: string) => {
+    if (!input.trim() || input.length < 2) {
+      setPlaceSuggestions([]);
+      setShowPlaceSuggestions(false);
+      return;
+    }
+
+    if (!googleMapsApiKey) {
+      console.error('Google Maps API Key 未配置');
+      return;
+    }
+
+    try {
+      // 使用 Google Places Autocomplete API
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${googleMapsApiKey}&language=zh-CN&components=country:mm`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.predictions) {
+        setPlaceSuggestions(data.predictions);
+        setShowPlaceSuggestions(true);
+      } else {
+        setPlaceSuggestions([]);
+        setShowPlaceSuggestions(false);
+      }
+    } catch (error) {
+      console.error('搜索地点失败:', error);
+      setPlaceSuggestions([]);
+      setShowPlaceSuggestions(false);
+    }
+  }, [googleMapsApiKey]);
+
+  // 获取地点详情并自动填充表单
+  const getPlaceDetails = useCallback(async (placeId: string) => {
+    if (!googleMapsApiKey) {
+      console.error('Google Maps API Key 未配置');
+      return;
+    }
+
+    setIsLoadingPlaceDetails(true);
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,formatted_phone_number,website,rating,types&key=${googleMapsApiKey}&language=zh-CN`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.result) {
+        const place = data.result;
+        const location = place.geometry.location;
+        
+        // 自动填充表单
+        setFormData(prev => ({
+          ...prev,
+          store_name: place.name || prev.store_name,
+          address: place.formatted_address || prev.address,
+          latitude: location.lat.toString(),
+          longitude: location.lng.toString(),
+          phone: place.formatted_phone_number || prev.phone,
+        }));
+        
+        // 更新地图中心
+        setMapCenter({ lat: location.lat, lng: location.lng });
+        
+        setPlaceSearchInput(place.name || place.formatted_address || '');
+        setShowPlaceSuggestions(false);
+      }
+    } catch (error) {
+      console.error('获取地点详情失败:', error);
+      setErrorMessage('获取店铺信息失败，请手动填写');
+    } finally {
+      setIsLoadingPlaceDetails(false);
+    }
+  }, [googleMapsApiKey]);
+
+  // 处理地点搜索输入变化（防抖）
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (placeSearchInput) {
+        searchPlaces(placeSearchInput);
+      } else {
+        setPlaceSuggestions([]);
+        setShowPlaceSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [placeSearchInput, searchPlaces]);
+
+  // 根据坐标判断合伙店铺属于哪个城市
   const getStoreCity = (store: DeliveryStore): string | null => {
     // 计算两点之间的距离（公里）
     const distance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -118,13 +219,13 @@ const DeliveryStoreManagement: React.FC = () => {
     return minDistance <= 50 ? closestCity : null;
   };
 
-  // 根据选择的城市过滤快递店
+  // 根据选择的城市过滤合伙店铺
   const filteredStores = allStores.filter(store => {
     const storeCity = getStoreCity(store);
     return storeCity === selectedCity;
   });
 
-  // 使用过滤后的快递店列表
+  // 使用过滤后的合伙店铺列表
   const stores = filteredStores;
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
@@ -389,11 +490,11 @@ const DeliveryStoreManagement: React.FC = () => {
         setErrorMessage(null); // 清除之前的错误信息
       }
       const data = await deliveryStoreService.getAllStores();
-      setAllStores(data); // 存储所有快递店
+      setAllStores(data); // 存储所有合伙店铺
       setRetryCount(0); // 重置重试计数
     } catch (error) {
-      console.error('加载快递店列表失败:', error);
-      setErrorMessage('加载快递店列表失败，请刷新页面重试');
+      console.error('加载合伙店铺列表失败:', error);
+      setErrorMessage('加载合伙店铺列表失败，请刷新页面重试');
       setAllStores([]); // 设置空数组避免undefined
       if (!isRetry) {
         setRetryCount(prev => prev + 1);
@@ -454,7 +555,7 @@ const DeliveryStoreManagement: React.FC = () => {
       });
 
       if (result) {
-        setSuccessMessage('快递店信息更新成功！');
+        setSuccessMessage('合伙店铺信息更新成功！');
         setShowForm(false);
         setEditingStore(null);
         setIsEditing(false);
@@ -474,7 +575,7 @@ const DeliveryStoreManagement: React.FC = () => {
       });
 
       if (result.success) {
-        setSuccessMessage('快递店创建成功！');
+        setSuccessMessage('合伙店铺创建成功！');
         setShowForm(false);
         resetForm();
         loadStores();
@@ -533,6 +634,9 @@ const DeliveryStoreManagement: React.FC = () => {
   };
 
   const resetForm = () => {
+    setPlaceSearchInput('');
+    setPlaceSuggestions([]);
+    setShowPlaceSuggestions(false);
     setFormData({
       store_name: '',
       store_code: '',
@@ -608,8 +712,8 @@ const DeliveryStoreManagement: React.FC = () => {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>快递店管理</h1>
-          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>管理配送网点、自提点和分拣中心</p>
+          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>合伙店铺</h1>
+          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>管理合伙店铺位置和信息</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
@@ -651,7 +755,7 @@ const DeliveryStoreManagement: React.FC = () => {
               boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)'
             }}
           >
-            {showForm ? (isEditing ? '取消编辑' : '取消') : '+ 新增快递店'}
+            {showForm ? (isEditing ? '取消编辑' : '取消') : '+ 新增合伙店铺'}
           </button>
         </div>
       </div>
@@ -670,7 +774,7 @@ const DeliveryStoreManagement: React.FC = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{errorMessage || successMessage}</span>
-            {errorMessage && errorMessage.includes('加载快递店列表失败') && (
+            {errorMessage && errorMessage.includes('加载合伙店铺列表失败') && (
               <button
                 onClick={() => loadStores(true)}
                 style={{
@@ -705,21 +809,23 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>
-            {isEditing ? '编辑快递店' : '新增快递店'}
+            {isEditing ? '编辑合伙店铺' : '新增合伙店铺'}
           </h2>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               <div>
                 <label style={labelStyle}>店铺名称 *</label>
-                <input
-                  type="text"
-                  name="store_name"
-                  value={formData.store_name}
-                  onChange={handleInputChange}
-                  placeholder="例: 缅甸中心店"
-                  style={inputStyle}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    name="store_name"
+                    value={formData.store_name}
+                    onChange={handleInputChange}
+                    placeholder="例: 缅甸中心店"
+                    style={inputStyle}
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>店铺代码 *</label>
@@ -749,13 +855,93 @@ const DeliveryStoreManagement: React.FC = () => {
                 </select>
               </div>
               <div>
+                <label style={labelStyle}>搜索店铺位置（可选）</label>
+                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    value={placeSearchInput}
+                    onChange={(e) => setPlaceSearchInput(e.target.value)}
+                    placeholder="输入店铺名称或地址进行搜索..."
+                    style={inputStyle}
+                    onFocus={() => {
+                      if (placeSearchInput && placeSuggestions.length > 0) {
+                        setShowPlaceSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // 延迟隐藏，以便点击建议项
+                      setTimeout(() => setShowPlaceSuggestions(false), 200);
+                    }}
+                  />
+                  {isLoadingPlaceDetails && (
+                    <div style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: '0.8rem'
+                    }}>
+                      加载中...
+                    </div>
+                  )}
+                  {showPlaceSuggestions && placeSuggestions.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      borderRadius: '8px',
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      border: '1px solid rgba(0,0,0,0.1)'
+                    }}>
+                      {placeSuggestions.map((suggestion, index) => (
+                        <div
+                          key={suggestion.place_id || index}
+                          onClick={() => {
+                            if (suggestion.place_id) {
+                              getPlaceDetails(suggestion.place_id);
+                            }
+                          }}
+                          style={{
+                            padding: '12px',
+                            cursor: 'pointer',
+                            borderBottom: index < placeSuggestions.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                            color: '#333',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(44, 82, 130, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <div style={{ fontWeight: 500, marginBottom: '4px' }}>
+                            {suggestion.structured_formatting?.main_text || suggestion.description}
+                          </div>
+                          {suggestion.structured_formatting?.secondary_text && (
+                            <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                              {suggestion.structured_formatting.secondary_text}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <label style={labelStyle}>详细地址 *</label>
                 <input
                   type="text"
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  placeholder="详细地址"
+                  placeholder="详细地址（可通过上方搜索自动填充）"
                   style={inputStyle}
                   required
                 />
@@ -960,15 +1146,15 @@ const DeliveryStoreManagement: React.FC = () => {
                 boxShadow: '0 6px 16px rgba(56, 161, 105, 0.3)'
               }}
             >
-              {isEditing ? '更新快递店' : '创建快递店'}
+              {isEditing ? '更新合伙店铺' : '创建合伙店铺'}
             </button>
           </form>
         </div>
       )}
 
-      {/* 快递店列表和地图 */}
+      {/* 合伙店铺列表和地图 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* 快递店列表 */}
+        {/* 合伙店铺列表 */}
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
@@ -979,7 +1165,7 @@ const DeliveryStoreManagement: React.FC = () => {
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>
-            快递店列表 
+            合伙店铺列表 
             <span style={{ fontSize: '0.9rem', fontWeight: 'normal', opacity: 0.8, marginLeft: '8px' }}>
               ({myanmarCities[selectedCity].name}: {stores.length} 个)
             </span>
@@ -989,8 +1175,8 @@ const DeliveryStoreManagement: React.FC = () => {
           ) : stores.length === 0 ? (
             <p style={{ opacity: 0.7 }}>
               {allStores.length === 0 
-                ? '暂无快递店数据' 
-                : `${myanmarCities[selectedCity].name}地区暂无快递店`}
+                ? '暂无合伙店铺数据' 
+                : `${myanmarCities[selectedCity].name}地区暂无合伙店铺`}
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1227,7 +1413,7 @@ const DeliveryStoreManagement: React.FC = () => {
             color: 'white'
           }}
         >
-          <h2 style={{ marginBottom: '20px' }}>快递店分布图</h2>
+          <h2 style={{ marginBottom: '20px' }}>合伙店铺分布图</h2>
           <div style={{ 
             position: 'relative',
             width: '100%',
