@@ -67,7 +67,11 @@ module.exports = {
     extra: {
       eas: {
         projectId: "9831d961-9124-46ed-8581-bf406616439f"
-      }
+      },
+      // 环境变量（从 .env 文件读取，或从 EAS Secrets 获取）
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || ''
     },
     owner: "amt349",
     privacy: "public",

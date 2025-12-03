@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 
-// 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// 使用环境变量配置 Supabase
+// 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
+const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Supabase 配置缺失:');
+  console.error('   EXPO_PUBLIC_SUPABASE_URL:', supabaseUrl ? '已配置' : '未配置');
+  console.error('   EXPO_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? '已配置' : '未配置');
+  console.error('   请检查 .env 文件或 EAS Secrets 配置');
   throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
