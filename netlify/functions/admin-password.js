@@ -95,6 +95,14 @@ async function verifyLogin(username, password) {
 
     const account = accounts[0];
     
+    // 安全检查：确保账号角色是有效的管理员角色
+    // 防止意外混入的非管理员账号登录
+    const validAdminRoles = ['admin', 'manager', 'operator', 'finance'];
+    if (!account.role || !validAdminRoles.includes(account.role)) {
+      console.warn(`非管理员账号尝试登录后台: ${username}, role: ${account.role}`);
+      return { success: false, error: '该账号无权访问管理后台' };
+    }
+    
     // 检查密码格式
     const isPasswordHashed = account.password && (
       account.password.startsWith('$2a$') || 
@@ -265,13 +273,6 @@ exports.handler = async (event, context) => {
         if (process.env.NODE_ENV !== 'production') {
           console.log('Cookie 设置:', cookieOptions);
           console.log('Token 生成成功:', token.substring(0, 20) + '...');
-          // 打印完整 Token 信息以便调试
-          const [u, r, t, s] = token.split(':');
-          console.log('生成签名 DEBUG:', {
-            payload: `${u}:${r}:${t}`,
-            signature: s,
-            secretLength: (process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || '').length
-          });
           console.log('请求 Host:', hostHeader, 'Proto:', protoHeader);
         }
       }
