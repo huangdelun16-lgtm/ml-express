@@ -1351,9 +1351,9 @@ const [packages, setPackages] = useState<Package[]>([]);
               ) : stores.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏪</div>
-                  <p>暂无快递店</p>
+                  <p>暂无合伙店铺</p>
                   <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', color: '#6b7280' }}>
-                    请前往独立页面添加快递店
+                    请前往独立页面添加合伙店铺
                   </p>
                 </div>
               ) : (
