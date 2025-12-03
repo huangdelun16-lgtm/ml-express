@@ -17,7 +17,37 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// 创建 Supabase 客户端，添加超时和重试配置
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false, // 移动 app 不使用持久化 session
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: {
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`
+    },
+    // 添加超时设置
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        // 设置超时时间为 30 秒
+        signal: AbortSignal.timeout(30000)
+      }).catch((error) => {
+        // 如果是超时错误，提供更清晰的错误信息
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+          throw new Error('请求超时，请检查网络连接');
+        }
+        throw error;
+      });
+    }
+  },
+  db: {
+    schema: 'public'
+  }
+});
 
 // 包裹数据类型
 export interface Package {
