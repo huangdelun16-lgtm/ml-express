@@ -18,6 +18,11 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
+// 调试信息：打印配置（不打印完整的 key）
+console.log('✅ Supabase 配置已加载:');
+console.log('   URL:', supabaseUrl);
+console.log('   Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : '未配置');
+
 // 创建 Supabase 客户端
 // 使用默认配置，让 Supabase 客户端自己处理网络请求
 export const supabase = createClient(supabaseUrl, supabaseKey, {
