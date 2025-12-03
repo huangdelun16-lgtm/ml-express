@@ -2435,9 +2435,6 @@ export default function MapScreen({ navigation }: any) {
         <Text style={styles.headerTitle}>
           🗺️ {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်လမ်းကြောင်း'}
         </Text>
-        <TouchableOpacity onPress={() => loadPackages(true)} style={styles.refreshButton}>
-          <Text style={styles.refreshText}>🔄</Text>
-        </TouchableOpacity>
       </View>
 
       {/* 网络状态和错误信息显示 */}
@@ -2666,23 +2663,6 @@ export default function MapScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {location && (
-        <View style={styles.planRouteContainer}>
-          <TouchableOpacity 
-            style={[styles.navigateAllButton, packages.length === 0 && styles.navigateAllButtonDisabled]}
-            onPress={handleNavigateAll}
-            disabled={packages.length === 0}
-          >
-            <Text style={styles.navigateAllIcon}>🧭</Text>
-            <Text style={styles.navigateAllText}>
-              {packages.length > 0 
-                ? (language === 'zh' ? `规划路线 (${packages.length}站)` : language === 'en' ? `Plan Route (${packages.length} stops)` : `လမ်းကြောင်းစီစဉ် (${packages.length} ဂိတ်)`)
-                : (language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိ')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       <View style={styles.listContainer}>
         {/* 搜索和筛选栏 */}
         <View style={styles.searchFilterContainer}>
@@ -2706,7 +2686,10 @@ export default function MapScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
           </View>
+        </View>
 
+        {/* 筛选和规划路线按钮 */}
+        <View style={styles.actionButtonsContainer}>
           {/* 筛选按钮 */}
           <TouchableOpacity
             style={styles.filterButton}
@@ -2725,6 +2708,21 @@ export default function MapScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
+          {/* 规划路线按钮 */}
+          {location && (
+            <TouchableOpacity 
+              style={[styles.navigateAllButton, packages.length === 0 && styles.navigateAllButtonDisabled]}
+              onPress={handleNavigateAll}
+              disabled={packages.length === 0}
+            >
+              <Text style={styles.navigateAllIcon}>🧭</Text>
+              <Text style={styles.navigateAllText}>
+                {packages.length > 0 
+                  ? (language === 'zh' ? `规划路线 (${packages.length}站)` : language === 'en' ? `Plan Route (${packages.length} stops)` : `လမ်းကြောင်းစီစဉ် (${packages.length} ဂိတ်)`)
+                  : (language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိ')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.listTitle}>
@@ -4006,15 +4004,15 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#2c5282',
     paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   refreshText: {
@@ -4220,34 +4218,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
   planRouteContainer: {
     margin: 16,
     marginBottom: 8,
     alignItems: 'flex-end', // 按钮靠右对齐
   },
   navigateAllButton: {
+    flex: 1,
     backgroundColor: '#3182ce',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   navigateAllButtonDisabled: {
     backgroundColor: '#cbd5e0',
   },
   navigateAllIcon: {
-    fontSize: 14,
+    fontSize: 12,
   },
   navigateAllText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   listContainer: {
@@ -5437,7 +5443,7 @@ const styles = StyleSheet.create({
   searchFilterContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -5448,19 +5454,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   searchIcon: {
-    fontSize: 18,
-    marginRight: 8,
+    fontSize: 14,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     color: '#1f2937',
     padding: 0,
   },
@@ -5479,21 +5485,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   filterButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#3b82f6',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    gap: 6,
+    gap: 4,
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   filterIcon: {
-    fontSize: 16,
+    fontSize: 12,
   },
   filterButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
   },
   filterBadge: {
