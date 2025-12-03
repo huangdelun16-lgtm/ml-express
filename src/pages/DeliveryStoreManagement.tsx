@@ -265,10 +265,10 @@ const DeliveryStoreManagement: React.FC = () => {
     email: '',
     manager_name: '',
     manager_phone: '',
-    store_type: 'branch' as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
+    store_type: 'restaurant' as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
     operating_hours: '08:00-22:00',
-    service_area_radius: 5,
-    capacity: 1000,
+    service_area_radius: 5, // 保留默认值，但不在表单中显示
+    capacity: 1000, // 保留默认值，但不在表单中显示
     facilities: [] as string[],
     notes: ''
   });
@@ -377,7 +377,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: store.email || '',
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
-      store_type: store.store_type as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
+      store_type: store.store_type as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
       operating_hours: store.operating_hours,
       service_area_radius: store.service_area_radius,
       capacity: store.capacity,
@@ -647,7 +647,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: '',
       manager_name: '',
       manager_phone: '',
-      store_type: 'branch' as 'hub' | 'branch' | 'pickup_point' | 'transit_station',
+      store_type: 'restaurant' as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
       operating_hours: '08:00-22:00',
       service_area_radius: 5,
       capacity: 1000,
@@ -682,14 +682,8 @@ const DeliveryStoreManagement: React.FC = () => {
   // };
 
   const facilityOptions = [
-    { key: 'parking', label: '停车场' },
-    { key: 'storage', label: '仓储区' },
-    { key: 'office', label: '办公区' },
-    { key: 'restroom', label: '洗手间' },
-    { key: 'loading_dock', label: '装卸区' },
-    { key: 'security', label: '安保' },
-    { key: 'cctv', label: '监控' },
-    { key: 'wifi', label: 'WiFi' }
+    { key: 'store', label: '店铺' },
+    { key: 'storage', label: '仓储区' }
   ];
 
   return (
@@ -848,100 +842,21 @@ const DeliveryStoreManagement: React.FC = () => {
                   style={inputStyle}
                   required
                 >
-                  <option value="hub">分拣中心 (Hub)</option>
-                  <option value="branch">配送点 (Branch)</option>
-                  <option value="pickup_point">自提点 (Pickup Point)</option>
-                  <option value="transit_station">中转站 (Transit Station)</option>
+                  <option value="restaurant">餐厅</option>
+                  <option value="tea_shop">茶铺</option>
+                  <option value="drinks_snacks">饮料和小吃</option>
+                  <option value="grocery">杂货店</option>
+                  <option value="transit_station">中转站</option>
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>搜索店铺位置（可选）</label>
-                <div style={{ position: 'relative', marginBottom: '8px' }}>
-                  <input
-                    type="text"
-                    value={placeSearchInput}
-                    onChange={(e) => setPlaceSearchInput(e.target.value)}
-                    placeholder="输入店铺名称或地址进行搜索..."
-                    style={inputStyle}
-                    onFocus={() => {
-                      if (placeSearchInput && placeSuggestions.length > 0) {
-                        setShowPlaceSuggestions(true);
-                      }
-                    }}
-                    onBlur={() => {
-                      // 延迟隐藏，以便点击建议项
-                      setTimeout(() => setShowPlaceSuggestions(false), 200);
-                    }}
-                  />
-                  {isLoadingPlaceDetails && (
-                    <div style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'rgba(255,255,255,0.7)',
-                      fontSize: '0.8rem'
-                    }}>
-                      加载中...
-                    </div>
-                  )}
-                  {showPlaceSuggestions && placeSuggestions.length > 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      borderRadius: '8px',
-                      marginTop: '4px',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      zIndex: 1000,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      border: '1px solid rgba(0,0,0,0.1)'
-                    }}>
-                      {placeSuggestions.map((suggestion, index) => (
-                        <div
-                          key={suggestion.place_id || index}
-                          onClick={() => {
-                            if (suggestion.place_id) {
-                              getPlaceDetails(suggestion.place_id);
-                            }
-                          }}
-                          style={{
-                            padding: '12px',
-                            cursor: 'pointer',
-                            borderBottom: index < placeSuggestions.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none',
-                            color: '#333',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(44, 82, 130, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                            {suggestion.structured_formatting?.main_text || suggestion.description}
-                          </div>
-                          {suggestion.structured_formatting?.secondary_text && (
-                            <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                              {suggestion.structured_formatting.secondary_text}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 <label style={labelStyle}>详细地址 *</label>
                 <input
                   type="text"
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  placeholder="详细地址（可通过上方搜索自动填充）"
+                  placeholder="详细地址"
                   style={inputStyle}
                   required
                 />
@@ -1006,29 +921,6 @@ const DeliveryStoreManagement: React.FC = () => {
                 />
               </div>
               <div>
-                <label style={labelStyle}>服务半径 (公里)</label>
-                <input
-                  type="number"
-                  name="service_area_radius"
-                  value={formData.service_area_radius}
-                  onChange={handleInputChange}
-                  min="1"
-                  max="50"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>日处理能力</label>
-                <input
-                  type="number"
-                  name="capacity"
-                  value={formData.capacity}
-                  onChange={handleInputChange}
-                  min="1"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
                 <label style={labelStyle}>纬度 *</label>
                 <input
                   type="number"
@@ -1059,7 +951,7 @@ const DeliveryStoreManagement: React.FC = () => {
             {/* 设施选择 */}
             <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>设施配置</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '20px' }}>
                 {facilityOptions.map(facility => (
                   <label key={facility.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input
@@ -1220,7 +1112,14 @@ const DeliveryStoreManagement: React.FC = () => {
                     <span>⏰ {store.operating_hours}</span>
                   </div>
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', opacity: 0.6 }}>
-                    <span>类型: {store.store_type === 'hub' ? '分拣中心' : store.store_type === 'branch' ? '配送点' : store.store_type === 'pickup_point' ? '自提点' : '中转站'}</span>
+                    <span>类型: {
+                      store.store_type === 'restaurant' ? '餐厅' : 
+                      store.store_type === 'tea_shop' ? '茶铺' : 
+                      store.store_type === 'drinks_snacks' ? '饮料和小吃' : 
+                      store.store_type === 'grocery' ? '杂货店' : 
+                      store.store_type === 'transit_station' ? '中转站' : 
+                      store.store_type
+                    }</span>
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
                   </div>
