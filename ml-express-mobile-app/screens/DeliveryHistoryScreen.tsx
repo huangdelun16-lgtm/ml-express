@@ -7,6 +7,7 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, Package } from '../services/supabase';
@@ -17,8 +18,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadHistory();
@@ -67,32 +67,8 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   };
 
   const filteredPackages = packages.filter(pkg => {
-    // 状态筛选
-    if (filter === 'completed' && pkg.status !== '已送达') return false;
-    if (filter === 'cancelled' && pkg.status !== '已取消') return false;
-    
-    // 日期筛选
-    if (dateFilter !== 'all') {
-      const dateStr = pkg.delivery_time || pkg.create_time;
-      if (!dateStr) return false;
-      
-      const date = new Date(dateStr);
-      const today = new Date();
-      
-      if (dateFilter === 'today') {
-        return date.getDate() === today.getDate() && 
-               date.getMonth() === today.getMonth() && 
-               date.getFullYear() === today.getFullYear();
-      }
-      
-      if (dateFilter === 'week') {
-        const weekAgo = new Date();
-        weekAgo.setDate(today.getDate() - 7);
-        return date >= weekAgo;
-      }
-    }
-    
-    return true;
+    if (!searchQuery.trim()) return true;
+    return pkg.id.toLowerCase().includes(searchQuery.toLowerCase().trim());
   });
 
   const renderPackageItem = ({ item }: { item: Package }) => (
@@ -195,32 +171,16 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* 筛选标签 */}
-      <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            {language === 'zh' ? '全部' : language === 'en' ? 'All' : 'အားလုံး'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'completed' && styles.filterButtonActive]}
-          onPress={() => setFilter('completed')}
-        >
-          <Text style={[styles.filterText, filter === 'completed' && styles.filterTextActive]}>
-            {language === 'zh' ? '已完成' : language === 'en' ? 'Completed' : 'ပြီးစီးပြီး'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'cancelled' && styles.filterButtonActive]}
-          onPress={() => setFilter('cancelled')}
-        >
-          <Text style={[styles.filterText, filter === 'cancelled' && styles.filterTextActive]}>
-            {language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး'}
-          </Text>
-        </TouchableOpacity>
+      {/* 搜索区域 */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder={language === 'zh' ? '🔍 搜索包裹单号...' : language === 'en' ? '🔍 Search Package ID...' : '🔍 ပက်ကေ့ဂျ်နံပါတ်ရှာပါ...'}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          clearButtonMode="while-editing"
+          placeholderTextColor="#999"
+        />
       </View>
 
       {/* 历史列表 */}
@@ -306,45 +266,19 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: '#e5e7eb',
   },
-  filterContainer: {
-    backgroundColor: '#fff',
+  searchContainer: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  filterLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 10,
-    width: 40,
-    fontWeight: '500',
-  },
-  filterOptions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  searchInput: {
     backgroundColor: '#f3f4f6',
-    marginRight: 8,
-  },
-  filterButtonActive: {
-    backgroundColor: '#2c5282',
-  },
-  filterButtonText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  filterButtonTextActive: {
-    color: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    color: '#333',
   },
   card: {
     backgroundColor: '#fff',
