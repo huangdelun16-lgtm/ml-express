@@ -596,9 +596,48 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={styles.infoLabel}>重量</Text>
             <Text style={styles.infoValue}>{currentPackage.weight}</Text>
           </View>
+          
+          {/* 费用信息区域 */}
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>价格</Text>
-            <Text style={styles.infoValue}>{currentPackage.price}</Text>
+            <Text style={styles.infoLabel}>跑腿费</Text>
+            <Text style={[styles.infoValue, { color: '#3b82f6', fontWeight: '600' }]}>
+              {(() => {
+                const deliveryFee = parseFloat(currentPackage.delivery_fee?.toString() || '0');
+                const priceValue = parseFloat(currentPackage.price?.toString() || '0');
+                // 如果 delivery_fee 为 0，使用 price 作为跑腿费
+                const value = deliveryFee > 0 ? deliveryFee : priceValue;
+                return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+              })()} MMK
+            </Text>
+          </View>
+
+          {/* 仅当有代收款时显示 */}
+          {parseFloat(currentPackage.store_fee?.toString() || '0') > 0 && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>代收款</Text>
+              <Text style={[styles.infoValue, { color: '#ef4444', fontWeight: '600' }]}>
+                {(() => {
+                  const value = parseFloat(currentPackage.store_fee?.toString() || '0');
+                  return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+                })()} MMK
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>总金额</Text>
+            <Text style={[styles.infoValue, { color: '#f59e0b', fontWeight: 'bold', fontSize: 16 }]}>
+              {(() => {
+                const storeFee = parseFloat(currentPackage.store_fee?.toString() || '0');
+                const deliveryFee = parseFloat(currentPackage.delivery_fee?.toString() || '0');
+                const priceValue = parseFloat(currentPackage.price?.toString() || '0');
+                const actualDeliveryFee = deliveryFee > 0 ? deliveryFee : priceValue;
+                const total = storeFee + actualDeliveryFee;
+                // 如果总金额计算结果 <= 0 且原price有值，回退显示原price（兼容旧数据）
+                const displayValue = total > 0 ? total : parseFloat(currentPackage.price?.toString() || '0');
+                return displayValue % 1 === 0 ? displayValue.toString() : displayValue.toFixed(2).replace(/\.?0+$/, '');
+              })()} MMK
+            </Text>
           </View>
           {currentPackage.description && (
             <View style={styles.infoRow}>
