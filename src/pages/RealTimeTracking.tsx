@@ -4,6 +4,7 @@ import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
 
 // Google Maps 配置
@@ -17,7 +18,8 @@ const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
-const [packages, setPackages] = useState<Package[]>([]);
+  const { language } = useLanguage();
+  const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
@@ -981,6 +983,25 @@ const [packages, setPackages] = useState<Package[]>([]);
                       }}>
                         {pkg.status === '待收款' ? '待取件' : pkg.status}
                       </span>
+                      
+                      {/* 代收款显示 - 只有合伙店铺下单且需要代收款时才显示 */}
+                      {pkg.delivery_store_id && parseFloat(pkg.store_fee?.toString() || '0') > 0 && (
+                        <span style={{
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                          border: '1px solid #fecaca',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '5px',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံရမည့်ပမာဏ'}: {(() => {
+                            const value = parseFloat(pkg.store_fee?.toString() || '0');
+                            return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+                          })()} MMK
+                        </span>
+                      )}
                     </div>
                   </div>
                   
