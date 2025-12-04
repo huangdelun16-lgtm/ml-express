@@ -3208,7 +3208,8 @@ const DeliveryStoreManagement: React.FC = () => {
                                     // 如果 delivery_fee 为 0，使用 price 作为跑腿费
                                     const actualDeliveryFee = deliveryFee > 0 ? deliveryFee : priceValue;
                                     const total = storeFee + actualDeliveryFee;
-                                    return total > 0 ? total.toFixed(2) : (pkg.price || '0');
+                                    const displayValue = total > 0 ? total : parseFloat(pkg.price || '0');
+                                    return displayValue % 1 === 0 ? displayValue.toString() : displayValue.toFixed(2).replace(/\.?0+$/, '');
                                   })()} MMK
                                 </div>
                               </div>
@@ -3259,7 +3260,10 @@ const DeliveryStoreManagement: React.FC = () => {
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis'
                                 }}>
-                                  {parseFloat(pkg.store_fee?.toString() || '0').toFixed(2)} MMK
+                                  {(() => {
+                                    const value = parseFloat(pkg.store_fee?.toString() || '0');
+                                    return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+                                  })()} MMK
                                 </div>
                               </div>
                               <div style={{
@@ -3298,7 +3302,8 @@ const DeliveryStoreManagement: React.FC = () => {
                                     const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
                                     const priceValue = parseFloat(pkg.price?.toString() || '0');
                                     // 如果 delivery_fee 为 0，使用 price 作为跑腿费
-                                    return (deliveryFee > 0 ? deliveryFee : priceValue).toFixed(2);
+                                    const value = deliveryFee > 0 ? deliveryFee : priceValue;
+                                    return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
                                   })()} MMK
                                 </div>
                               </div>
