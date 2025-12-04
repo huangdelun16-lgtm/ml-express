@@ -68,6 +68,9 @@ class ErrorBoundary extends React.Component<
 
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('ml-express-language') || 'zh';
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -3141,41 +3144,50 @@ const DeliveryStoreManagement: React.FC = () => {
                         {/* 代收款金额 - 突出显示 */}
                         <div style={{
                           marginTop: '0.75rem',
-                          padding: '0.75rem',
+                          padding: '0.85rem 1rem',
                           background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%)',
                           borderRadius: '8px',
-                          border: '2px solid rgba(251, 191, 36, 0.5)'
+                          border: '2px solid rgba(251, 191, 36, 0.5)',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                         }}>
                           <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '1rem'
+                            alignItems: 'stretch',
+                            gap: '1.25rem'
                           }}>
                             {/* 左侧：总金额 */}
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '0.4rem',
-                              flex: '0 0 auto'
+                              gap: '0.5rem',
+                              flex: '0 0 auto',
+                              minWidth: '100px',
+                              paddingRight: '1rem',
+                              borderRight: '1px solid rgba(251, 191, 36, 0.3)'
                             }}>
                               <span style={{
-                                fontSize: '1.2rem',
-                                fontWeight: 'bold'
+                                fontSize: '1.3rem',
+                                fontWeight: 'bold',
+                                lineHeight: '1'
                               }}>💰</span>
-                              <div>
+                              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{
                                   fontSize: '0.7rem',
-                                  color: 'rgba(255, 255, 255, 0.8)',
-                                  marginBottom: '0.15rem'
+                                  color: 'rgba(255, 255, 255, 0.85)',
+                                  marginBottom: '0.2rem',
+                                  fontWeight: '500',
+                                  lineHeight: '1.2'
                                 }}>
-                                  总金额
+                                  {language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '1.2rem',
+                                  fontSize: '1.15rem',
                                   fontWeight: 'bold',
                                   color: '#fbbf24',
-                                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                                  lineHeight: '1.2',
+                                  letterSpacing: '0.3px'
                                 }}>
                                   {(() => {
                                     const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
@@ -3196,29 +3208,34 @@ const DeliveryStoreManagement: React.FC = () => {
                               flex: '1',
                               gap: '1.5rem',
                               justifyContent: 'space-between',
-                              alignItems: 'center',
+                              alignItems: 'stretch',
                               padding: '0 1rem',
-                              borderLeft: '1px solid rgba(251, 191, 36, 0.3)',
                               borderRight: '1px solid rgba(251, 191, 36, 0.3)',
-                              minWidth: '300px'
+                              minWidth: '320px'
                             }}>
                               <div style={{
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '0.3rem',
+                                justifyContent: 'center',
+                                gap: '0.35rem',
                                 flex: '1',
-                                minWidth: '120px'
+                                minWidth: '130px'
                               }}>
                                 <div style={{
-                                  fontSize: '0.65rem',
-                                  color: 'rgba(255, 255, 255, 0.7)'
+                                  fontSize: '0.7rem',
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontWeight: '500',
+                                  lineHeight: '1.2',
+                                  marginBottom: '0.1rem'
                                 }}>
-                                  待付款
+                                  {language === 'zh' ? '代收款' : language === 'en' ? 'COD Amount' : 'ငွေကောက်ခံရမည့်ပမာဏ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '0.85rem',
+                                  fontSize: '0.9rem',
                                   color: '#fbbf24',
-                                  fontWeight: '600'
+                                  fontWeight: '700',
+                                  lineHeight: '1.3',
+                                  letterSpacing: '0.2px'
                                 }}>
                                   {parseFloat(pkg.store_fee?.toString() || '0').toFixed(2)} MMK
                                 </div>
@@ -3226,54 +3243,72 @@ const DeliveryStoreManagement: React.FC = () => {
                               <div style={{
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '0.3rem',
+                                justifyContent: 'center',
+                                gap: '0.35rem',
                                 flex: '1',
-                                minWidth: '120px'
+                                minWidth: '130px'
                               }}>
                                 <div style={{
-                                  fontSize: '0.65rem',
-                                  color: 'rgba(255, 255, 255, 0.7)'
+                                  fontSize: '0.7rem',
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontWeight: '500',
+                                  lineHeight: '1.2',
+                                  marginBottom: '0.1rem'
                                 }}>
-                                  跑腿费
+                                  {language === 'zh' ? '跑腿费' : language === 'en' ? 'Delivery Fee' : 'ပို့ဆောင်ခ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '0.85rem',
+                                  fontSize: '0.9rem',
                                   color: '#3b82f6',
-                                  fontWeight: '600'
+                                  fontWeight: '700',
+                                  lineHeight: '1.3',
+                                  letterSpacing: '0.2px'
                                 }}>
                                   {(() => {
                                     const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
                                     const priceValue = parseFloat(pkg.price?.toString() || '0');
                                     // 如果 delivery_fee 为 0，使用 price 作为跑腿费
                                     return (deliveryFee > 0 ? deliveryFee : priceValue).toFixed(2);
-                                  })()} MMK
+                                  })} MMK
                                 </div>
                               </div>
                             </div>
                             
                             {/* 右侧：支付方式 */}
                             <div style={{
-                              textAlign: 'right',
-                              flex: '0 0 auto'
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'flex-end',
+                              flex: '0 0 auto',
+                              minWidth: '100px',
+                              paddingLeft: '1rem'
                             }}>
                               <div style={{
                                 fontSize: '0.7rem',
-                                color: 'rgba(255, 255, 255, 0.8)',
-                                marginBottom: '0.15rem'
+                                color: 'rgba(255, 255, 255, 0.85)',
+                                marginBottom: '0.2rem',
+                                fontWeight: '500',
+                                lineHeight: '1.2'
                               }}>
-                                支付方式
+                                {language === 'zh' ? '支付方式' : language === 'en' ? 'Payment Method' : 'ငွေပေးချေမှုနည်းလမ်း'}
                               </div>
                               <div style={{
                                 fontSize: '0.75rem',
                                 fontWeight: '600',
                                 color: pkg.payment_method === 'qr' ? '#3b82f6' : '#10b981',
-                                padding: '0.2rem 0.6rem',
+                                padding: '0.25rem 0.7rem',
                                 background: pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                                 borderRadius: '6px',
                                 border: `1px solid ${pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                lineHeight: '1.3'
                               }}>
-                                {pkg.payment_method === 'qr' ? '📱 二维码支付' : pkg.payment_method === 'cash' ? '💵 现金支付' : '未设置'}
+                                {pkg.payment_method === 'qr' 
+                                  ? (language === 'zh' ? '📱 二维码支付' : language === 'en' ? '📱 QR Payment' : '📱 QR Code ငွေပေးချေမှု')
+                                  : pkg.payment_method === 'cash' 
+                                  ? (language === 'zh' ? '💵 现金支付' : language === 'en' ? '💵 Cash Payment' : '💵 ငွေသားငွေပေးချေမှု')
+                                  : (language === 'zh' ? '未设置' : language === 'en' ? 'Not Set' : 'မသတ်မှတ်ထားပါ')}
                               </div>
                             </div>
                           </div>
