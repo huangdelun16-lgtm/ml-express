@@ -3194,24 +3194,26 @@ const DeliveryStoreManagement: React.FC = () => {
                             <div style={{
                               display: 'flex',
                               flex: '1',
-                              gap: '1rem',
+                              gap: '1.5rem',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              padding: '0 0.75rem',
+                              padding: '0 1rem',
                               borderLeft: '1px solid rgba(251, 191, 36, 0.3)',
-                              borderRight: '1px solid rgba(251, 191, 36, 0.3)'
+                              borderRight: '1px solid rgba(251, 191, 36, 0.3)',
+                              minWidth: '300px'
                             }}>
                               <div style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '0.3rem',
-                                flex: '1'
+                                flex: '1',
+                                minWidth: '120px'
                               }}>
                                 <div style={{
                                   fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.7)'
                                 }}>
-                                  待付款（店铺填写）
+                                  待付款
                                 </div>
                                 <div style={{
                                   fontSize: '0.85rem',
@@ -3225,13 +3227,14 @@ const DeliveryStoreManagement: React.FC = () => {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '0.3rem',
-                                flex: '1'
+                                flex: '1',
+                                minWidth: '120px'
                               }}>
                                 <div style={{
                                   fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.7)'
                                 }}>
-                                  跑腿费（系统自动生成）
+                                  跑腿费
                                 </div>
                                 <div style={{
                                   fontSize: '0.85rem',
