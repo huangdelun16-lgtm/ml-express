@@ -3148,13 +3148,16 @@ const DeliveryStoreManagement: React.FC = () => {
                           background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%)',
                           borderRadius: '8px',
                           border: '2px solid rgba(251, 191, 36, 0.5)',
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                          overflow: 'hidden'
                         }}>
                           <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'stretch',
-                            gap: '1.25rem'
+                            gap: '1rem',
+                            width: '100%',
+                            boxSizing: 'border-box'
                           }}>
                             {/* 左侧：总金额 */}
                             <div style={{
@@ -3162,32 +3165,41 @@ const DeliveryStoreManagement: React.FC = () => {
                               alignItems: 'center',
                               gap: '0.5rem',
                               flex: '0 0 auto',
-                              minWidth: '100px',
-                              paddingRight: '1rem',
-                              borderRight: '1px solid rgba(251, 191, 36, 0.3)'
+                              minWidth: '90px',
+                              maxWidth: '120px',
+                              paddingRight: '0.75rem',
+                              borderRight: '1px solid rgba(251, 191, 36, 0.3)',
+                              boxSizing: 'border-box'
                             }}>
                               <span style={{
-                                fontSize: '1.3rem',
+                                fontSize: '1.2rem',
                                 fontWeight: 'bold',
-                                lineHeight: '1'
+                                lineHeight: '1',
+                                flexShrink: 0
                               }}>💰</span>
-                              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
                                 <div style={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.85)',
-                                  marginBottom: '0.2rem',
+                                  marginBottom: '0.15rem',
                                   fontWeight: '500',
-                                  lineHeight: '1.2'
+                                  lineHeight: '1.2',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '1.15rem',
+                                  fontSize: '1rem',
                                   fontWeight: 'bold',
                                   color: '#fbbf24',
                                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
                                   lineHeight: '1.2',
-                                  letterSpacing: '0.3px'
+                                  letterSpacing: '0.2px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {(() => {
                                     const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
@@ -3206,36 +3218,46 @@ const DeliveryStoreManagement: React.FC = () => {
                             <div style={{
                               display: 'flex',
                               flex: '1',
-                              gap: '1.5rem',
+                              gap: '1rem',
                               justifyContent: 'space-between',
                               alignItems: 'stretch',
-                              padding: '0 1rem',
+                              padding: '0 0.75rem',
                               borderRight: '1px solid rgba(251, 191, 36, 0.3)',
-                              minWidth: '320px'
+                              minWidth: '280px',
+                              maxWidth: '400px',
+                              boxSizing: 'border-box'
                             }}>
                               <div style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center',
-                                gap: '0.35rem',
+                                gap: '0.3rem',
                                 flex: '1',
-                                minWidth: '130px'
+                                minWidth: '110px',
+                                maxWidth: '150px',
+                                boxSizing: 'border-box'
                               }}>
                                 <div style={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.8)',
                                   fontWeight: '500',
                                   lineHeight: '1.2',
-                                  marginBottom: '0.1rem'
+                                  marginBottom: '0.1rem',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {language === 'zh' ? '代收款' : language === 'en' ? 'COD Amount' : 'ငွေကောက်ခံရမည့်ပမာဏ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '0.9rem',
+                                  fontSize: '0.85rem',
                                   color: '#fbbf24',
                                   fontWeight: '700',
                                   lineHeight: '1.3',
-                                  letterSpacing: '0.2px'
+                                  letterSpacing: '0.2px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {parseFloat(pkg.store_fee?.toString() || '0').toFixed(2)} MMK
                                 </div>
@@ -3244,25 +3266,33 @@ const DeliveryStoreManagement: React.FC = () => {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'center',
-                                gap: '0.35rem',
+                                gap: '0.3rem',
                                 flex: '1',
-                                minWidth: '130px'
+                                minWidth: '110px',
+                                maxWidth: '150px',
+                                boxSizing: 'border-box'
                               }}>
                                 <div style={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.8)',
                                   fontWeight: '500',
                                   lineHeight: '1.2',
-                                  marginBottom: '0.1rem'
+                                  marginBottom: '0.1rem',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {language === 'zh' ? '跑腿费' : language === 'en' ? 'Delivery Fee' : 'ပို့ဆောင်ခ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '0.9rem',
+                                  fontSize: '0.85rem',
                                   color: '#3b82f6',
                                   fontWeight: '700',
                                   lineHeight: '1.3',
-                                  letterSpacing: '0.2px'
+                                  letterSpacing: '0.2px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
                                 }}>
                                   {(() => {
                                     const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
@@ -3279,30 +3309,41 @@ const DeliveryStoreManagement: React.FC = () => {
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'center',
-                              alignItems: 'flex-end',
+                              alignItems: 'flex-start',
                               flex: '0 0 auto',
-                              minWidth: '100px',
-                              paddingLeft: '1rem'
+                              minWidth: '90px',
+                              maxWidth: '140px',
+                              paddingLeft: '0.75rem',
+                              boxSizing: 'border-box',
+                              overflow: 'hidden'
                             }}>
                               <div style={{
-                                fontSize: '0.7rem',
+                                fontSize: '0.65rem',
                                 color: 'rgba(255, 255, 255, 0.85)',
                                 marginBottom: '0.2rem',
                                 fontWeight: '500',
-                                lineHeight: '1.2'
+                                lineHeight: '1.2',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                width: '100%'
                               }}>
                                 {language === 'zh' ? '支付方式' : language === 'en' ? 'Payment Method' : 'ငွေပေးချေမှုနည်းလမ်း'}
                               </div>
                               <div style={{
-                                fontSize: '0.75rem',
+                                fontSize: '0.7rem',
                                 fontWeight: '600',
                                 color: pkg.payment_method === 'qr' ? '#3b82f6' : '#10b981',
-                                padding: '0.25rem 0.7rem',
+                                padding: '0.2rem 0.5rem',
                                 background: pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                                 borderRadius: '6px',
                                 border: `1px solid ${pkg.payment_method === 'qr' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
                                 whiteSpace: 'nowrap',
-                                lineHeight: '1.3'
+                                lineHeight: '1.3',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '100%',
+                                boxSizing: 'border-box'
                               }}>
                                 {pkg.payment_method === 'qr' 
                                   ? (language === 'zh' ? '📱 二维码支付' : language === 'en' ? '📱 QR Payment' : '📱 QR Code ငွေပေးချေမှု')
