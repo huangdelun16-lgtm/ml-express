@@ -37,6 +37,9 @@ interface Package {
   created_at: string;
   pickup_time?: string;
   delivery_time?: string;
+  delivery_store_id?: string;
+  store_fee?: number | string;
+  payment_method?: string;
 }
 
 const MyTasksScreen: React.FC = () => {
@@ -958,6 +961,26 @@ const MyTasksScreen: React.FC = () => {
                             </Text>
                           </View>
                         )}
+                        
+                        {/* 代收款标识 - 仅合伙店铺下单且需要代收款时显示 */}
+                        {item.delivery_store_id && parseFloat(item.store_fee?.toString() || '0') > 0 && (
+                          <View style={[
+                            styles.paymentBadge, 
+                            { 
+                              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(239, 68, 68, 0.3)'
+                            }
+                          ]}>
+                            <Text style={[styles.paymentBadgeText, { color: '#ef4444' }]}>
+                              {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံ'}: {(() => {
+                                const value = parseFloat(item.store_fee?.toString() || '0');
+                                return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+                              })()}
+                            </Text>
+                          </View>
+                        )}
+                        
                         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                           <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
                         </View>

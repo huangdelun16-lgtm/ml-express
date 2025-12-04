@@ -72,6 +72,9 @@ export interface Package {
   scheduled_delivery_time?: string; // 定时配送时间
   // 新增支付方式字段
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  // 费用明细字段
+  store_fee?: string | number; // 待付款（店铺填写）
+  delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
 }
 
 export interface AdminAccount {
