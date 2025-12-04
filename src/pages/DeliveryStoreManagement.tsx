@@ -3155,9 +3155,10 @@ const DeliveryStoreManagement: React.FC = () => {
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'stretch',
-                            gap: '1rem',
+                            gap: '0.75rem',
                             width: '100%',
-                            boxSizing: 'border-box'
+                            boxSizing: 'border-box',
+                            overflow: 'visible'
                           }}>
                             {/* 左侧：总金额 */}
                             <div style={{
@@ -3165,8 +3166,7 @@ const DeliveryStoreManagement: React.FC = () => {
                               alignItems: 'center',
                               gap: '0.5rem',
                               flex: '0 0 auto',
-                              minWidth: '90px',
-                              maxWidth: '120px',
+                              minWidth: '110px',
                               paddingRight: '0.75rem',
                               borderRight: '1px solid rgba(251, 191, 36, 0.3)',
                               boxSizing: 'border-box'
@@ -3177,29 +3177,26 @@ const DeliveryStoreManagement: React.FC = () => {
                                 lineHeight: '1',
                                 flexShrink: 0
                               }}>💰</span>
-                              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0 }}>
                                 <div style={{
                                   fontSize: '0.65rem',
                                   color: 'rgba(255, 255, 255, 0.85)',
                                   marginBottom: '0.15rem',
                                   fontWeight: '500',
                                   lineHeight: '1.2',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
+                                  whiteSpace: 'nowrap'
                                 }}>
                                   {language === 'zh' ? '总金额' : language === 'en' ? 'Total Amount' : 'စုစုပေါင်းငွေ'}
                                 </div>
                                 <div style={{
-                                  fontSize: '1rem',
+                                  fontSize: '0.95rem',
                                   fontWeight: 'bold',
                                   color: '#fbbf24',
                                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
                                   lineHeight: '1.2',
-                                  letterSpacing: '0.2px',
+                                  letterSpacing: '0.1px',
                                   whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
+                                  wordBreak: 'keep-all'
                                 }}>
                                   {(() => {
                                     const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
