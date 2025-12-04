@@ -3090,7 +3090,8 @@ const DeliveryStoreManagement: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.5rem',
-                          marginBottom: '0.5rem'
+                          marginBottom: '0.5rem',
+                          flexWrap: 'wrap'
                         }}>
                           <h3 style={{
                             margin: 0,
@@ -3116,6 +3117,24 @@ const DeliveryStoreManagement: React.FC = () => {
                           }}>
                             {pkg.status}
                           </span>
+                          {/* 代收款显示 - 只有合伙店铺下单且需要代收款时才显示 */}
+                          {pkg.delivery_store_id && parseFloat(pkg.store_fee?.toString() || '0') > 0 && (
+                            <span style={{
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              background: 'rgba(239, 68, 68, 0.3)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.5)',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံရမည့်ပမာဏ'}: {(() => {
+                                const value = parseFloat(pkg.store_fee?.toString() || '0');
+                                return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+                              })()} MMK
+                            </span>
+                          )}
                         </div>
                         <div style={{
                           display: 'grid',
