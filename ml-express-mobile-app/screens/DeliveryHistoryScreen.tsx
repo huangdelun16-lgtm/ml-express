@@ -18,6 +18,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week'>('all');
 
   useEffect(() => {
     loadHistory();
@@ -66,8 +67,31 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   };
 
   const filteredPackages = packages.filter(pkg => {
-    if (filter === 'completed') return pkg.status === '已送达';
-    if (filter === 'cancelled') return pkg.status === '已取消';
+    // 状态筛选
+    if (filter === 'completed' && pkg.status !== '已送达') return false;
+    if (filter === 'cancelled' && pkg.status !== '已取消') return false;
+    
+    // 日期筛选
+    if (dateFilter !== 'all') {
+      const dateStr = pkg.delivery_time || pkg.create_time;
+      if (!dateStr) return false;
+      
+      const date = new Date(dateStr);
+      const today = new Date();
+      
+      if (dateFilter === 'today') {
+        return date.getDate() === today.getDate() && 
+               date.getMonth() === today.getMonth() && 
+               date.getFullYear() === today.getFullYear();
+      }
+      
+      if (dateFilter === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(today.getDate() - 7);
+        return date >= weekAgo;
+      }
+    }
+    
     return true;
   });
 
@@ -283,29 +307,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
   filterContainer: {
-    flexDirection: 'row',
+    backgroundColor: '#fff',
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 10,
+    width: 40,
+    fontWeight: '500',
+  },
+  filterOptions: {
+    flexDirection: 'row',
     gap: 10,
   },
   filterButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
   },
   filterButtonActive: {
     backgroundColor: '#2c5282',
-    borderColor: '#2c5282',
   },
-  filterText: {
-    fontSize: 14,
+  filterButtonText: {
+    fontSize: 13,
     color: '#666',
     fontWeight: '500',
   },
-  filterTextActive: {
+  filterButtonTextActive: {
     color: '#fff',
   },
   card: {
