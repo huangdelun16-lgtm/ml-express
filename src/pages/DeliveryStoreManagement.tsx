@@ -3269,7 +3269,7 @@ const DeliveryStoreManagement: React.FC = () => {
                                     const priceValue = parseFloat(pkg.price?.toString() || '0');
                                     // 如果 delivery_fee 为 0，使用 price 作为跑腿费
                                     return (deliveryFee > 0 ? deliveryFee : priceValue).toFixed(2);
-                                  })} MMK
+                                  })()} MMK
                                 </div>
                               </div>
                             </div>
