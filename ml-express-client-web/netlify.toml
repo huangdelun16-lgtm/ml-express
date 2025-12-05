@@ -5,7 +5,7 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "18"
   NPM_FLAGS = "--legacy-peer-deps"
 
 # SPA重定向配置 - 解决React Router路由问题
