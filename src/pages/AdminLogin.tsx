@@ -159,33 +159,35 @@ const AdminLogin: React.FC = () => {
       }}></div>
       
       <div style={{
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '20px',
+        background: 'rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(25px)',
+        borderRadius: '24px',
         padding: '40px',
         width: '100%',
-        maxWidth: '400px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
+        maxWidth: '420px',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         position: 'relative',
         zIndex: 1
       }}>
         {/* LOGO */}
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <Logo size="large" />
         </div>
         
         <h2 style={{ 
           color: 'white', 
           textAlign: 'center', 
-          marginBottom: '30px',
-          fontSize: '2rem',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+          marginBottom: '40px',
+          fontSize: '1.8rem',
+          fontWeight: '600',
+          letterSpacing: '1px',
+          textShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }}>
-          管理后台登录
+          后台管理系统
         </h2>
         <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '24px' }}>
             <input
               type="text"
               placeholder="用户名"
@@ -193,19 +195,30 @@ const AdminLogin: React.FC = () => {
               onChange={(e) => setUsername(e.target.value)}
               style={{
                 width: '100%',
-                padding: '15px',
-                borderRadius: '10px',
+                padding: '16px',
+                borderRadius: '12px',
                 border: '2px solid rgba(255, 255, 255, 0.3)',
                 fontSize: '1rem',
-                background: 'rgba(255, 255, 255, 0.9)',
-                transition: 'border-color 0.3s ease'
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                color: '#1a202c',
+                outline: 'none'
               }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#4299e1';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
               required
             />
           </div>
-          <div style={{ marginBottom: '30px' }}>
+          <div style={{ marginBottom: '32px' }}>
             <input
               type="password"
               placeholder="密码"
@@ -213,15 +226,26 @@ const AdminLogin: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: '100%',
-                padding: '15px',
-                borderRadius: '10px',
+                padding: '16px',
+                borderRadius: '12px',
                 border: '2px solid rgba(255, 255, 255, 0.3)',
                 fontSize: '1rem',
-                background: 'rgba(255, 255, 255, 0.9)',
-                transition: 'border-color 0.3s ease'
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                color: '#1a202c',
+                outline: 'none'
               }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#2c5282'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#4299e1';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
               required
             />
           </div>
@@ -230,63 +254,38 @@ const AdminLogin: React.FC = () => {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '15px',
-              borderRadius: '10px',
+              padding: '16px',
+              borderRadius: '12px',
               border: 'none',
               fontSize: '1.1rem',
-              fontWeight: 'bold',
-              background: loading ? 'rgba(192, 192, 192, 0.5)' : 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
-              color: '#2C3E50',
+              fontWeight: '600',
+              letterSpacing: '1px',
+              background: loading ? 'rgba(192, 192, 192, 0.5)' : 'linear-gradient(135deg, #63b3ed 0%, #4299e1 100%)',
+              color: 'white',
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s ease',
-              boxShadow: '0 4px 15px rgba(192, 192, 192, 0.3)',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
+              boxShadow: '0 10px 20px -5px rgba(66, 153, 225, 0.4)',
+              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
               opacity: loading ? 0.7 : 1
             }}
             onMouseOver={(e) => {
               if (!loading) {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
+                e.currentTarget.style.boxShadow = '0 15px 25px -5px rgba(66, 153, 225, 0.5)';
+                e.currentTarget.style.filter = 'brightness(1.1)';
               }
             }}
             onMouseOut={(e) => {
               if (!loading) {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
+                e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(66, 153, 225, 0.4)';
+                e.currentTarget.style.filter = 'brightness(1)';
               }
             }}
           >
             {loading ? '登录中...' : '登录'}
           </button>
         </form>
-        
-        {/* 退出按钮 */}
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button
-            onClick={() => window.location.href = '/'}
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              backdropFilter: 'blur(10px)',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            ← 返回首页
-          </button>
-        </div>
       </div>
     </div>
   );
