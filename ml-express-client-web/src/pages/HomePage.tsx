@@ -6307,31 +6307,44 @@ const HomePage: React.FC = () => {
 
       {/* 用户注册/登录模态窗口 */}
       {showRegisterModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 3000,
-          animation: 'fadeIn 0.3s ease-out'
-        }}>
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(135deg, rgba(44, 82, 130, 0.6) 0%, rgba(49, 130, 206, 0.5) 100%)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 3000,
+            animation: 'fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            padding: '1rem'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRegisterModal(false);
+              setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+              setCodeSent(false);
+              setCountdown(0);
+            }
+          }}
+        >
           <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: window.innerWidth < 768 ? '2rem' : '3rem',
+            background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)',
+            padding: window.innerWidth < 768 ? '2rem 1.5rem' : '3rem 2.5rem',
             borderRadius: '24px',
-            width: window.innerWidth < 768 ? '90%' : '480px',
+            width: window.innerWidth < 768 ? '100%' : '520px',
+            maxWidth: '90vw',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 32px 64px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.8) inset, 0 0 60px rgba(49, 130, 206, 0.15)',
+            border: '1px solid rgba(255, 255, 255, 0.9)',
             position: 'relative',
-            animation: 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            animation: 'scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1)'
           }}>
             {/* 关闭按钮 */}
             <button
@@ -6343,57 +6356,92 @@ const HomePage: React.FC = () => {
               }}
               style={{
                 position: 'absolute',
-                top: '1.5rem',
-                right: '1.5rem',
-                background: 'rgba(0, 0, 0, 0.05)',
-                border: 'none',
-                width: '32px',
-                height: '32px',
+                top: '1.25rem',
+                right: '1.25rem',
+                background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.08) 100%)',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                width: '40px',
+                height: '40px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: '#666',
+                color: '#64748b',
                 fontSize: '1.2rem',
-                transition: 'all 0.2s ease'
+                fontWeight: '600',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'rotate(90deg)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.15) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
-                e.currentTarget.style.transform = 'rotate(0deg)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.08) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                e.currentTarget.style.color = '#64748b';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
               }}
             >
               ✕
             </button>
 
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '2.5rem',
+              paddingTop: '0.5rem'
+            }}>
               <div style={{ 
-                fontSize: '3.5rem', 
-                marginBottom: '1rem',
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
-              }}>
+                fontSize: '5rem', 
+                marginBottom: '1.25rem',
+                filter: 'drop-shadow(0 8px 24px rgba(49, 130, 206, 0.3))',
+                transform: 'translateY(0)',
+                transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                display: 'inline-block',
+                lineHeight: 1
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px) scale(1.15) rotate(5deg)';
+                e.currentTarget.style.filter = 'drop-shadow(0 12px 32px rgba(49, 130, 206, 0.4))';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1) rotate(0deg)';
+                e.currentTarget.style.filter = 'drop-shadow(0 8px 24px rgba(49, 130, 206, 0.3))';
+              }}
+              >
                 {isLoginMode ? '🔐' : '✨'}
               </div>
               <h2 style={{ 
                 color: '#1a202c', 
                 margin: 0, 
-                fontSize: '2rem', 
-                fontWeight: '800',
-                letterSpacing: '-0.5px',
-                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                fontSize: window.innerWidth < 768 ? '1.8rem' : '2.4rem', 
+                fontWeight: '900',
+                letterSpacing: '-0.8px',
+                background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)',
                 WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                marginBottom: '0.75rem',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
               }}>
                 {isLoginMode ? 
                   (language === 'zh' ? '欢迎回来' : language === 'en' ? 'Welcome Back' : 'ကြိုဆိုပါတယ်') :
                   (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်သစ်ဖွင့်ရန်')
                 }
               </h2>
-              <p style={{ color: '#718096', marginTop: '0.8rem', fontSize: '1rem' }}>
+              <p style={{ 
+                color: '#64748b', 
+                marginTop: '0', 
+                fontSize: '1rem', 
+                lineHeight: '1.7',
+                fontWeight: '400',
+                letterSpacing: '0.2px'
+              }}>
                 {isLoginMode ?
                   (language === 'zh' ? '登录以继续使用服务' : 
                    language === 'en' ? 'Login to continue using services' : 
@@ -6410,11 +6458,12 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: '#4a5568', 
+                    color: '#475569', 
                     display: 'block', 
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.6rem',
                     fontWeight: '600',
-                    fontSize: '0.9rem'
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '姓名' : language === 'en' ? 'Name' : 'နာမည်'}
                   </label>
@@ -6426,24 +6475,28 @@ const HomePage: React.FC = () => {
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '0.8rem 1rem',
+                      padding: '0.875rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
+                      borderRadius: '14px',
                       fontSize: '1rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
                       outline: 'none',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      fontFamily: 'inherit'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                 </div>
@@ -6453,11 +6506,12 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: '#4a5568', 
+                    color: '#475569', 
                     display: 'block', 
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.6rem',
                     fontWeight: '600',
-                    fontSize: '0.9rem'
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '电话号码' : language === 'en' ? 'Phone Number' : 'ဖုန်းနံပါတ်'}
                   </label>
@@ -6469,24 +6523,28 @@ const HomePage: React.FC = () => {
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '0.8rem 1rem',
+                      padding: '0.875rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
+                      borderRadius: '14px',
                       fontSize: '1rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
                       outline: 'none',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      fontFamily: 'inherit'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                 </div>
@@ -6495,11 +6553,12 @@ const HomePage: React.FC = () => {
               {/* 3. 密码 */}
               <div style={{ marginBottom: '1.2rem' }}>
                 <label style={{ 
-                  color: '#4a5568', 
+                  color: '#475569', 
                   display: 'block', 
-                  marginBottom: '0.5rem',
+                  marginBottom: '0.6rem',
                   fontWeight: '600',
-                  fontSize: '0.9rem'
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.3px'
                 }}>
                   {language === 'zh' ? '密码' : language === 'en' ? 'Password' : 'စကားဝှက်'}
                 </label>
@@ -6512,24 +6571,28 @@ const HomePage: React.FC = () => {
                   minLength={6}
                   style={{
                     width: '100%',
-                    padding: '0.8rem 1rem',
+                    padding: '0.875rem 1.125rem',
                     border: '2px solid #e2e8f0',
-                    borderRadius: '12px',
+                    borderRadius: '14px',
                     fontSize: '1rem',
-                    background: '#f7fafc',
-                    color: '#2d3748',
+                    background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                    color: '#1e293b',
                     outline: 'none',
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                    fontFamily: 'inherit'
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#3182ce';
-                    e.currentTarget.style.background = '#fff';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.background = '#f7fafc';
-                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 />
               </div>
@@ -6538,11 +6601,12 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: '#4a5568', 
+                    color: '#475569', 
                     display: 'block', 
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.6rem',
                     fontWeight: '600',
-                    fontSize: '0.9rem'
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '确认密码' : language === 'en' ? 'Confirm Password' : 'စကားဝှက်အတည်ပြုပါ'}
                   </label>
@@ -6555,24 +6619,28 @@ const HomePage: React.FC = () => {
                     minLength={6}
                     style={{
                       width: '100%',
-                      padding: '0.8rem 1rem',
+                      padding: '0.875rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
+                      borderRadius: '14px',
                       fontSize: '1rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
                       outline: 'none',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      fontFamily: 'inherit'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                 </div>
@@ -6581,15 +6649,16 @@ const HomePage: React.FC = () => {
               {/* 5. 电子邮箱 */}
               <div style={{ marginBottom: '1.2rem' }}>
                 <label style={{ 
-                  color: '#4a5568', 
+                  color: '#475569', 
                   display: 'block', 
-                  marginBottom: '0.5rem',
+                  marginBottom: '0.6rem',
                   fontWeight: '600',
-                  fontSize: '0.9rem'
+                  fontSize: '0.875rem',
+                  letterSpacing: '0.3px'
                 }}>
                   {language === 'zh' ? '电子邮箱' : language === 'en' ? 'Email' : 'အီးမေးလ်'}
                 </label>
-                <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <input
                     type="email"
                     value={registerForm.email}
@@ -6598,24 +6667,28 @@ const HomePage: React.FC = () => {
                     required
                     style={{
                       flex: isLoginMode ? '1' : '1.2',
-                      padding: '0.8rem 1rem',
+                      padding: '0.875rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
+                      borderRadius: '14px',
                       fontSize: '1rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
                       outline: 'none',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      fontFamily: 'inherit'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                   
@@ -6627,22 +6700,36 @@ const HomePage: React.FC = () => {
                       disabled={countdown > 0}
                       style={{
                         flex: '0.8',
-                        padding: '0.8rem',
-                        background: countdown > 0 ? '#edf2f7' : '#ebf8ff',
-                        color: countdown > 0 ? '#a0aec0' : '#3182ce',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontSize: '0.9rem',
-                        fontWeight: '600',
+                        padding: '0.875rem 1rem',
+                        background: countdown > 0 
+                          ? 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)' 
+                          : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                        color: countdown > 0 ? '#94a3b8' : '#2563eb',
+                        border: countdown > 0 ? '2px solid #e2e8f0' : '2px solid #93c5fd',
+                        borderRadius: '14px',
+                        fontSize: '0.875rem',
+                        fontWeight: '700',
                         cursor: countdown > 0 ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.3s ease',
-                        whiteSpace: 'nowrap'
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        whiteSpace: 'nowrap',
+                        boxShadow: countdown > 0 ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.2)',
+                        transform: 'translateY(0)'
                       }}
                       onMouseEnter={(e) => {
-                        if (countdown === 0) e.currentTarget.style.background = '#bee3f8';
+                        if (countdown === 0) {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%)';
+                          e.currentTarget.style.borderColor = '#60a5fa';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        if (countdown === 0) e.currentTarget.style.background = '#ebf8ff';
+                        if (countdown === 0) {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
+                          e.currentTarget.style.borderColor = '#93c5fd';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.2)';
+                        }
                       }}
                     >
                       {countdown > 0 ? 
@@ -6658,11 +6745,12 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: '#4a5568', 
+                    color: '#475569', 
                     display: 'block', 
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.6rem',
                     fontWeight: '600',
-                    fontSize: '0.9rem'
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '验证码' : language === 'en' ? 'Code' : 'အတည်ပြုကုဒ်'}
                   </label>
@@ -6675,27 +6763,31 @@ const HomePage: React.FC = () => {
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '0.8rem 1rem',
+                      padding: '1rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      fontSize: '1.2rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
-                      fontWeight: '600',
+                      borderRadius: '14px',
+                      fontSize: '1.5rem',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
+                      fontWeight: '700',
                       outline: 'none',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       letterSpacing: '0.5em',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      fontFamily: 'monospace'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                 </div>
@@ -6705,11 +6797,12 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '2rem' }}>
                   <label style={{ 
-                    color: '#4a5568', 
+                    color: '#475569', 
                     display: 'block', 
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.6rem',
                     fontWeight: '600',
-                    fontSize: '0.9rem'
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '地址（可选）' : language === 'en' ? 'Address' : 'လိပ်စာ'}
                   </label>
@@ -6720,26 +6813,30 @@ const HomePage: React.FC = () => {
                     rows={2}
                     style={{
                       width: '100%',
-                      padding: '0.8rem 1rem',
+                      padding: '0.875rem 1.125rem',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
+                      borderRadius: '14px',
                       fontSize: '1rem',
-                      background: '#f7fafc',
-                      color: '#2d3748',
+                      background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                      color: '#1e293b',
                       outline: 'none',
                       resize: 'vertical',
                       fontFamily: 'inherit',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      lineHeight: '1.6'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#3182ce';
-                      e.currentTarget.style.background = '#fff';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.background = '#ffffff';
+                      e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.background = '#f7fafc';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   />
                 </div>
@@ -6756,25 +6853,30 @@ const HomePage: React.FC = () => {
                   type="submit"
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
                     color: 'white',
                     border: 'none',
-                    padding: '1rem',
-                    borderRadius: '12px',
+                    padding: '1.125rem 1.5rem',
+                    borderRadius: '16px',
                     cursor: 'pointer',
-                    fontWeight: '700',
-                    fontSize: '1.1rem',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 6px rgba(49, 130, 206, 0.3)',
-                    transform: 'translateY(0)'
+                    fontWeight: '800',
+                    fontSize: '1.125rem',
+                    letterSpacing: '0.5px',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 8px 16px rgba(37, 99, 235, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+                    transform: 'translateY(0)',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 12px rgba(49, 130, 206, 0.4)';
+                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(37, 99, 235, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15) inset';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(49, 130, 206, 0.3)';
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(37, 99, 235, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1) inset';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)';
                   }}
                 >
                   {isLoginMode ? 
@@ -6785,9 +6887,10 @@ const HomePage: React.FC = () => {
                 
                 <div style={{ 
                   textAlign: 'center', 
-                  marginTop: '0.5rem',
-                  fontSize: '0.9rem',
-                  color: '#718096'
+                  marginTop: '1rem',
+                  fontSize: '0.9375rem',
+                  color: '#64748b',
+                  fontWeight: '400'
                 }}>
                   {isLoginMode ? (
                     <>
@@ -6795,10 +6898,22 @@ const HomePage: React.FC = () => {
                       <span 
                         onClick={() => setIsLoginMode(false)}
                         style={{ 
-                          color: '#3182ce', 
-                          fontWeight: '600', 
+                          color: '#2563eb', 
+                          fontWeight: '700', 
                           cursor: 'pointer',
-                          textDecoration: 'underline'
+                          textDecoration: 'none',
+                          marginLeft: '0.5rem',
+                          transition: 'all 0.2s ease',
+                          borderBottom: '2px solid transparent',
+                          paddingBottom: '2px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#1d4ed8';
+                          e.currentTarget.style.borderBottomColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#2563eb';
+                          e.currentTarget.style.borderBottomColor = 'transparent';
                         }}
                       >
                         {language === 'zh' ? '去注册' : language === 'en' ? 'Register' : 'မှတ်ပုံတင်ပါ'}
@@ -6810,10 +6925,22 @@ const HomePage: React.FC = () => {
                       <span 
                         onClick={() => setIsLoginMode(true)}
                         style={{ 
-                          color: '#3182ce', 
-                          fontWeight: '600', 
+                          color: '#2563eb', 
+                          fontWeight: '700', 
                           cursor: 'pointer',
-                          textDecoration: 'underline'
+                          textDecoration: 'none',
+                          marginLeft: '0.5rem',
+                          transition: 'all 0.2s ease',
+                          borderBottom: '2px solid transparent',
+                          paddingBottom: '2px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#1d4ed8';
+                          e.currentTarget.style.borderBottomColor = '#1d4ed8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#2563eb';
+                          e.currentTarget.style.borderBottomColor = 'transparent';
                         }}
                       >
                         {language === 'zh' ? '去登录' : language === 'en' ? 'Login' : 'ဝင်ပါ'}
