@@ -1879,18 +1879,47 @@ const HomePage: React.FC = () => {
             }}>EXPRESS</span>
           </span>
           <span style={{
-            color: 'rgba(255, 255, 255, 0.9)',
-            fontSize: size === 'small' ? '0.6rem' : size === 'large' ? '1.1rem' : '0.8rem',
+            display: 'flex',
+            alignItems: 'center',
+            fontStyle: 'italic',
+            fontSize: size === 'small' ? '0.5rem' : size === 'large' ? '0.9rem' : '0.7rem',
             fontWeight: '600',
-            letterSpacing: size === 'small' ? '3px' : '6px',
+            letterSpacing: size === 'small' ? '2px' : '4px',
             textTransform: 'uppercase',
-            marginTop: '6px',
-            textAlign: 'justify',
-            textAlignLast: 'justify',
+            color: 'rgba(255, 255, 255, 0.9)',
             textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-            fontFamily: "'Roboto', sans-serif"
+            fontFamily: "'Roboto', sans-serif",
+            marginTop: '4px',
+            marginLeft: size === 'small' ? '0' : size === 'large' ? '0' : '0'
           }}>
-            Delivery Services
+            <span style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'flex-start',
+              marginRight: '6px',
+              gap: '2px',
+              justifyContent: 'center'
+            }}>
+              <span style={{ 
+                width: size === 'small' ? '8px' : size === 'large' ? '20px' : '12px',
+                height: '1.5px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                display: 'block'
+              }}></span>
+              <span style={{ 
+                width: size === 'small' ? '12px' : size === 'large' ? '30px' : '18px',
+                height: '1.5px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                display: 'block'
+              }}></span>
+              <span style={{ 
+                width: size === 'small' ? '16px' : size === 'large' ? '40px' : '24px',
+                height: '1.5px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                display: 'block'
+              }}></span>
+            </span>
+            DELIVERY SERVICES
           </span>
         </div>
       </div>
