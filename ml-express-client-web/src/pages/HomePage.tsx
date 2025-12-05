@@ -173,6 +173,7 @@ const HomePage: React.FC = () => {
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false); // true=登录模式, false=注册模式
+  const [loginType, setLoginType] = useState<'normal' | 'partner'>('normal'); // 登录类型：普通登录或合伙登录
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [registerForm, setRegisterForm] = useState({
     name: '',
@@ -6386,6 +6387,7 @@ const HomePage: React.FC = () => {
               setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
               setCodeSent(false);
               setCountdown(0);
+              setLoginType('normal'); // 重置登录类型
             }
           }}
         >
@@ -6409,6 +6411,7 @@ const HomePage: React.FC = () => {
                 setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
                 setCodeSent(false);
                 setCountdown(0);
+                setLoginType('normal'); // 重置登录类型
               }}
               style={{
                 position: 'absolute',
@@ -6505,23 +6508,115 @@ const HomePage: React.FC = () => {
                   (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်သစ်ဖွင့်ရန်')
                 )}
               </h2>
-              <p style={{ 
-                color: '#64748b', 
-                marginTop: '0', 
-                fontSize: '1rem', 
-                lineHeight: '1.7',
-                fontWeight: '400',
-                letterSpacing: '0.2px'
-              }}>
-                {isLoginMode ?
-                  (language === 'zh' ? '登录以继续使用服务' : 
-                   language === 'en' ? 'Login to continue using services' : 
-                   'ဝန်ဆောင်မှုများကို ဆက်လက်အသုံးပြုရန် ဝင်ရောက်ပါ') :
-                  (language === 'zh' ? '注册只需几分钟' : 
+              {/* 登录模式：显示登录类型选择按钮 */}
+              {isLoginMode && (
+                <div style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  justifyContent: 'center',
+                  marginTop: '0.75rem',
+                  marginBottom: '1.5rem',
+                  width: '100%'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setLoginType('normal')}
+                    style={{
+                      flex: 1,
+                      maxWidth: '200px',
+                      padding: '0.875rem 1.5rem',
+                      background: loginType === 'normal' 
+                        ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                        : 'rgba(255, 255, 255, 0.9)',
+                      color: loginType === 'normal' ? 'white' : '#475569',
+                      border: loginType === 'normal' 
+                        ? '2px solid #2563eb' 
+                        : '2px solid rgba(148, 163, 184, 0.5)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: loginType === 'normal' 
+                        ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
+                        : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                      transform: loginType === 'normal' ? 'translateY(-2px)' : 'translateY(0)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (loginType !== 'normal') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+                        e.currentTarget.style.borderColor = 'rgba(100, 116, 139, 0.7)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (loginType !== 'normal') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                      }
+                    }}
+                  >
+                    {language === 'zh' ? '普通登录' : language === 'en' ? 'Login' : 'ဝင်ရောက်ပါ'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginType('partner')}
+                    style={{
+                      flex: 1,
+                      maxWidth: '200px',
+                      padding: '0.875rem 1.5rem',
+                      background: loginType === 'partner' 
+                        ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                        : 'rgba(255, 255, 255, 0.9)',
+                      color: loginType === 'partner' ? 'white' : '#475569',
+                      border: loginType === 'partner' 
+                        ? '2px solid #2563eb' 
+                        : '2px solid rgba(148, 163, 184, 0.5)',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: loginType === 'partner' 
+                        ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
+                        : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                      transform: loginType === 'partner' ? 'translateY(-2px)' : 'translateY(0)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (loginType !== 'partner') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
+                        e.currentTarget.style.borderColor = 'rgba(100, 116, 139, 0.7)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (loginType !== 'partner') {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                      }
+                    }}
+                  >
+                    {language === 'zh' ? '合伙登录' : language === 'en' ? 'Partner' : 'လုပ်ဖော်ကိုင်ဖက်'}
+                  </button>
+                </div>
+              )}
+              {/* 注册模式：显示描述文字 */}
+              {!isLoginMode && (
+                <p style={{ 
+                  color: '#64748b', 
+                  marginTop: '0', 
+                  fontSize: '1rem', 
+                  lineHeight: '1.7',
+                  fontWeight: '400',
+                  letterSpacing: '0.2px'
+                }}>
+                  {language === 'zh' ? '注册只需几分钟' : 
                    language === 'en' ? 'Registration takes just a few minutes' : 
-                   'မှတ်ပုံတင်ခြင်းသည် မိနစ်အနည်းငယ်သာ ကြာပါသည်')
-                }
-              </p>
+                   'မှတ်ပုံတင်ခြင်းသည် မိနစ်အနည်းငယ်သာ ကြာပါသည်'}
+                </p>
+              )}
             </div>
 
             <form onSubmit={handleRegister}>
@@ -7080,7 +7175,10 @@ const HomePage: React.FC = () => {
                     <>
                       {language === 'zh' ? '还没有账户？' : language === 'en' ? "Don't have an account? " : 'အကောင့်မရှိသေးဘူးလား? '}
                       <span 
-                        onClick={() => setIsLoginMode(false)}
+                        onClick={() => {
+                          setIsLoginMode(false);
+                          setLoginType('normal'); // 切换到注册模式时重置登录类型
+                        }}
                         style={{ 
                           color: '#2563eb', 
                           fontWeight: '700', 
@@ -7107,7 +7205,10 @@ const HomePage: React.FC = () => {
                     <>
                       {language === 'zh' ? '已有账户？' : language === 'en' ? 'Already have an account? ' : 'အကောင့်ရှိပြီးသားလား? '}
                       <span 
-                        onClick={() => setIsLoginMode(true)}
+                        onClick={() => {
+                          setIsLoginMode(true);
+                          setLoginType('normal'); // 切换到登录模式时重置登录类型
+                        }}
                         style={{ 
                           color: '#2563eb', 
                           fontWeight: '700', 
