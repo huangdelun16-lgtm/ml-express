@@ -6313,60 +6313,110 @@ const HomePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'rgba(0, 0, 0, 0.6)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 3000
+          zIndex: 3000,
+          animation: 'fadeIn 0.3s ease-out'
         }}>
           <div style={{
-            background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-            padding: window.innerWidth < 768 ? '2rem' : '2.5rem',
-            borderRadius: '20px',
-            width: window.innerWidth < 768 ? '90%' : '500px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: window.innerWidth < 768 ? '2rem' : '3rem',
+            borderRadius: '24px',
+            width: window.innerWidth < 768 ? '90%' : '480px',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 25px 70px rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            animation: 'fadeInUp 0.5s ease-out'
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            position: 'relative',
+            animation: 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
           }}>
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>
-                {isLoginMode ? '🔐' : '📝'}
+            {/* 关闭按钮 */}
+            <button
+              onClick={() => {
+                setShowRegisterModal(false);
+                setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+                setCodeSent(false);
+                setCountdown(0);
+              }}
+              style={{
+                position: 'absolute',
+                top: '1.5rem',
+                right: '1.5rem',
+                background: 'rgba(0, 0, 0, 0.05)',
+                border: 'none',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#666',
+                fontSize: '1.2rem',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              ✕
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+              <div style={{ 
+                fontSize: '3.5rem', 
+                marginBottom: '1rem',
+                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+              }}>
+                {isLoginMode ? '🔐' : '✨'}
               </div>
-              <h2 style={{ color: 'white', margin: 0, fontSize: '1.8rem', fontWeight: 'bold' }}>
+              <h2 style={{ 
+                color: '#1a202c', 
+                margin: 0, 
+                fontSize: '2rem', 
+                fontWeight: '800',
+                letterSpacing: '-0.5px',
+                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
                 {isLoginMode ? 
-                  (language === 'zh' ? '用户登录' : language === 'en' ? 'User Login' : 'အကောင့်ဝင်ရန်') :
-                  (language === 'zh' ? '用户注册' : language === 'en' ? 'User Registration' : 'အကောင့်ဖွင့်ရန်')
+                  (language === 'zh' ? '欢迎回来' : language === 'en' ? 'Welcome Back' : 'ကြိုဆိုပါတယ်') :
+                  (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်သစ်ဖွင့်ရန်')
                 }
               </h2>
-              <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
+              <p style={{ color: '#718096', marginTop: '0.8rem', fontSize: '1rem' }}>
                 {isLoginMode ?
-                  (language === 'zh' ? '请输入您的邮箱和密码登录' : 
-                   language === 'en' ? 'Please enter your email and password to login' : 
-                   'သင့်အီးမေးလ်နှင့် စကားဝှက်ဖြင့် ဝင်ရောက်ပါ') :
-                  (language === 'zh' ? '请填写您的信息完成注册' : 
-                   language === 'en' ? 'Please fill in your information to register' : 
-                   'မှတ်ပုံတင်ရန် သင့်အချက်အလက်များဖြည့်ပါ')
+                  (language === 'zh' ? '登录以继续使用服务' : 
+                   language === 'en' ? 'Login to continue using services' : 
+                   'ဝန်ဆောင်မှုများကို ဆက်လက်အသုံးပြုရန် ဝင်ရောက်ပါ') :
+                  (language === 'zh' ? '注册只需几分钟' : 
+                   language === 'en' ? 'Registration takes just a few minutes' : 
+                   'မှတ်ပုံတင်ခြင်းသည် မိနစ်အနည်းငယ်သာ ကြာပါသည်')
                 }
               </p>
             </div>
 
             <form onSubmit={handleRegister}>
-              {/* 新的表单排列顺序 */}
-              
               {/* 1. 姓名（仅注册模式显示） */}
               {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: 'white', 
+                    color: '#4a5568', 
                     display: 'block', 
                     marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                   }}>
-                    {language === 'zh' ? '姓名 *' : language === 'en' ? 'Name *' : 'နာမည် *'}
+                    {language === 'zh' ? '姓名' : language === 'en' ? 'Name' : 'နာမည်'}
                   </label>
                   <input
                     type="text"
@@ -6376,33 +6426,40 @@ const HomePage: React.FC = () => {
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       outline: 'none',
                       transition: 'all 0.3s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               )}
 
               {/* 2. 电话号码（仅注册模式显示） */}
               {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: 'white', 
+                    color: '#4a5568', 
                     display: 'block', 
                     marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                   }}>
-                    {language === 'zh' ? '电话号码 *' : language === 'en' ? 'Phone Number *' : 'ဖုန်းနံပါတ် *'}
+                    {language === 'zh' ? '电话号码' : language === 'en' ? 'Phone Number' : 'ဖုန်းနံပါတ်'}
                   </label>
                   <input
                     type="tel"
@@ -6412,80 +6469,82 @@ const HomePage: React.FC = () => {
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       outline: 'none',
                       transition: 'all 0.3s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
-                  <small style={{ 
-                    color: 'rgba(255, 255, 255, 0.7)', 
-                    fontSize: '0.85rem',
-                    marginTop: '0.3rem',
-                    display: 'block'
-                  }}>
-                    {language === 'zh' ? '请输入缅甸手机号（以09开头）' : 
-                     language === 'en' ? 'Enter Myanmar phone number (starting with 09)' : 
-                     'မြန်မာဖုန်းနံပါတ်ထည့်ပါ (09 ဖြင့်စတင်)'}
-                  </small>
                 </div>
               )}
 
-              {/* 3. 密码（注册模式显示，登录模式下移到邮箱后面） */}
-              {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ 
-                    color: 'white', 
-                    display: 'block', 
-                    marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
-                  </label>
-                  <input
-                    type="password"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    placeholder={language === 'zh' ? '请输入密码（至少6位）' : language === 'en' ? 'Enter password (min 6 chars)' : 'စကားဝှက်ထည့်ပါ (အနည်းဆုံး 6 လုံး)'}
-                    required
-                    minLength={6}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '12px',
-                      fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
-                      outline: 'none',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                  />
-                </div>
-              )}
+              {/* 3. 密码 */}
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ 
+                  color: '#4a5568', 
+                  display: 'block', 
+                  marginBottom: '0.5rem',
+                  fontWeight: '600',
+                  fontSize: '0.9rem'
+                }}>
+                  {language === 'zh' ? '密码' : language === 'en' ? 'Password' : 'စကားဝှက်'}
+                </label>
+                <input
+                  type="password"
+                  value={registerForm.password}
+                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入密码' : language === 'en' ? 'Enter password' : 'စကားဝှက်ထည့်ပါ'}
+                  required
+                  minLength={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.8rem 1rem',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    background: '#f7fafc',
+                    color: '#2d3748',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3182ce';
+                    e.currentTarget.style.background = '#fff';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.background = '#f7fafc';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
 
               {/* 4. 确认密码（仅注册模式显示） */}
               {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: 'white', 
+                    color: '#4a5568', 
                     display: 'block', 
                     marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                   }}>
-                    {language === 'zh' ? '确认密码 *' : language === 'en' ? 'Confirm Password *' : 'စကားဝှက်အတည်ပြုပါ *'}
+                    {language === 'zh' ? '确认密码' : language === 'en' ? 'Confirm Password' : 'စကားဝှက်အတည်ပြုပါ'}
                   </label>
                   <input
                     type="password"
@@ -6496,54 +6555,68 @@ const HomePage: React.FC = () => {
                     minLength={6}
                     style={{
                       width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       outline: 'none',
                       transition: 'all 0.3s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               )}
 
-              {/* 5. 电子邮箱（登录和注册都显示） */}
-              <div style={{ marginBottom: '1.5rem' }}>
+              {/* 5. 电子邮箱 */}
+              <div style={{ marginBottom: '1.2rem' }}>
                 <label style={{ 
-                  color: 'white', 
+                  color: '#4a5568', 
                   display: 'block', 
                   marginBottom: '0.5rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem'
+                  fontWeight: '600',
+                  fontSize: '0.9rem'
                 }}>
-                  {language === 'zh' ? '电子邮箱 *' : language === 'en' ? 'Email Address *' : 'အီးမေးလ်လိပ်စာ *'}
+                  {language === 'zh' ? '电子邮箱' : language === 'en' ? 'Email' : 'အီးမေးလ်'}
                 </label>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.8rem' }}>
                   <input
                     type="email"
                     value={registerForm.email}
                     onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                    placeholder={language === 'zh' ? 'example@gmail.com' : language === 'en' ? 'example@gmail.com' : 'example@gmail.com'}
+                    placeholder={language === 'zh' ? 'example@gmail.com' : 'example@gmail.com'}
                     required
                     style={{
                       flex: isLoginMode ? '1' : '1.2',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       outline: 'none',
                       transition: 'all 0.3s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                   
                   {/* 获取验证码按钮（仅注册模式显示） */}
@@ -6554,22 +6627,22 @@ const HomePage: React.FC = () => {
                       disabled={countdown > 0}
                       style={{
                         flex: '0.8',
-                        padding: '1rem',
-                        background: countdown > 0 ? '#cbd5e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
+                        padding: '0.8rem',
+                        background: countdown > 0 ? '#edf2f7' : '#ebf8ff',
+                        color: countdown > 0 ? '#a0aec0' : '#3182ce',
                         border: 'none',
                         borderRadius: '12px',
                         fontSize: '0.9rem',
-                        fontWeight: 'bold',
+                        fontWeight: '600',
                         cursor: countdown > 0 ? 'not-allowed' : 'pointer',
                         transition: 'all 0.3s ease',
                         whiteSpace: 'nowrap'
                       }}
                       onMouseEnter={(e) => {
-                        if (countdown === 0) e.currentTarget.style.transform = 'translateY(-2px)';
+                        if (countdown === 0) e.currentTarget.style.background = '#bee3f8';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
+                        if (countdown === 0) e.currentTarget.style.background = '#ebf8ff';
                       }}
                     >
                       {countdown > 0 ? 
@@ -6579,91 +6652,51 @@ const HomePage: React.FC = () => {
                     </button>
                   )}
                 </div>
-                {!isLoginMode && (
-                  <small style={{ 
-                    color: 'rgba(255, 255, 255, 0.7)', 
-                    fontSize: '0.85rem',
-                    marginTop: '0.3rem',
-                    display: 'block'
-                  }}>
-                    {language === 'zh' ? '验证码将发送到您的邮箱' : 
-                     language === 'en' ? 'Verification code will be sent to your email' : 
-                     'အတည်ပြုကုဒ်ကို သင့်အီးမေးလ်သို့ ပေးပို့ပါမည်'}
-                  </small>
-                )}
               </div>
-
-              {/* 密码（登录模式显示） */}
-              {isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ 
-                    color: 'white', 
-                    display: 'block', 
-                    marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    {language === 'zh' ? '密码 *' : language === 'en' ? 'Password *' : 'စကားဝှက် *'}
-                  </label>
-                  <input
-                    type="password"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    placeholder={language === 'zh' ? '请输入密码' : language === 'en' ? 'Enter password' : 'စကားဝှက်ထည့်ပါ'}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '12px',
-                      fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
-                      outline: 'none',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-                  />
-                </div>
-              )}
 
               {/* 6. 验证码（仅注册模式显示） */}
               {!isLoginMode && (
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.2rem' }}>
                   <label style={{ 
-                    color: 'white', 
+                    color: '#4a5568', 
                     display: 'block', 
                     marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                   }}>
-                    {language === 'zh' ? '验证码 *' : language === 'en' ? 'Verification Code *' : 'အတည်ပြုကုဒ် *'}
+                    {language === 'zh' ? '验证码' : language === 'en' ? 'Code' : 'အတည်ပြုကုဒ်'}
                   </label>
                   <input
                     type="text"
                     value={registerForm.verificationCode}
                     onChange={(e) => setRegisterForm({ ...registerForm, verificationCode: e.target.value })}
-                    placeholder={language === 'zh' ? '请输入6位验证码' : language === 'en' ? 'Enter 6-digit code' : '6 လုံးကုဒ်ထည့်ပါ'}
+                    placeholder="000000"
                     maxLength={6}
                     required={!isLoginMode}
                     style={{
                       width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1.2rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       fontWeight: '600',
                       outline: 'none',
                       transition: 'all 0.3s ease',
                       letterSpacing: '0.5em',
                       textAlign: 'center'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               )}
@@ -6672,35 +6705,42 @@ const HomePage: React.FC = () => {
               {!isLoginMode && (
                 <div style={{ marginBottom: '2rem' }}>
                   <label style={{ 
-                    color: 'white', 
+                    color: '#4a5568', 
                     display: 'block', 
                     marginBottom: '0.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                   }}>
-                    {language === 'zh' ? '地址（可选）' : language === 'en' ? 'Address (Optional)' : 'လိပ်စာ (ရွေးချယ်ရန်)'}
+                    {language === 'zh' ? '地址（可选）' : language === 'en' ? 'Address' : 'လိပ်စာ'}
                   </label>
                   <textarea
                     value={registerForm.address}
                     onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
                     placeholder={language === 'zh' ? '请输入您的地址' : language === 'en' ? 'Enter your address' : 'သင့်လိပ်စာထည့်ပါ'}
-                    rows={3}
+                    rows={2}
                     style={{
                       width: '100%',
-                      padding: '1rem',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      padding: '0.8rem 1rem',
+                      border: '2px solid #e2e8f0',
                       borderRadius: '12px',
                       fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      color: '#2c5282',
-                      fontWeight: '500',
+                      background: '#f7fafc',
+                      color: '#2d3748',
                       outline: 'none',
                       resize: 'vertical',
                       fontFamily: 'inherit',
                       transition: 'all 0.3s ease'
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#48bb78'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3182ce';
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(49, 130, 206, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.background = '#f7fafc';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   />
                 </div>
               )}
@@ -6708,69 +6748,79 @@ const HomePage: React.FC = () => {
               {/* 按钮区 */}
               <div style={{ 
                 display: 'flex', 
+                flexDirection: 'column',
                 gap: '1rem',
-                justifyContent: 'center',
-                flexDirection: window.innerWidth < 768 ? 'column' : 'row'
+                marginTop: '2rem'
               }}>
                 <button
                   type="submit"
                   style={{
-                    background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
                     color: 'white',
                     border: 'none',
-                    padding: '1rem 2.5rem',
+                    padding: '1rem',
                     borderRadius: '12px',
                     cursor: 'pointer',
-                    fontWeight: 'bold',
+                    fontWeight: '700',
                     fontSize: '1.1rem',
                     transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 15px rgba(72, 187, 120, 0.4)',
-                    flex: 1
+                    boxShadow: '0 4px 6px rgba(49, 130, 206, 0.3)',
+                    transform: 'translateY(0)'
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(72, 187, 120, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 6px 12px rgba(49, 130, 206, 0.4)';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(72, 187, 120, 0.4)';
+                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(49, 130, 206, 0.3)';
                   }}
                 >
                   {isLoginMode ? 
-                    (language === 'zh' ? '登录' : language === 'en' ? 'Login' : 'ဝင်ရန်') :
-                    (language === 'zh' ? '注册' : language === 'en' ? 'Register' : 'အကောင့်ဖွင့်ရန်')
+                    (language === 'zh' ? '立即登录' : language === 'en' ? 'Login Now' : 'ယခုဝင်ပါ') :
+                    (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်ဖွင့်ပါ')
                   }
                 </button>
                 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRegisterModal(false);
-                    setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
-                    setCodeSent(false);
-                    setCountdown(0);
-                  }}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid white',
-                    padding: '1rem 2.5rem',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '1.1rem',
-                    transition: 'all 0.3s ease',
-                    flex: 1
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                >
-                  {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မလုပ်တော့'}
-                </button>
+                <div style={{ 
+                  textAlign: 'center', 
+                  marginTop: '0.5rem',
+                  fontSize: '0.9rem',
+                  color: '#718096'
+                }}>
+                  {isLoginMode ? (
+                    <>
+                      {language === 'zh' ? '还没有账户？' : language === 'en' ? "Don't have an account? " : 'အကောင့်မရှိသေးဘူးလား? '}
+                      <span 
+                        onClick={() => setIsLoginMode(false)}
+                        style={{ 
+                          color: '#3182ce', 
+                          fontWeight: '600', 
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        {language === 'zh' ? '去注册' : language === 'en' ? 'Register' : 'မှတ်ပုံတင်ပါ'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {language === 'zh' ? '已有账户？' : language === 'en' ? 'Already have an account? ' : 'အကောင့်ရှိပြီးသားလား? '}
+                      <span 
+                        onClick={() => setIsLoginMode(true)}
+                        style={{ 
+                          color: '#3182ce', 
+                          fontWeight: '600', 
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        {language === 'zh' ? '去登录' : language === 'en' ? 'Login' : 'ဝင်ပါ'}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </form>
           </div>
