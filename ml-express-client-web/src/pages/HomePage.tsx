@@ -6469,10 +6469,10 @@ const HomePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleRegister}>
-              {/* 登录模式：邮箱和电话号码 */}
+              {/* 登录模式：邮箱或电话号码 */}
               {isLoginMode && (
                 <>
-                  {/* 邮箱和电话号码 */}
+                  {/* 邮箱或电话号码 */}
                   <div style={{ marginBottom: '1.2rem' }}>
                     <label style={{ 
                       color: '#475569', 
@@ -6482,74 +6482,53 @@ const HomePage: React.FC = () => {
                       fontSize: '0.875rem',
                       letterSpacing: '0.3px'
                     }}>
-                      {language === 'zh' ? '邮箱和电话号码' : language === 'en' ? 'Email and Phone Number' : 'အီးမေးလ်နှင့် ဖုန်းနံပါတ်'}
+                      {language === 'zh' ? '邮箱或电话号码' : language === 'en' ? 'Email or Phone Number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်'}
                     </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <input
-                        type="email"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        placeholder={language === 'zh' ? 'example@gmail.com' : 'example@gmail.com'}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem 1.125rem',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '14px',
-                          fontSize: '1rem',
-                          background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-                          color: '#1e293b',
-                          outline: 'none',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                          fontFamily: 'inherit'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#3b82f6';
-                          e.currentTarget.style.background = '#ffffff';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
-                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      />
-                      <input
-                        type="tel"
-                        value={registerForm.phone}
-                        onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                        placeholder={language === 'zh' ? '09xxxxxxxx' : language === 'en' ? '09xxxxxxxx' : '09xxxxxxxx'}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem 1.125rem',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '14px',
-                          fontSize: '1rem',
-                          background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-                          color: '#1e293b',
-                          outline: 'none',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                          fontFamily: 'inherit'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#3b82f6';
-                          e.currentTarget.style.background = '#ffffff';
-                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
-                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={registerForm.email || registerForm.phone}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // 判断输入的是邮箱还是电话号码
+                        if (value.includes('@')) {
+                          // 包含@符号，认为是邮箱
+                          setRegisterForm({ ...registerForm, email: value, phone: '' });
+                        } else if (/^\d/.test(value)) {
+                          // 以数字开头，认为是电话号码
+                          setRegisterForm({ ...registerForm, phone: value, email: '' });
+                        } else {
+                          // 其他情况，同时更新两个字段（让后端判断）
+                          setRegisterForm({ ...registerForm, email: value, phone: value });
+                        }
+                      }}
+                      placeholder={language === 'zh' ? '输入邮箱或电话号码' : language === 'en' ? 'Enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ် ထည့်ပါ'}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem 1.125rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '14px',
+                        fontSize: '1rem',
+                        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                        color: '#1e293b',
+                        outline: 'none',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                        fontFamily: 'inherit'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    />
                   </div>
                   
                   {/* 密码 */}
