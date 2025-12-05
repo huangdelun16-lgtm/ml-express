@@ -1856,28 +1856,39 @@ const HomePage: React.FC = () => {
           <span style={{
             color: 'white',
             fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '4rem' : '2.2rem',
-            fontWeight: '800',
-            textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-            background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+            fontWeight: '900',
+            textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
+            background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 50%, #b3d9ff 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            letterSpacing: '-1px',
-            whiteSpace: 'nowrap'
+            letterSpacing: '1px',
+            whiteSpace: 'nowrap',
+            fontFamily: "'Montserrat', 'Roboto', sans-serif",
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
           }}>
-            MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+            MARKET LINK <span style={{ 
+              fontSize: '1em', 
+              fontStyle: 'italic', 
+              fontWeight: '900',
+              background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              marginLeft: '4px'
+            }}>EXPRESS</span>
           </span>
           <span style={{
-            color: 'white',
-            fontSize: size === 'small' ? '0.7rem' : size === 'large' ? '1.2rem' : '0.9rem',
-            fontStyle: 'italic',
-            fontWeight: '400',
-            letterSpacing: '1px',
-            opacity: 0.9,
-            marginTop: '-2px',
-            textAlign: 'right',
-            paddingRight: '4px',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontSize: size === 'small' ? '0.6rem' : size === 'large' ? '1.1rem' : '0.8rem',
+            fontWeight: '600',
+            letterSpacing: size === 'small' ? '3px' : '6px',
+            textTransform: 'uppercase',
+            marginTop: '6px',
+            textAlign: 'justify',
+            textAlignLast: 'justify',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            fontFamily: "'Roboto', sans-serif"
           }}>
             Delivery Services
           </span>
