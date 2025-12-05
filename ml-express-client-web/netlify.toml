@@ -1,8 +1,8 @@
 [build]
+  base = "ml-express-client-web"
   command = "npm install && npm run build"
-  publish = "build"
-  # base 不需要设置，因为 Netlify Dashboard 中已经配置了 base directory
-  functions = "netlify/functions"
+  publish = "ml-express-client-web/build"
+  functions = "ml-express-client-web/netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
