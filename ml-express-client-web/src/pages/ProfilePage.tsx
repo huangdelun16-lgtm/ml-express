@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import QRCode from 'qrcode';
 
 const ProfilePage: React.FC = () => {
@@ -19,23 +19,67 @@ const ProfilePage: React.FC = () => {
   const [showPackageDetailModal, setShowPackageDetailModal] = useState(false); // 显示包裹详情模态框
   const [showPickupCodeModal, setShowPickupCodeModal] = useState(false); // 显示寄件码模态框
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(''); // 二维码数据URL
+  const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
+
+  // 检查用户是否是合伙店铺账户
+  const checkIfPartnerStore = useCallback(async (user: any) => {
+    if (!user) return false;
+    
+    try {
+      // 构建查询条件
+      const conditions: string[] = [];
+      if (user.email) {
+        conditions.push(`email.eq.${user.email}`);
+      }
+      if (user.phone) {
+        conditions.push(`phone.eq.${user.phone}`);
+      }
+      
+      // 如果没有邮箱和手机号，无法判断
+      if (conditions.length === 0) {
+        return false;
+      }
+      
+      // 检查用户的邮箱或手机号是否在 delivery_stores 表中
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('id')
+        .or(conditions.join(','))
+        .limit(1);
+      
+      if (error) {
+        console.error('检查合伙店铺失败:', error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('检查合伙店铺异常:', error);
+      return false;
+    }
+  }, []);
 
   // 从本地存储加载用户信息
-  const loadUserFromStorage = useCallback(() => {
+  const loadUserFromStorage = useCallback(async () => {
     const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
+        
+        // 检查是否是合伙店铺账户
+        const isPartner = await checkIfPartnerStore(user);
+        setIsPartnerStore(isPartner);
       } catch (error) {
         console.error('加载用户信息失败:', error);
         setCurrentUser(null);
+        setIsPartnerStore(false);
       }
     } else {
       // 如果未登录，重定向到首页
       navigate('/');
     }
-  }, [navigate]);
+  }, [navigate, checkIfPartnerStore]);
 
   // 加载用户的包裹列表
   const loadUserPackages = useCallback(async () => {
@@ -730,16 +774,16 @@ const ProfilePage: React.FC = () => {
                   {currentUser.name || '-'}
                 </div>
                 <div style={{
-                  background: 'rgba(255, 215, 0, 0.2)',
-                  border: '1px solid rgba(255, 215, 0, 0.5)',
-                  color: '#ffd700',
+                  background: isPartnerStore ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                  border: isPartnerStore ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
+                  color: isPartnerStore ? '#3b82f6' : '#ffd700',
                   padding: '0.2rem 0.8rem',
                   borderRadius: '20px',
                   fontSize: '0.8rem',
                   fontWeight: '600',
                   textShadow: '0 1px 2px rgba(0,0,0,0.2)'
                 }}>
-                  VIP 会员
+                  {isPartnerStore ? 'Partner' : (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')}
                 </div>
               </div>
               
