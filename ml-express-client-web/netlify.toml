@@ -1,11 +1,11 @@
 [build]
   base = "ml-express-client-web"
   command = "npm install && npm run build"
-  publish = "ml-express-client-web/build"
-  functions = "ml-express-client-web/netlify/functions"
+  publish = "build"
+  functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]
