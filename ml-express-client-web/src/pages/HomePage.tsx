@@ -1875,8 +1875,39 @@ const HomePage: React.FC = () => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              marginLeft: '4px'
-            }}>EXPRESS</span>
+              marginLeft: '4px',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}>
+              <span style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'flex-end',
+                marginRight: '6px',
+                gap: '2px',
+                justifyContent: 'center'
+              }}>
+                <span style={{ 
+                  width: size === 'small' ? '16px' : size === 'large' ? '40px' : '24px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: size === 'small' ? '24px' : size === 'large' ? '60px' : '36px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: size === 'small' ? '32px' : size === 'large' ? '80px' : '48px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+              </span>
+              EXPRESS
+            </span>
           </span>
           <span style={{
             display: 'flex',
@@ -1895,25 +1926,25 @@ const HomePage: React.FC = () => {
             <span style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              alignItems: 'flex-start',
+              alignItems: 'flex-end',
               marginRight: '6px',
               gap: '2px',
               justifyContent: 'center'
             }}>
               <span style={{ 
-                width: size === 'small' ? '8px' : size === 'large' ? '20px' : '12px',
-                height: '1.5px',
-                background: 'rgba(255, 255, 255, 0.9)',
-                display: 'block'
-              }}></span>
-              <span style={{ 
-                width: size === 'small' ? '12px' : size === 'large' ? '30px' : '18px',
-                height: '1.5px',
-                background: 'rgba(255, 255, 255, 0.9)',
-                display: 'block'
-              }}></span>
-              <span style={{ 
                 width: size === 'small' ? '16px' : size === 'large' ? '40px' : '24px',
+                height: '1.5px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                display: 'block'
+              }}></span>
+              <span style={{ 
+                width: size === 'small' ? '24px' : size === 'large' ? '60px' : '36px',
+                height: '1.5px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                display: 'block'
+              }}></span>
+              <span style={{ 
+                width: size === 'small' ? '32px' : size === 'large' ? '80px' : '48px',
                 height: '1.5px',
                 background: 'rgba(255, 255, 255, 0.9)',
                 display: 'block'
