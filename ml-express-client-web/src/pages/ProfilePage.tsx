@@ -20,16 +20,35 @@ const ProfilePage: React.FC = () => {
   const [showPickupCodeModal, setShowPickupCodeModal] = useState(false); // 显示寄件码模态框
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(''); // 二维码数据URL
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
+  const [showPasswordModal, setShowPasswordModal] = useState(false); // 显示密码修改模态框
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  }); // 密码修改表单
+  const [storeInfo, setStoreInfo] = useState<any>(null); // 合伙店铺信息
 
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
-  // 判断逻辑：检查用户的邮箱或手机号是否在 delivery_stores 表中
-  // 如果匹配，说明是admin web中创建的合伙店铺账号
+  // 判断逻辑：
+  // 1. 如果 user_type === 'partner'，直接返回 true
+  // 2. 如果用户有 store_code 或 store_id，返回 true
+  // 3. 否则检查用户的邮箱或手机号是否在 delivery_stores 表中
   const checkIfPartnerStore = useCallback(async (user: any) => {
     if (!user) return false;
     
+    // 方法1: 检查 user_type
+    if (user.user_type === 'partner') {
+      return true;
+    }
+    
+    // 方法2: 检查是否有 store_code 或 store_id
+    if (user.store_code || user.store_id) {
+      return true;
+    }
+    
     try {
-      // 构建查询条件
+      // 方法3: 构建查询条件，检查用户的邮箱或手机号是否在 delivery_stores 表中
       const conditions: string[] = [];
       if (user.email) {
         conditions.push(`email.eq.${user.email}`);
@@ -75,6 +94,24 @@ const ProfilePage: React.FC = () => {
         // 检查是否是合伙店铺账户
         const isPartner = await checkIfPartnerStore(user);
         setIsPartnerStore(isPartner);
+        
+        // 如果是合伙店铺，加载店铺信息
+        if (isPartner && (user.store_code || user.store_id)) {
+          try {
+            const { data: store, error } = await supabase
+              .from('delivery_stores')
+              .select('*')
+              .eq('store_code', user.store_code || '')
+              .or(`id.eq.${user.store_id || ''}`)
+              .maybeSingle();
+            
+            if (!error && store) {
+              setStoreInfo(store);
+            }
+          } catch (error) {
+            console.error('加载店铺信息失败:', error);
+          }
+        }
       } catch (error) {
         console.error('加载用户信息失败:', error);
         setCurrentUser(null);
@@ -137,6 +174,85 @@ const ProfilePage: React.FC = () => {
     localStorage.removeItem('ml-express-customer');
     setCurrentUser(null);
     navigate('/');
+  };
+
+  // 处理密码修改
+  const handlePasswordChange = async () => {
+    if (!isPartnerStore || !storeInfo) {
+      alert(language === 'zh' ? '只有合伙店铺账户可以修改密码' : 
+            language === 'en' ? 'Only partner store accounts can change password' : 
+            'လုပ်ဖော်ကိုင်ဖက်ဆိုင်အကောင့်သာ စကားဝှက်ကို ပြောင်းလဲနိုင်သည်');
+      return;
+    }
+
+    // 验证输入
+    if (!passwordForm.currentPassword) {
+      alert(language === 'zh' ? '请输入当前密码' : 
+            language === 'en' ? 'Please enter current password' : 
+            'လက်ရှိစကားဝှက်ထည့်ပါ');
+      return;
+    }
+
+    if (!passwordForm.newPassword) {
+      alert(language === 'zh' ? '请输入新密码' : 
+            language === 'en' ? 'Please enter new password' : 
+            'စကားဝှက်အသစ်ထည့်ပါ');
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      alert(language === 'zh' ? '新密码至少需要6位' : 
+            language === 'en' ? 'New password must be at least 6 characters' : 
+            'စကားဝှက်အသစ်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert(language === 'zh' ? '两次输入的密码不一致' : 
+            language === 'en' ? 'Passwords do not match' : 
+            'စကားဝှက်များ မတူညီပါ');
+      return;
+    }
+
+    // 验证当前密码
+    if (storeInfo.password !== passwordForm.currentPassword) {
+      alert(language === 'zh' ? '当前密码错误' : 
+            language === 'en' ? 'Current password is incorrect' : 
+            'လက်ရှိစကားဝှက် မှားနေပါသည်');
+      return;
+    }
+
+    try {
+      // 更新密码
+      const { error } = await supabase
+        .from('delivery_stores')
+        .update({ password: passwordForm.newPassword })
+        .eq('id', storeInfo.id);
+
+      if (error) {
+        console.error('更新密码失败:', error);
+        alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
+              language === 'en' ? 'Failed to update password, please try again later' : 
+              'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
+        return;
+      }
+
+      // 更新本地存储的店铺信息
+      setStoreInfo({ ...storeInfo, password: passwordForm.newPassword });
+      
+      // 清空表单并关闭模态框
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowPasswordModal(false);
+      
+      alert(language === 'zh' ? '密码修改成功！' : 
+            language === 'en' ? 'Password changed successfully!' : 
+            'စကားဝှက် ပြောင်းလဲခြင်း အောင်မြင်ပါသည်!');
+    } catch (error) {
+      console.error('更新密码异常:', error);
+      alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
+            language === 'en' ? 'Failed to update password, please try again later' : 
+            'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
+    }
   };
 
   // 语言切换函数
@@ -943,6 +1059,65 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
+            
+            {/* 合伙店铺：显示店铺代码（只读） */}
+            {isPartnerStore && storeInfo && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ fontSize: '1.5rem' }}>🏪</div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                    {language === 'zh' ? '店铺代码' : language === 'en' ? 'Store Code' : 'ဆိုင်ကုဒ်'}
+                  </label>
+                  <div style={{ 
+                    color: 'white', 
+                    fontSize: '1rem', 
+                    fontWeight: '500',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}>
+                    {storeInfo.store_code || currentUser.store_code || '-'}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* 合伙店铺：密码修改按钮 */}
+            {isPartnerStore && (
+              <div style={{ 
+                gridColumn: window.innerWidth < 768 ? '1' : '1 / -1',
+                display: 'flex',
+                justifyContent: 'center',
+                marginTop: '1rem'
+              }}>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 2rem',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                  }}
+                >
+                  {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2039,6 +2214,263 @@ const ProfilePage: React.FC = () => {
               >
                 💾 {language === 'zh' ? '保存二维码' : language === 'en' ? 'Save QR Code' : 'QR code သိမ်းဆည်းရန်'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 密码修改模态框 */}
+      {showPasswordModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 2000,
+            padding: '1rem'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPasswordModal(false);
+              setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            }
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9))',
+              borderRadius: '24px',
+              padding: '2.5rem',
+              width: '100%',
+              maxWidth: '500px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '2rem'
+            }}>
+              <h2 style={{
+                color: '#1e293b',
+                fontSize: '1.8rem',
+                fontWeight: '800',
+                margin: 0
+              }}>
+                {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                }}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.05)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.color = '#ef4444';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* 当前密码 */}
+              <div>
+                <label style={{
+                  color: '#475569',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  display: 'block',
+                  marginBottom: '0.5rem'
+                }}>
+                  {language === 'zh' ? '当前密码' : language === 'en' ? 'Current Password' : 'လက်ရှိစကားဝှက်'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入当前密码' : language === 'en' ? 'Enter current password' : 'လက်ရှိစကားဝှက်ထည့်ပါ'}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              {/* 新密码 */}
+              <div>
+                <label style={{
+                  color: '#475569',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  display: 'block',
+                  marginBottom: '0.5rem'
+                }}>
+                  {language === 'zh' ? '新密码' : language === 'en' ? 'New Password' : 'စကားဝှက်အသစ်'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder={language === 'zh' ? '请输入新密码（至少6位）' : language === 'en' ? 'Enter new password (at least 6 characters)' : 'စကားဝှက်အသစ်ထည့်ပါ (အနည်းဆုံး ၆ လုံး)'}
+                  minLength={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              {/* 确认新密码 */}
+              <div>
+                <label style={{
+                  color: '#475569',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  display: 'block',
+                  marginBottom: '0.5rem'
+                }}>
+                  {language === 'zh' ? '确认新密码' : language === 'en' ? 'Confirm New Password' : 'စကားဝှက်အသစ် အတည်ပြုရန်'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder={language === 'zh' ? '请再次输入新密码' : language === 'en' ? 'Enter new password again' : 'စကားဝှက်အသစ် ထပ်မံထည့်ပါ'}
+                  minLength={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              {/* 按钮 */}
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                marginTop: '1rem'
+              }}>
+                <button
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.875rem',
+                    background: 'rgba(0, 0, 0, 0.05)',
+                    color: '#475569',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+                  }}
+                >
+                  {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}
+                </button>
+                <button
+                  onClick={handlePasswordChange}
+                  style={{
+                    flex: 1,
+                    padding: '0.875rem',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                  }}
+                >
+                  {language === 'zh' ? '确认修改' : language === 'en' ? 'Confirm Change' : 'အတည်ပြုရန်'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

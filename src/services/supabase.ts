@@ -153,6 +153,7 @@ export interface DeliveryStore {
   current_load: number;
   facilities: string[];
   notes?: string;
+  password?: string; // 合伙店铺登录密码
   created_by?: string;
   created_at?: string;
   updated_at?: string;

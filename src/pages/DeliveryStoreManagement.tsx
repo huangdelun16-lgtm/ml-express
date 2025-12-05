@@ -303,7 +303,8 @@ const DeliveryStoreManagement: React.FC = () => {
     service_area_radius: 5, // 保留默认值，但不在表单中显示
     capacity: 1000, // 保留默认值，但不在表单中显示
     facilities: [] as string[],
-    notes: ''
+    notes: '',
+    password: '' // 合伙店铺登录密码
   });
 
   // 生成店长收件码二维码
@@ -402,7 +403,8 @@ const DeliveryStoreManagement: React.FC = () => {
       service_area_radius: store.service_area_radius,
       capacity: store.capacity,
       facilities: store.facilities || [],
-      notes: store.notes || ''
+      notes: store.notes || '',
+      password: store.password || ''
     });
     setShowForm(true);
   };
@@ -556,7 +558,7 @@ const DeliveryStoreManagement: React.FC = () => {
     setSuccessMessage(null);
 
     // 验证必填项
-    if (!formData.store_name || !formData.store_code || !formData.address || !formData.latitude || !formData.longitude) {
+    if (!formData.store_name || !formData.store_code || !formData.address || !formData.latitude || !formData.longitude || !formData.password) {
       setErrorMessage('请填写所有必填项');
       return;
     }
@@ -672,7 +674,8 @@ const DeliveryStoreManagement: React.FC = () => {
       service_area_radius: 5,
       capacity: 1000,
       facilities: [],
-      notes: ''
+      notes: '',
+      password: ''
     });
   };
 
@@ -868,6 +871,18 @@ const DeliveryStoreManagement: React.FC = () => {
                   <option value="grocery">杂货店</option>
                   <option value="transit_station">中转站</option>
                 </select>
+              </div>
+              <div>
+                <label style={labelStyle}>密码 *</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="合伙店铺登录密码"
+                  style={inputStyle}
+                  required
+                />
               </div>
               <div>
                 <label style={labelStyle}>详细地址 *</label>

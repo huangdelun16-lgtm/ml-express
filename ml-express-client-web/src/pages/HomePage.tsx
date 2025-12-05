@@ -452,7 +452,73 @@ const HomePage: React.FC = () => {
       
       if (isLoginMode) {
         // ===== 登录模式 =====
-        // 验证邮箱和密码
+        
+        // 合伙登录
+        if (loginType === 'partner') {
+          // 验证店铺代码和密码
+          if (!registerForm.email) {
+            alert(language === 'zh' ? '请输入店铺代码' : language === 'en' ? 'Please enter store code' : 'ဆိုင်ကုဒ် ထည့်ပါ');
+            return;
+          }
+
+          if (!registerForm.password) {
+            alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
+            return;
+          }
+
+          // 查询合伙店铺
+          const storeCode = registerForm.email.trim();
+          const { data: store, error: storeError } = await supabase
+            .from('delivery_stores')
+            .select('*')
+            .eq('store_code', storeCode)
+            .maybeSingle();
+
+          if (storeError) {
+            console.error('查询合伙店铺失败:', storeError);
+            alert(language === 'zh' ? '查询店铺失败，请稍后重试' : language === 'en' ? 'Failed to query store, please try again later' : 'ဆိုင်ကို ရှာဖွေရန် မအောင်မြင်ပါ');
+            return;
+          }
+
+          if (!store) {
+            alert(language === 'zh' ? '店铺代码不存在' : language === 'en' ? 'Store code does not exist' : 'ဆိုင်ကုဒ် မရှိပါ');
+            return;
+          }
+
+          // 验证密码
+          if (store.password !== registerForm.password) {
+            alert(language === 'zh' ? '密码错误' : language === 'en' ? 'Incorrect password' : 'စကားဝှက်မှားနေပါသည်');
+            return;
+          }
+
+          // 登录成功，创建用户对象（用于兼容现有系统）
+          const partnerUser = {
+            id: store.id,
+            name: store.store_name,
+            email: store.email || store.store_code,
+            phone: store.phone,
+            user_type: 'partner',
+            address: store.address,
+            store_code: store.store_code,
+            store_id: store.id
+          };
+
+          setCurrentUser(partnerUser);
+          localStorage.setItem('ml-express-customer', JSON.stringify(partnerUser));
+          setShowRegisterModal(false);
+          alert(language === 'zh' ? `登录成功！欢迎回来，${store.store_name}` : 
+                language === 'en' ? `Login successful! Welcome back, ${store.store_name}` : 
+                `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${store.store_name}`);
+          
+          // 清空表单
+          setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
+          setCodeSent(false);
+          setCountdown(0);
+          setLoginType('normal'); // 重置登录类型
+          return;
+        }
+        
+        // 普通登录：验证邮箱和密码
         if (!registerForm.email) {
           alert(language === 'zh' ? '请输入邮箱' : language === 'en' ? 'Please enter email' : 'အီးမေးလ်ထည့်ပါ');
           return;
@@ -6520,7 +6586,10 @@ const HomePage: React.FC = () => {
                 }}>
                   <button
                     type="button"
-                    onClick={() => setLoginType('normal')}
+                    onClick={() => {
+                      setLoginType('normal');
+                      setRegisterForm({ ...registerForm, email: '', phone: '', password: '' });
+                    }}
                     style={{
                       flex: 1,
                       maxWidth: '200px',
@@ -6561,7 +6630,10 @@ const HomePage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLoginType('partner')}
+                    onClick={() => {
+                      setLoginType('partner');
+                      setRegisterForm({ ...registerForm, email: '', phone: '', password: '' });
+                    }}
                     style={{
                       flex: 1,
                       maxWidth: '200px',
@@ -6620,67 +6692,119 @@ const HomePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleRegister}>
-              {/* 登录模式：邮箱或电话号码 */}
+              {/* 登录模式 */}
               {isLoginMode && (
                 <>
-                  {/* 邮箱或电话号码 */}
-                  <div style={{ marginBottom: '1.2rem' }}>
-                    <label style={{ 
-                      color: '#475569', 
-                      display: 'block', 
-                      marginBottom: '0.6rem',
-                      fontWeight: '600',
-                      fontSize: '0.875rem',
-                      letterSpacing: '0.3px'
-                    }}>
-                      {language === 'zh' ? '邮箱或电话号码' : language === 'en' ? 'Email or Phone Number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်'}
-                    </label>
-                    <input
-                      type="text"
-                      value={registerForm.email || registerForm.phone}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // 判断输入的是邮箱还是电话号码
-                        if (value.includes('@')) {
-                          // 包含@符号，认为是邮箱
-                          setRegisterForm({ ...registerForm, email: value, phone: '' });
-                        } else if (/^\d/.test(value)) {
-                          // 以数字开头，认为是电话号码
-                          setRegisterForm({ ...registerForm, phone: value, email: '' });
-                        } else {
-                          // 其他情况，同时更新两个字段（让后端判断）
-                          setRegisterForm({ ...registerForm, email: value, phone: value });
-                        }
-                      }}
-                      placeholder={language === 'zh' ? '输入邮箱或电话号码' : language === 'en' ? 'Enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ် ထည့်ပါ'}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem 1.125rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '14px',
-                        fontSize: '1rem',
-                        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-                        color: '#1e293b',
-                        outline: 'none',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                        fontFamily: 'inherit'
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6';
-                        e.currentTarget.style.background = '#ffffff';
-                        e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
-                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                    />
-                  </div>
+                  {/* 普通登录：邮箱或电话号码 */}
+                  {loginType === 'normal' && (
+                    <div style={{ marginBottom: '1.2rem' }}>
+                      <label style={{ 
+                        color: '#475569', 
+                        display: 'block', 
+                        marginBottom: '0.6rem',
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.3px'
+                      }}>
+                        {language === 'zh' ? '邮箱或电话号码' : language === 'en' ? 'Email or Phone Number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်'}
+                      </label>
+                      <input
+                        type="text"
+                        value={registerForm.email || registerForm.phone}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // 判断输入的是邮箱还是电话号码
+                          if (value.includes('@')) {
+                            // 包含@符号，认为是邮箱
+                            setRegisterForm({ ...registerForm, email: value, phone: '' });
+                          } else if (/^\d/.test(value)) {
+                            // 以数字开头，认为是电话号码
+                            setRegisterForm({ ...registerForm, phone: value, email: '' });
+                          } else {
+                            // 其他情况，同时更新两个字段（让后端判断）
+                            setRegisterForm({ ...registerForm, email: value, phone: value });
+                          }
+                        }}
+                        placeholder={language === 'zh' ? '输入邮箱或电话号码' : language === 'en' ? 'Enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ် ထည့်ပါ'}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1.125rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '14px',
+                          fontSize: '1rem',
+                          background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                          color: '#1e293b',
+                          outline: 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                          fontFamily: 'inherit'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.background = '#ffffff';
+                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* 合伙登录：店铺代码 */}
+                  {loginType === 'partner' && (
+                    <div style={{ marginBottom: '1.2rem' }}>
+                      <label style={{ 
+                        color: '#475569', 
+                        display: 'block', 
+                        marginBottom: '0.6rem',
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.3px'
+                      }}>
+                        {language === 'zh' ? '店铺代码' : language === 'en' ? 'Store Code' : 'ဆိုင်ကုဒ်'}
+                      </label>
+                      <input
+                        type="text"
+                        value={registerForm.email || ''}
+                        onChange={(e) => {
+                          setRegisterForm({ ...registerForm, email: e.target.value, phone: '' });
+                        }}
+                        placeholder={language === 'zh' ? '输入店铺代码' : language === 'en' ? 'Enter store code' : 'ဆိုင်ကုဒ် ထည့်ပါ'}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1.125rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '14px',
+                          fontSize: '1rem',
+                          background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
+                          color: '#1e293b',
+                          outline: 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                          fontFamily: 'inherit'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.background = '#ffffff';
+                          e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15)';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.background = 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)';
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      />
+                    </div>
+                  )}
                   
                   {/* 密码 */}
                   <div style={{ marginBottom: '1.2rem' }}>
