@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, LoadScript, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import QRCode from 'qrcode';
+
+// Google Maps API 配置
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
+if (!GOOGLE_MAPS_API_KEY) {
+  console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
+}
+const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 添加CSS动画样式
 const spinAnimation = `
@@ -71,6 +78,27 @@ const DeliveryStoreManagement: React.FC = () => {
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
+  
+  // Google Maps API 加载 - 使用 useJsApiLoader hook（与其他页面保持一致）
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES
+  });
+  
+  // 检查 Google Maps API Key 配置
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.trim() === '') {
+      console.error('❌ Google Maps API密钥未设置！');
+      console.error('请在 Netlify Dashboard 的环境变量设置中配置：REACT_APP_GOOGLE_MAPS_API_KEY');
+    } else {
+      console.log('✅ Google Maps API Key 已加载:', GOOGLE_MAPS_API_KEY.substring(0, 20) + '...');
+    }
+    
+    if (mapLoadError) {
+      console.error('❌ Google Maps 加载失败:', mapLoadError);
+    }
+  }, [isMapLoaded, mapLoadError]);
+  
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -87,7 +115,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const [isLoadingPlaceDetails, setIsLoadingPlaceDetails] = useState(false);
   const autocompleteServiceRef = useRef<any>(null);
   const placesServiceRef = useRef<any>(null);
-  const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
+  const googleMapsApiKey = GOOGLE_MAPS_API_KEY;
   
   // 缅甸主要城市数据
   const myanmarCities = {
@@ -237,10 +265,6 @@ const DeliveryStoreManagement: React.FC = () => {
   const [editingStore, setEditingStore] = useState<DeliveryStore | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   
-  // 地图加载状态管理
-  const [mapLoading, setMapLoading] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
-  
   // 包裹详情相关状态
   const [showPackageModal, setShowPackageModal] = useState(false);
   // const [storePackages, setStorePackages] = useState<Package[]>([]); // 暂时未使用
@@ -323,48 +347,35 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 打开地图选择
   const openMapSelection = () => {
-    setMapError(null);
-    setMapLoading(true);
     setShowMapModal(true);
-    
-    // 设置超时机制，15秒后如果还没加载完成就显示错误
-    setTimeout(() => {
-      if (mapLoading) {
-        setMapLoading(false);
-        setMapError('地图加载超时，可能是网络问题或API配置问题。请尝试手动输入坐标或联系管理员。');
-      }
-    }, 15000);
   };
 
   // 地图加载成功回调
   const onMapLoad = useCallback(() => {
-    setMapLoading(false);
-    setMapError(null);
+    console.log('✅ 地图加载成功');
   }, []);
 
-  // 地图加载失败回调
-  const onMapError = useCallback((error: any) => {
-    console.error('❌ Google Maps 加载失败:', error);
-    setMapLoading(false);
+  // 获取地图错误消息
+  const getMapErrorMessage = useCallback(() => {
+    if (!mapLoadError) return null;
     
-    // 根据错误类型提供不同的提示
-    let errorMessage = '地图加载失败，请重试';
+    const error = mapLoadError as any;
     if (error && error.message) {
       if (error.message.includes('quota') || error.message.includes('billing')) {
-        errorMessage = 'Google Maps API配额已用完，请联系管理员设置付费账户';
+        return 'Google Maps API配额已用完，请联系管理员设置付费账户';
       } else if (error.message.includes('key') || error.message.includes('API_KEY')) {
-        errorMessage = 'Google Maps API密钥无效，请联系管理员检查配置';
+        return 'Google Maps API密钥无效，请联系管理员检查配置';
       } else if (error.message.includes('network') || error.message.includes('timeout')) {
-        errorMessage = '网络连接失败，请检查网络后重试';
+        return '网络连接失败，请检查网络后重试';
       } else if (error.message.includes('referer') || error.message.includes('domain')) {
-        errorMessage = 'API密钥域名限制，请联系管理员添加当前域名';
+        return 'API密钥域名限制，请联系管理员添加当前域名';
       } else {
-        errorMessage = `地图加载失败: ${error.message}`;
+        return `地图加载失败: ${error.message}`;
       }
     }
     
-    setMapError(errorMessage);
-  }, []);
+    return '地图加载失败，请重试';
+  }, [mapLoadError]);
 
   // 确认地图选择
   const confirmMapSelection = () => {
@@ -1389,7 +1400,50 @@ const DeliveryStoreManagement: React.FC = () => {
             </div>
 
             <ErrorBoundary>
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}>
+              {!isMapLoaded ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  borderRadius: '12px'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>正在加载地图...</h3>
+                  <p style={{ margin: '0', opacity: 0.8 }}>请稍候，正在连接Google Maps服务</p>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                    borderTop: '3px solid #3498db',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    marginTop: '1rem'
+                  }}></div>
+                </div>
+              ) : mapLoadError ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(231, 76, 60, 0.1)',
+                  color: 'white',
+                  textAlign: 'center',
+                  padding: '2rem',
+                  borderRadius: '12px'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c' }}>地图加载失败</h3>
+                  <p style={{ margin: '0', opacity: 0.8 }}>{getMapErrorMessage()}</p>
+                </div>
+              ) : (
                 <GoogleMap
                   key={selectedCity}
                   mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '12px' }}
@@ -1403,146 +1457,146 @@ const DeliveryStoreManagement: React.FC = () => {
                     fullscreenControl: true,
                   }}
                 >
-                {stores.map((store) => (
-                  <Marker
-                    key={store.id}
-                    position={{ lat: store.latitude, lng: store.longitude }}
-                    onClick={() => setSelectedStore(store)}
-                    icon={{
-                      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
-                          <circle cx="20" cy="16" r="6" fill="white"/>
-                          <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#e74c3c">店</text>
-                        </svg>
-                      `),
-                      scaledSize: new window.google.maps.Size(40, 40),
-                      anchor: new window.google.maps.Point(20, 40)
-                    }}
-                  />
-                ))}
-                {selectedStore && (
-                  <InfoWindow
-                    position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
-                    onCloseClick={() => setSelectedStore(null)}
-                  >
-                    <div style={{ 
-                      color: '#000', 
-                      padding: '8px',
-                      minWidth: '200px',
-                      fontFamily: 'Arial, sans-serif'
-                    }}>
-                      <h3 style={{ 
-                        margin: '0 0 8px 0', 
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        color: '#2c5282'
+                  {stores.map((store) => (
+                    <Marker
+                      key={store.id}
+                      position={{ lat: store.latitude, lng: store.longitude }}
+                      onClick={() => setSelectedStore(store)}
+                      icon={{
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+                            <circle cx="20" cy="16" r="6" fill="white"/>
+                            <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#e74c3c">店</text>
+                          </svg>
+                        `),
+                        scaledSize: new window.google.maps.Size(40, 40),
+                        anchor: new window.google.maps.Point(20, 40)
+                      }}
+                    />
+                  ))}
+                  {selectedStore && (
+                    <InfoWindow
+                      position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
+                      onCloseClick={() => setSelectedStore(null)}
+                    >
+                      <div style={{ 
+                        color: '#000', 
+                        padding: '8px',
+                        minWidth: '200px',
+                        fontFamily: 'Arial, sans-serif'
                       }}>
-                        {selectedStore.store_name}
-                      </h3>
-                      <p style={{ 
-                        margin: '0 0 6px 0', 
-                        fontSize: '14px',
-                        color: '#4a5568'
-                      }}>
-                        📍 {selectedStore.address}
-                      </p>
-                      <p style={{ 
-                        margin: '0 0 6px 0', 
-                        fontSize: '14px',
-                        color: '#4a5568',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <span style={{ color: '#e53e3e' }}>📞</span> {selectedStore.phone}
-                      </p>
-                      <p style={{ 
-                        margin: '0 0 6px 0', 
-                        fontSize: '14px',
-                        color: '#4a5568',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <span style={{ color: '#805ad5' }}>👤</span> {selectedStore.manager_name}
-                      </p>
-                      <p style={{ 
-                        margin: '0 0 6px 0', 
-                        fontSize: '14px',
-                        color: '#4a5568',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <span style={{ color: '#e53e3e' }}>⏰</span> {selectedStore.operating_hours}
-                      </p>
-                      <div style={{
-                        marginTop: '8px',
-                        padding: '4px 8px',
-                        background: selectedStore.status === 'active' ? '#c6f6d5' : '#fed7d7',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        color: selectedStore.status === 'active' ? '#22543d' : '#742a2a',
-                        fontWeight: '500',
-                        marginBottom: '8px'
-                      }}>
-                        {selectedStore.status === 'active' && '🟢 营业中'}
-                        {selectedStore.status === 'inactive' && '🔴 暂停营业'}
-                        {selectedStore.status === 'maintenance' && '🟡 维护中'}
-                      </div>
-                      <button
-                        onClick={async () => {
-                          // 关闭地图弹窗
-                          setSelectedStore(null);
-                          // 打开店铺包裹查看模态框
-                          if (selectedStore && selectedStore.id) {
-                            setCurrentViewStore(selectedStore);
-                            setShowStorePackagesModal(true);
-                            setLoadingStorePackages(true);
-                            
-                            try {
-                              const packages = await packageService.getPackagesByStoreId(selectedStore.id);
-                              setStorePackages(packages);
-                            } catch (error) {
-                              console.error('加载店铺包裹失败:', error);
-                              setErrorMessage('加载店铺包裹失败，请重试');
-                              setStorePackages([]);
-                            } finally {
-                              setLoadingStorePackages(false);
-                            }
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          marginTop: '8px',
-                          padding: '8px 16px',
-                          background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
+                        <h3 style={{ 
+                          margin: '0 0 8px 0', 
+                          fontSize: '16px',
+                          fontWeight: 'bold',
+                          color: '#2c5282'
+                        }}>
+                          {selectedStore.store_name}
+                        </h3>
+                        <p style={{ 
+                          margin: '0 0 6px 0', 
                           fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          boxShadow: '0 2px 4px rgba(56, 161, 105, 0.3)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(56, 161, 105, 0.4)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(56, 161, 105, 0.3)';
-                        }}
-                      >
-                        🔍 进店查看
-                      </button>
-                    </div>
-                  </InfoWindow>
-                )}
-              </GoogleMap>
-            </LoadScript>
+                          color: '#4a5568'
+                        }}>
+                          📍 {selectedStore.address}
+                        </p>
+                        <p style={{ 
+                          margin: '0 0 6px 0', 
+                          fontSize: '14px',
+                          color: '#4a5568',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ color: '#e53e3e' }}>📞</span> {selectedStore.phone}
+                        </p>
+                        <p style={{ 
+                          margin: '0 0 6px 0', 
+                          fontSize: '14px',
+                          color: '#4a5568',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ color: '#805ad5' }}>👤</span> {selectedStore.manager_name}
+                        </p>
+                        <p style={{ 
+                          margin: '0 0 6px 0', 
+                          fontSize: '14px',
+                          color: '#4a5568',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ color: '#e53e3e' }}>⏰</span> {selectedStore.operating_hours}
+                        </p>
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '4px 8px',
+                          background: selectedStore.status === 'active' ? '#c6f6d5' : '#fed7d7',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          color: selectedStore.status === 'active' ? '#22543d' : '#742a2a',
+                          fontWeight: '500',
+                          marginBottom: '8px'
+                        }}>
+                          {selectedStore.status === 'active' && '🟢 营业中'}
+                          {selectedStore.status === 'inactive' && '🔴 暂停营业'}
+                          {selectedStore.status === 'maintenance' && '🟡 维护中'}
+                        </div>
+                        <button
+                          onClick={async () => {
+                            // 关闭地图弹窗
+                            setSelectedStore(null);
+                            // 打开店铺包裹查看模态框
+                            if (selectedStore && selectedStore.id) {
+                              setCurrentViewStore(selectedStore);
+                              setShowStorePackagesModal(true);
+                              setLoadingStorePackages(true);
+                              
+                              try {
+                                const packages = await packageService.getPackagesByStoreId(selectedStore.id);
+                                setStorePackages(packages);
+                              } catch (error) {
+                                console.error('加载店铺包裹失败:', error);
+                                setErrorMessage('加载店铺包裹失败，请重试');
+                                setStorePackages([]);
+                              } finally {
+                                setLoadingStorePackages(false);
+                              }
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            marginTop: '8px',
+                            padding: '8px 16px',
+                            background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 2px 4px rgba(56, 161, 105, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(56, 161, 105, 0.4)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(56, 161, 105, 0.3)';
+                          }}
+                        >
+                          🔍 进店查看
+                        </button>
+                      </div>
+                    </InfoWindow>
+                  )}
+                </GoogleMap>
+              )}
           </ErrorBoundary>
         </div>
       </div>
@@ -2175,7 +2229,31 @@ const DeliveryStoreManagement: React.FC = () => {
               border: '2px solid rgba(255, 255, 255, 0.2)',
               position: 'relative'
             }}>
-              {mapError ? (
+              {!isMapLoaded ? (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>正在加载地图...</h3>
+                  <p style={{ margin: '0', opacity: 0.8 }}>请稍候，正在连接Google Maps服务</p>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                    borderTop: '3px solid #3498db',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    marginTop: '1rem'
+                  }}></div>
+                </div>
+              ) : mapLoadError ? (
                 <div style={{
                   width: '100%',
                   height: '100%',
@@ -2190,13 +2268,11 @@ const DeliveryStoreManagement: React.FC = () => {
                 }}>
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c' }}>地图加载失败</h3>
-                  <p style={{ margin: '0 0 1rem 0', opacity: 0.8 }}>{mapError}</p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <p style={{ margin: '0 0 1rem 0', opacity: 0.8 }}>{getMapErrorMessage()}</p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button
                       onClick={() => {
-                        setMapError(null);
-                        setMapLoading(true);
-                        // 强制重新加载地图
+                        // 强制重新加载页面
                         window.location.reload();
                       }}
                       style={{
@@ -2246,12 +2322,12 @@ const DeliveryStoreManagement: React.FC = () => {
                       onClick={() => {
                         // 使用预设的常用位置
                         const locations = [
-                          { name: '缅甸市中心', lat: '21.9588', lng: '96.0891' },
+                          { name: '曼德勒市中心', lat: '21.9588', lng: '96.0891' },
                           { name: '仰光市中心', lat: '16.8661', lng: '96.1951' },
                           { name: '内比都', lat: '19.7633', lng: '96.0785' }
                         ];
                         
-                        const choice = prompt(`请选择预设位置:\n1. 缅甸市中心\n2. 仰光市中心\n3. 内比都\n\n请输入数字 (1-3):`);
+                        const choice = prompt(`请选择预设位置:\n1. 曼德勒市中心\n2. 仰光市中心\n3. 内比都\n\n请输入数字 (1-3):`);
                         const index = parseInt(choice || '0') - 1;
                         
                         if (index >= 0 && index < locations.length) {
@@ -2280,65 +2356,35 @@ const DeliveryStoreManagement: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : mapLoading ? (
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white'
-                }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
-                  <h3 style={{ margin: '0 0 0.5rem 0' }}>正在加载地图...</h3>
-                  <p style={{ margin: '0', opacity: 0.8 }}>请稍候，正在连接Google Maps服务</p>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    border: '3px solid rgba(255, 255, 255, 0.3)',
-                    borderTop: '3px solid #3498db',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    marginTop: '1rem'
-                  }}></div>
-                </div>
               ) : (
                 <ErrorBoundary>
-                  <LoadScript 
-                    googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={mapCenter}
+                    zoom={12}
+                    onClick={handleMapClick}
                     onLoad={onMapLoad}
-                    onError={onMapError}
                   >
-                    <GoogleMap
-                      mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={mapCenter}
-                      zoom={12}
-                      onClick={handleMapClick}
-                      onLoad={onMapLoad}
-                    >
-                      {formData.latitude && formData.longitude && (
-                        <Marker
-                          position={{
-                            lat: Number(formData.latitude),
-                            lng: Number(formData.longitude)
-                          }}
-                          icon={{
-                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                              <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
-                                <circle cx="20" cy="16" r="6" fill="white"/>
-                                <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
-                              </svg>
-                            `),
-                            scaledSize: new window.google.maps.Size(40, 40),
-                            anchor: new window.google.maps.Point(20, 40)
-                          }}
-                        />
-                      )}
-                    </GoogleMap>
-                  </LoadScript>
+                    {formData.latitude && formData.longitude && isMapLoaded && window.google && (
+                      <Marker
+                        position={{
+                          lat: Number(formData.latitude),
+                          lng: Number(formData.longitude)
+                        }}
+                        icon={{
+                          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
+                              <circle cx="20" cy="16" r="6" fill="white"/>
+                              <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
+                            </svg>
+                          `),
+                          scaledSize: new window.google.maps.Size(40, 40),
+                          anchor: new window.google.maps.Point(20, 40)
+                        }}
+                      />
+                    )}
+                  </GoogleMap>
                 </ErrorBoundary>
               )}
             </div>
@@ -2377,14 +2423,14 @@ const DeliveryStoreManagement: React.FC = () => {
             }}>
               <button
                 onClick={confirmMapSelection}
-                disabled={!formData.latitude || !formData.longitude || mapLoading || !!mapError}
+                disabled={!formData.latitude || !formData.longitude || !isMapLoaded || !!mapLoadError}
                 style={{
-                  background: (!formData.latitude || !formData.longitude || mapLoading || !!mapError) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  background: (!formData.latitude || !formData.longitude || !isMapLoaded || !!mapLoadError) ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '1rem 2rem',
                   borderRadius: '10px',
-                  cursor: (!formData.latitude || !formData.longitude || mapLoading || !!mapError) ? 'not-allowed' : 'pointer',
+                  cursor: (!formData.latitude || !formData.longitude || !isMapLoaded || !!mapLoadError) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   fontSize: '1rem',
                   boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
@@ -2394,19 +2440,19 @@ const DeliveryStoreManagement: React.FC = () => {
                   gap: '0.5rem'
                 }}
                 onMouseOver={(e) => {
-                  if (formData.latitude && formData.longitude && !mapLoading && !mapError) {
+                  if (formData.latitude && formData.longitude && isMapLoaded && !mapLoadError) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (formData.latitude && formData.longitude) {
+                  if (formData.latitude && formData.longitude && isMapLoaded && !mapLoadError) {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
                   }
                 }}
               >
-                {mapLoading ? '⏳ 加载中...' : mapError ? '❌ 加载失败' : '✅ 确认位置'}
+                {!isMapLoaded ? '⏳ 加载中...' : mapLoadError ? '❌ 加载失败' : '✅ 确认位置'}
               </button>
               <button
                 onClick={() => setShowMapModal(false)}
