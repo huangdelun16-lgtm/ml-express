@@ -22,6 +22,9 @@ const ProfilePage: React.FC = () => {
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
 
   // 检查用户是否是合伙店铺账户
+  // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
+  // 判断逻辑：检查用户的邮箱或手机号是否在 delivery_stores 表中
+  // 如果匹配，说明是admin web中创建的合伙店铺账号
   const checkIfPartnerStore = useCallback(async (user: any) => {
     if (!user) return false;
     
@@ -41,6 +44,7 @@ const ProfilePage: React.FC = () => {
       }
       
       // 检查用户的邮箱或手机号是否在 delivery_stores 表中
+      // 只有admin web中创建的合伙店铺账号才会在delivery_stores表中有记录
       const { data, error } = await supabase
         .from('delivery_stores')
         .select('id')
@@ -52,6 +56,7 @@ const ProfilePage: React.FC = () => {
         return false;
       }
       
+      // 如果找到匹配的记录，说明是合伙店铺账号（在admin web中注册的）
       return data && data.length > 0;
     } catch (error) {
       console.error('检查合伙店铺异常:', error);
