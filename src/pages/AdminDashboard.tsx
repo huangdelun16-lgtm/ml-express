@@ -20,6 +20,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
   const [userEditFormData, setUserEditFormData] = useState({
     username: '',
     password: '',
+    confirmPassword: '',
     employee_name: ''
   });
 
@@ -32,6 +33,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
     setUserEditFormData({
       username: currentUser,
       password: '',
+      confirmPassword: '',
       employee_name: currentUserName
     });
     setShowUserEditModal(true);
@@ -42,6 +44,12 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
     e.preventDefault();
     
     try {
+      // 验证密码一致性
+      if (userEditFormData.password && userEditFormData.password !== userEditFormData.confirmPassword) {
+        alert('两次输入的密码不一致');
+        return;
+      }
+
       // 获取当前用户的完整信息
       const accounts = await adminAccountService.getAllAccounts();
       const currentAccount = accounts.find(account => account.username === currentUser);
@@ -475,27 +483,30 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 1000
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
-            borderRadius: '20px',
-            padding: '30px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '24px',
+            padding: '40px',
             width: '90%',
-            maxWidth: '500px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+            maxWidth: '480px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)'
           }}>
             <h2 style={{ 
               color: 'white', 
-              marginBottom: '25px', 
+              marginBottom: '30px', 
               textAlign: 'center',
-              fontSize: '1.5rem',
-              fontWeight: 'bold'
+              fontSize: '1.8rem',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }}>
               {language === 'zh' ? '编辑个人信息' : language === 'en' ? 'Edit Profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်'}
             </h2>
@@ -504,10 +515,11 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ 
                   display: 'block', 
-                  color: 'white', 
+                  color: 'rgba(255, 255, 255, 0.9)', 
                   marginBottom: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px'
                 }}>
                   {language === 'zh' ? '用户名' : language === 'en' ? 'Username' : 'အသုံးပြုသူအမည်'}
                 </label>
@@ -520,12 +532,22 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                   })}
                   style={{
                     width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    fontSize: '1rem'
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#4299e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                   }}
                   required
                 />
@@ -534,10 +556,11 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ 
                   display: 'block', 
-                  color: 'white', 
+                  color: 'rgba(255, 255, 255, 0.9)', 
                   marginBottom: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px'
                 }}>
                   {language === 'zh' ? '员工姓名' : language === 'en' ? 'Employee Name' : 'ဝန်ထမ်းအမည်'}
                 </label>
@@ -550,26 +573,40 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                   })}
                   style={{
                     width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    fontSize: '1rem'
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#4299e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                   }}
                   required
                 />
               </div>
 
-              <div style={{ marginBottom: '25px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <label style={{ 
                   display: 'block', 
-                  color: 'white', 
+                  color: 'rgba(255, 255, 255, 0.9)', 
                   marginBottom: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px'
                 }}>
-                  {language === 'zh' ? '新密码 (留空则不修改)' : language === 'en' ? 'New Password (Leave blank to keep current)' : 'စကားဝှက်အသစ် (မပြောင်းလိုပါက ဗလာထားပါ)'}
+                  {language === 'zh' ? '新密码' : language === 'en' ? 'New Password' : 'စကားဝှက်အသစ်'}
+                  <span style={{ fontSize: '0.8rem', opacity: 0.7, fontWeight: 'normal', marginLeft: '8px' }}>
+                    {language === 'zh' ? '(留空则不修改)' : language === 'en' ? '(Leave blank to keep current)' : '(မပြောင်းလိုပါက ဗလာထားပါ)'}
+                  </span>
                 </label>
                 <input
                   type="password"
@@ -580,20 +617,71 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                   })}
                   style={{
                     width: '100%',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    fontSize: '1rem'
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#4299e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                   }}
                   placeholder={language === 'zh' ? '输入新密码' : language === 'en' ? 'Enter new password' : 'စကားဝှက်အသစ်ထည့်ပါ'}
                 />
               </div>
 
+              <div style={{ marginBottom: '30px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  marginBottom: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px'
+                }}>
+                  {language === 'zh' ? '确认新密码' : language === 'en' ? 'Confirm New Password' : 'စကားဝှက်အသစ်အတည်ပြုပါ'}
+                </label>
+                <input
+                  type="password"
+                  value={userEditFormData.confirmPassword}
+                  onChange={(e) => setUserEditFormData({
+                    ...userEditFormData,
+                    confirmPassword: e.target.value
+                  })}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#4299e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                  placeholder={language === 'zh' ? '再次输入新密码' : language === 'en' ? 'Confirm new password' : 'စကားဝှက်အသစ်ထပ်ရိုက်ပါ'}
+                />
+              </div>
+
               <div style={{ 
                 display: 'flex', 
-                gap: '15px', 
+                gap: '16px', 
                 justifyContent: 'flex-end' 
               }}>
                 <button
@@ -603,11 +691,21 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: 'white',
                     border: '1px solid rgba(255, 255, 255, 0.3)',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
+                    padding: '12px 28px',
+                    borderRadius: '12px',
                     cursor: 'pointer',
                     fontSize: '1rem',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
                   {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}
@@ -615,14 +713,26 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                 <button
                   type="submit"
                   style={{
-                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
+                    background: 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)',
                     color: 'white',
                     border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
+                    padding: '12px 28px',
+                    borderRadius: '12px',
                     cursor: 'pointer',
                     fontSize: '1rem',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 15px rgba(66, 153, 225, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 153, 225, 0.5)';
+                    e.currentTarget.style.filter = 'brightness(1.1)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(66, 153, 225, 0.4)';
+                    e.currentTarget.style.filter = 'brightness(1)';
                   }}
                 >
                   {language === 'zh' ? '保存更改' : language === 'en' ? 'Save Changes' : 'ပြောင်းလဲမှုများသိမ်းဆည်းရန်'}
