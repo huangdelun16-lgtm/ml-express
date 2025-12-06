@@ -1202,9 +1202,9 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         return (
                           <span style={{
                             marginLeft: '8px',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            fontSize: '0.65rem',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
                             fontWeight: 'bold',
                             color: userTypeColor,
                             background: userTypeBg,
