@@ -123,6 +123,8 @@ const HomePage: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);                                                       
   const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
   const [senderAddressText, setSenderAddressText] = useState('');
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
@@ -211,6 +213,21 @@ const HomePage: React.FC = () => {
     loadPricingSettings();
     loadUserFromStorage();
   }, []);
+
+  // 当打开订单表单且用户已登录时，自动填充寄件人信息
+  useEffect(() => {
+    if (showOrderForm && currentUser) {
+      // 自动填充寄件人信息
+      setSenderName(currentUser.name || '');
+      setSenderPhone(currentUser.phone || currentUser.email || '');
+      setSenderAddressText(currentUser.address || '');
+    } else if (!showOrderForm) {
+      // 关闭表单时清空字段（可选，根据需求决定）
+      // setSenderName('');
+      // setSenderPhone('');
+      // setSenderAddressText('');
+    }
+  }, [showOrderForm, currentUser]);
 
   // 验证码倒计时
   useEffect(() => {
@@ -3851,6 +3868,8 @@ const HomePage: React.FC = () => {
                   type="text"
                   name="senderName"
                   placeholder={t.order.senderName}
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
                   required
                   style={{
                     width: '100%',
@@ -3877,6 +3896,8 @@ const HomePage: React.FC = () => {
                   type="tel"
                   name="senderPhone"
                   placeholder={t.order.senderPhone}
+                  value={senderPhone}
+                  onChange={(e) => setSenderPhone(e.target.value)}
                   required
                   style={{
                     width: '100%',
@@ -6553,7 +6574,7 @@ const HomePage: React.FC = () => {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-                marginBottom: '0.75rem',
+                marginBottom: isLoginMode ? '0.25rem' : '0.75rem',
                 textShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
                 whiteSpace: 'nowrap'
               }}>
@@ -6574,6 +6595,31 @@ const HomePage: React.FC = () => {
                   (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်သစ်ဖွင့်ရန်')
                 )}
               </h2>
+              
+              {/* 登录模式：显示副标题 */}
+              {isLoginMode && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '1.5rem',
+                  gap: '1rem'
+                }}>
+                  <div style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, transparent, #cbd5e1)' }}></div>
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontStyle: 'italic',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase'
+                  }}>
+                    DELIVERY SERVICE
+                  </span>
+                  <div style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, #cbd5e1, transparent)' }}></div>
+                </div>
+              )}
+
               {/* 登录模式：显示登录类型选择按钮 */}
               {isLoginMode && (
                 <div style={{
