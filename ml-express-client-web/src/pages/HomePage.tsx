@@ -4253,7 +4253,7 @@ const HomePage: React.FC = () => {
                 </select>
 
                 {/* 代收款 (仅Partner或VIP可见) */}
-                {(isPartnerStore || (currentUser && currentUser.user_type === 'vip')) && (
+                {((currentUser && currentUser.user_type === 'partner') || (currentUser && currentUser.user_type === 'vip')) && (
                   <div style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
                     <label style={{ 
                       display: 'block', 
