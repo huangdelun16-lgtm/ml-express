@@ -15,6 +15,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
   const [courierDetail, setCourierDetail] = useState<any>(null);
   const [courierLoading, setCourierLoading] = useState(false);
   
@@ -74,6 +75,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   // 加载包裹数据
   useEffect(() => {
     loadPackages();
+    loadDeliveryStores();
     
     // 设置定时刷新，每30秒刷新一次包裹状态
     const refreshInterval = setInterval(() => {
@@ -82,6 +84,18 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
     
     return () => clearInterval(refreshInterval);
   }, []);
+
+  const loadDeliveryStores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('id, store_name, store_code');
+      if (error) throw error;
+      setDeliveryStores(data || []);
+    } catch (error) {
+      console.error('加载店铺列表失败:', error);
+    }
+  };
 
   const loadPackages = async () => {
     try {
@@ -1195,13 +1209,19 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       {(() => {
                         let userType = language === 'zh' ? '普通账户' : language === 'en' ? 'Normal' : 'သာမန်';
                         let styleProps: any = {
-                          background: 'rgba(156, 163, 175, 0.2)',
-                          color: '#9ca3af',
-                          border: '1px solid #9ca3af',
-                          boxShadow: 'none'
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                         };
 
-                        if (pkg.delivery_store_id) {
+                        // 检查是否为合伙店铺 (ID匹配 或 名称匹配)
+                        const isStoreMatch = deliveryStores.some(store => 
+                          store.store_name === pkg.sender_name || 
+                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                        );
+
+                        if (pkg.delivery_store_id || isStoreMatch) {
                           userType = 'Partner';
                           styleProps = {
                             background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
