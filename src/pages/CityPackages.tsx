@@ -1039,10 +1039,15 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                     
                     {/* 代收款显示 */}
                     {(() => {
-                      const isPartnerOrder = !!pkg.delivery_store_id;
+                      // 检查是否为合伙店铺 (ID匹配 或 名称匹配)
+                      const isStoreMatch = deliveryStores.some(store => 
+                        store.store_name === pkg.sender_name || 
+                        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                      );
+                      const isPartnerOrder = !!pkg.delivery_store_id || isStoreMatch;
                       const codAmount = Number(pkg.cod_amount || 0);
                       
-                      if (isPartnerOrder || codAmount > 0) {
+                      if (isPartnerOrder) {
                         return (
                           <span style={{
                             background: '#fcd34d', // Amber-300
@@ -1055,6 +1060,22 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
                           }}>
                             💰 {language === 'zh' ? '代收' : 'COD'}: {codAmount > 0 ? `${codAmount} MMK` : (language === 'zh' ? '无' : 'None')}
+                          </span>
+                        );
+                      } else if (codAmount > 0) {
+                        // 非 Partner 但有金额，仍需显示以防遗漏
+                        return (
+                          <span style={{
+                            background: '#fcd34d',
+                            color: '#b45309',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            marginLeft: '0.5rem',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            💰 {language === 'zh' ? '代收' : 'COD'}: {codAmount} MMK
                           </span>
                         );
                       }
