@@ -49,6 +49,7 @@ export interface Package {
   sender_code?: string;
   transfer_code?: string;
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  cod_amount?: number; // 代收款金额 (Cash on Delivery)
   customer_email?: string; // 客户邮箱
   customer_name?: string; // 客户姓名
 }
@@ -376,6 +377,7 @@ export interface PendingOrder {
   price: number;
   distance: number;
   payment_method: 'qr' | 'cash';
+  cod_amount?: number; // 代收款金额
   customer_email?: string | null;
   customer_name?: string | null;
   created_at?: string;

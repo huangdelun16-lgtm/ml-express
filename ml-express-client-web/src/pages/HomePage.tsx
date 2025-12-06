@@ -127,6 +127,7 @@ const HomePage: React.FC = () => {
   const [senderPhone, setSenderPhone] = useState('');
   const [senderAddressText, setSenderAddressText] = useState('');
   const [receiverAddressText, setReceiverAddressText] = useState('');
+  const [codAmount, setCodAmount] = useState(''); // 代收款金额
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CITY_CENTER);
@@ -1777,6 +1778,7 @@ const HomePage: React.FC = () => {
       senderLongitude: selectedSenderLocation?.lng || null,
       receiverLatitude: selectedReceiverLocation?.lat || null,
       receiverLongitude: selectedReceiverLocation?.lng || null,
+      codAmount: codAmount ? parseFloat(codAmount) : 0,
     };
     
     // 验证必填字段
@@ -1858,6 +1860,7 @@ const HomePage: React.FC = () => {
         price: price,
         distance: distance,
         payment_method: paymentMethod,
+        cod_amount: orderInfo.codAmount, // 添加代收款金额
         customer_email: currentUser?.email || null,
         customer_name: currentUser?.name || orderInfo.senderName || null
       };
@@ -1871,6 +1874,7 @@ const HomePage: React.FC = () => {
           price: price,
           distance: distance,
           tempOrderId: tempOrderId,
+          codAmount: orderInfo.codAmount, // 添加代收款金额
           customerEmail: currentUser?.email || '',
           customerName: currentUser?.name || orderInfo.senderName,
           paymentMethod: paymentMethod
@@ -4247,6 +4251,63 @@ const HomePage: React.FC = () => {
                   <option value={t.ui.urgentDelivery}>{t.ui.urgentDelivery}</option>
                   <option value={t.ui.scheduledDelivery}>{t.ui.scheduledDelivery}</option>
                 </select>
+
+                {/* 代收款 (仅Partner或VIP可见) */}
+                {(isPartnerStore || (currentUser && currentUser.user_type === 'vip')) && (
+                  <div style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      marginBottom: '0.5rem', 
+                      fontWeight: 'bold', 
+                      color: 'white',
+                      fontSize: 'var(--font-size-base)'
+                    }}>
+                      {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collection Amount (COD)' : 'ငွေကောက်ခံရန် (COD)'}
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="number"
+                        name="codAmount"
+                        value={codAmount}
+                        onChange={(e) => setCodAmount(e.target.value)}
+                        placeholder={language === 'zh' ? '请输入代收金额' : language === 'en' ? 'Enter amount' : 'ပမာဏထည့်ပါ'}
+                        style={{
+                          width: '100%',
+                          padding: 'var(--spacing-3) var(--spacing-4)',
+                          paddingRight: '3.5rem',
+                          border: '2px solid var(--color-border-dark)',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: 'var(--font-size-base)',
+                          lineHeight: 'var(--line-height-normal)',
+                          textAlign: 'left',
+                          transition: 'all var(--transition-base)',
+                          fontFamily: 'var(--font-family-base)',
+                          background: 'rgba(255, 255, 255, 0.9)',
+                          backdropFilter: 'blur(5px)'
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        right: '1rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#4a5568',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem'
+                      }}>
+                        MMK
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 {/* 显示选择的时间 */}
                 {selectedDeliverySpeed === t.ui.scheduledDelivery && scheduledDeliveryTime && (
@@ -4814,6 +4875,7 @@ const HomePage: React.FC = () => {
                           price: dbPendingOrder.price,
                           distance: dbPendingOrder.distance,
                           paymentMethod: dbPendingOrder.payment_method,
+                          codAmount: dbPendingOrder.cod_amount, // 读取代收款
                           tempOrderId: dbPendingOrder.temp_order_id
                         };
                       }
@@ -4880,7 +4942,8 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
-                      payment_method: currentPaymentMethod // 添加支付方式字段
+                      payment_method: currentPaymentMethod, // 添加支付方式字段
+                      cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
 
                     // 只有在用户登录时才添加 customer_email 和 customer_name
