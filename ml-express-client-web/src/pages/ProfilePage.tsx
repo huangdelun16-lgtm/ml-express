@@ -317,7 +317,7 @@ const ProfilePage: React.FC = () => {
       receiver: '收件人',
       close: '关闭',
       paymentMethod: '支付方式',
-      qrPayment: '二维码支付',
+      qrPayment: '转账',
       cashPayment: '现金支付',
       totalOrders: '全部订单',
       accountDate: '开户日期',
@@ -359,7 +359,7 @@ const ProfilePage: React.FC = () => {
       receiver: 'Receiver',
       close: 'Close',
       paymentMethod: 'Payment Method',
-      qrPayment: 'QR Code',
+      qrPayment: 'Transfer',
       cashPayment: 'Cash',
       totalOrders: 'Total Orders',
       accountDate: 'Account Created',
@@ -401,7 +401,7 @@ const ProfilePage: React.FC = () => {
       receiver: 'လက်ခံသူ',
       close: 'ပိတ်ရန်',
       paymentMethod: 'ငွေပေးချေမှုနည်းလမ်း',
-      qrPayment: 'QR Code',
+      qrPayment: 'ငွေလွှဲ',
       cashPayment: 'ငွေသား',
       totalOrders: 'စုစုပေါင်းအော်ဒါ',
       accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ',
@@ -461,7 +461,7 @@ const ProfilePage: React.FC = () => {
   // 获取支付方式文本
   const getPaymentMethodText = (paymentMethod?: string) => {
     if (paymentMethod === 'qr') {
-      return language === 'zh' ? '二维码支付' : language === 'en' ? 'QR Code' : 'QR Code';
+      return language === 'zh' ? '转账' : language === 'en' ? 'Transfer' : 'ငွေလွှဲ';
     } else if (paymentMethod === 'cash') {
       return language === 'zh' ? '现金支付' : language === 'en' ? 'Cash' : 'ငွေသား';
     }
@@ -1215,18 +1215,17 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* 详细信息网格 */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.5rem',
-            padding: '1.5rem',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            {/* 非合伙店铺显示的详细信息 */}
-            {!isPartnerStore && (
+          {/* 详细信息网格 - 仅非合伙店铺显示 */}
+          {!isPartnerStore && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+              padding: '1.5rem',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
@@ -1261,24 +1260,8 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
-            
-            {/* 合伙店铺：密码修改按钮 - 已移动到头部 */}
-            {/* {isPartnerStore && (
-              <div style={{ 
-                display: 'flex',
-                justifyContent: 'center',
-                width: '100%'
-              }}>
-                <button
-                  onClick={() => setShowPasswordModal(true)}
-                  // ... styles
-                >
-                  {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
-                </button>
-              </div>
-            )} */}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* 包裹列表 */}
@@ -1444,22 +1427,31 @@ const ProfilePage: React.FC = () => {
                       setShowPackageDetailModal(true);
                     }}
                     style={{
-                      background: 'rgba(59, 130, 246, 0.3)',
+                      background: 'rgba(59, 130, 246, 0.25)',
                       color: 'white',
-                      border: '1px solid rgba(59, 130, 246, 0.5)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
                       padding: '0.5rem 1.5rem',
                       borderRadius: '8px',
                       cursor: 'pointer',
                       fontSize: '0.9rem',
                       fontWeight: 'bold',
                       transition: 'all 0.3s ease',
-                      width: '100%'
+                      width: '100%',
+                      maxWidth: '200px',
+                      marginTop: '0.5rem',
+                      display: 'block',
+                      marginLeft: 'auto',
+                      marginRight: 'auto'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     {t.viewDetails}
