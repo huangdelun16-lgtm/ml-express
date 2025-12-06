@@ -919,81 +919,176 @@ const ProfilePage: React.FC = () => {
             
             {/* 用户基本信息 */}
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
-                <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
-                  {currentUser.name || '-'}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
+                    {currentUser.name || '-'}
+                  </div>
+                  <div style={{
+                    background: isPartnerStore ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                    border: isPartnerStore ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
+                    color: isPartnerStore ? '#3b82f6' : '#ffd700',
+                    padding: '0.2rem 0.8rem',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                  }}>
+                    {isPartnerStore ? 'Partner' : (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')}
+                  </div>
                 </div>
-                <div style={{
-                  background: isPartnerStore ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                  border: isPartnerStore ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
-                  color: isPartnerStore ? '#3b82f6' : '#ffd700',
-                  padding: '0.2rem 0.8rem',
-                  borderRadius: '20px',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                }}>
-                  {isPartnerStore ? 'Partner' : (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')}
-                </div>
+                
+                {/* 合伙店铺：修改密码按钮 */}
+                {isPartnerStore && (
+                  <button
+                    onClick={() => setShowPasswordModal(true)}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#60a5fa',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      padding: '0.5rem 1.2rem',
+                      borderRadius: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span>🔒</span>
+                    {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
+                  </button>
+                )}
               </div>
               
               {isPartnerStore && storeInfo ? (
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, auto)',
-                  gap: '1rem',
-                  marginTop: '1rem',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                  gap: '1.2rem',
+                  marginTop: '1.5rem',
                   background: 'rgba(0, 0, 0, 0.2)',
-                  padding: '1.2rem',
-                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  borderRadius: '20px',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
                 }}>
-                  {/* 第一行：店铺类型和代码 */}
+                  {/* 第一行：店铺代码, 店铺类型 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>🏪</span>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem'
+                    }}>🔢</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.storeType}</span>
-                      <span style={{ color: 'white', fontWeight: '500' }}>{getStoreTypeLabel(storeInfo.store_type)}</span>
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>🔢</span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.storeCode}</span>
-                      <span style={{ color: 'white', fontWeight: '500', fontFamily: 'monospace', letterSpacing: '1px' }}>{storeInfo.store_code}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeCode}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontFamily: 'monospace', letterSpacing: '1px', fontSize: '1.05rem' }}>
+                        {storeInfo.store_code}
+                      </span>
                     </div>
                   </div>
 
-                  {/* 第二行：地址（可能较长，占满一行） */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem'
+                    }}>🏪</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeType}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                        {getStoreTypeLabel(storeInfo.store_type)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* 第二行：电话号码, 开户日期 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem'
+                    }}>📞</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.phone}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                        {storeInfo.manager_phone || currentUser.phone}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem'
+                    }}>📅</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.accountDate}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                        {formatDate(storeInfo.created_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 第三行：地址（占满一行） */}
                   <div style={{ 
                     display: 'flex', 
                     alignItems: 'flex-start', 
                     gap: '0.8rem',
-                    gridColumn: window.innerWidth < 768 ? '1' : '1 / -1'
+                    gridColumn: window.innerWidth < 768 ? '1' : '1 / -1',
+                    background: 'rgba(255,255,255,0.05)',
+                    padding: '0.8rem',
+                    borderRadius: '12px'
                   }}>
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9, marginTop: '2px' }}>📍</span>
+                    <div style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      flexShrink: 0
+                    }}>📍</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.address}</span>
-                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.4' }}>{storeInfo.address}</span>
-                    </div>
-                  </div>
-
-                  {/* 第三行：开户日期 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📅</span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.accountDate}</span>
-                      <span style={{ color: 'white', fontWeight: '500' }}>{formatDate(storeInfo.created_at)}</span>
-                    </div>
-                  </div>
-
-                   {/* 补充：电话 */}
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.phone}</span>
-                      <span style={{ color: 'white', fontWeight: '500' }}>{storeInfo.manager_phone || currentUser.phone}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.address}</span>
+                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.5', fontSize: '1rem' }}>
+                        {storeInfo.address}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1160,8 +1255,8 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
             
-            {/* 合伙店铺：密码修改按钮 */}
-            {isPartnerStore && (
+            {/* 合伙店铺：密码修改按钮 - 已移动到头部 */}
+            {/* {isPartnerStore && (
               <div style={{ 
                 display: 'flex',
                 justifyContent: 'center',
@@ -1169,31 +1264,12 @@ const ProfilePage: React.FC = () => {
               }}>
                 <button
                   onClick={() => setShowPasswordModal(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.75rem 2rem',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                  }}
+                  // ... styles
                 >
                   {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
                 </button>
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
