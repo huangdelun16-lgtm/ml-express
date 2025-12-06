@@ -324,7 +324,9 @@ const ProfilePage: React.FC = () => {
       pendingPickup: '待取件',
       inTransit: '配送中',
       completed: '已完成',
-      pickupCode: '寄件码'
+      pickupCode: '寄件码',
+      storeType: '店铺类型',
+      storeCode: '店铺代码'
     },
     en: {
       nav: {
@@ -364,7 +366,9 @@ const ProfilePage: React.FC = () => {
       pendingPickup: 'Pending Pickup',
       inTransit: 'In Transit',
       completed: 'Completed',
-      pickupCode: 'Pickup Code'
+      pickupCode: 'Pickup Code',
+      storeType: 'Store Type',
+      storeCode: 'Store Code'
     },
     my: {
       nav: {
@@ -404,11 +408,36 @@ const ProfilePage: React.FC = () => {
       pendingPickup: 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်',
       inTransit: 'ပို့ဆောင်နေသည်',
       completed: 'ပြီးစီးပြီး',
-      pickupCode: 'ကောက်ယူမည့်ကုဒ်'
+      pickupCode: 'ကောက်ယူမည့်ကုဒ်',
+      storeType: 'ဆိုင်အမျိုးအစား',
+      storeCode: 'ဆိုင်ကုဒ်'
     }
   };
 
   const t = translations[language as keyof typeof translations] || translations.zh;
+
+  // 获取店铺类型文本
+  const getStoreTypeLabel = (type: string) => {
+    const typeMap: { [key: string]: { zh: string; en: string; my: string } } = {
+      restaurant: { zh: '餐厅', en: 'Restaurant', my: 'စားသောက်ဆိုင်' },
+      tea_shop: { zh: '茶馆', en: 'Tea Shop', my: 'လက်ဖက်ရည်ဆိုင်' },
+      drinks_snacks: { zh: '饮料小吃', en: 'Drinks & Snacks', my: 'အချိုရည်နှင့်မုန့်' },
+      grocery: { zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်' },
+      transit_station: { zh: '中转站', en: 'Transit Station', my: 'သယ်ယူပို့ဆောင်ရေးစခန်း' }
+    };
+    const labels = typeMap[type] || { zh: type, en: type, my: type };
+    return language === 'zh' ? labels.zh : language === 'en' ? labels.en : labels.my;
+  };
+
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   // 获取状态颜色
   const getStatusColor = (status: string) => {
@@ -890,7 +919,7 @@ const ProfilePage: React.FC = () => {
             
             {/* 用户基本信息 */}
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
                 <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
                   {currentUser.name || '-'}
                 </div>
@@ -908,20 +937,82 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📧</span>
-                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
-                    {currentUser.email || '未绑定邮箱'}
-                  </span>
+              {isPartnerStore && storeInfo ? (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, auto)',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  padding: '1.2rem',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {/* 第一行：店铺类型和代码 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>🏪</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.storeType}</span>
+                      <span style={{ color: 'white', fontWeight: '500' }}>{getStoreTypeLabel(storeInfo.store_type)}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>🔢</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.storeCode}</span>
+                      <span style={{ color: 'white', fontWeight: '500', fontFamily: 'monospace', letterSpacing: '1px' }}>{storeInfo.store_code}</span>
+                    </div>
+                  </div>
+
+                  {/* 第二行：地址（可能较长，占满一行） */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    gap: '0.8rem',
+                    gridColumn: window.innerWidth < 768 ? '1' : '1 / -1'
+                  }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9, marginTop: '2px' }}>📍</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.address}</span>
+                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.4' }}>{storeInfo.address}</span>
+                    </div>
+                  </div>
+
+                  {/* 第三行：开户日期 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📅</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.accountDate}</span>
+                      <span style={{ color: 'white', fontWeight: '500' }}>{formatDate(storeInfo.created_at)}</span>
+                    </div>
+                  </div>
+
+                   {/* 补充：电话 */}
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>{t.phone}</span>
+                      <span style={{ color: 'white', fontWeight: '500' }}>{storeInfo.manager_phone || currentUser.phone}</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
-                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
-                    {currentUser.phone || '未绑定电话'}
-                  </span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📧</span>
+                    <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                      {currentUser.email || '未绑定邮箱'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
+                    <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                      {currentUser.phone || '未绑定电话'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -1023,61 +1114,47 @@ const ProfilePage: React.FC = () => {
 
           {/* 详细信息网格 */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+            display: 'flex',
+            flexDirection: 'column',
             gap: '1.5rem',
             padding: '1.5rem',
             background: 'rgba(0, 0, 0, 0.2)',
             borderRadius: '16px',
             border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ fontSize: '1.5rem' }}>📅</div>
-              <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
-                  {t.accountDate}
-                </label>
-                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
-                  {currentUser.created_at 
-                    ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })
-                    : '-'}
+            {/* 非合伙店铺显示的详细信息 */}
+            {!isPartnerStore && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ fontSize: '1.5rem' }}>📅</div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                      {t.accountDate}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                      {currentUser.created_at 
+                        ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        : '-'}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ fontSize: '1.5rem' }}>📍</div>
-              <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
-                  {t.address}
-                </label>
-                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
-                  {currentUser.address || '-'}
-                </div>
-              </div>
-            </div>
-            
-            {/* 合伙店铺：显示店铺代码（只读） */}
-            {isPartnerStore && storeInfo && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ fontSize: '1.5rem' }}>🏪</div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
-                    {language === 'zh' ? '店铺代码' : language === 'en' ? 'Store Code' : 'ဆိုင်ကုဒ်'}
-                  </label>
-                  <div style={{ 
-                    color: 'white', 
-                    fontSize: '1rem', 
-                    fontWeight: '500',
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}>
-                    {storeInfo.store_code || currentUser.store_code || '-'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ fontSize: '1.5rem' }}>📍</div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                      {t.address}
+                    </label>
+                    <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                      {currentUser.address || '-'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1086,10 +1163,9 @@ const ProfilePage: React.FC = () => {
             {/* 合伙店铺：密码修改按钮 */}
             {isPartnerStore && (
               <div style={{ 
-                gridColumn: window.innerWidth < 768 ? '1' : '1 / -1',
                 display: 'flex',
                 justifyContent: 'center',
-                marginTop: '1rem'
+                width: '100%'
               }}>
                 <button
                   onClick={() => setShowPasswordModal(true)}
