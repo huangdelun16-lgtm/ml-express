@@ -472,7 +472,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div>
           <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-            {language === 'zh' ? '同城包裹管理' : language === 'en' ? 'City Package Management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု'}
+            {language === 'zh' ? '同城订单管理' : language === 'en' ? 'City Order Management' : 'မြို့တွင်းအော်ဒါစီမံခန့်ခွဲမှု'}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
               {language === 'zh' ? '管理缅甸同城快递包裹' : 'Manage local express packages in Myanmar'}
@@ -1181,7 +1181,40 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                   borderTop: '1px solid rgba(255, 255, 255, 0.1)'
                 }}>
                   <div>
-                    <h4 style={{ color: '#ffffff', margin: '0 0 2px 0', fontSize: '0.75rem', fontWeight: '600' }}>寄件人</h4>
+                    <h4 style={{ color: '#ffffff', margin: '0 0 2px 0', fontSize: '0.75rem', fontWeight: '600', display: 'flex', alignItems: 'center' }}>
+                      寄件人
+                      {(() => {
+                        let userType = language === 'zh' ? '普通账户' : language === 'en' ? 'Normal' : 'သာမန်';
+                        let userTypeColor = '#9ca3af'; // gray
+                        let userTypeBg = 'rgba(156, 163, 175, 0.2)';
+
+                        if (pkg.delivery_store_id) {
+                          userType = 'Partner';
+                          userTypeColor = '#3b82f6'; // blue
+                          userTypeBg = 'rgba(59, 130, 246, 0.2)';
+                        } else if (pkg.customer_email || pkg.customer_name) {
+                          userType = language === 'zh' ? 'VIP账户' : language === 'en' ? 'VIP' : 'VIP';
+                          userTypeColor = '#f59e0b'; // amber
+                          userTypeBg = 'rgba(245, 158, 11, 0.2)';
+                        }
+
+                        return (
+                          <span style={{
+                            marginLeft: '8px',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: 'bold',
+                            color: userTypeColor,
+                            background: userTypeBg,
+                            border: `1px solid ${userTypeColor}`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {userType}
+                          </span>
+                        );
+                      })()}
+                    </h4>
                     <p style={{ color: '#ffffff', margin: 0, fontSize: '0.8rem', fontWeight: '500' }}>
                       {pkg.sender_name} - {pkg.sender_phone}
                     </p>

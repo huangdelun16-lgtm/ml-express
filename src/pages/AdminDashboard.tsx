@@ -99,7 +99,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
   // 所有卡片数据及其权限配置
   const allCardData = [
     {
-      title: language === 'zh' ? '同城包裹' : language === 'en' ? 'City Packages' : 'မြို့တွင်းပက်ကေ့ဂျ်များ',
+      title: language === 'zh' ? '同城订单' : language === 'en' ? 'City Orders' : 'မြို့တွင်းအော်ဒါများ',
       description: language === 'zh' ? '同城快递包裹管理' : language === 'en' ? 'Local express package management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု',
       color: '#2c5282',
       icon: '📦',
@@ -161,7 +161,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
 
   const handleCardClick = (title: string) => {
     // 根据卡片标题（支持中英缅文）导航到对应页面
-    if (title === '同城包裹' || title === 'City Packages' || title === 'မြို့တွင်းပက်ကေ့ဂျ်များ') {
+    if (title === '同城订单' || title === 'City Orders' || title === 'မြို့တွင်းအော်ဒါများ') {
       navigate('/admin/city-packages');
     } else if (title === '用户管理' || title === 'User Management' || title === 'အသုံးပြုသူစီမံခန့်ခွဲမှု') {
       navigate('/admin/users');
