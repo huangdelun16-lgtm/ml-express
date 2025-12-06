@@ -3179,7 +3179,7 @@ const DeliveryStoreManagement: React.FC = () => {
                             {pkg.status}
                           </span>
                           {/* 代收款显示 - 只有合伙店铺下单且需要代收款时才显示 */}
-                          {pkg.delivery_store_id && parseFloat(pkg.store_fee?.toString() || '0') > 0 && (
+                          {pkg.delivery_store_id && (pkg.cod_amount ? parseFloat(pkg.cod_amount.toString()) : 0) > 0 && (
                             <span style={{
                               padding: '0.25rem 0.75rem',
                               borderRadius: '6px',
@@ -3191,7 +3191,7 @@ const DeliveryStoreManagement: React.FC = () => {
                               whiteSpace: 'nowrap'
                             }}>
                               {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံရမည့်ပမာဏ'}: {(() => {
-                                const value = parseFloat(pkg.store_fee?.toString() || '0');
+                                const value = parseFloat(pkg.cod_amount?.toString() || '0');
                                 return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
                               })()} MMK
                             </span>
@@ -3279,7 +3279,7 @@ const DeliveryStoreManagement: React.FC = () => {
                                   wordBreak: 'keep-all'
                                 }}>
                                   {(() => {
-                                    const storeFee = parseFloat(pkg.store_fee?.toString() || '0');
+                                    const storeFee = parseFloat(pkg.cod_amount?.toString() || '0');
                                     const deliveryFee = parseFloat(pkg.delivery_fee?.toString() || '0');
                                     const priceValue = parseFloat(pkg.price?.toString() || '0');
                                     // 如果 delivery_fee 为 0，使用 price 作为跑腿费
@@ -3338,7 +3338,7 @@ const DeliveryStoreManagement: React.FC = () => {
                                   textOverflow: 'ellipsis'
                                 }}>
                                   {(() => {
-                                    const value = parseFloat(pkg.store_fee?.toString() || '0');
+                                    const value = parseFloat(pkg.cod_amount?.toString() || '0');
                                     return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
                                   })()} MMK
                                 </div>
