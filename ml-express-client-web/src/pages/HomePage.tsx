@@ -4946,6 +4946,27 @@ const HomePage: React.FC = () => {
                       cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
 
+                    // 如果是合伙店铺，添加店铺关联信息
+                    if (currentUser && currentUser.user_type === 'partner') {
+                      // 如果 store_id 存在，添加到 delivery_store_id
+                      if (currentUser.store_id) {
+                        packageData.delivery_store_id = currentUser.store_id;
+                      } else if (currentUser.id) {
+                        // 兼容旧逻辑，如果 id 就是 store_id
+                        packageData.delivery_store_id = currentUser.id;
+                      }
+                      
+                      // 添加店铺名称
+                      if (currentUser.name) {
+                        packageData.delivery_store_name = currentUser.name;
+                      }
+                      
+                      // 添加店铺代码作为 sender_code
+                      if (currentUser.store_code) {
+                        packageData.sender_code = currentUser.store_code;
+                      }
+                    }
+
                     // 只有在用户登录时才添加 customer_email 和 customer_name
                     // 如果数据库表中没有这些字段，这些值会被忽略
                     if (currentUser?.email) {
