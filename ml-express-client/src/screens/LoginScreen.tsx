@@ -157,9 +157,17 @@ export default function LoginScreen({ navigation }: any) {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.welcomeText}>{currentT.welcome}</Text>
-            <Text style={styles.title}>{currentT.title}</Text>
-            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
+            {/* <Text style={styles.welcomeText}>{currentT.welcome}</Text> */}
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.brandTitle}>
+                MARKET LINK <Text style={styles.brandTitleItalic}>EXPRESS</Text>
+              </Text>
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.deliveryServiceText}>DELIVERY SERVICE</Text>
+                <View style={styles.dividerLine} />
+              </View>
+            </View>
           </View>
 
           {/* Login Form Card */}
@@ -238,7 +246,38 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 30,
+  },
+  brandTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+  },
+  brandTitleItalic: {
+    fontStyle: 'italic',
+    color: '#f59e0b', // Gold/Amber color
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 10,
+  },
+  dividerLine: {
+    width: 30,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  deliveryServiceText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.9)',
+    letterSpacing: 2,
   },
   logoContainer: {
     width: 83,

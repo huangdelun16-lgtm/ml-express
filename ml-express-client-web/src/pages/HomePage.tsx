@@ -6574,7 +6574,7 @@ const HomePage: React.FC = () => {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-                marginBottom: isLoginMode ? '0.25rem' : '0.75rem',
+                marginBottom: '0.75rem',
                 textShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
                 whiteSpace: 'nowrap'
               }}>
@@ -6595,31 +6595,6 @@ const HomePage: React.FC = () => {
                   (language === 'zh' ? '创建账户' : language === 'en' ? 'Create Account' : 'အကောင့်သစ်ဖွင့်ရန်')
                 )}
               </h2>
-              
-              {/* 登录模式：显示副标题 */}
-              {isLoginMode && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '1.5rem',
-                  gap: '1rem'
-                }}>
-                  <div style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, transparent, #cbd5e1)' }}></div>
-                  <span style={{
-                    fontSize: '0.8rem',
-                    fontStyle: 'italic',
-                    fontWeight: '700',
-                    color: '#64748b',
-                    letterSpacing: '2px',
-                    textTransform: 'uppercase'
-                  }}>
-                    DELIVERY SERVICE
-                  </span>
-                  <div style={{ width: '30px', height: '1px', background: 'linear-gradient(90deg, #cbd5e1, transparent)' }}></div>
-                </div>
-              )}
-
               {/* 登录模式：显示登录类型选择按钮 */}
               {isLoginMode && (
                 <div style={{
