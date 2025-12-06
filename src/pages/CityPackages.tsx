@@ -1194,30 +1194,42 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                       寄件人
                       {(() => {
                         let userType = language === 'zh' ? '普通账户' : language === 'en' ? 'Normal' : 'သာမန်';
-                        let userTypeColor = '#9ca3af'; // gray
-                        let userTypeBg = 'rgba(156, 163, 175, 0.2)';
+                        let styleProps: any = {
+                          background: 'rgba(156, 163, 175, 0.2)',
+                          color: '#9ca3af',
+                          border: '1px solid #9ca3af',
+                          boxShadow: 'none'
+                        };
 
                         if (pkg.delivery_store_id) {
                           userType = 'Partner';
-                          userTypeColor = '#3b82f6'; // blue
-                          userTypeBg = 'rgba(59, 130, 246, 0.2)';
+                          styleProps = {
+                            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            boxShadow: '0 4px 12px rgba(14, 165, 233, 0.4)'
+                          };
                         } else if (pkg.customer_email || pkg.customer_name) {
-                          userType = language === 'zh' ? 'VIP账户' : language === 'en' ? 'VIP' : 'VIP';
-                          userTypeColor = '#f59e0b'; // amber
-                          userTypeBg = 'rgba(245, 158, 11, 0.2)';
+                          userType = language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်';
+                          styleProps = {
+                            background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)'
+                          };
                         }
 
                         return (
                           <span style={{
                             marginLeft: '8px',
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
+                            padding: '2px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
                             fontWeight: 'bold',
-                            color: userTypeColor,
-                            background: userTypeBg,
-                            border: `1px solid ${userTypeColor}`,
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            verticalAlign: 'middle',
+                            textShadow: styleProps.color === 'white' ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                            ...styleProps
                           }}>
                             {userType}
                           </span>
