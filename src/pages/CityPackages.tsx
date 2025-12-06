@@ -1024,20 +1024,28 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                     )}
                     
                     {/* 代收款显示 */}
-                    {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
-                      <span style={{
-                        background: '#fcd34d', // Amber-300
-                        color: '#b45309',     // Amber-700
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        fontWeight: 'bold',
-                        marginLeft: '0.5rem',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-                      }}>
-                        💰 代收: {pkg.cod_amount} MMK
-                      </span>
-                    )}
+                    {(() => {
+                      const isPartnerOrder = !!pkg.delivery_store_id;
+                      const codAmount = Number(pkg.cod_amount || 0);
+                      
+                      if (isPartnerOrder || codAmount > 0) {
+                        return (
+                          <span style={{
+                            background: '#fcd34d', // Amber-300
+                            color: '#b45309',     // Amber-700
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            marginLeft: '0.5rem',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            💰 {language === 'zh' ? '代收' : 'COD'}: {codAmount > 0 ? `${codAmount} MMK` : (language === 'zh' ? '无' : 'None')}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
 
