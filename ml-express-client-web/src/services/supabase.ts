@@ -95,10 +95,40 @@ export const packageService = {
         .single();
       
       // 如果错误是因为列不存在，移除这些字段后重试
-      if (error && (error.message.includes('customer_email') || error.message.includes('customer_name') || error.code === 'PGRST204')) {
-        console.warn('检测到 customer_email 或 customer_name 列不存在，移除这些字段后重试');
-        delete dataToInsert.customer_email;
-        delete dataToInsert.customer_name;
+      if (error && (
+        error.message.includes('customer_email') || 
+        error.message.includes('customer_name') || 
+        error.message.includes('sender_code') || 
+        error.message.includes('delivery_store_id') || 
+        error.message.includes('delivery_store_name') || 
+        error.message.includes('cod_amount') ||
+        error.code === 'PGRST204'
+      )) {
+        console.warn('检测到列不存在，尝试移除可选字段后重试:', error.message);
+        
+        // 如果是特定字段错误，只移除该字段；如果是通用错误(PGRST204)，移除所有可能的新字段
+        if (error.message.includes('customer_')) {
+          delete dataToInsert.customer_email;
+          delete dataToInsert.customer_name;
+        }
+        if (error.message.includes('sender_code') || error.message.includes('delivery_store_')) {
+          delete dataToInsert.sender_code;
+          delete dataToInsert.delivery_store_id;
+          delete dataToInsert.delivery_store_name;
+        }
+        if (error.message.includes('cod_amount')) {
+          delete dataToInsert.cod_amount;
+        }
+        
+        // 如果是通用错误，移除所有可能导致问题的可选字段
+        if (error.code === 'PGRST204') {
+          delete dataToInsert.customer_email;
+          delete dataToInsert.customer_name;
+          delete dataToInsert.sender_code;
+          delete dataToInsert.delivery_store_id;
+          delete dataToInsert.delivery_store_name;
+          delete dataToInsert.cod_amount;
+        }
         
         // 重试插入
         const retryResult = await supabase
