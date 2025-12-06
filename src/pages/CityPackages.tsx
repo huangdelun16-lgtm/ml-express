@@ -1021,6 +1021,22 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                         )}
                       </>
                     )}
+                    
+                    {/* 代收款显示 */}
+                    {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
+                      <span style={{
+                        background: '#fcd34d', // Amber-300
+                        color: '#b45309',     // Amber-700
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        marginLeft: '0.5rem',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                      }}>
+                        💰 代收: {pkg.cod_amount} MMK
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -2657,6 +2673,12 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>创建时间:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.create_time}</span>
                   </div>
+                  {selectedPackage.cod_amount && Number(selectedPackage.cod_amount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#fcd34d', fontWeight: '500' }}>代收款 (COD):</span>
+                      <span style={{ color: '#fcd34d', fontWeight: 'bold' }}>{selectedPackage.cod_amount} MMK</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
