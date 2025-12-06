@@ -925,14 +925,19 @@ const ProfilePage: React.FC = () => {
                     {currentUser.name || '-'}
                   </div>
                   <div style={{
-                    background: isPartnerStore ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                    border: isPartnerStore ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
-                    color: isPartnerStore ? '#3b82f6' : '#ffd700',
-                    padding: '0.2rem 0.8rem',
+                    background: isPartnerStore 
+                      ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
+                      : 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                    boxShadow: isPartnerStore 
+                      ? '0 4px 12px rgba(14, 165, 233, 0.4)' 
+                      : '0 4px 12px rgba(251, 191, 36, 0.4)',
+                    color: 'white',
+                    padding: '0.3rem 1rem',
                     borderRadius: '20px',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.2)'
                   }}>
                     {isPartnerStore ? 'Partner' : (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')}
                   </div>
@@ -943,9 +948,9 @@ const ProfilePage: React.FC = () => {
                   <button
                     onClick={() => setShowPasswordModal(true)}
                     style={{
-                      background: 'rgba(59, 130, 246, 0.2)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
                       padding: '0.5rem 1.2rem',
                       borderRadius: '12px',
                       fontSize: '0.9rem',
@@ -955,17 +960,20 @@ const ProfilePage: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      backdropFilter: 'blur(5px)'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.8)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.2)';
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <span>🔒</span>
