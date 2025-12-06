@@ -192,6 +192,7 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   };
 
   // 格式化日期显示
+  // 触发重新部署
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr);
     const today = new Date();
