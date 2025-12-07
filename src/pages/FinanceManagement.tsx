@@ -3951,10 +3951,26 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {/* 统计卡片 */}
               {(() => {
                 const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
-                const totalCash = cashPackages.reduce((sum, pkg) => {
+                
+                let totalDeliveryFee = 0;
+                let totalCOD = 0;
+                
+                cashPackages.forEach(pkg => {
                   const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                  return sum + price;
-                }, 0);
+                  totalDeliveryFee += price;
+                  
+                  // Check partner
+                  const isStoreMatch = deliveryStores.some(store => 
+                    store.store_name === pkg.sender_name || 
+                    (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                  );
+                  const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                  if (isPartner) {
+                    totalCOD += Number(pkg.cod_amount || 0);
+                  }
+                });
+                
+                const totalAmount = totalDeliveryFee + totalCOD;
 
                 return (
                   <div style={{
@@ -3962,20 +3978,52 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '16px'
                   }}>
+                    {/* 总跑腿费 */}
                     <div style={{
                       background: 'rgba(254, 243, 199, 0.2)',
                       borderRadius: '12px',
                       padding: '20px',
                       border: '1px solid rgba(254, 243, 199, 0.3)'
                     }}>
-                      <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '8px' }}>总现金收款</div>
-                      <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
-                        {totalCash.toLocaleString()} MMK
+                      <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '8px' }}>总跑腿费</div>
+                      <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                        {totalDeliveryFee.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
                         {cashPackages.length} 个包裹
                       </div>
                     </div>
+
+                    {/* 总代收款 */}
+                    <div style={{
+                      background: 'rgba(254, 202, 202, 0.2)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid rgba(254, 202, 202, 0.3)'
+                    }}>
+                      <div style={{ color: '#fecaca', fontSize: '0.9rem', marginBottom: '8px' }}>总代收款</div>
+                      <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                        {totalCOD.toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                        Partner店铺代收
+                      </div>
+                    </div>
+
+                    {/* 总金额 */}
+                    <div style={{
+                      background: 'rgba(167, 243, 208, 0.2)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid rgba(167, 243, 208, 0.3)'
+                    }}>
+                      <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '8px' }}>总金额 (跑腿费+代收)</div>
+                      <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                        {totalAmount.toLocaleString()} MMK
+                      </div>
+                    </div>
+
+                    {/* 快递员数 */}
                     <div style={{
                       background: 'rgba(219, 234, 254, 0.2)',
                       borderRadius: '12px',
@@ -3983,7 +4031,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                       border: '1px solid rgba(219, 234, 254, 0.3)'
                     }}>
                       <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>总快递员数</div>
-                      <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                      <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {couriers.length}
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
@@ -4349,10 +4397,25 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
                   // 过滤掉已结清的包裹
                   const visiblePackages = filteredPackages.filter(pkg => !clearedCashPackages.has(pkg.id));
-                  const visibleTotalAmount = visiblePackages.reduce((sum, pkg) => {
+                  
+                  let visibleDeliveryFee = 0;
+                  let visibleCOD = 0;
+
+                  visiblePackages.forEach(pkg => {
                     const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                    return sum + price;
-                  }, 0);
+                    visibleDeliveryFee += price;
+                    
+                    const isStoreMatch = deliveryStores.some(store => 
+                      store.store_name === pkg.sender_name || 
+                      (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                    );
+                    const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                    if (isPartner) {
+                      visibleCOD += Number(pkg.cod_amount || 0);
+                    }
+                  });
+                  
+                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD;
                   
                   // 检查是否全选
                   const allSelected = visiblePackages.length > 0 && visiblePackages.every(pkg => selectedCashPackages.has(pkg.id));
@@ -4388,28 +4451,56 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   return (
                     <>
                       {/* 统计信息 */}
-                      <div style={{
-                        background: 'rgba(254, 243, 199, 0.2)',
-                        borderRadius: '12px',
-                        padding: '16px',
-                        marginBottom: '20px',
-                        border: '1px solid rgba(254, 243, 199, 0.3)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '12px'
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '4px' }}>筛选结果</div>
-                          <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                            {visibleTotalAmount.toLocaleString()} MMK
+                      <div style={{ marginBottom: '20px' }}>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                          gap: '12px',
+                          marginBottom: '16px'
+                        }}>
+                          {/* 总跑腿费 */}
+                          <div style={{
+                            background: 'rgba(254, 243, 199, 0.2)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            border: '1px solid rgba(254, 243, 199, 0.3)'
+                          }}>
+                            <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '4px' }}>总跑腿费</div>
+                            <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>
+                              {visibleDeliveryFee.toLocaleString()} MMK
+                            </div>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.8rem', marginTop: '4px' }}>
+                              {visiblePackages.length} 个包裹
+                            </div>
                           </div>
-                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                            {visiblePackages.length} 个包裹
+
+                          {/* 总代收款 */}
+                          <div style={{
+                            background: 'rgba(254, 202, 202, 0.2)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            border: '1px solid rgba(254, 202, 202, 0.3)'
+                          }}>
+                            <div style={{ color: '#fecaca', fontSize: '0.9rem', marginBottom: '4px' }}>总代收款</div>
+                            <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>
+                              {visibleCOD.toLocaleString()} MMK
+                            </div>
+                          </div>
+
+                          {/* 总金额 */}
+                          <div style={{
+                            background: 'rgba(167, 243, 208, 0.2)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            border: '1px solid rgba(167, 243, 208, 0.3)'
+                          }}>
+                            <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '4px' }}>总金额 (未结清)</div>
+                            <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>
+                              {visibleTotalAmount.toLocaleString()} MMK
+                            </div>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {/* 全选图标 */}
                           <button
                             onClick={handleSelectAll}
