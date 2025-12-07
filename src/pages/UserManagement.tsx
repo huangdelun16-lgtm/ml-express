@@ -37,6 +37,58 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [filterStatus, setFilterStatus] = useState('all');
   // const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  
+  // 批量操作状态
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
+  // 批量选择处理
+  const handleSelectAll = () => {
+    if (selectedUsers.size === filteredUsers.length && filteredUsers.length > 0) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(filteredUsers.map(u => u.id)));
+    }
+  };
+
+  const handleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  // 批量删除处理
+  const handleBatchDelete = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!window.confirm(`确定要删除选中的 ${selectedUsers.size} 个用户吗？此操作不可恢复！`)) return;
+
+    try {
+      setIsBatchDeleting(true);
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .in('id', Array.from(selectedUsers));
+
+      if (error) {
+        console.error('批量删除失败:', error);
+        window.alert('批量删除失败，请重试');
+      } else {
+        await loadUsers();
+        setSelectedUsers(new Set());
+        window.alert('批量删除成功');
+      }
+    } catch (error) {
+      console.error('批量删除异常:', error);
+      window.alert('操作出错');
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  };
 
   const [userForm, setUserForm] = useState({
     name: '',
@@ -47,6 +99,17 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
     user_type: 'customer' as 'customer' | 'courier' | 'admin',
     status: 'active' as 'active' | 'inactive' | 'suspended',
     notes: ''
+  });
+
+  // 过滤用户
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.phone.includes(searchTerm) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || user.user_type === filterType;
+    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+    
+    return matchesSearch && matchesType && matchesStatus;
   });
 
   // 加载用户数据
@@ -261,17 +324,6 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
     }
   };
 
-  // 过滤用户
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.phone.includes(searchTerm) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || user.user_type === filterType;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -461,59 +513,132 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
 
           {/* 搜索和过滤 */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+            display: 'flex',
+            flexWrap: 'wrap',
             gap: '15px',
-            marginBottom: '20px'
+            marginBottom: '24px',
+            alignItems: 'center',
+            background: 'rgba(255, 255, 255, 0.05)',
+            padding: '16px',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            <input
-              type="text"
-              placeholder="搜索用户..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                padding: '10px',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                color: 'white',
-                fontSize: '1rem'
-              }}
-            />
+            <div style={{ flex: '1 1 300px' }}>
+              <input
+                type="text"
+                placeholder="🔍 搜索姓名、电话或邮箱..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'all 0.3s ease'
+                }}
+                onFocus={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'}
+                onBlur={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'}
+              />
+            </div>
+            
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
               style={{
-                padding: '10px',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '8px',
-                background: 'rgba(7, 23, 53, 0.65)',
+                padding: '12px 16px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                background: 'rgba(0, 0, 0, 0.2)',
                 color: 'white',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                outline: 'none',
+                cursor: 'pointer'
               }}
             >
-              <option value="all">所有类型</option>
-              <option value="customer">客户</option>
-              <option value="courier">快递员</option>
-              <option value="admin">管理员</option>
+              <option value="all">👤 所有类型</option>
+              <option value="customer">🛒 客户</option>
+              <option value="courier">🛵 快递员</option>
+              <option value="admin">🔧 管理员</option>
             </select>
+
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               style={{
-                padding: '10px',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '8px',
-                background: 'rgba(7, 23, 53, 0.65)',
+                padding: '12px 16px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                background: 'rgba(0, 0, 0, 0.2)',
                 color: 'white',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                outline: 'none',
+                cursor: 'pointer'
               }}
             >
-              <option value="all">所有状态</option>
-              <option value="active">活跃</option>
-              <option value="inactive">非活跃</option>
-              <option value="suspended">已暂停</option>
+              <option value="all">📊 所有状态</option>
+              <option value="active">✅ 活跃</option>
+              <option value="inactive">💤 非活跃</option>
+              <option value="suspended">🚫 已暂停</option>
             </select>
+
+            <div style={{ flex: 1 }}></div>
+
+            {/* 批量操作按钮 */}
+            {selectedUsers.size > 0 && (
+              <button
+                onClick={handleBatchDelete}
+                disabled={isBatchDeleting}
+                style={{
+                  background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  cursor: isBatchDeleting ? 'not-allowed' : 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)',
+                  transition: 'all 0.3s ease',
+                  opacity: isBatchDeleting ? 0.7 : 1
+                }}
+                onMouseOver={(e) => !isBatchDeleting && (e.currentTarget.style.transform = 'translateY(-2px)')}
+                onMouseOut={(e) => !isBatchDeleting && (e.currentTarget.style.transform = 'translateY(0)')}
+              >
+                {isBatchDeleting ? '⏳ 删除中...' : `🗑️ 批量删除 (${selectedUsers.size})`}
+              </button>
+            )}
+            
+            <button
+              onClick={handleSelectAll}
+              style={{
+                background: selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 
+                  ? 'rgba(52, 152, 219, 0.3)' 
+                  : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: selectedUsers.size === filteredUsers.length && filteredUsers.length > 0
+                  ? '1px solid #3498db'
+                  : '1px solid rgba(255, 255, 255, 0.2)',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                fontWeight: '600',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              onMouseOut={(e) => e.currentTarget.style.background = selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 
+                  ? 'rgba(52, 152, 219, 0.3)' 
+                  : 'rgba(255, 255, 255, 0.1)'}
+            >
+              {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 ? '☒ 取消全选' : '☐ 全选'}
+            </button>
           </div>
 
           {loading ? (
@@ -526,23 +651,70 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
               gap: '15px'
             }}>
               {filteredUsers.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
-                  <p>没有找到匹配的用户</p>
+                <div style={{ 
+                  textAlign: 'center', 
+                  color: 'white', 
+                  padding: '4rem 2rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</div>
+                  <p style={{ fontSize: '1.2rem', margin: 0 }}>没有找到匹配的用户</p>
                 </div>
               ) : (
-                filteredUsers.map((user) => (
-                  <div key={user.id} style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    borderRadius: '10px',
-                    padding: isMobile ? '12px' : '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '15px'
-                    }}>
+                filteredUsers.map((user) => {
+                  const isSelected = selectedUsers.has(user.id);
+                  return (
+                    <div key={user.id} style={{
+                      background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '16px',
+                      padding: isMobile ? '16px' : '24px',
+                      border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.15)',
+                      transition: 'all 0.3s ease',
+                      position: 'relative',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: isSelected ? '0 8px 24px rgba(52, 152, 219, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                        handleSelectUser(user.id);
+                      }
+                    }}
+                    >
+                      {/* Checkbox Badge */}
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectUser(user.id);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '16px',
+                          right: '16px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: isSelected ? 'none' : '2px solid rgba(255, 255, 255, 0.3)',
+                          background: isSelected ? '#3498db' : 'rgba(255, 255, 255, 0.05)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          zIndex: 10
+                        }}
+                      >
+                        {isSelected && <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>✓</span>}
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: '15px',
+                        paddingRight: '40px'
+                      }}>
                       <div>
                         <h3 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1.2rem' }}>
                           {user.name} ({user.id})
@@ -677,7 +849,8 @@ const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
                       </button>
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           )}
