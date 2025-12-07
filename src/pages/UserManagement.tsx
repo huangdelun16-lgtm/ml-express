@@ -398,13 +398,8 @@ const UserManagement: React.FC = () => {
   const loadPartnerStores = async () => {
     try {
       setLoadingStores(true);
-      const { data, error } = await deliveryStoreService.getAllStores();
-      if (error) {
-        console.error('获取合伙店铺失败:', error);
-        setPartnerStores([]);
-      } else {
-        setPartnerStores(data || []);
-      }
+      const data = await deliveryStoreService.getAllStores();
+      setPartnerStores(data || []);
     } catch (error) {
       console.error('加载合伙店铺异常:', error);
       setPartnerStores([]);
