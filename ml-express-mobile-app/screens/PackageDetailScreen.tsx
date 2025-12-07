@@ -11,7 +11,7 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { packageService, auditLogService, Package, deliveryPhotoService } from '../services/supabase';
+import { packageService, auditLogService, Package, deliveryPhotoService, deliveryStoreService, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -360,26 +360,73 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     }
   };
 
-  const handleScanCode = (data: string) => {
-    if (!data || scannedData) return; // 如果已经扫描过，忽略
+  // 扫码功能处理函数
+  const handleScanCode = async (data: string) => {
+    if (!data) return;
 
     console.log('扫描到数据:', data);
     setScannedData(data);
     setScanning(false);
+    setShowScanModal(false);
 
-    // 显示扫描结果
-    Alert.alert(
-      '扫码成功',
-      `扫描结果：\n${data}\n\n包裹ID: ${currentPackage.id}`,
-      [
-        {
-          text: '确定',
-          onPress: () => {
-            // 可以在这里添加处理扫码结果的逻辑
-            // 例如验证包裹码、更新状态等
-          }
+    // 1. 检查是否是当前包裹ID或中转码
+    if (data === currentPackage.id || (currentPackage.transfer_code && data === currentPackage.transfer_code)) {
+        if (currentPackage.status === '待取件') {
+            Alert.alert(
+                '确认取件',
+                `扫码成功！\n包裹ID: ${currentPackage.id}\n\n确认取件？`,
+                [
+                    { text: '取消', style: 'cancel' },
+                    { 
+                        text: '确认', 
+                        onPress: () => proceedWithStatusUpdate('已取件', '扫码确认取件') 
+                    }
+                ]
+            );
+        } else if (currentPackage.status === '已取件') {
+             Alert.alert('提示', '该包裹已取件，请开始配送');
+        } else if (currentPackage.status === '配送中') {
+             Alert.alert('提示', '该包裹正在配送中');
+        } else if (currentPackage.status === '已送达') {
+             Alert.alert('提示', '该包裹已送达');
+        } else {
+             Alert.alert('提示', `扫码成功，当前状态: ${currentPackage.status}`);
         }
-      ]
+        return;
+    }
+
+    // 2. 检查是否是店长收件码
+    if (data.startsWith('STORE_')) {
+      const storeInfo = data.replace('STORE_', '');
+      const [storeId] = storeInfo.split('_');
+      
+      try {
+        const store = await deliveryStoreService.getStoreById(storeId);
+        const storeName = store ? store.store_name : `店铺${storeId}`;
+        
+        Alert.alert(
+          '确认送达',
+          `识别到店铺收件码\n\n店铺：${storeName}\n\n确认将包裹标记为已送达？`,
+          [
+            { text: '取消', style: 'cancel' },
+            {
+              text: '确认送达',
+              onPress: () => proceedWithStatusUpdate('已送达', `扫码送达店铺: ${storeName}`)
+            }
+          ]
+        );
+      } catch (err) {
+        console.error('获取店铺信息失败:', err);
+        Alert.alert('错误', '无法获取店铺信息');
+      }
+      return;
+    }
+
+    // 3. 不匹配
+    Alert.alert(
+      '扫码结果',
+      `扫描内容：${data}\n\n⚠️ 与当前包裹ID不匹配`,
+      [{ text: '确定' }]
     );
   };
 
