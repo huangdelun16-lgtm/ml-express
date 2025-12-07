@@ -113,6 +113,22 @@ interface PackageWithExtras extends Package {
   totalDistance?: number | null;
 }
 
+// 计算两点间距离（海里公式）
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // 地球半径（米）
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // 返回米
+};
+
 export default function MapScreen({ navigation }: any) {
   const { language } = useApp();
   const [location, setLocation] = useState<any>(null);
@@ -139,6 +155,10 @@ export default function MapScreen({ navigation }: any) {
     renderTimes: [],
     memoryUsage: [],
   });
+  
+  // 位置追踪优化
+  const lastUpdateLocation = useRef<{lat: number, lng: number, time: number} | null>(null);
+  const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // 拍照相关状态
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -772,38 +792,89 @@ export default function MapScreen({ navigation }: any) {
       const courierId = await AsyncStorage.getItem('currentCourierId');
       if (!courierId) return;
 
+      // 防止重复启动
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+      }
+
       setIsLocationTracking(true);
       
-      // 每30秒更新一次位置
-      const interval = setInterval(async () => {
+      const updateLocation = async () => {
         try {
           const currentLocation = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
+          
+          const now = Date.now();
+          const { latitude, longitude } = currentLocation.coords;
+          
+          let shouldUpdate = false;
+          
+          if (!lastUpdateLocation.current) {
+            shouldUpdate = true;
+          } else {
+            const distance = calculateDistance(
+              lastUpdateLocation.current.lat,
+              lastUpdateLocation.current.lng,
+              latitude,
+              longitude
+            );
+            
+            // 策略：
+            // 1. 如果移动超过 20 米 -> 更新
+            // 2. 如果静止，但距离上次更新超过 5 分钟 (心跳包) -> 更新
+            // 3. 否则 -> 跳过
+            
+            const timeDiff = now - lastUpdateLocation.current.time;
+            
+            if (distance > 20) {
+               console.log(`📍 移动距离 ${Math.round(distance)}米 > 20米，触发更新`);
+               shouldUpdate = true;
+            } else if (timeDiff > 5 * 60 * 1000) {
+               console.log(`📍 静止超时 ${Math.round(timeDiff/1000)}秒 > 300秒，触发心跳更新`);
+               shouldUpdate = true;
+            } else {
+               // console.log(`📍 位置未显著变化 (${Math.round(distance)}米)，跳过更新`);
+            }
+          }
 
-          // 更新数据库中的位置信息
-          await supabase
-            .from('courier_locations')
-            .upsert({
-              courier_id: courierId,
-              latitude: currentLocation.coords.latitude,
-              longitude: currentLocation.coords.longitude,
-              heading: currentLocation.coords.heading,
-              speed: currentLocation.coords.speed,
-              last_update: new Date().toISOString(),
-              battery_level: null, // 可以后续添加电池电量检测
+          if (shouldUpdate) {
+            // 更新数据库中的位置信息
+            await supabase
+              .from('courier_locations')
+              .upsert({
+                courier_id: courierId,
+                latitude: currentLocation.coords.latitude,
+                longitude: currentLocation.coords.longitude,
+                heading: currentLocation.coords.heading,
+                speed: currentLocation.coords.speed,
+                last_update: new Date().toISOString(),
+                battery_level: null, // 可以后续添加电池电量检测
+              });
+
+            lastUpdateLocation.current = {
+                lat: latitude,
+                lng: longitude,
+                time: now
+            };
+
+            console.log('✅ 数据库位置已更新:', {
+              lat: latitude,
+              lng: longitude,
+              time: new Date().toLocaleTimeString()
             });
-
-          console.log('📍 位置已更新:', {
-            lat: currentLocation.coords.latitude,
-            lng: currentLocation.coords.longitude,
-            time: new Date().toLocaleTimeString()
-          });
+          }
         } catch (error) {
           console.error('位置更新失败:', error);
         }
-      }, 30000); // 30秒间隔
+      };
 
+      // 立即执行一次
+      updateLocation();
+
+      // 每60秒检查一次
+      const interval = setInterval(updateLocation, 60000); 
+      locationIntervalRef.current = interval;
       setLocationUpdateInterval(interval);
     } catch (error) {
       console.error('启动位置追踪失败:', error);
@@ -812,10 +883,14 @@ export default function MapScreen({ navigation }: any) {
   };
 
   const stopLocationTracking = () => {
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
     if (locationUpdateInterval) {
       clearInterval(locationUpdateInterval);
-      setLocationUpdateInterval(null);
     }
+    setLocationUpdateInterval(null);
     setIsLocationTracking(false);
   };
 
