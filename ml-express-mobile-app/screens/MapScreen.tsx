@@ -196,10 +196,29 @@ export default function MapScreen({ navigation }: any) {
   const packageStartTimes = useRef<Record<string, number>>({});
   const lastAlertTimes = useRef<Record<string, number>>({});
 
+  // 店铺列表状态
+  const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
+
+  // 加载店铺列表
+  const loadDeliveryStores = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('id, store_name, store_code');
+      if (error) {
+        console.warn('获取店铺列表失败:', error);
+        return;
+      }
+      setDeliveryStores(data || []);
+    } catch (error) {
+      console.warn('获取店铺列表异常:', error);
+    }
+  }, []);
 
   useEffect(() => {
     requestLocationPermission();
     loadPackages();
+    loadDeliveryStores();
     loadCurrentDeliveringPackage();
     
     // 启动位置追踪
@@ -2255,6 +2274,38 @@ export default function MapScreen({ navigation }: any) {
                   </Text>
                 </View>
               )}
+              
+              {/* 代收款显示 - Partner订单 */}
+              {(() => {
+                const isStoreMatch = deliveryStores.some(store => 
+                  store.store_name === item.sender_name || 
+                  (item.sender_name && item.sender_name.startsWith(store.store_name))
+                );
+                const isPartner = !!item.delivery_store_id || isStoreMatch;
+                const codVal = Number(item.cod_amount || 0);
+                
+                if (isPartner) {
+                  return (
+                    <View style={{
+                      backgroundColor: '#fee2e2',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#fecaca'
+                    }}>
+                      <Text style={{
+                        color: '#b91c1c',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                      }}>
+                        {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : (language === 'zh' ? '无' : 'None')}
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
             </View>
             <Text style={styles.senderName}>{item.sender_name}</Text>
             <Text style={styles.address} numberOfLines={2}>{item.sender_address}</Text>
