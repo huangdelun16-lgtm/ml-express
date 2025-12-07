@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { supabase, auditLogService } from '../services/supabase';
+import { supabase, auditLogService, deliveryStoreService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -51,10 +51,12 @@ interface Courier {
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'courier_management'>('list');
+  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'partner_store' | 'courier_management'>('customer_list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [partnerStores, setPartnerStores] = useState<any[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
   
   // 快递员管理状态
   const [couriers, setCouriers] = useState<Courier[]>([]);
@@ -155,7 +157,15 @@ const UserManagement: React.FC = () => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.phone.includes(searchTerm) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || user.user_type === filterType;
+                         
+    // 根据当前标签页过滤类型
+    let matchesType = true;
+    if (activeTab === 'customer_list') {
+      matchesType = user.user_type === 'customer';
+    } else if (activeTab === 'admin_list') {
+      matchesType = user.user_type === 'admin';
+    }
+    
     const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
     
     return matchesSearch && matchesType && matchesStatus;
@@ -378,8 +388,30 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'courier_management') {
       loadCouriers();
+    } else if (activeTab === 'partner_store') {
+      loadPartnerStores();
+    } else if (activeTab === 'customer_list' || activeTab === 'admin_list') {
+      loadUsers();
     }
   }, [activeTab]);
+
+  const loadPartnerStores = async () => {
+    try {
+      setLoadingStores(true);
+      const { data, error } = await deliveryStoreService.getAllStores();
+      if (error) {
+        console.error('获取合伙店铺失败:', error);
+        setPartnerStores([]);
+      } else {
+        setPartnerStores(data || []);
+      }
+    } catch (error) {
+      console.error('加载合伙店铺异常:', error);
+      setPartnerStores([]);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
 
   const loadCouriers = async () => {
     try {
@@ -781,9 +813,9 @@ const UserManagement: React.FC = () => {
         zIndex: 1
       }}>
         <button
-          onClick={() => setActiveTab('list')}
+          onClick={() => setActiveTab('customer_list')}
           style={{
-            background: activeTab === 'list' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'customer_list' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
             color: 'white',
             border: '1px solid rgba(255, 255, 255, 0.3)',
             padding: '10px 20px',
@@ -794,12 +826,12 @@ const UserManagement: React.FC = () => {
             transition: 'all 0.3s ease'
           }}
         >
-          {language === 'zh' ? '用户列表' : language === 'en' ? 'User List' : 'အသုံးပြုသူစာရင်း'}
+          客户列表
         </button>
         <button
-          onClick={() => setActiveTab('create')}
+          onClick={() => setActiveTab('admin_list')}
           style={{
-            background: activeTab === 'create' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'admin_list' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
             color: 'white',
             border: '1px solid rgba(255, 255, 255, 0.3)',
             padding: '10px 20px',
@@ -810,7 +842,23 @@ const UserManagement: React.FC = () => {
             transition: 'all 0.3s ease'
           }}
         >
-          创建用户
+          管理员列表
+        </button>
+        <button
+          onClick={() => setActiveTab('partner_store')}
+          style={{
+            background: activeTab === 'partner_store' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            padding: '10px 20px',
+            borderRadius: '10px',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          合伙店铺
         </button>
         <button
           onClick={() => setActiveTab('courier_management')}
@@ -830,8 +878,8 @@ const UserManagement: React.FC = () => {
         </button>
       </div>
 
-      {/* 用户列表 */}
-      {activeTab === 'list' && (
+      {/* 用户列表 (客户/管理员) */}
+      {(activeTab === 'customer_list' || activeTab === 'admin_list') && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
@@ -869,7 +917,7 @@ const UserManagement: React.FC = () => {
               border: '1px solid rgba(155, 89, 182, 0.3)'
             }}>
               <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0', fontSize: '1.5rem' }}>
-                {users.filter(u => u.user_type === 'courier').length}
+                {couriers.length}
               </h3>
               <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>快递员总数</p>
             </div>
@@ -914,7 +962,7 @@ const UserManagement: React.FC = () => {
             <div style={{ flex: '1 1 300px' }}>
               <input
                 type="text"
-                placeholder="🔍 搜索姓名、电话或邮箱..."
+                placeholder={activeTab === 'customer_list' ? "🔍 搜索客户姓名、电话..." : "🔍 搜索管理员..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -933,26 +981,6 @@ const UserManagement: React.FC = () => {
               />
             </div>
             
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              style={{
-                padding: '12px 16px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '12px',
-                background: 'rgba(0, 0, 0, 0.2)',
-                color: 'white',
-                fontSize: '1rem',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all">👤 所有类型</option>
-              <option value="customer">🛒 客户</option>
-              <option value="courier">🛵 快递员</option>
-              <option value="admin">🔧 管理员</option>
-            </select>
-
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -1477,6 +1505,78 @@ const UserManagement: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* 合伙店铺列表 */}
+      {activeTab === 'partner_store' && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '15px',
+          padding: isMobile ? '12px' : '20px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <h2 style={{ color: 'white', margin: 0 }}>合伙店铺 ({partnerStores.length})</h2>
+             {/* 未来可以添加创建店铺按钮 */}
+          </div>
+
+          {loadingStores ? (
+            <div style={{ textAlign: 'center', color: 'white', padding: '40px' }}>加载中...</div>
+          ) : partnerStores.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'white', padding: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+               暂无合伙店铺数据
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '15px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+              {partnerStores.map((store: any) => (
+                <div key={store.id} style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                      🏪 {store.store_name}
+                    </h3>
+                    <span style={{ 
+                      background: store.status === 'active' ? 'rgba(39, 174, 96, 0.8)' : 'rgba(149, 165, 166, 0.8)', 
+                      color: 'white', 
+                      padding: '4px 10px', 
+                      borderRadius: '12px', 
+                      fontSize: '0.8rem' 
+                    }}>
+                      {store.status === 'active' ? '营业中' : '休息'}
+                    </span>
+                  </div>
+                  
+                  <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📞</span>
+                      <span>{store.contact_phone || '无电话'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <span>📍</span>
+                      <span style={{ lineHeight: '1.4' }}>{store.address || '无地址'}</span>
+                    </div>
+                    {store.store_code && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ opacity: 0.6 }}>代码:</span>
+                        <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>{store.store_code}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
