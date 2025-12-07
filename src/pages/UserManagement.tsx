@@ -874,7 +874,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* 用户列表 (客户/管理员) */}
-      {(activeTab === 'customer_list' || activeTab === 'admin_list') && (
+      {(activeTab === 'customer_list' || activeTab === 'admin_list') && !editingUser && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
@@ -1268,8 +1268,8 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {/* 创建/编辑用户表单 */}
-      {activeTab === 'create' && (
+      {/* 创建/编辑用户表单 - 仅在编辑模式下显示，或者后续添加新建按钮时启用 */}
+      {editingUser && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
@@ -1482,7 +1482,6 @@ const UserManagement: React.FC = () => {
                     status: 'active',
                     notes: ''
                   });
-                  setActiveTab('list');
                 }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
