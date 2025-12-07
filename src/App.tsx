@@ -9,7 +9,6 @@ import DeliveryAlerts from './pages/DeliveryAlerts';
 import AdminDashboard from './pages/AdminDashboard';
 import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
-import CourierManagement from './pages/CourierManagement';
 import FinanceManagement from './pages/FinanceManagement';
 import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
@@ -52,14 +51,6 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['admin', 'manager']}>
                   <UserManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/couriers" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                  <CourierManagement />
                 </ProtectedRoute>
               } 
             />
