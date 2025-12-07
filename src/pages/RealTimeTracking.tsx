@@ -984,24 +984,33 @@ const RealTimeTracking: React.FC = () => {
                         {pkg.status === '待收款' ? '待取件' : pkg.status}
                       </span>
                       
-                      {/* 代收款显示 - 只有合伙店铺下单且需要代收款时才显示 */}
-                      {pkg.delivery_store_id && parseFloat(pkg.store_fee?.toString() || '0') > 0 && (
-                        <span style={{
-                          background: '#fee2e2',
-                          color: '#b91c1c',
-                          border: '1px solid #fecaca',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံရမည့်ပမာဏ'}: {(() => {
-                            const value = parseFloat(pkg.store_fee?.toString() || '0');
-                            return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
-                          })()} MMK
-                        </span>
-                      )}
+                      {/* 代收款显示 - Partner订单显示代收款 */}
+                      {(() => {
+                        const isStoreMatch = stores.some(store => 
+                          store.store_name === pkg.sender_name || 
+                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                        );
+                        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                        const codVal = Number(pkg.cod_amount || 0);
+                        
+                        if (isPartner) {
+                          return (
+                            <span style={{
+                              background: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #fecaca',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '5px',
+                              fontSize: '0.8rem',
+                              fontWeight: 'bold',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                   
@@ -1093,8 +1102,27 @@ const RealTimeTracking: React.FC = () => {
                       </p>
                     )}
                     <p style={{ margin: '0.3rem 0' }}>
-                      💰 价格: {pkg.price}
+                      💰 跑腿费: {pkg.price}
                     </p>
+                    {(() => {
+                      const isStoreMatch = stores.some(store => 
+                        store.store_name === pkg.sender_name || 
+                        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                      );
+                      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                      
+                      if (isPartner) {
+                        const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                        const codVal = Number(pkg.cod_amount || 0);
+                        const totalVal = priceVal + codVal;
+                        return (
+                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#b45309' }}>
+                            💰 总金额: {totalVal.toLocaleString()} MMK
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <div style={{ 
@@ -1246,8 +1274,8 @@ const RealTimeTracking: React.FC = () => {
                           </span>
                         )}
                         <span style={{
-                          background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
-                          color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
+                          background: pkg.status === '待收款' ? '待取件' : pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
+                          color: pkg.status === '待收款' ? 'inherit' : pkg.status === '已取件' ? '#92400e' : '#1e40af',
                           padding: '0.2rem 0.6rem',
                           borderRadius: '5px',
                           fontSize: '0.8rem',
@@ -1255,6 +1283,34 @@ const RealTimeTracking: React.FC = () => {
                         }}>
                           {pkg.status === '待收款' ? '待取件' : pkg.status}
                         </span>
+
+                        {/* 代收款显示 - Partner订单显示代收款 */}
+                        {(() => {
+                          const isStoreMatch = stores.some(store => 
+                            store.store_name === pkg.sender_name || 
+                            (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                          );
+                          const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                          const codVal = Number(pkg.cod_amount || 0);
+                          
+                          if (isPartner) {
+                            return (
+                              <span style={{
+                                background: '#fee2e2',
+                                color: '#b91c1c',
+                                border: '1px solid #fecaca',
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '5px',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                     
@@ -1351,6 +1407,29 @@ const RealTimeTracking: React.FC = () => {
                           <strong>⏰ 取件时间:</strong> {pkg.pickup_time}
                         </p>
                       )}
+
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong>💰 跑腿费:</strong> {pkg.price}
+                      </p>
+                      {(() => {
+                        const isStoreMatch = stores.some(store => 
+                          store.store_name === pkg.sender_name || 
+                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                        );
+                        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                        
+                        if (isPartner) {
+                          const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                          const codVal = Number(pkg.cod_amount || 0);
+                          const totalVal = priceVal + codVal;
+                          return (
+                            <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#b45309' }}>
+                              <strong>💰 总金额:</strong> {totalVal.toLocaleString()} MMK
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 ))
