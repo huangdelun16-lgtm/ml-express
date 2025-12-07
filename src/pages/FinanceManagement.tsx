@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount, supabase } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount, deliveryStoreService, supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import {
@@ -130,6 +130,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   
   // 现金收款管理相关状态
   const [couriers, setCouriers] = useState<any[]>([]); // 快递员列表
+  const [deliveryStores, setDeliveryStores] = useState<any[]>([]); // 合伙店铺列表
   const [showCashDetailModal, setShowCashDetailModal] = useState<boolean>(false);
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
   const [cashDetailDateFilter, setCashDetailDateFilter] = useState<string>('all'); // 'all' | '7days' | '30days' | '90days' | 'custom'
@@ -391,7 +392,8 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
     packageIncome: 0, // 添加包裹收入
     packageCount: 0, // 添加包裹数量
     courierKmCost: 0, // 快递员公里费用（仅送货距离）
-    totalKm: 0 // 总送货公里数
+    totalKm: 0, // 总送货公里数
+    partnerCollection: 0 // 总合伙店铺代收款
   });
 
   useEffect(() => {
@@ -420,6 +422,20 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
         return sum + (pkg.delivery_distance || 0);
       }, 0);
       const courierKmCost = totalKm * COURIER_KM_RATE;
+
+      // 计算合伙店铺代收款
+      const partnerCollection = deliveredPackages.reduce((sum, pkg) => {
+        const isStoreMatch = deliveryStores.some(store => 
+          store.store_name === pkg.sender_name || 
+          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+        );
+        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+        
+        if (isPartner) {
+          return sum + Number(pkg.cod_amount || 0);
+        }
+        return sum;
+      }, 0);
       
       setSummary({
         totalIncome,
@@ -429,29 +445,32 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
         packageIncome,
         packageCount,
         courierKmCost,
-        totalKm
+        totalKm,
+        partnerCollection
       });
     };
     
     calculateSummary();
-  }, [records, packages]);
+  }, [records, packages, deliveryStores]);
 
   const loadRecords = async () => {
     try {
       setLoading(true);
-      // 同时加载财务记录、包裹数据、工资数据、账号数据和快递员数据
-      const [financeData, packageData, salaryData, accountsData, couriersData] = await Promise.all([
+      // 同时加载财务记录、包裹数据、工资数据、账号数据、快递员数据和合伙店铺数据
+      const [financeData, packageData, salaryData, accountsData, couriersData, storesData] = await Promise.all([
         financeService.getAllRecords(),
         packageService.getAllPackages(),
         courierSalaryService.getAllSalaries(),
         adminAccountService.getAllAccounts(),
-        supabase.from('couriers').select('*').order('created_at', { ascending: false })
+        supabase.from('couriers').select('*').order('created_at', { ascending: false }),
+        deliveryStoreService.getAllStores()
       ]);
       setRecords(financeData);
       setPackages(packageData);
       setCourierSalaries(salaryData);
       setAdminAccounts(accountsData);
       setCouriers(couriersData.data || []);
+      setDeliveryStores(storesData);
     } catch (error) {
       console.error('加载财务数据失败:', error);
       // 添加用户友好的错误提示
@@ -980,6 +999,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             }}
           >
             {renderSummaryCard('总收入', summary.totalIncome, '已完成的所有收入记录总和', '#4cd137')}
+            {renderSummaryCard('总合伙店铺代收款', summary.partnerCollection, '所有合伙店铺的代收款总额', '#ef4444')}
             {renderSummaryCard('总支出', summary.totalExpense, '已完成的所有支出记录总和', '#ff7979')}
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
@@ -4482,6 +4502,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                           {visiblePackages.map(pkg => {
                             const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                             const isSelected = selectedCashPackages.has(pkg.id);
+                            
+                            // 检查是否为合伙店铺订单
+                            const isStoreMatch = deliveryStores.some(store => 
+                              store.store_name === pkg.sender_name || 
+                              (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+                            );
+                            const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                            const codVal = Number(pkg.cod_amount || 0);
+
                             return (
                               <div
                                 key={pkg.id}
@@ -4555,15 +4584,35 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                                     </div>
                                   </div>
                                   <div style={{
-                                    background: '#fef3c7',
-                                    color: '#92400e',
-                                    padding: '4px 12px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 'bold',
-                                    whiteSpace: 'nowrap'
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-end',
+                                    gap: '4px'
                                   }}>
-                                    {price.toLocaleString()} MMK
+                                    <div style={{
+                                      background: '#fef3c7',
+                                      color: '#92400e',
+                                      padding: '4px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.9rem',
+                                      fontWeight: 'bold',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {price.toLocaleString()} MMK
+                                    </div>
+                                    {isPartner && (
+                                      <div style={{
+                                        background: '#fee2e2',
+                                        color: '#b91c1c',
+                                        padding: '4px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        代收: {codVal > 0 ? `${codVal.toLocaleString()} MMK` : '无'}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               <div style={{
