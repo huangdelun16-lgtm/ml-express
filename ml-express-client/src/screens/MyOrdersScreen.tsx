@@ -46,6 +46,7 @@ interface Order {
   delivery_time?: string;
   customer_rating?: number;
   customer_comment?: string;
+  cod_amount?: number;
 }
 
 export default function MyOrdersScreen({ navigation, route }: any) {
@@ -94,6 +95,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       packageType: '包裹类型',
       weight: '重量',
       courier: '配送员',
+      deliveryFee: '跑腿费',
+      cod: '代收款',
+      totalAmount: '总金额',
+      none: '无',
     },
     en: {
       title: 'My Orders',
@@ -117,6 +122,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       packageType: 'Type',
       weight: 'Weight',
       courier: 'Courier',
+      deliveryFee: 'Delivery Fee',
+      cod: 'COD',
+      totalAmount: 'Total',
+      none: 'None',
     },
     my: {
       title: 'ကျွန်ုပ်၏ အော်ဒါများ',
@@ -140,6 +149,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       packageType: 'အမျိုးအစား',
       weight: 'အလေးချိန်',
       courier: 'ပို့ဆောင်သူ',
+      deliveryFee: 'ပို့ဆောင်ခ',
+      cod: 'ငွေကောက်ခံရန်',
+      totalAmount: 'စုစုပေါင်း',
+      none: 'မရှိ',
       // 包裹类型翻译
       packageTypes: {
         'standard': 'စံပါဆယ်',
@@ -588,7 +601,21 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               {/* 订单底部 */}
               <View style={styles.orderFooter}>
                 <View style={styles.orderFooterLeft}>
-                  <Text style={styles.orderPrice}>{order.price} MMK</Text>
+                  {userType === 'partner' ? (
+                    <View>
+                      <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
+                        {t.deliveryFee}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{order.price} MMK</Text>
+                      </Text>
+                      <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
+                        {t.cod}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{Number(order.cod_amount || 0) > 0 ? `${order.cod_amount} MMK` : t.none}</Text>
+                      </Text>
+                      <Text style={styles.orderPrice}>
+                        {t.totalAmount}: {(parseFloat(order.price?.replace(/[^\d.]/g, '') || '0') + Number(order.cod_amount || 0)).toLocaleString()} MMK
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.orderPrice}>{order.price} MMK</Text>
+                  )}
                   <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
                 </View>
                 <TouchableOpacity
