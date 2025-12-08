@@ -52,6 +52,7 @@ interface Order {
   sender_code?: string;
   transfer_code?: string;
   store_receive_code?: string;
+  cod_amount?: number;
 }
 
 interface TrackingEvent {
@@ -72,6 +73,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerId, setCustomerId] = useState('');
+  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
 
   // 评价相关
   const [showRateModal, setShowRateModal] = useState(false);
@@ -111,6 +113,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       description: '物品描述',
       priceInfo: '价格信息',
       totalPrice: '总价',
+      deliveryFee: '跑腿费',
+      cod: '代收款',
+      totalAmount: '总金额',
+      none: '无',
       courierInfo: '配送员',
       trackingHistory: '追踪历史',
       noTracking: '暂无追踪信息',
@@ -164,6 +170,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       description: 'Description',
       priceInfo: 'Price',
       totalPrice: 'Total',
+      deliveryFee: 'Delivery Fee',
+      cod: 'COD',
+      totalAmount: 'Total Amount',
+      none: 'None',
       courierInfo: 'Courier',
       trackingHistory: 'Tracking',
       noTracking: 'No tracking info',
@@ -217,6 +227,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       description: 'ဖော်ပြချက်',
       priceInfo: 'စျေးနှုန်း',
       totalPrice: 'စုစုပေါင်း',
+      deliveryFee: 'ပို့ဆောင်ခ',
+      cod: 'ငွေကောက်ခံရန်',
+      totalAmount: 'စုစုပေါင်း',
+      none: 'မရှိ',
       courierInfo: 'ပို့ဆောင်သူ',
       trackingHistory: 'ခြေရာခံ',
       noTracking: 'အချက်အလက်မရှိ',
@@ -279,9 +293,13 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       
       // 加载用户ID
       const userData = await AsyncStorage.getItem('currentUser');
+      const storedUserType = await AsyncStorage.getItem('userType');
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
+        // 检测用户类型
+        const detectedUserType = storedUserType || user.user_type || 'customer';
+        setUserType(detectedUserType === 'partner' ? 'partner' : 'customer');
       }
 
       // 加载订单详情
@@ -569,10 +587,31 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         {/* 价格信息 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>💰 {t.priceInfo}</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t.totalPrice}</Text>
-            <Text style={styles.priceValue}>{order.price} MMK</Text>
-          </View>
+          {userType === 'partner' ? (
+            <View style={styles.partnerPriceContainer}>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>{t.deliveryFee} =</Text>
+                <Text style={styles.priceValue}>{order.price} MMK</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>{t.cod} =</Text>
+                <Text style={styles.priceValue}>{Number(order.cod_amount || 0) > 0 ? `${order.cod_amount} MMK` : t.none}</Text>
+              </View>
+              <View style={[styles.priceRow, styles.totalPriceRow]}>
+                <Text style={styles.totalPriceLabel}>
+                  {t.totalAmount} = {t.deliveryFee} + {t.cod}
+                </Text>
+                <Text style={styles.totalPriceValue}>
+                  {(parseFloat(order.price?.replace(/[^\d.]/g, '') || '0') + Number(order.cod_amount || 0)).toLocaleString()} MMK
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>{t.totalPrice}</Text>
+              <Text style={styles.priceValue}>{order.price} MMK</Text>
+            </View>
+          )}
         </View>
 
         {/* 配送员信息 */}
@@ -1018,6 +1057,9 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '500',
   },
+  partnerPriceContainer: {
+    gap: 12,
+  },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1032,9 +1074,27 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   priceValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#3b82f6',
+  },
+  totalPriceRow: {
+    backgroundColor: '#dbeafe',
+    borderTopWidth: 2,
+    borderTopColor: '#3b82f6',
+    marginTop: 8,
+    paddingTop: 16,
+  },
+  totalPriceLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e40af',
+    flex: 1,
+  },
+  totalPriceValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1e40af',
   },
   courierContainer: {
     flexDirection: 'row',
