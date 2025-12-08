@@ -605,38 +605,60 @@ export const packageService = {
 
   // 获取客户订单统计（通过description匹配）
   // 获取订单统计（针对客户ID、邮箱或手机号）
+  // 注意：此方法使用与 getAllOrders 完全相同的查询逻辑，确保统计准确
   async getOrderStats(userId: string, email?: string, phone?: string, userType?: string) {
     try {
+      // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status 字段用于统计
       let query = supabase
         .from('packages')
-        .select('status, description');
+        .select('status')
+        .order('created_at', { ascending: false });
 
       if (userType === 'partner') {
         // 合伙人：检查 delivery_store_id 或 customer_email (等于store_code)
-        const conditions = [`delivery_store_id.eq.${userId}`];
-        if (email) conditions.push(`customer_email.eq.${email}`);
+        // 与 getAllOrders 保持完全一致
+        const conditions: string[] = [];
+        conditions.push(`delivery_store_id.eq.${userId}`);
+        if (email) {
+          conditions.push(`customer_email.eq.${email}`);
+        }
         
-        // 使用 OR 连接条件
-        query = query.or(conditions.join(','));
+        // 使用 or 查询，匹配任一条件
+        if (conditions.length > 0) {
+          query = query.or(conditions.join(','));
+        }
       } else {
-        // 普通客户：检查 customer_id 或 邮箱 或 手机号 或 description中的ID
+        // 普通客户：使用与 getAllOrders 完全相同的查询逻辑
         // 注意：如果 customer_id 字段不存在，请先运行 add-customer-id-to-packages.sql 脚本
         const conditions: string[] = [];
         
+        // 方式1：通过 customer_id 匹配（运行SQL脚本后可用）
         // 暂时注释掉 customer_id，等运行SQL脚本后再取消注释
         // conditions.push(`customer_id.eq.${userId}`);
         
-        // 使用备用方案匹配
+        // 方式2：通过 description 匹配（兼容旧数据）
         conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        if (phone) conditions.push(`sender_phone.eq.${phone}`);
         
+        // 方式3：通过邮箱匹配
+        if (email) {
+          conditions.push(`customer_email.eq.${email}`);
+        }
+        
+        // 方式4：通过手机号匹配（备用方案）
+        if (phone) {
+          conditions.push(`sender_phone.eq.${phone}`);
+        }
+        
+        // 使用 or 查询，匹配任一条件（与 getAllOrders 保持一致）
         query = query.or(conditions.join(','));
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('获取订单统计失败:', error);
+        throw error;
+      }
 
       const stats = {
         total: data?.length || 0,
