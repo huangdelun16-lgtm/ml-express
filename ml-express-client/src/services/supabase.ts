@@ -558,15 +558,32 @@ export const packageService = {
     });
   },
 
-  // 获取客户最近的订单（限制数量，通过description匹配）
-  async getRecentOrders(customerId: string, limit: number = 5) {
+  // 获取客户最近的订单（支持合伙人和普通客户）
+  async getRecentOrders(userId: string, limit: number = 5, email?: string, phone?: string, userType?: string) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('packages')
         .select('*')
-        .ilike('description', `%[客户ID: ${customerId}]%`)
         .order('created_at', { ascending: false })
         .limit(limit);
+
+      if (userType === 'partner') {
+        // 合伙人：检查 delivery_store_id 或 customer_email (等于store_code)
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (email) conditions.push(`customer_email.eq.${email}`);
+        
+        query = query.or(conditions.join(','));
+      } else {
+        // 普通客户
+        const conditions = [`customer_id.eq.${userId}`];
+        if (email) conditions.push(`customer_email.eq.${email}`);
+        // 兼容旧数据：检查description
+        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+        
+        query = query.or(conditions.join(','));
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data || [];
@@ -577,12 +594,31 @@ export const packageService = {
   },
 
   // 获取客户订单统计（通过description匹配）
-  async getOrderStats(customerId: string) {
+  // 获取订单统计（针对客户ID、邮箱或手机号）
+  async getOrderStats(userId: string, email?: string, phone?: string, userType?: string) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('packages')
-        .select('status, description')
-        .ilike('description', `%[客户ID: ${customerId}]%`);
+        .select('status, description');
+
+      if (userType === 'partner') {
+        // 合伙人：检查 delivery_store_id 或 customer_email (等于store_code)
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (email) conditions.push(`customer_email.eq.${email}`);
+        
+        // 使用 OR 连接条件
+        query = query.or(conditions.join(','));
+      } else {
+        // 普通客户：检查 customer_id 或 邮箱 或 手机号 或 description中的ID
+        const conditions = [`customer_id.eq.${userId}`];
+        if (email) conditions.push(`customer_email.eq.${email}`);
+        if (phone) conditions.push(`sender_phone.eq.${phone}`);
+        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+        
+        query = query.or(conditions.join(','));
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -761,17 +797,51 @@ export const packageService = {
   },
 
   // 获取所有订单（带筛选和分页，通过description匹配）
-  async getAllOrders(customerId: string, options?: {
+  // 获取所有订单（支持分页和筛选，支持合伙人）
+  async getAllOrders(userId: string, options?: {
     status?: string;
     limit?: number;
     offset?: number;
+    email?: string;
+    phone?: string;
+    userType?: string;
+    storeName?: string; // 合伙人店铺名称，用于匹配 sender_name
   }) {
     try {
       let query = supabase
         .from('packages')
         .select('*', { count: 'exact' })
-        .ilike('description', `%[客户ID: ${customerId}]%`)
         .order('created_at', { ascending: false });
+
+      if (options?.userType === 'partner') {
+        // 合伙人订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
+        const conditions: string[] = [];
+        
+        // 通过 delivery_store_id 匹配
+        conditions.push(`delivery_store_id.eq.${userId}`);
+        
+        // 如果提供了店铺名称，也通过 sender_name 匹配（兼容旧数据）
+        if (options.storeName) {
+          // 精确匹配店铺名称
+          conditions.push(`sender_name.eq.${options.storeName}`);
+        }
+        
+        if (options.email) {
+          conditions.push(`customer_email.eq.${options.email}`);
+        }
+        
+        // 使用 or 查询，匹配任一条件
+        if (conditions.length > 0) {
+          query = query.or(conditions.join(','));
+        }
+      } else {
+        const conditions = [`customer_id.eq.${userId}`];
+        if (options?.email) conditions.push(`customer_email.eq.${options.email}`);
+        // 兼容旧数据
+        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+        
+        query = query.or(conditions.join(','));
+      }
 
       if (options?.status && options.status !== 'all') {
         query = query.eq('status', options.status);

@@ -58,6 +58,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
@@ -215,10 +216,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
       const isGuest = await AsyncStorage.getItem('isGuest');
+      const storedUserType = await AsyncStorage.getItem('userType');
       
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
+        
+        // 检测用户类型：优先使用 AsyncStorage 中的 userType，否则从 user 对象中读取
+        const detectedUserType = storedUserType || user.user_type || 'customer';
+        const finalUserType = detectedUserType === 'partner' ? 'partner' : 'customer';
+        setUserType(finalUserType);
         
         // 如果是访客，不加载订单
         if (isGuest === 'true' || user.id === 'guest') {
@@ -226,7 +233,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           setOrders([]);
           setFilteredOrders([]);
         } else {
-          loadOrders(user.id);
+          loadOrders(user.id, finalUserType);
         }
       } else {
         // 没有用户信息，跳转登录
@@ -243,10 +250,24 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string) => {
+  const loadOrders = async (userId: string, type: 'customer' | 'partner' = 'customer') => {
     try {
       setLoading(true);
-      const { orders: data } = await packageService.getAllOrders(userId);
+      
+      // 如果是合伙人，获取店铺名称用于匹配 sender_name（兼容旧数据）
+      let storeName: string | undefined;
+      if (type === 'partner') {
+        const userName = await AsyncStorage.getItem('userName');
+        if (userName) {
+          storeName = userName;
+        }
+      }
+      
+      // 传递 userType 和 storeName 参数，让 getAllOrders 知道如何查询订单
+      const { orders: data } = await packageService.getAllOrders(userId, {
+        userType: type,
+        storeName: storeName
+      });
       setOrders(data);
       filterOrders(data, selectedStatus);
     } catch (error: any) {
@@ -260,9 +281,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const onRefresh = useCallback(async () => {
     if (!customerId) return;
     setRefreshing(true);
-    await loadOrders(customerId);
+    await loadOrders(customerId, userType);
     setRefreshing(false);
-  }, [customerId]);
+  }, [customerId, userType]);
 
   // 过滤订单
   const filterOrders = (orderList: Order[], status: string) => {
