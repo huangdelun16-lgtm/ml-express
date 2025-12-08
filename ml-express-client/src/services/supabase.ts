@@ -67,6 +67,7 @@ export interface Package {
   customer_comment?: string;
   rating_time?: string;
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  cod_amount?: number; // 代收款金额
 }
 
 // 客户服务（使用users表）
@@ -441,7 +442,9 @@ export const packageService = {
       const fullDescription = `${customerNote} ${packageData.description || ''}`.trim();
 
       const insertData: any = {
-        // 注意：不包含customer_id，因为数据库表中没有这个字段
+        // 添加 customer_id 和 customer_email (需先运行数据库迁移脚本)
+        customer_id: packageData.customer_id,
+        customer_email: packageData.customer_email,
         sender_name: packageData.sender_name,
         sender_phone: packageData.sender_phone,
         sender_address: packageData.sender_address,
@@ -454,7 +457,7 @@ export const packageService = {
         receiver_longitude: packageData.receiver_longitude,
         package_type: packageData.package_type,
         weight: packageData.weight,
-        description: fullDescription, // 将客户ID包含在描述中
+        description: fullDescription, // 将客户ID包含在描述中 (保留用于兼容旧数据)
         price: String(packageData.price || '0'), // 确保是字符串
         delivery_speed: packageData.delivery_speed || '准时达',
         scheduled_delivery_time: packageData.scheduled_delivery_time || null,
@@ -465,6 +468,7 @@ export const packageService = {
         delivery_time: '',
         courier: '待分配',
         payment_method: packageData.payment_method || 'cash', // 添加支付方式
+        cod_amount: packageData.cod_amount || 0, // 添加代收款
       };
 
       // 如果提供了自定义ID，使用它
