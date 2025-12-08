@@ -578,11 +578,17 @@ export const packageService = {
         
         query = query.or(conditions.join(','));
       } else {
-        // 普通客户
-        const conditions = [`customer_id.eq.${userId}`];
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        // 兼容旧数据：检查description
+        // 普通客户：使用多种方式匹配订单
+        // 注意：如果 customer_id 字段不存在，请先运行 add-customer-id-to-packages.sql 脚本
+        const conditions: string[] = [];
+        
+        // 暂时注释掉 customer_id，等运行SQL脚本后再取消注释
+        // conditions.push(`customer_id.eq.${userId}`);
+        
+        // 使用备用方案匹配
         conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+        if (email) conditions.push(`customer_email.eq.${email}`);
+        if (phone) conditions.push(`sender_phone.eq.${phone}`);
         
         query = query.or(conditions.join(','));
       }
@@ -614,10 +620,16 @@ export const packageService = {
         query = query.or(conditions.join(','));
       } else {
         // 普通客户：检查 customer_id 或 邮箱 或 手机号 或 description中的ID
-        const conditions = [`customer_id.eq.${userId}`];
+        // 注意：如果 customer_id 字段不存在，请先运行 add-customer-id-to-packages.sql 脚本
+        const conditions: string[] = [];
+        
+        // 暂时注释掉 customer_id，等运行SQL脚本后再取消注释
+        // conditions.push(`customer_id.eq.${userId}`);
+        
+        // 使用备用方案匹配
+        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
         if (email) conditions.push(`customer_email.eq.${email}`);
         if (phone) conditions.push(`sender_phone.eq.${phone}`);
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
         
         query = query.or(conditions.join(','));
       }
@@ -839,10 +851,27 @@ export const packageService = {
           query = query.or(conditions.join(','));
         }
       } else {
-        const conditions = [`customer_id.eq.${userId}`];
-        if (options?.email) conditions.push(`customer_email.eq.${options.email}`);
-        // 兼容旧数据
+        // 普通客户查询：使用多种方式匹配订单
+        // 注意：运行 add-customer-id-to-packages.sql 脚本后，customer_id 字段将可用
+        const conditions: string[] = [];
+        
+        // 方式1：通过 customer_id 匹配（运行SQL脚本后可用）
+        // 如果字段不存在，此条件会导致查询失败，所以先注释掉
+        // 运行 add-customer-id-to-packages.sql 后，取消下面的注释
+        // conditions.push(`customer_id.eq.${userId}`);
+        
+        // 方式2：通过 description 匹配（兼容旧数据）
         conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+        
+        // 方式3：通过邮箱匹配
+        if (options?.email) {
+          conditions.push(`customer_email.eq.${options.email}`);
+        }
+        
+        // 方式4：通过手机号匹配（备用方案）
+        if (options?.phone) {
+          conditions.push(`sender_phone.eq.${options.phone}`);
+        }
         
         query = query.or(conditions.join(','));
       }

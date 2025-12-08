@@ -267,6 +267,12 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     try {
       setLoading(true);
       
+      // 获取用户信息用于匹配订单
+      const userData = await AsyncStorage.getItem('currentUser');
+      const user = userData ? JSON.parse(userData) : null;
+      const userEmail = await AsyncStorage.getItem('userEmail');
+      const userPhone = await AsyncStorage.getItem('userPhone');
+      
       // 如果是合伙人，获取店铺名称用于匹配 sender_name（兼容旧数据）
       let storeName: string | undefined;
       if (type === 'partner') {
@@ -276,10 +282,12 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         }
       }
       
-      // 传递 userType 和 storeName 参数，让 getAllOrders 知道如何查询订单
+      // 传递 userType、storeName、email 和 phone 参数，让 getAllOrders 知道如何查询订单
       const { orders: data } = await packageService.getAllOrders(userId, {
         userType: type,
-        storeName: storeName
+        storeName: storeName,
+        email: userEmail || user?.email,
+        phone: userPhone || user?.phone
       });
       setOrders(data);
       filterOrders(data, selectedStatus);

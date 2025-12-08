@@ -244,7 +244,10 @@ export default function LoginScreen({ navigation }: any) {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.appTitle}>MARKET LINK EXPRESS</Text>
+            <View style={styles.appTitleContainer}>
+              <Text style={styles.appTitleMain}>MARKET LINK </Text>
+              <Text style={styles.appTitleExpress}>EXPRESS</Text>
+            </View>
             <View style={styles.divider}>
               <View style={styles.line} />
               <Text style={styles.dividerText}>DELIVERY SERVICE</Text>
@@ -378,15 +381,30 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
   },
-  appTitle: {
+  appTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  appTitleMain: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#FF9900',
+    color: '#ffffff',
     letterSpacing: 1,
-    marginBottom: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  appTitleExpress: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFD700',
+    letterSpacing: 1,
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   divider: {
     flexDirection: 'row',
