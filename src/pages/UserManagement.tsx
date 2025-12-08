@@ -802,23 +802,26 @@ const UserManagement: React.FC = () => {
       {/* 标签页 */}
       <div style={{
         display: 'flex',
-        gap: '10px',
+        gap: '12px',
         marginBottom: '30px',
         position: 'relative',
-        zIndex: 1
+        zIndex: 1,
+        flexWrap: 'wrap'
       }}>
         <button
           onClick={() => setActiveTab('customer_list')}
           style={{
-            background: activeTab === 'customer_list' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'customer_list' ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1))' : 'rgba(0, 0, 0, 0.2)',
             color: 'white',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            padding: '10px 20px',
-            borderRadius: '10px',
+            border: activeTab === 'customer_list' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '12px 24px',
+            borderRadius: '12px',
             cursor: 'pointer',
             fontSize: '1rem',
+            fontWeight: activeTab === 'customer_list' ? '600' : '400',
             backdropFilter: 'blur(10px)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: activeTab === 'customer_list' ? '0 4px 15px rgba(0,0,0,0.1)' : 'none',
           }}
         >
           客户列表
@@ -826,15 +829,17 @@ const UserManagement: React.FC = () => {
         <button
           onClick={() => setActiveTab('admin_list')}
           style={{
-            background: activeTab === 'admin_list' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'admin_list' ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1))' : 'rgba(0, 0, 0, 0.2)',
             color: 'white',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            padding: '10px 20px',
-            borderRadius: '10px',
+            border: activeTab === 'admin_list' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '12px 24px',
+            borderRadius: '12px',
             cursor: 'pointer',
             fontSize: '1rem',
+            fontWeight: activeTab === 'admin_list' ? '600' : '400',
             backdropFilter: 'blur(10px)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: activeTab === 'admin_list' ? '0 4px 15px rgba(0,0,0,0.1)' : 'none',
           }}
         >
           管理员列表
@@ -842,15 +847,17 @@ const UserManagement: React.FC = () => {
         <button
           onClick={() => setActiveTab('partner_store')}
           style={{
-            background: activeTab === 'partner_store' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'partner_store' ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1))' : 'rgba(0, 0, 0, 0.2)',
             color: 'white',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            padding: '10px 20px',
-            borderRadius: '10px',
+            border: activeTab === 'partner_store' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '12px 24px',
+            borderRadius: '12px',
             cursor: 'pointer',
             fontSize: '1rem',
+            fontWeight: activeTab === 'partner_store' ? '600' : '400',
             backdropFilter: 'blur(10px)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: activeTab === 'partner_store' ? '0 4px 15px rgba(0,0,0,0.1)' : 'none',
           }}
         >
           合伙店铺
@@ -858,15 +865,17 @@ const UserManagement: React.FC = () => {
         <button
           onClick={() => setActiveTab('courier_management')}
           style={{
-            background: activeTab === 'courier_management' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+            background: activeTab === 'courier_management' ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.1))' : 'rgba(0, 0, 0, 0.2)',
             color: 'white',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            padding: '10px 20px',
-            borderRadius: '10px',
+            border: activeTab === 'courier_management' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '12px 24px',
+            borderRadius: '12px',
             cursor: 'pointer',
             fontSize: '1rem',
+            fontWeight: activeTab === 'courier_management' ? '600' : '400',
             backdropFilter: 'blur(10px)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: activeTab === 'courier_management' ? '0 4px 15px rgba(0,0,0,0.1)' : 'none',
           }}
         >
           快递员管理
@@ -962,17 +971,26 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '12px 16px',
+                  padding: '14px 20px',
                   border: '1px solid rgba(255, 255, 255, 0.2)',
                   borderRadius: '12px',
-                  background: 'rgba(0, 0, 0, 0.2)',
+                  background: 'rgba(0, 0, 0, 0.4)',
                   color: 'white',
                   fontSize: '1rem',
                   outline: 'none',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(5px)'
                 }}
-                onFocus={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'}
-                onBlur={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'}
+                onFocus={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
             </div>
             
@@ -980,14 +998,15 @@ const UserManagement: React.FC = () => {
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               style={{
-                padding: '12px 16px',
+                padding: '14px 20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 borderRadius: '12px',
-                background: 'rgba(0, 0, 0, 0.2)',
+                background: 'rgba(0, 0, 0, 0.4)',
                 color: 'white',
                 fontSize: '1rem',
                 outline: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                backdropFilter: 'blur(5px)'
               }}
             >
               <option value="all">📊 所有状态</option>
@@ -1065,13 +1084,15 @@ const UserManagement: React.FC = () => {
                 <div style={{ 
                   textAlign: 'center', 
                   color: 'white', 
-                  padding: '4rem 2rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                  padding: '5rem 2rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: '20px',
+                  border: '1px dashed rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(5px)'
                 }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</div>
-                  <p style={{ fontSize: '1.2rem', margin: 0 }}>没有找到匹配的用户</p>
+                  <div style={{ fontSize: '4rem', marginBottom: '20px', opacity: 0.8 }}>🔍</div>
+                  <h3 style={{ fontSize: '1.5rem', margin: '0 0 10px 0', fontWeight: 600 }}>未找到匹配用户</h3>
+                  <p style={{ fontSize: '1.1rem', margin: 0, opacity: 0.6 }}>请尝试调整搜索关键词或筛选条件</p>
                 </div>
               ) : (
                 filteredUsers.map((user) => {
@@ -1165,32 +1186,38 @@ const UserManagement: React.FC = () => {
                       marginBottom: '15px'
                     }}>
                       <div>
-                        <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>联系信息</h4>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                          电话: {user.phone}
+                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>联系信息</h4>
+                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.7 }}>电话:</span>
+                          <span style={{ fontWeight: 500 }}>{user.phone}</span>
                         </p>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                          邮箱: {user.email}
+                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.7 }}>邮箱:</span>
+                          <span>{user.email}</span>
                         </p>
-                        <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
-                          地址: {user.address}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>统计信息</h4>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                          订单数: {user.total_orders}
-                        </p>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                          消费金额: {user.total_spent.toLocaleString()} MMK
-                        </p>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>
-                          评分: {user.rating}/5.0
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>地址:</span>
+                          <span style={{ opacity: 0.9 }}>{user.address}</span>
                         </p>
                       </div>
                       <div>
-                        <h4 style={{ color: '#C0C0C0', margin: '0 0 5px 0', fontSize: '1rem' }}>备注</h4>
-                        <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.8rem' }}>
+                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>统计信息</h4>
+                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.7 }}>订单数:</span>
+                          <span style={{ fontWeight: 500 }}>{user.total_orders}</span>
+                        </p>
+                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.7 }}>消费:</span>
+                          <span style={{ fontWeight: 500, color: '#fbbf24' }}>{user.total_spent.toLocaleString()} MMK</span>
+                        </p>
+                        <p style={{ color: 'white', margin: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.7 }}>评分:</span>
+                          <span style={{ color: '#fbbf24' }}>★ {user.rating}/5.0</span>
+                        </p>
+                      </div>
+                      <div>
+                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>备注</h4>
+                        <p style={{ color: 'rgba(255,255,255,0.85)', margin: 0, fontSize: '0.9rem', lineHeight: '1.5' }}>
                           {user.notes || '无备注'}
                         </p>
                       </div>
@@ -1529,41 +1556,44 @@ const UserManagement: React.FC = () => {
             <div style={{ display: 'grid', gap: '15px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
               {partnerStores.map((store: any) => (
                 <div key={store.id} style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '12px',
-                  padding: '20px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderRadius: '16px',
+                  padding: '24px',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   backdropFilter: 'blur(10px)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                       🏪 {store.store_name}
                     </h3>
                     <span style={{ 
-                      background: store.status === 'active' ? 'rgba(39, 174, 96, 0.8)' : 'rgba(149, 165, 166, 0.8)', 
+                      background: store.status === 'active' ? 'rgba(39, 174, 96, 0.9)' : 'rgba(149, 165, 166, 0.9)', 
                       color: 'white', 
-                      padding: '4px 10px', 
-                      borderRadius: '12px', 
-                      fontSize: '0.8rem' 
+                      padding: '6px 12px', 
+                      borderRadius: '20px', 
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                     }}>
                       {store.status === 'active' ? '营业中' : '休息'}
                     </span>
                   </div>
                   
-                  <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>📞</span>
-                      <span>{store.contact_phone || '无电话'}</span>
+                  <div style={{ color: 'white', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>📞</span>
+                      <span style={{ fontWeight: 500 }}>{store.contact_phone || '无电话'}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <span>📍</span>
-                      <span style={{ lineHeight: '1.4' }}>{store.address || '无地址'}</span>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>📍</span>
+                      <span style={{ lineHeight: '1.5', opacity: 0.9 }}>{store.address || '无地址'}</span>
                     </div>
                     {store.store_code && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <span style={{ opacity: 0.6 }}>代码:</span>
-                        <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>{store.store_code}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ opacity: 0.7 }}>代码:</span>
+                        <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>{store.store_code}</span>
                       </div>
                     )}
                   </div>
