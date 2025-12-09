@@ -27,6 +27,12 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   }); // 密码修改表单
   const [storeInfo, setStoreInfo] = useState<any>(null); // 合伙店铺信息
+  const [partnerCODStats, setPartnerCODStats] = useState({
+    totalCOD: 0,
+    unclearedCOD: 0,
+    unclearedCount: 0,
+    lastSettledAt: null as string | null,
+  }); // 合伙店铺代收款统计
 
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
@@ -160,9 +166,31 @@ const ProfilePage: React.FC = () => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
+  // 加载合伙店铺代收款统计
+  const loadPartnerCODStats = useCallback(async () => {
+    if (!currentUser || !isPartnerStore) {
+      return;
+    }
+
+    try {
+      const storeName = currentUser.name || storeInfo?.store_name;
+      const userId = currentUser.id || storeInfo?.id;
+      
+      if (userId) {
+        const stats = await packageService.getPartnerStats(userId, storeName);
+        setPartnerCODStats(stats);
+      }
+    } catch (error) {
+      console.error('加载代收款统计失败:', error);
+    }
+  }, [currentUser, isPartnerStore, storeInfo]);
+
   useEffect(() => {
     loadUserPackages();
-  }, [loadUserPackages]);
+    if (isPartnerStore) {
+      loadPartnerCODStats();
+    }
+  }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
 
   // 当包裹列表变化时，重置到第一页
   useEffect(() => {
@@ -326,7 +354,13 @@ const ProfilePage: React.FC = () => {
       completed: '已完成',
       pickupCode: '寄件码',
       storeType: '店铺类型',
-      storeCode: '店铺代码'
+      storeCode: '店铺代码',
+      codStats: '代收款统计',
+      totalCOD: '总代收款',
+      unclearedCOD: '待结清金额',
+      unclearedCount: '待结清订单数',
+      lastSettledAt: '上次结清日期',
+      noSettlement: '暂无结清记录'
     },
     en: {
       nav: {
@@ -368,7 +402,13 @@ const ProfilePage: React.FC = () => {
       completed: 'Completed',
       pickupCode: 'Pickup Code',
       storeType: 'Store Type',
-      storeCode: 'Store Code'
+      storeCode: 'Store Code',
+      codStats: 'COD Statistics',
+      totalCOD: 'Total COD',
+      unclearedCOD: 'Uncleared Amount',
+      unclearedCount: 'Uncleared Orders',
+      lastSettledAt: 'Last Settled Date',
+      noSettlement: 'No Settlement Record'
     },
     my: {
       nav: {
@@ -410,7 +450,13 @@ const ProfilePage: React.FC = () => {
       completed: 'ပြီးစီးပြီး',
       pickupCode: 'ကောက်ယူမည့်ကုဒ်',
       storeType: 'ဆိုင်အမျိုးအစား',
-      storeCode: 'ဆိုင်ကုဒ်'
+      storeCode: 'ဆိုင်ကုဒ်',
+      codStats: 'ငွေကောက်ခံမှုစာရင်း',
+      totalCOD: 'စုစုပေါင်းငွေကောက်ခံမှု',
+      unclearedCOD: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောငွေ',
+      unclearedCount: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောအော်ဒါ',
+      lastSettledAt: 'နောက်ဆုံးရှင်းလင်းထားသောရက်စွဲ',
+      noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ'
     }
   };
 
@@ -1214,6 +1260,158 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* 代收款统计卡片 - 仅合伙店铺显示 */}
+          {isPartnerStore && (
+            <div style={{
+              marginBottom: '2.5rem'
+            }}>
+              <h3 style={{
+                color: 'white',
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                marginBottom: '1.5rem',
+                paddingBottom: '0.75rem',
+                borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                {t.codStats}
+              </h3>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                {/* 总代收款 */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.15))',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  border: '2px solid rgba(59, 130, 246, 0.4)',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  cursor: 'default',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-5px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
+                }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '1.5rem' }}>💰</div>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
+                      {t.totalCOD}
+                    </div>
+                  </div>
+                  <div style={{ color: '#60a5fa', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2' }}>
+                    {partnerCODStats.totalCOD.toLocaleString()}
+                    <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
+                  </div>
+                </div>
+
+                {/* 待结清金额 */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.15))',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  border: '2px solid rgba(239, 68, 68, 0.4)',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  cursor: 'default',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-5px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
+                }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '1.5rem' }}>⏰</div>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
+                      {t.unclearedCOD}
+                    </div>
+                  </div>
+                  <div style={{ color: '#f87171', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2' }}>
+                    {partnerCODStats.unclearedCOD.toLocaleString()}
+                    <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 详细信息行 */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingBottom: '1rem',
+                  marginBottom: '1rem',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
+                    {t.unclearedCount}
+                  </span>
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    borderRadius: '12px',
+                    padding: '0.5rem 1rem',
+                    border: '1px solid rgba(239, 68, 68, 0.3)'
+                  }}>
+                    <span style={{ color: '#f87171', fontSize: '1.1rem', fontWeight: '700' }}>
+                      {partnerCODStats.unclearedCount}
+                    </span>
+                  </div>
+                </div>
+                
+                {partnerCODStats.lastSettledAt ? (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
+                      {t.lastSettledAt}
+                    </span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '1rem', fontWeight: '600' }}>
+                      {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                ) : partnerCODStats.totalCOD > 0 ? (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
+                      {t.lastSettledAt}
+                    </span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '1rem', fontStyle: 'italic' }}>
+                      {t.noSettlement}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {/* 详细信息网格 - 仅非合伙店铺显示 */}
           {!isPartnerStore && (

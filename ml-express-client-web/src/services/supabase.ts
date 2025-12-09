@@ -52,6 +52,8 @@ export interface Package {
   cod_amount?: number; // 代收款金额 (Cash on Delivery)
   customer_email?: string; // 客户邮箱
   customer_name?: string; // 客户姓名
+  cod_settled?: boolean; // 代收款是否已结清
+  cod_settled_at?: string; // 代收款结清时间
 }
 
 // 客户端包裹服务（只包含客户端需要的功能）
@@ -313,6 +315,78 @@ export const packageService = {
     } catch (err) {
       console.error('获取用户包裹列表异常:', err);
       return [];
+    }
+  },
+
+  // 获取合伙店铺代收款统计
+  async getPartnerStats(userId: string, storeName?: string) {
+    try {
+      // 构建查询函数
+      const runQuery = async (fields: string) => {
+        let q = supabase
+          .from('packages')
+          .select(fields)
+          .eq('status', '已送达')
+          .gt('cod_amount', 0);
+
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (storeName) {
+          conditions.push(`sender_name.eq.${storeName}`);
+        }
+        
+        return q.or(conditions.join(','));
+      };
+
+      // 尝试查询所有字段
+      let { data, error } = await runQuery('cod_amount, cod_settled, cod_settled_at, status');
+
+      // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
+      if (error && error.code === '42703') {
+        console.warn('cod_settled 字段不存在，使用降级查询');
+        const retryResult = await runQuery('cod_amount, status');
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+
+      if (error) throw error;
+
+      // 类型断言：确保 data 是正确的类型
+      const packages = (data || []) as Array<{
+        cod_amount?: number;
+        cod_settled?: boolean;
+        cod_settled_at?: string;
+        status?: string;
+      }>;
+
+      const totalCOD = packages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      
+      // 如果没有 cod_settled 字段，data 中该属性为 undefined，!undefined 为 true，即默认未结清
+      const unclearedPackages = packages.filter(pkg => !pkg.cod_settled);
+      const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      const unclearedCount = unclearedPackages.length;
+      
+      // 计算最后结清日期
+      const settledPackages = packages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
+      let lastSettledAt: string | null = null;
+      if (settledPackages.length > 0) {
+        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledPackages[0].cod_settled_at || null;
+      }
+
+      return {
+        totalCOD,
+        unclearedCOD,
+        unclearedCount,
+        lastSettledAt
+      };
+    } catch (error) {
+      console.error('获取合伙人统计失败:', error);
+      return {
+        totalCOD: 0,
+        unclearedCOD: 0,
+        unclearedCount: 0,
+        lastSettledAt: null
+      };
     }
   }
 };
