@@ -589,42 +589,53 @@ export default function ProfileScreen({ navigation }: any) {
       <Text style={styles.sectionTitle}>{t.codStats}</Text>
       <View style={styles.codCard}>
         <View style={styles.codStatsRow}>
-          <View style={[styles.codStatBox, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-            <Text style={styles.codStatLabel}>{t.totalCOD}</Text>
+          <LinearGradient
+            colors={['rgba(59, 130, 246, 0.15)', 'rgba(59, 130, 246, 0.05)']}
+            style={[styles.codStatBox, { borderColor: 'rgba(59, 130, 246, 0.3)' }]}
+          >
+            <Text style={[styles.codStatLabel, { color: '#60a5fa' }]}>{t.totalCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#3b82f6' }]}>
-              {partnerCODStats.totalCOD.toLocaleString()} MMK
+              {partnerCODStats.totalCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
-          </View>
-          <View style={[styles.codStatBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-            <Text style={styles.codStatLabel}>{t.unclearedCOD}</Text>
+          </LinearGradient>
+          <LinearGradient
+            colors={['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']}
+            style={[styles.codStatBox, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+          >
+            <Text style={[styles.codStatLabel, { color: '#f87171' }]}>{t.unclearedCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
-              {partnerCODStats.unclearedCOD.toLocaleString()} MMK
+              {partnerCODStats.unclearedCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
-          </View>
+          </LinearGradient>
         </View>
-        <View style={styles.codInfoRow}>
-          <Text style={styles.codInfoLabel}>{t.unclearedCount}:</Text>
-          <Text style={styles.codInfoValue}>{partnerCODStats.unclearedCount}</Text>
+        <View style={styles.codInfoContainer}>
+          <View style={styles.codInfoRow}>
+            <Text style={styles.codInfoLabel}>{t.unclearedCount}</Text>
+            <View style={[styles.codInfoBadge, { backgroundColor: partnerCODStats.unclearedCount > 0 ? '#ef4444' : '#10b981' }]}>
+              <Text style={styles.codInfoBadgeText}>{partnerCODStats.unclearedCount}</Text>
+            </View>
+          </View>
+          {partnerCODStats.lastSettledAt && (
+            <View style={styles.codInfoRow}>
+              <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
+              <Text style={styles.codInfoValue}>
+                {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </Text>
+            </View>
+          )}
+          {!partnerCODStats.lastSettledAt && partnerCODStats.totalCOD > 0 && (
+            <View style={styles.codInfoRow}>
+              <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
+              <Text style={[styles.codInfoValue, { opacity: 0.6, fontStyle: 'italic' }]}>{t.noSettlement}</Text>
+            </View>
+          )}
         </View>
-        {partnerCODStats.lastSettledAt && (
-          <View style={styles.codInfoRow}>
-            <Text style={styles.codInfoLabel}>{t.lastSettledAt}:</Text>
-            <Text style={styles.codInfoValue}>
-              {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </Text>
-          </View>
-        )}
-        {!partnerCODStats.lastSettledAt && partnerCODStats.totalCOD > 0 && (
-          <View style={styles.codInfoRow}>
-            <Text style={[styles.codInfoLabel, { opacity: 0.6 }]}>{t.noSettlement}</Text>
-          </View>
-        )}
       </View>
     </View>
   );
@@ -1327,49 +1338,67 @@ const styles = StyleSheet.create({
   },
   codCard: {
     backgroundColor: theme.colors.background.paper,
-    borderRadius: theme.borderRadius.l,
+    borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.l,
     borderWidth: 1,
-    borderColor: theme.colors.border.light,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    ...theme.shadows.medium,
   },
   codStatsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   codStatBox: {
     flex: 1,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   codStatLabel: {
-    fontSize: theme.typography.sizes.s,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 8,
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   codStatValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.white,
+  },
+  codInfoContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+    padding: 12,
   },
   codInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
   codInfoLabel: {
-    fontSize: theme.typography.sizes.m,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: theme.typography.sizes.s,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
   },
   codInfoValue: {
-    fontSize: theme.typography.sizes.m,
+    fontSize: theme.typography.sizes.s,
     fontWeight: '600',
-    color: theme.colors.white,
+    color: theme.colors.text.primary,
+  },
+  codInfoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  codInfoBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
 });
 
