@@ -107,7 +107,7 @@ function AdminTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
+          tabBarLabel: language === 'zh' ? '账号' : language === 'en' ? 'Profile' : 'အကောင့်',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'person' : 'person-outline'} 
@@ -201,7 +201,7 @@ function CourierTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: language === 'zh' ? '我的' : language === 'en' ? 'Profile' : 'ကိုယ်ရေး',
+          tabBarLabel: language === 'zh' ? '账号' : language === 'en' ? 'Profile' : 'အကောင့်',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'person' : 'person-outline'} 

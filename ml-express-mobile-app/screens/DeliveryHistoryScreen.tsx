@@ -8,6 +8,8 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, Package } from '../services/supabase';
@@ -19,6 +21,8 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [totalStats, setTotalStats] = useState({ deliveryFee: 0, cod: 0 });
+  const [showCODModal, setShowCODModal] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -37,6 +41,20 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       );
       
       setPackages(history);
+
+      // 计算统计数据
+      let deliveryFee = 0;
+      let cod = 0;
+      history.forEach(pkg => {
+        // 只有已送达的订单才计算金额
+        if (pkg.status === '已送达') {
+          const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+          deliveryFee += priceVal;
+          cod += Number(pkg.cod_amount || 0);
+        }
+      });
+      setTotalStats({ deliveryFee, cod });
+
     } catch (error) {
       console.error('加载历史失败:', error);
     } finally {
@@ -183,6 +201,52 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
         />
       </View>
 
+      {/* 金额统计 */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 10, gap: 10 }}>
+        <View style={{ 
+          flex: 1, 
+          backgroundColor: '#3b82f6', 
+          borderRadius: 12, 
+          padding: 12, 
+          alignItems: 'center',
+          elevation: 2,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        }}>
+          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginBottom: 4 }}>
+            {language === 'zh' ? '总跑腿费' : language === 'en' ? 'Total Delivery Fee' : 'စုစုပေါင်းပို့ဆောင်ခ'}
+          </Text>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+            {totalStats.deliveryFee.toLocaleString()} MMK
+          </Text>
+        </View>
+
+        <TouchableOpacity 
+          style={{ 
+            flex: 1, 
+            backgroundColor: '#f59e0b', 
+            borderRadius: 12, 
+            padding: 12, 
+            alignItems: 'center',
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+          }}
+          onPress={() => setShowCODModal(true)}
+        >
+          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginBottom: 4 }}>
+            {language === 'zh' ? '总代收款' : language === 'en' ? 'Total COD' : 'စုစုပေါင်းငွေကောက်ခံမှု'}
+          </Text>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+            {totalStats.cod.toLocaleString()} MMK
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* 历史列表 */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -206,11 +270,136 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           contentContainerStyle={{ padding: 16 }}
         />
       )}
+
+      {/* 代收款详情 Modal */}
+      <Modal
+        visible={showCODModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCODModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {language === 'zh' ? '代收款详情' : language === 'en' ? 'COD Details' : 'ငွေကောက်ခံမှုအသေးစိတ်'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCODModal(false)}>
+                <Text style={styles.closeIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScroll}>
+              {packages.filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达').length > 0 ? (
+                packages
+                  .filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达')
+                  .map((pkg, index) => (
+                    <View key={index} style={styles.codItem}>
+                      <View>
+                        <Text style={styles.codOrderId}>{pkg.id}</Text>
+                        <Text style={styles.codTime}>{pkg.delivery_time}</Text>
+                      </View>
+                      <Text style={styles.codAmount}>{pkg.cod_amount} MMK</Text>
+                    </View>
+                  ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  {language === 'zh' ? '暂无代收款记录' : language === 'en' ? 'No COD Records' : 'ငွေကောက်ခံမှုမှတ်တမ်းမရှိပါ'}
+                </Text>
+              )}
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowCODModal(false)}
+            >
+              <Text style={styles.closeButtonText}>
+                {language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်ရန်'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '80%',
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  closeIcon: {
+    fontSize: 20,
+    color: '#999',
+    padding: 4,
+  },
+  modalScroll: {
+    marginBottom: 16,
+  },
+  codItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  codOrderId: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  codTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  codAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f59e0b',
+  },
+  closeButton: {
+    backgroundColor: '#2c5282',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f7fafc',
