@@ -18,7 +18,6 @@ import * as Location from 'expo-location';
 
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
-  const [loginType, setLoginType] = useState<'customer' | 'partner' | 'staff'>('customer');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -166,11 +165,6 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
-  const getPlaceholder = () => {
-    if (loginType === 'staff') return language === 'zh' ? '用户名' : 'Username';
-    if (loginType === 'partner') return language === 'zh' ? '店铺代码' : 'Store Code';
-    return language === 'zh' ? '邮箱' : 'Email';
-  };
 
   return (
     <KeyboardAvoidingView 
@@ -187,43 +181,15 @@ export default function LoginScreen({ navigation }: any) {
           />
           <Text style={styles.title}>MARKET LINK EXPRESS</Text>
           <Text style={styles.subtitle}>
-            {language === 'zh' ? '客户端' : 'Client App'}
+            Staff
           </Text>
-        </View>
-
-        {/* 登录类型切换 */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tabButton, loginType === 'customer' && styles.activeTab]}
-            onPress={() => { setLoginType('customer'); setUsername(''); setPassword(''); }}
-          >
-            <Text style={[styles.tabText, loginType === 'customer' && styles.activeTabText]}>
-              {language === 'zh' ? '客户登录' : 'Customer'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tabButton, loginType === 'partner' && styles.activeTab]}
-            onPress={() => { setLoginType('partner'); setUsername(''); setPassword(''); }}
-          >
-            <Text style={[styles.tabText, loginType === 'partner' && styles.activeTabText]}>
-              {language === 'zh' ? '合伙登录' : 'Partner'}
-            </Text>
-          </TouchableOpacity>
-           <TouchableOpacity 
-            style={[styles.tabButton, loginType === 'staff' && styles.activeTab]}
-            onPress={() => { setLoginType('staff'); setUsername(''); setPassword(''); }}
-          >
-            <Text style={[styles.tabText, loginType === 'staff' && styles.activeTabText]}>
-              {language === 'zh' ? '员工登录' : 'Staff'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* 输入框 */}
         <View style={styles.formContainer}>
           <TextInput
             style={styles.input}
-            placeholder={getPlaceholder()}
+            placeholder={language === 'zh' ? '用户名' : 'Username'}
             placeholderTextColor="#999"
             value={username}
             onChangeText={setUsername}
