@@ -23,7 +23,7 @@ import {
   ComposedChart
 } from 'recharts';
 
-type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection';
+type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection' | 'partner_collection';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
 
@@ -452,6 +452,53 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
     
     calculateSummary();
   }, [records, packages, deliveryStores]);
+
+  // 计算合伙店铺代收款统计
+  const partnerCollectionStats = useMemo(() => {
+    if (!deliveryStores.length) return [];
+
+    return deliveryStores.map(store => {
+      // 查找该店铺的所有代收款订单
+      const storePackages = packages.filter(pkg => 
+        (pkg.delivery_store_id === store.id || pkg.sender_name === store.store_name) &&
+        pkg.status === '已送达' &&
+        Number(pkg.cod_amount || 0) > 0
+      );
+
+      const totalAmount = storePackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
+      
+      const unclearedPackages = storePackages.filter(pkg => !pkg.cod_settled);
+      const unclearedAmount = unclearedPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
+      
+      return {
+        ...store,
+        totalAmount,
+        unclearedAmount,
+        unclearedCount: unclearedPackages.length
+      };
+    }).sort((a, b) => b.unclearedAmount - a.unclearedAmount);
+  }, [deliveryStores, packages]);
+
+  // 结清合伙店铺代收款
+  const handleSettlePartner = async (storeId: string, storeName: string) => {
+    if (!window.confirm(`确定要结清 "${storeName}" 的所有代收款吗？\n\n这将把该店铺所有 "已送达" 且 "未结清" 的代收款订单标记为已结清。`)) return;
+
+    try {
+      setLoading(true);
+      const result = await packageService.settlePartnerCOD(storeId, storeName);
+      if (result.success) {
+        window.alert('结清成功！');
+        loadRecords(); // 刷新数据
+      } else {
+        throw result.error;
+      }
+    } catch (error) {
+      console.error('结清失败:', error);
+      window.alert('结清失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadRecords = async () => {
     try {
@@ -945,7 +992,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             flexWrap: 'wrap'
           }}
         >
-          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection'] as TabKey[]).map((key) => (
+          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[]).map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -966,6 +1013,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {key === 'package_records' && '📦 包裹收支记录'}
               {key === 'courier_records' && '🚚 骑手收支记录'}
               {key === 'cash_collection' && '💵 现金收款管理'}
+              {key === 'partner_collection' && '🤝 合伙代收款'}
             </button>
           ))}
           <button
@@ -4743,6 +4791,97 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 })()}
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'partner_collection' && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+            gap: '20px'
+          }}>
+            {partnerCollectionStats.map(store => (
+              <div
+                key={store.id}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.12)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  border: '1px solid rgba(255, 255, 255, 0.18)',
+                  boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem' }}>{store.store_name}</h3>
+                  <div style={{ 
+                    background: store.unclearedAmount > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    color: store.unclearedAmount > 0 ? '#ef4444' : '#10b981',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                  }}>
+                    {store.unclearedAmount > 0 ? '未结清' : '已结清'}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>总代收款</div>
+                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      {store.totalAmount.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>待结清金额</div>
+                    <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      {store.unclearedAmount.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                  待结清订单数: <span style={{ color: 'white', fontWeight: 'bold' }}>{store.unclearedCount}</span> 单
+                </div>
+
+                {store.unclearedAmount > 0 && (
+                  <button
+                    onClick={() => handleSettlePartner(store.id, store.store_name)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      marginTop: 'auto',
+                      boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
+                      transition: 'transform 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    确认结清 ({store.unclearedAmount.toLocaleString()} MMK)
+                  </button>
+                )}
+              </div>
+            ))}
+            
+            {partnerCollectionStats.length === 0 && (
+              <div style={{ 
+                gridColumn: '1 / -1', 
+                textAlign: 'center', 
+                padding: '60px',
+                color: 'rgba(255,255,255,0.5)' 
+              }}>
+                暂无合伙店铺数据
+              </div>
+            )}
           </div>
         )}
       </div>

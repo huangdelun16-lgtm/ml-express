@@ -209,6 +209,49 @@ export const testConnection = async () => {
 
 // 包裹数据库操作
 export const packageService = {
+  // 结清合伙店铺代收款
+  async settlePartnerCOD(storeId: string, storeName: string) {
+    try {
+      const now = new Date().toISOString();
+      
+      // 1. 更新通过 delivery_store_id 匹配的订单
+      const { error: error1 } = await supabase
+        .from('packages')
+        .update({ 
+          cod_settled: true,
+          cod_settled_at: now
+        })
+        .eq('status', '已送达')
+        // .is('cod_settled', false) // 处理 null 或 false
+        .or('cod_settled.is.false,cod_settled.is.null')
+        .gt('cod_amount', 0)
+        .eq('delivery_store_id', storeId);
+
+      if (error1) throw error1;
+
+      // 2. 更新通过 sender_name 匹配的订单（兼容旧数据）
+      // 仅更新 delivery_store_id 为空的，避免重复操作（虽然幂等操作也无妨）
+      const { error: error2 } = await supabase
+        .from('packages')
+        .update({ 
+          cod_settled: true,
+          cod_settled_at: now
+        })
+        .eq('status', '已送达')
+        .or('cod_settled.is.false,cod_settled.is.null')
+        .gt('cod_amount', 0)
+        .is('delivery_store_id', null) 
+        .eq('sender_name', storeName);
+
+      if (error2) throw error2;
+
+      return { success: true };
+    } catch (error) {
+      console.error('结清代收款失败:', error);
+      return { success: false, error };
+    }
+  },
+
   // 获取所有包裹
   async getAllPackages(): Promise<Package[]> {
     try {
