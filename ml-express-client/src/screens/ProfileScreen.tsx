@@ -33,11 +33,18 @@ export default function ProfileScreen({ navigation }: any) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
   const [isGuest, setIsGuest] = useState(false);
+  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
   const [orderStats, setOrderStats] = useState({
     total: 0,
     pending: 0,
     inTransit: 0,
     delivered: 0,
+  });
+  const [partnerCODStats, setPartnerCODStats] = useState({
+    totalCOD: 0,
+    unclearedCOD: 0,
+    unclearedCount: 0,
+    lastSettledAt: null as string | null,
   });
   
   // Toast状态
@@ -133,6 +140,13 @@ export default function ProfileScreen({ navigation }: any) {
       saveSettings: '保存设置',
       settingsSaved: '设置已保存',
       settingsSaveFailed: '设置保存失败',
+      // 代收款相关翻译
+      codStats: '代收款统计',
+      totalCOD: '总代收款',
+      unclearedCOD: '待结清金额',
+      unclearedCount: '待结清订单数',
+      lastSettledAt: '上次结清',
+      noSettlement: '暂无结清记录',
     },
     en: {
       title: 'Profile',
@@ -191,6 +205,13 @@ export default function ProfileScreen({ navigation }: any) {
       saveSettings: 'Save Settings',
       settingsSaved: 'Settings saved',
       settingsSaveFailed: 'Failed to save settings',
+      // COD related translations
+      codStats: 'COD Statistics',
+      totalCOD: 'Total COD',
+      unclearedCOD: 'Uncleared Amount',
+      unclearedCount: 'Uncleared Orders',
+      lastSettledAt: 'Last Settled',
+      noSettlement: 'No settlement record',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -249,6 +270,13 @@ export default function ProfileScreen({ navigation }: any) {
       saveSettings: 'ဆက်တင်များသိမ်းရန်',
       settingsSaved: 'ဆက်တင်များသိမ်းပြီးပါပြီ',
       settingsSaveFailed: 'ဆက်တင်များသိမ်းမှုမအောင်မြင်ပါ',
+      // ငွေကောက်ခံရန်ဆက်စပ်ဘာသာပြန်များ
+      codStats: 'ငွေကောက်ခံရန်စာရင်းအင်း',
+      totalCOD: 'စုစုပေါင်းငွေကောက်ခံရန်',
+      unclearedCOD: 'မရှင်းလင်းသေးသောငွေ',
+      unclearedCount: 'မရှင်းလင်းသေးသောအော်ဒါများ',
+      lastSettledAt: 'နောက်ဆုံးရှင်းလင်းချိန်',
+      noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ',
     },
   };
 
@@ -279,19 +307,31 @@ export default function ProfileScreen({ navigation }: any) {
       setUserPhone(user.phone || '');
       setIsGuest(false);
 
+      // 检测用户类型
+      const detectedUserType = user.user_type === 'partner' ? 'partner' : 'customer';
+      setUserType(detectedUserType);
+
       // 加载订单统计
       if (user.id && user.id !== 'guest') {
         // 如果是合伙人，获取店铺名称（通常存储在user.name或AsyncStorage中）
         let storeName: string | undefined = undefined;
-        if (user.user_type === 'partner') {
+        if (detectedUserType === 'partner') {
           storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
+          
+          // 加载合伙店铺代收款统计
+          try {
+            const codStats = await packageService.getPartnerStats(user.id, storeName);
+            setPartnerCODStats(codStats);
+          } catch (error) {
+            console.error('加载代收款统计失败:', error);
+          }
         }
 
         const stats = await packageService.getOrderStats(
           user.id, 
           user.email, 
           user.phone, 
-          user.user_type,
+          detectedUserType,
           storeName
         );
         setOrderStats(stats);
@@ -544,6 +584,51 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 
+  const renderPartnerCODStats = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t.codStats}</Text>
+      <View style={styles.codCard}>
+        <View style={styles.codStatsRow}>
+          <View style={[styles.codStatBox, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+            <Text style={styles.codStatLabel}>{t.totalCOD}</Text>
+            <Text style={[styles.codStatValue, { color: '#3b82f6' }]}>
+              {partnerCODStats.totalCOD.toLocaleString()} MMK
+            </Text>
+          </View>
+          <View style={[styles.codStatBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+            <Text style={styles.codStatLabel}>{t.unclearedCOD}</Text>
+            <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
+              {partnerCODStats.unclearedCOD.toLocaleString()} MMK
+            </Text>
+          </View>
+        </View>
+        <View style={styles.codInfoRow}>
+          <Text style={styles.codInfoLabel}>{t.unclearedCount}:</Text>
+          <Text style={styles.codInfoValue}>{partnerCODStats.unclearedCount}</Text>
+        </View>
+        {partnerCODStats.lastSettledAt && (
+          <View style={styles.codInfoRow}>
+            <Text style={styles.codInfoLabel}>{t.lastSettledAt}:</Text>
+            <Text style={styles.codInfoValue}>
+              {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </Text>
+          </View>
+        )}
+        {!partnerCODStats.lastSettledAt && partnerCODStats.totalCOD > 0 && (
+          <View style={styles.codInfoRow}>
+            <Text style={[styles.codInfoLabel, { opacity: 0.6 }]}>{t.noSettlement}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
   const renderQuickActions = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t.quickActions}</Text>
@@ -658,6 +743,7 @@ export default function ProfileScreen({ navigation }: any) {
       >
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
+        {!isGuest && userType === 'partner' && renderPartnerCODStats()}
         {renderQuickActions()}
         {renderSettings()}
 
@@ -1238,6 +1324,52 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: theme.colors.text.tertiary,
     marginLeft: 8,
+  },
+  codCard: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  codStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  codStatBox: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  codStatLabel: {
+    fontSize: theme.typography.sizes.s,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 8,
+  },
+  codStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.white,
+  },
+  codInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  codInfoLabel: {
+    fontSize: theme.typography.sizes.m,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  codInfoValue: {
+    fontSize: theme.typography.sizes.m,
+    fontWeight: '600',
+    color: theme.colors.white,
   },
 });
 
