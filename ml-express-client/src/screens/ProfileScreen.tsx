@@ -522,8 +522,16 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={styles.userNameRow}>
             <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
             {!isGuest && (
-              <View style={styles.userBadge}>
-                <Text style={styles.userBadgeText}>普通会员</Text>
+              <View style={[
+                styles.userBadge,
+                userType === 'partner' && styles.partnerBadge
+              ]}>
+                <Text style={[
+                  styles.userBadgeText,
+                  userType === 'partner' && styles.partnerBadgeText
+                ]}>
+                  {userType === 'partner' ? 'Partner' : '普通会员'}
+                </Text>
               </View>
             )}
           </View>
@@ -1033,6 +1041,15 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: 10,
     fontWeight: '600',
+  },
+  partnerBadge: {
+    backgroundColor: '#fbbf24', // 金色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  partnerBadgeText: {
+    color: '#92400e', // 深褐色文字
+    fontWeight: '800',
   },
   contactInfoContainer: {
     gap: 4,
