@@ -906,17 +906,18 @@ const ProfilePage: React.FC = () => {
       }}>
         {/* 页面标题 */}
         <div style={{
-          textAlign: 'center',
-          marginBottom: '3rem',
+          textAlign: 'left',
+          marginBottom: '2rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
           transition: 'all 0.6s ease'
         }}>
           <h1 style={{
             color: 'white',
-            fontSize: '3rem',
-            marginBottom: '1rem',
-            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+            fontSize: '1.75rem',
+            marginBottom: '0.5rem',
+            fontWeight: '700',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
             {t.title}
           </h1>
@@ -924,13 +925,13 @@ const ProfilePage: React.FC = () => {
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1))',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '2.5rem',
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '20px',
+          padding: '2rem',
           marginBottom: '2rem',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease 0.2s'
@@ -939,24 +940,24 @@ const ProfilePage: React.FC = () => {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '2rem',
-            marginBottom: '2.5rem',
-            paddingBottom: '2rem',
-            borderBottom: '1px solid rgba(255,255,255,0.2)'
+            gap: '1.5rem',
+            marginBottom: '2rem',
+            paddingBottom: '1.5rem',
+            borderBottom: '1px solid rgba(255,255,255,0.15)'
           }}>
             {/* 头像 */}
             <div style={{
-              width: '100px',
-              height: '100px',
+              width: '80px',
+              height: '80px',
               borderRadius: '50%',
               background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '4px solid rgba(255, 255, 255, 0.8)',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
-              fontSize: '2.5rem',
-              fontWeight: 'bold',
+              border: '3px solid rgba(255, 255, 255, 0.9)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              fontSize: '2rem',
+              fontWeight: '700',
               color: '#0284c7',
               flexShrink: 0
             }}>
@@ -965,9 +966,9 @@ const ProfilePage: React.FC = () => {
             
             {/* 用户基本信息 */}
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div style={{ color: 'white', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '0.5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: '700' }}>
                     {currentUser.name || '-'}
                   </div>
                   <div style={{
@@ -975,14 +976,13 @@ const ProfilePage: React.FC = () => {
                       ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
                       : 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
                     boxShadow: isPartnerStore 
-                      ? '0 4px 12px rgba(14, 165, 233, 0.4)' 
-                      : '0 4px 12px rgba(251, 191, 36, 0.4)',
+                      ? '0 2px 8px rgba(14, 165, 233, 0.3)' 
+                      : '0 2px 8px rgba(251, 191, 36, 0.3)',
                     color: 'white',
-                    padding: '0.3rem 1rem',
-                    borderRadius: '20px',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                    padding: '0.2rem 0.8rem',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
                     border: '1px solid rgba(255,255,255,0.2)'
                   }}>
                     {isPartnerStore ? 'Partner' : (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')}
@@ -1043,17 +1043,17 @@ const ProfilePage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ 
                       background: 'rgba(255,255,255,0.1)', 
-                      width: '40px', 
-                      height: '40px', 
+                      width: '36px', 
+                      height: '36px', 
                       borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem'
+                      fontSize: '1.1rem'
                     }}>🔢</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeCode}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontFamily: 'monospace', letterSpacing: '1px', fontSize: '1.05rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeCode}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontFamily: 'monospace', fontSize: '0.95rem' }}>
                         {storeInfo.store_code}
                       </span>
                     </div>
@@ -1062,17 +1062,17 @@ const ProfilePage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ 
                       background: 'rgba(255,255,255,0.1)', 
-                      width: '40px', 
-                      height: '40px', 
+                      width: '36px', 
+                      height: '36px', 
                       borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem'
+                      fontSize: '1.1rem'
                     }}>🏪</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeType}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeType}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
                         {getStoreTypeLabel(storeInfo.store_type)}
                       </span>
                     </div>
@@ -1082,17 +1082,17 @@ const ProfilePage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ 
                       background: 'rgba(255,255,255,0.1)', 
-                      width: '40px', 
-                      height: '40px', 
+                      width: '36px', 
+                      height: '36px', 
                       borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem'
+                      fontSize: '1.1rem'
                     }}>📞</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.phone}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.phone}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
                         {storeInfo.manager_phone || currentUser.phone}
                       </span>
                     </div>
@@ -1101,17 +1101,17 @@ const ProfilePage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <div style={{ 
                       background: 'rgba(255,255,255,0.1)', 
-                      width: '40px', 
-                      height: '40px', 
+                      width: '36px', 
+                      height: '36px', 
                       borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem'
+                      fontSize: '1.1rem'
                     }}>📅</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.accountDate}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '1.05rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.accountDate}</span>
+                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
                         {formatDate(storeInfo.created_at)}
                       </span>
                     </div>
@@ -1129,18 +1129,18 @@ const ProfilePage: React.FC = () => {
                   }}>
                     <div style={{ 
                       background: 'rgba(255,255,255,0.1)', 
-                      width: '40px', 
-                      height: '40px', 
+                      width: '36px', 
+                      height: '36px', 
                       borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem',
+                      fontSize: '1.1rem',
                       flexShrink: 0
                     }}>📍</div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.address}</span>
-                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.5', fontSize: '1rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.address}</span>
+                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.5', fontSize: '0.95rem' }}>
                         {storeInfo.address}
                       </span>
                     </div>
