@@ -55,6 +55,8 @@ export interface Package {
   // 费用明细字段
   store_fee?: string | number; // 待付款（店铺填写）
   delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
+  cod_settled?: boolean; // 代收款是否已结清
+  cod_settled_at?: string; // 代收款结清时间
 }
 
 export interface FinanceRecord {
