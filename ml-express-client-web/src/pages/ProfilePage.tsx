@@ -329,7 +329,7 @@ const ProfilePage: React.FC = () => {
       packageId: '订单号',
       status: '状态',
       createTime: '创建时间',
-      price: '价格',
+      price: '跑腿费',
       viewDetails: '查看详情',
       logout: '退出登录',
       welcome: '欢迎',
@@ -347,6 +347,9 @@ const ProfilePage: React.FC = () => {
       paymentMethod: '支付方式',
       qrPayment: '转账',
       cashPayment: '现金支付',
+      cod: '代收款',
+      totalAmount: '总金额',
+      none: '无',
       totalOrders: '全部订单',
       accountDate: '开户日期',
       pendingPickup: '待取件',
@@ -377,7 +380,7 @@ const ProfilePage: React.FC = () => {
       packageId: 'Order ID',
       status: 'Status',
       createTime: 'Created',
-      price: 'Price',
+      price: 'Delivery Fee',
       viewDetails: 'View Details',
       logout: 'Logout',
       welcome: 'Welcome',
@@ -395,6 +398,9 @@ const ProfilePage: React.FC = () => {
       paymentMethod: 'Payment Method',
       qrPayment: 'Transfer',
       cashPayment: 'Cash',
+      cod: 'Collection Amount',
+      totalAmount: 'Total Amount',
+      none: 'None',
       totalOrders: 'Total Orders',
       accountDate: 'Account Created',
       pendingPickup: 'Pending Pickup',
@@ -425,7 +431,7 @@ const ProfilePage: React.FC = () => {
       packageId: 'အော်ဒါနံပါတ်',
       status: 'အခြေအနေ',
       createTime: 'ဖန်တီးထားသောအချိန်',
-      price: 'စျေးနှုန်း',
+      price: 'ပို့ဆောင်ခ',
       viewDetails: 'အသေးစိတ်ကြည့်ရန်',
       logout: 'ထွက်ရန်',
       welcome: 'ကြိုဆိုပါတယ်',
@@ -443,6 +449,9 @@ const ProfilePage: React.FC = () => {
       paymentMethod: 'ငွေပေးချေမှုနည်းလမ်း',
       qrPayment: 'ငွေလွှဲ',
       cashPayment: 'ငွေသား',
+      cod: 'ငွေကောက်ခံမှု',
+      totalAmount: 'စုစုပေါင်းငွေ',
+      none: 'မရှိ',
       totalOrders: 'စုစုပေါင်းအော်ဒါ',
       accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ',
       pendingPickup: 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်',
@@ -1617,6 +1626,22 @@ const ProfilePage: React.FC = () => {
                         {getPaymentMethodText(pkg.payment_method)}
                       </div>
                     )}
+
+                    {/* 代收款 - 仅当是合伙店铺或有代收款时显示 */}
+                    {(isPartnerStore || (pkg.cod_amount && pkg.cod_amount > 0)) && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        color: '#fca5a5',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {t.cod}: {pkg.cod_amount > 0 ? `${pkg.cod_amount} MMK` : t.none}
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1994,6 +2019,27 @@ const ProfilePage: React.FC = () => {
                     {selectedPackage.price || '-'}
                   </div>
                 </div>
+
+                {(isPartnerStore || (selectedPackage.cod_amount && selectedPackage.cod_amount > 0)) && (
+                  <>
+                    <div>
+                      <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                        {t.cod}
+                      </label>
+                      <div style={{ color: '#fca5a5', fontSize: '1rem', fontWeight: 'bold' }}>
+                        {selectedPackage.cod_amount > 0 ? `${selectedPackage.cod_amount} MMK` : t.none}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                        {t.totalAmount}
+                      </label>
+                      <div style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                        {(parseFloat(selectedPackage.price?.replace(/[^\d.]/g, '') || '0') + (selectedPackage.cod_amount || 0)).toLocaleString()} MMK
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* 关闭按钮 */}
@@ -2195,6 +2241,27 @@ const ProfilePage: React.FC = () => {
                       {selectedPackage.price || '-'}
                     </div>
                   </div>
+
+                  {(isPartnerStore || (selectedPackage.cod_amount && selectedPackage.cod_amount > 0)) && (
+                    <>
+                      <div>
+                        <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                          {t.cod}
+                        </label>
+                        <div style={{ color: '#fca5a5', fontSize: '1rem', fontWeight: 'bold' }}>
+                          {selectedPackage.cod_amount > 0 ? `${selectedPackage.cod_amount} MMK` : t.none}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
+                          {t.totalAmount}
+                        </label>
+                        <div style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                          {(parseFloat(selectedPackage.price?.replace(/[^\d.]/g, '') || '0') + (selectedPackage.cod_amount || 0)).toLocaleString()} MMK
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>
                       {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
