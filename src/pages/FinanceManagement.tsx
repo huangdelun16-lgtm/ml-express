@@ -4828,6 +4828,35 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   </div>
                 </div>
 
+                {/* 店铺联系信息 - 使用 delivery_stores 表的数据 */}
+                <div style={{ 
+                  background: 'rgba(0,0,0,0.15)', 
+                  padding: '12px', 
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  {store.contact_phone && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)' }}>
+                      <span style={{ fontSize: '1rem' }}>📞</span>
+                      <span style={{ fontSize: '0.9rem' }}>{store.contact_phone}</span>
+                    </div>
+                  )}
+                  {store.address && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'rgba(255,255,255,0.8)' }}>
+                      <span style={{ fontSize: '1rem' }}>📍</span>
+                      <span style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>{store.address}</span>
+                    </div>
+                  )}
+                  {store.store_code && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>代码:</span>
+                      <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.85rem' }}>{store.store_code}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>总代收款</div>
