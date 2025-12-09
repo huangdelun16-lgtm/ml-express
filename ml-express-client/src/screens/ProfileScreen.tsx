@@ -84,7 +84,7 @@ export default function ProfileScreen({ navigation }: any) {
   // 多语言翻译
   const translations = {
     zh: {
-      title: '我的',
+      title: '账户',
       guest: '访客用户',
       login: '登录/注册',
       orderStats: '订单统计',
@@ -739,7 +739,9 @@ export default function ProfileScreen({ navigation }: any) {
     <View style={styles.container}>
       <BackToHomeButton navigation={navigation} position="topRight" />
       <LinearGradient
-        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
+        colors={['#1e3a8a', '#2563eb', '#60a5fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <Text style={styles.headerTitle}>{t.title}</Text>
@@ -965,9 +967,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: theme.typography.sizes.display,
+    fontSize: 24,
     fontWeight: 'bold',
     color: theme.colors.text.light,
+    letterSpacing: 1,
   },
   scrollView: {
     flex: 1,
