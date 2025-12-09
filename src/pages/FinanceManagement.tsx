@@ -470,11 +470,21 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
       const unclearedPackages = storePackages.filter(pkg => !pkg.cod_settled);
       const unclearedAmount = unclearedPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
       
+      // 计算最后结清日期
+      const settledPackages = storePackages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
+      let lastSettledAt: string | null = null;
+      if (settledPackages.length > 0) {
+        // 找到最新的结清日期
+        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledPackages[0].cod_settled_at || null;
+      }
+      
       return {
         ...store,
         totalAmount,
         unclearedAmount,
-        unclearedCount: unclearedPackages.length
+        unclearedCount: unclearedPackages.length,
+        lastSettledAt
       };
     }).sort((a, b) => b.unclearedAmount - a.unclearedAmount);
   }, [deliveryStores, packages]);
@@ -1016,26 +1026,28 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {key === 'partner_collection' && '🤝 合伙代收款'}
             </button>
           ))}
-          <button
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-              setActiveTab('records');
-            }}
-            style={{
-              marginLeft: 'auto',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-              color: '#05223b',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 12px 25px rgba(79, 172, 254, 0.35)'
-            }}
-          >
-            + 添加记录
-          </button>
+          {activeTab === 'records' && (
+            <button
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+                setActiveTab('records');
+              }}
+              style={{
+                marginLeft: 'auto',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                color: '#05223b',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 12px 25px rgba(79, 172, 254, 0.35)'
+              }}
+            >
+              + 添加记录
+            </button>
+          )}
         </div>
 
         {activeTab === 'overview' && (
@@ -4875,6 +4887,12 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
                   待结清订单数: <span style={{ color: 'white', fontWeight: 'bold' }}>{store.unclearedCount}</span> 单
                 </div>
+
+                {store.lastSettledAt && (
+                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginTop: '4px' }}>
+                    上次结清: <span style={{ color: 'white', fontWeight: '500' }}>{new Date(store.lastSettledAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
 
                 {store.unclearedAmount > 0 && (
                   <button
