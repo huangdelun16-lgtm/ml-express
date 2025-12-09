@@ -50,6 +50,7 @@ export interface Package {
   transfer_code?: string;
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额 (Cash on Delivery)
+  customer_id?: string; // 客户ID
   customer_email?: string; // 客户邮箱
   customer_name?: string; // 客户姓名
   cod_settled?: boolean; // 代收款是否已结清

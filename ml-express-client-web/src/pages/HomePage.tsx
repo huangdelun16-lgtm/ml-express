@@ -258,7 +258,7 @@ const HomePage: React.FC = () => {
         });
         setCurrentBannerIndex(nextIndex);
       }
-    }, 5000); // 5秒切换
+    }, 10000); // 10秒切换
 
     return () => clearInterval(timer);
   }, [currentBannerIndex, isBannerPaused]);
@@ -4969,6 +4969,10 @@ const HomePage: React.FC = () => {
 
                     // 只有在用户登录时才添加 customer_email 和 customer_name
                     // 如果数据库表中没有这些字段，这些值会被忽略
+                    if (currentUser?.id) {
+                      packageData.customer_id = currentUser.id;
+                    }
+                    
                     if (currentUser?.email) {
                       packageData.customer_email = currentUser.email;
                     } else if (orderInfo.customerEmail) {
