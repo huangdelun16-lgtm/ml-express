@@ -606,7 +606,7 @@ export const packageService = {
   // 获取客户订单统计（通过description匹配）
   // 获取订单统计（针对客户ID、邮箱或手机号）
   // 注意：此方法使用与 getAllOrders 完全相同的查询逻辑，确保统计准确
-  async getOrderStats(userId: string, email?: string, phone?: string, userType?: string) {
+  async getOrderStats(userId: string, email?: string, phone?: string, userType?: string, storeName?: string) {
     try {
       // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status 字段用于统计
       let query = supabase
@@ -621,6 +621,11 @@ export const packageService = {
         conditions.push(`delivery_store_id.eq.${userId}`);
         if (email) {
           conditions.push(`customer_email.eq.${email}`);
+        }
+        
+        // 如果提供了店铺名称，也通过 sender_name 匹配（兼容旧数据）
+        if (storeName) {
+          conditions.push(`sender_name.eq.${storeName}`);
         }
         
         // 使用 or 查询，匹配任一条件

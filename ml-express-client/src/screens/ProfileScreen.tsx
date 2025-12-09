@@ -281,7 +281,19 @@ export default function ProfileScreen({ navigation }: any) {
 
       // 加载订单统计
       if (user.id && user.id !== 'guest') {
-        const stats = await packageService.getOrderStats(user.id);
+        // 如果是合伙人，获取店铺名称（通常存储在user.name或AsyncStorage中）
+        let storeName: string | undefined = undefined;
+        if (user.user_type === 'partner') {
+          storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
+        }
+
+        const stats = await packageService.getOrderStats(
+          user.id, 
+          user.email, 
+          user.phone, 
+          user.user_type,
+          storeName
+        );
         setOrderStats(stats);
       }
     } catch (error) {
