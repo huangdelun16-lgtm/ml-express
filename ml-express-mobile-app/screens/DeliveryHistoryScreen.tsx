@@ -46,8 +46,8 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       let deliveryFee = 0;
       let cod = 0;
       history.forEach(pkg => {
-        // 只有已送达的订单才计算金额
-        if (pkg.status === '已送达') {
+        // 只有已送达且未结清的订单才计算金额
+        if (pkg.status === '已送达' && !pkg.rider_settled) {
           const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
           deliveryFee += priceVal;
           cod += Number(pkg.cod_amount || 0);
@@ -290,9 +290,9 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
             </View>
             
             <ScrollView style={styles.modalScroll}>
-              {packages.filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达').length > 0 ? (
+              {packages.filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达' && !p.rider_settled).length > 0 ? (
                 packages
-                  .filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达')
+                  .filter(p => (p.cod_amount || 0) > 0 && p.status === '已送达' && !p.rider_settled)
                   .map((pkg, index) => (
                     <View key={index} style={styles.codItem}>
                       <View>

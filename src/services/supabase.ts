@@ -57,6 +57,8 @@ export interface Package {
   delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
   cod_settled?: boolean; // 代收款是否已结清
   cod_settled_at?: string; // 代收款结清时间
+  rider_settled?: boolean; // 骑手是否已结清
+  rider_settled_at?: string; // 骑手结清时间
 }
 
 export interface FinanceRecord {
@@ -250,6 +252,27 @@ export const packageService = {
       return { success: true };
     } catch (error) {
       console.error('结清代收款失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 结清骑手现金（包括跑腿费和代收款）
+  async settleRiderCash(packageIds: string[]) {
+    try {
+      if (!packageIds || packageIds.length === 0) return { success: true };
+
+      const { error } = await supabase
+        .from('packages')
+        .update({ 
+          rider_settled: true,
+          rider_settled_at: new Date().toISOString()
+        })
+        .in('id', packageIds);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('结清骑手现金失败:', error);
       return { success: false, error };
     }
   },

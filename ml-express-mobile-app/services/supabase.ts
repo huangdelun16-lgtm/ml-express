@@ -73,6 +73,8 @@ export interface Package {
   // 新增支付方式字段
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额 (COD)
+  rider_settled?: boolean; // 骑手是否已结清
+  rider_settled_at?: string; // 骑手结清时间
   // 费用明细字段
   store_fee?: string | number; // 待付款（店铺填写）
   delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）

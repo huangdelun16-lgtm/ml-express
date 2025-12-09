@@ -4456,7 +4456,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   }
 
                   // 过滤掉已结清的包裹
-                  const visiblePackages = filteredPackages.filter(pkg => !clearedCashPackages.has(pkg.id));
+                  const visiblePackages = filteredPackages.filter(pkg => !clearedCashPackages.has(pkg.id) && !pkg.rider_settled);
                   
                   let visibleDeliveryFee = 0;
                   let visibleCOD = 0;
@@ -4493,18 +4493,27 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   };
                   
                   // 全部结清处理
-                  const handleClearAll = () => {
+                  const handleClearAll = async () => {
                     if (selectedCashPackages.size === 0) {
                       window.alert('请先选择要结清的包裹');
                       return;
                     }
-                    if (window.confirm(`确定要结清 ${selectedCashPackages.size} 个包裹吗？`)) {
-                      setClearedCashPackages(prev => {
-                        const newSet = new Set(prev);
-                        selectedCashPackages.forEach(id => newSet.add(id));
-                        return newSet;
-                      });
-                      setSelectedCashPackages(new Set());
+                    if (window.confirm(`确定要结清 ${selectedCashPackages.size} 个包裹吗？\n这将标记这些包裹的现金已上缴。`)) {
+                      const ids = Array.from(selectedCashPackages);
+                      const result = await packageService.settleRiderCash(ids);
+                      
+                      if (result.success) {
+                        setClearedCashPackages(prev => {
+                          const newSet = new Set(prev);
+                          selectedCashPackages.forEach(id => newSet.add(id));
+                          return newSet;
+                        });
+                        setSelectedCashPackages(new Set());
+                        // 重新加载数据（可选，或者直接修改本地 visiblePackages 如果有状态管理）
+                        // 这里我们使用 clearedCashPackages 来隐藏已结清的，所以不需要重载
+                      } else {
+                        window.alert('结清失败，请重试');
+                      }
                     }
                   };
 
