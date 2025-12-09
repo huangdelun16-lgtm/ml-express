@@ -34,137 +34,74 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
 
     try {
-      if (loginType === 'staff') {
-        // ===== 员工登录 (原有逻辑) =====
-        const account = await adminAccountService.login(username, password);
+      // ===== 员工登录 =====
+      const account = await adminAccountService.login(username, password);
+      
+      if (account) {
+        await AsyncStorage.setItem('currentUser', account.username);
+        await AsyncStorage.setItem('currentUserName', account.employee_name);
+        await AsyncStorage.setItem('currentUserRole', account.role);
+        await AsyncStorage.setItem('currentUserPosition', account.position || '');
         
-        if (account) {
-          await AsyncStorage.setItem('currentUser', account.username);
-          await AsyncStorage.setItem('currentUserName', account.employee_name);
-          await AsyncStorage.setItem('currentUserRole', account.role);
-          await AsyncStorage.setItem('currentUserPosition', account.position || '');
-          
-          if (account.position === '骑手' || account.position === '骑手队长') {
-            try {
-              const { data: courierData } = await supabase
+        if (account.position === '骑手' || account.position === '骑手队长') {
+          try {
+            const { data: courierData } = await supabase
+              .from('couriers')
+              .select('id, name')
+              .eq('name', account.employee_name)
+              .single();
+            
+            if (courierData) {
+              await supabase
                 .from('couriers')
-                .select('id, name')
-                .eq('name', account.employee_name)
-                .single();
+                .update({ last_active: new Date().toISOString(), status: 'active' })
+                .eq('id', courierData.id);
               
-              if (courierData) {
-                await supabase
-                  .from('couriers')
-                  .update({ last_active: new Date().toISOString(), status: 'active' })
-                  .eq('id', courierData.id);
-                
-                await AsyncStorage.setItem('currentCourierId', courierData.id);
-                await AsyncStorage.setItem('currentUserName', courierData.name);
-                
-                // 简单的位置上传逻辑...
-                try {
-                   // (省略详细位置逻辑，保持原样，如果需要可以复制过来)
-                   // 为简化，这里假设位置逻辑在Dashboard或其他地方也有
-                } catch (e) {
-                  console.log('Location update error', e);
+              await AsyncStorage.setItem('currentCourierId', courierData.id);
+              await AsyncStorage.setItem('currentUserName', courierData.name);
+              
+              // 简单的位置上传逻辑...
+              try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({});
+                    const { latitude, longitude } = location.coords;
+                    
+                    await supabase
+                        .from('couriers')
+                        .update({
+                            latitude,
+                            longitude,
+                            last_update: new Date().toISOString()
+                        })
+                        .eq('id', courierData.id);
                 }
+              } catch (e) {
+                console.log('Location update error', e);
               }
-            } catch (error) {
-              console.error('Courier data sync error:', error);
             }
+          } catch (error) {
+            console.error('Courier data sync error:', error);
           }
-          
-          navigation.replace('Main');
-        } else {
-          Alert.alert(
-            language === 'zh' ? '登录失败' : 'Login Failed',
-            language === 'zh' ? '用户名或密码错误' : 'Invalid username or password'
-          );
         }
-      } else if (loginType === 'customer') {
-        // ===== 客户登录 =====
-        // 查询用户 (根据邮箱或电话? Web是Email)
-        // Web logic: select id, email, user_type, name, password from users where email = username
-        
-        // 尝试通过邮箱查询
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', username) // Web使用的是email作为登录名
-          .maybeSingle();
-
-        if (error || !user) {
-          // 尝试通过电话查询? (Web主要用Email，但也可能扩展)
-          Alert.alert(
-            language === 'zh' ? '登录失败' : 'Login Failed',
-            language === 'zh' ? '用户不存在' : 'User not found'
-          );
-          return;
-        }
-
-        if (user.password !== password) {
-          Alert.alert(
-            language === 'zh' ? '登录失败' : 'Login Failed',
-            language === 'zh' ? '密码错误' : 'Incorrect password'
-          );
-          return;
-        }
-
-        // 登录成功
-        await AsyncStorage.setItem('currentUser', user.email);
-        await AsyncStorage.setItem('currentUserName', user.name);
-        await AsyncStorage.setItem('currentUserRole', 'customer');
-        await AsyncStorage.setItem('currentUserId', user.id);
         
         navigation.replace('Main');
-
-      } else if (loginType === 'partner') {
-        // ===== 合伙登录 =====
-        // Web logic: select * from delivery_stores where store_code = username
-        
-        const { data: store, error } = await supabase
-          .from('delivery_stores')
-          .select('*')
-          .eq('store_code', username)
-          .maybeSingle();
-
-        if (error || !store) {
-          Alert.alert(
-            language === 'zh' ? '登录失败' : 'Login Failed',
-            language === 'zh' ? '店铺代码不存在' : 'Store code not found'
-          );
-          return;
-        }
-
-        if (store.password !== password) {
-          Alert.alert(
-            language === 'zh' ? '登录失败' : 'Login Failed',
-            language === 'zh' ? '密码错误' : 'Incorrect password'
-          );
-          return;
-        }
-
-        // 登录成功
-        await AsyncStorage.setItem('currentUser', store.store_code);
-        await AsyncStorage.setItem('currentUserName', store.store_name);
-        await AsyncStorage.setItem('currentUserRole', 'partner');
-        await AsyncStorage.setItem('currentUserId', store.id); // store_id
-        await AsyncStorage.setItem('currentStoreCode', store.store_code);
-
-        navigation.replace('Main');
+      } else {
+        Alert.alert(
+          language === 'zh' ? '登录失败' : 'Login Failed',
+          language === 'zh' ? '用户名或密码错误' : 'Invalid username or password'
+        );
       }
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       Alert.alert(
-        language === 'zh' ? '错误' : 'Error',
-        language === 'zh' ? '登录过程发生错误' : 'An error occurred during login'
+        language === 'zh' ? '登录错误' : 'Login Error',
+        error.message || 'Unknown error'
       );
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <KeyboardAvoidingView 
@@ -260,37 +197,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 30,
-    width: '100%',
-    maxWidth: 400,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  tabText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  activeTabText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   formContainer: {
     width: '100%',
