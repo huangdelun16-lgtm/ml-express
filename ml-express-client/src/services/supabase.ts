@@ -686,6 +686,70 @@ export const packageService = {
     }
   },
 
+  // 获取合伙人代收款统计
+  async getPartnerStats(userId: string, storeName?: string) {
+    try {
+      // 构建查询函数
+      const runQuery = async (fields: string) => {
+        let q = supabase
+          .from('packages')
+          .select(fields)
+          .eq('status', '已送达')
+          .gt('cod_amount', 0);
+
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (storeName) {
+          conditions.push(`sender_name.eq.${storeName}`);
+        }
+        
+        return q.or(conditions.join(','));
+      };
+
+      // 尝试查询所有字段
+      let { data, error } = await runQuery('cod_amount, cod_settled, cod_settled_at, status');
+
+      // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
+      if (error && error.code === '42703') {
+        console.warn('cod_settled 字段不存在，使用降级查询');
+        const retryResult = await runQuery('cod_amount, status');
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+
+      if (error) throw error;
+
+      const totalCOD = data?.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
+      
+      // 如果没有 cod_settled 字段，data 中该属性为 undefined，!undefined 为 true，即默认未结清
+      const unclearedPackages = data?.filter(pkg => !pkg.cod_settled) || [];
+      const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      const unclearedCount = unclearedPackages.length;
+      
+      // 计算最后结清日期
+      const settledPackages = data?.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
+      let lastSettledAt = null;
+      if (settledPackages.length > 0) {
+        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledPackages[0].cod_settled_at;
+      }
+
+      return {
+        totalCOD,
+        unclearedCOD,
+        unclearedCount,
+        lastSettledAt
+      };
+    } catch (error) {
+      console.error('获取合伙人统计失败:', error);
+      return {
+        totalCOD: 0,
+        unclearedCOD: 0,
+        unclearedCount: 0,
+        lastSettledAt: null
+      };
+    }
+  },
+
   // 根据ID获取订单
   async getOrderById(orderId: string) {
     try {
