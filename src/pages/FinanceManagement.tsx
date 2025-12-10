@@ -4012,22 +4012,88 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem' }}>
                   💵 当日收款管理
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>日期:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.3)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <button
+                    onClick={() => {
+                      const date = new Date(cashCollectionDate);
+                      date.setDate(date.getDate() - 1);
+                      setCashCollectionDate(date.toISOString().split('T')[0]);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem',
+                      padding: '0 8px',
+                      fontWeight: 'bold',
+                      opacity: 0.8
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+                    title="前一天"
+                  >
+                    &lt;
+                  </button>
+
                   <input
                     type="date"
                     value={cashCollectionDate}
                     onChange={(e) => setCashCollectionDate(e.target.value)}
                     style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      background: 'rgba(0, 0, 0, 0.3)',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: 'transparent',
                       color: 'white',
                       fontSize: '1rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      outline: 'none'
                     }}
                   />
+
+                  <button
+                    onClick={() => {
+                      const date = new Date(cashCollectionDate);
+                      date.setDate(date.getDate() + 1);
+                      setCashCollectionDate(date.toISOString().split('T')[0]);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem',
+                      padding: '0 8px',
+                      fontWeight: 'bold',
+                      opacity: 0.8
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+                    title="后一天"
+                  >
+                    &gt;
+                  </button>
+
+                  <button
+                    onClick={() => setCashCollectionDate(new Date().toISOString().split('T')[0])}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      padding: '4px 10px',
+                      marginLeft: '8px',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  >
+                    今天
+                  </button>
                 </div>
               </div>
               
