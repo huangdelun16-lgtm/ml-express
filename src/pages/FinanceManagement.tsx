@@ -465,13 +465,16 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
         Number(pkg.cod_amount || 0) > 0
       );
 
-      const totalAmount = storePackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
+      // 3. 计算金额和订单数
+      // 只有骑手已结清 (rider_settled) 的订单才计入合伙人待结清列表
+      const validPackages = storePackages.filter(pkg => pkg.rider_settled);
+      const totalAmount = validPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
       
-      const unclearedPackages = storePackages.filter(pkg => !pkg.cod_settled);
+      const unclearedPackages = validPackages.filter(pkg => !pkg.cod_settled);
       const unclearedAmount = unclearedPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
       
       // 计算最后结清日期
-      const settledPackages = storePackages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
+      const settledPackages = validPackages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
       let lastSettledAt: string | null = null;
       if (settledPackages.length > 0) {
         // 找到最新的结清日期
@@ -4509,8 +4512,8 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                           return newSet;
                         });
                         setSelectedCashPackages(new Set());
-                        // 重新加载数据（可选，或者直接修改本地 visiblePackages 如果有状态管理）
-                        // 这里我们使用 clearedCashPackages 来隐藏已结清的，所以不需要重载
+                        // 重新加载数据，确保状态同步
+                        loadRecords();
                       } else {
                         window.alert('结清失败，请重试');
                       }
