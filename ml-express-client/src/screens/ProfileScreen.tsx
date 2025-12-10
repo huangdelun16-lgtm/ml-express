@@ -460,6 +460,7 @@ export default function ProfileScreen({ navigation }: any) {
       
       // 注意：getPartnerCODOrders 现在返回 { orders, total }
       const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, 1, 20);
+      console.log('COD Orders result:', result);
       setCodOrders(result.orders);
       setCodOrdersTotal(result.total);
     } catch (error) {
@@ -1243,14 +1244,25 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text style={{ marginTop: 12, color: theme.colors.text.secondary }}>{t.loading}</Text>
                 </View>
               ) : (
-                <FlatList
+                  <FlatList
                   data={codOrders}
                   keyExtractor={(item) => item.orderId}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}
                   onEndReached={loadMoreCODOrders}
                   onEndReachedThreshold={0.2}
                   showsVerticalScrollIndicator={true}
-                  renderItem={({ item }) => (
+                  renderItem={({ item }) => {
+                    const formatDate = (dateStr?: string) => {
+                      if (!dateStr) return '-';
+                      try {
+                        const d = new Date(dateStr);
+                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                      } catch (e) {
+                        return dateStr;
+                      }
+                    };
+                    return (
                     <View style={{
                       flexDirection: 'row',
                       justifyContent: 'space-between',
@@ -1265,9 +1277,7 @@ export default function ProfileScreen({ navigation }: any) {
                     }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.colors.text.tertiary, fontSize: 12, marginBottom: 4 }}>
-                          {item.deliveryTime ? new Date(item.deliveryTime).toLocaleString('zh-CN', {
-                            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-                          }) : '-'}
+                          {formatDate(item.deliveryTime)}
                         </Text>
                         <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '600' }}>
                           {t.orderId}: <Text style={{ fontFamily: 'System' }}>{item.orderId}</Text>
@@ -1283,7 +1293,7 @@ export default function ProfileScreen({ navigation }: any) {
                         <Text style={{ color: '#3b82f6', fontSize: 10 }}>MMK</Text>
                       </View>
                     </View>
-                  )}
+                  );}}
                   ListEmptyComponent={
                     <View style={{ padding: 40, alignItems: 'center' }}>
                       <Text style={{ fontSize: 40, marginBottom: 16 }}>📭</Text>

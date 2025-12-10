@@ -793,6 +793,8 @@ export const packageService = {
       
       if (error) throw error;
       
+      console.log(`[getPartnerCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
+      
       const orders = (data || []).map(pkg => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
