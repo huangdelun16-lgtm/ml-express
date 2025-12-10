@@ -424,7 +424,9 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
       }, 0);
       const courierKmCost = totalKm * COURIER_KM_RATE;
 
-      // 计算合伙店铺代收款
+      // 计算合伙店铺代收款余额 (已从骑手收回 - 已结给店铺)
+      // 逻辑：总合伙店铺代收款 = 骑手已结清的代收款 - 已结算给合伙店铺的代收款
+      // 即：rider_settled === true && cod_settled !== true
       const partnerCollection = deliveredPackages.reduce((sum, pkg) => {
         const isStoreMatch = deliveryStores.some(store => 
           store.store_name === pkg.sender_name || 
@@ -432,7 +434,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
         );
         const isPartner = !!pkg.delivery_store_id || isStoreMatch;
         
-        if (isPartner) {
+        if (isPartner && pkg.rider_settled && !pkg.cod_settled) {
           return sum + Number(pkg.cod_amount || 0);
         }
         return sum;
