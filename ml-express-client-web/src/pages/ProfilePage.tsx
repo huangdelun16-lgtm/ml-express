@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { packageService, supabase } from '../services/supabase';
 import QRCode from 'qrcode';
@@ -39,6 +39,29 @@ const ProfilePage: React.FC = () => {
   });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
   const [codOrders, setCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePrevMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    let newYear = year;
+    let newMonth = month - 1;
+    if (newMonth < 1) {
+      newMonth = 12;
+      newYear -= 1;
+    }
+    setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    let newYear = year;
+    let newMonth = month + 1;
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear += 1;
+    }
+    setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+  };
 
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
@@ -1308,7 +1331,13 @@ const ProfilePage: React.FC = () => {
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && (
             <div style={{
-              marginBottom: '2.5rem'
+              marginBottom: '2.5rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h3 style={{
@@ -1316,25 +1345,95 @@ const ProfilePage: React.FC = () => {
                   fontSize: '1.5rem',
                   fontWeight: '600',
                   margin: 0,
-                  paddingBottom: '0.75rem',
+                  paddingBottom: '0.5rem',
                   borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
                 }}>
                   {t.codStats}
                 </h3>
-                <input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    color: 'white',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                  }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button 
+                    onClick={handlePrevMonth}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      padding: '6px 12px',
+                      fontSize: '1.2rem',
+                      lineHeight: '1',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                  >
+                    ‹
+                  </button>
+                  
+                  <div 
+                    style={{
+                      position: 'relative',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => dateInputRef.current?.showPicker()}
+                  >
+                    <div style={{
+                      padding: '8px 16px',
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      minWidth: '110px',
+                      textAlign: 'center',
+                      letterSpacing: '1px'
+                    }}>
+                      {selectedMonth}
+                    </div>
+                    <input
+                      ref={dateInputRef}
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: 'pointer',
+                        zIndex: 10
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handleNextMonth}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      padding: '6px 12px',
+                      fontSize: '1.2rem',
+                      lineHeight: '1',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                  >
+                    ›
+                  </button>
+                </div>
               </div>
               
               <div style={{
