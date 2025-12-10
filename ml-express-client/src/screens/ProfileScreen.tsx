@@ -58,6 +58,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [codOrdersTotal, setCodOrdersTotal] = useState(0);
   const [codOrdersLoading, setCodOrdersLoading] = useState(false);
   const [codOrdersLoadingMore, setCodOrdersLoadingMore] = useState(false);
+  const [codOrdersSearchText, setCodOrdersSearchText] = useState('');
+  const [allCodOrders, setAllCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
   
   // 月份选择器状态
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -174,6 +176,9 @@ export default function ProfileScreen({ navigation }: any) {
       selectDate: '选择日期',
       year: '年',
       month: '月',
+      searchOrder: '搜索订单号',
+      totalAmount: '总金额',
+      refresh: '刷新',
     },
     en: {
       title: 'Profile',
@@ -249,6 +254,9 @@ export default function ProfileScreen({ navigation }: any) {
       selectDate: 'Select Date',
       year: 'Year',
       month: 'Month',
+      searchOrder: 'Search Order ID',
+      totalAmount: 'Total Amount',
+      refresh: 'Refresh',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -324,6 +332,9 @@ export default function ProfileScreen({ navigation }: any) {
       selectDate: 'ရက်စွဲရွေးချယ်ပါ',
       year: 'နှစ်',
       month: 'လ',
+      searchOrder: 'အော်ဒါနံပါတ်ရှာဖွေရန်',
+      totalAmount: 'စုစုပေါင်းငွေ',
+      refresh: 'ပြန်လည်စတင်ရန်',
     },
   };
 
@@ -461,8 +472,10 @@ export default function ProfileScreen({ navigation }: any) {
       // 注意：getPartnerCODOrders 现在返回 { orders, total }
       const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, 1, 20);
       console.log('COD Orders result:', result);
+      setAllCodOrders(result.orders);
       setCodOrders(result.orders);
       setCodOrdersTotal(result.total);
+      setCodOrdersSearchText(''); // 重置搜索
     } catch (error) {
       console.error('加载代收款订单失败:', error);
       showToast('加载订单列表失败', 'error');
@@ -471,9 +484,32 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  // 搜索订单
+  const handleSearchCODOrders = (text: string) => {
+    setCodOrdersSearchText(text);
+    if (!text.trim()) {
+      setCodOrders(allCodOrders);
+    } else {
+      const filtered = allCodOrders.filter(order => 
+        order.orderId.toLowerCase().includes(text.toLowerCase().trim())
+      );
+      setCodOrders(filtered);
+    }
+  };
+
+  // 刷新订单列表
+  const refreshCODOrders = async () => {
+    await handleViewCODOrders();
+  };
+
+  // 计算总金额
+  const calculateTotalAmount = () => {
+    return codOrders.reduce((sum, order) => sum + order.codAmount, 0);
+  };
+
   // 加载更多代收款订单
   const loadMoreCODOrders = async () => {
-    if (codOrdersLoadingMore || codOrders.length >= codOrdersTotal) return;
+    if (codOrdersLoadingMore || allCodOrders.length >= codOrdersTotal) return;
 
     try {
       const currentUser = await AsyncStorage.getItem('currentUser');
@@ -491,7 +527,17 @@ export default function ProfileScreen({ navigation }: any) {
       const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, nextPage, 20);
       
       if (result.orders.length > 0) {
-        setCodOrders(prev => [...prev, ...result.orders]);
+        const newOrders = [...allCodOrders, ...result.orders];
+        setAllCodOrders(newOrders);
+        // 如果有搜索文本，需要过滤
+        if (codOrdersSearchText.trim()) {
+          const filtered = newOrders.filter(order => 
+            order.orderId.toLowerCase().includes(codOrdersSearchText.toLowerCase().trim())
+          );
+          setCodOrders(filtered);
+        } else {
+          setCodOrders(newOrders);
+        }
         setCodOrdersPage(nextPage);
       }
     } catch (error) {
@@ -1238,43 +1284,104 @@ export default function ProfileScreen({ navigation }: any) {
             padding: 0, 
             overflow: 'hidden' 
           }]}>
-            <View style={{ 
-              padding: 20, 
-              backgroundColor: '#f8fafc',
-              borderBottomWidth: 1, 
-              borderBottomColor: '#e2e8f0', 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
-              alignItems: 'center' 
-            }}>
-              <View>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.text.primary }}>
-                  {t.codOrders}
-                </Text>
-                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginTop: 4 }}>
-                  {selectedMonth} • {language === 'zh' ? '共' : 'Total'} {codOrdersTotal} {language === 'zh' ? '单' : 'Orders'}
-                </Text>
+            {/* 头部 */}
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ padding: 20, paddingTop: 24 }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 4 }}>
+                    {t.codOrders}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>
+                    {selectedMonth} • {language === 'zh' ? '共' : 'Total'} {codOrdersTotal} {language === 'zh' ? '单' : 'Orders'}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setShowCODOrdersModal(false)} 
+                  style={{ 
+                    padding: 8, 
+                    backgroundColor: 'rgba(255,255,255,0.2)', 
+                    borderRadius: 20 
+                  }}
+                >
+                  <Ionicons name="close" size={22} color="white" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity 
-                onPress={() => setShowCODOrdersModal(false)} 
-                style={{ 
-                  padding: 8, 
-                  backgroundColor: 'rgba(0,0,0,0.05)', 
-                  borderRadius: 20 
-                }}
-              >
-                <Ionicons name="close" size={24} color="#64748b" />
-              </TouchableOpacity>
-            </View>
+
+              {/* 搜索框 */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                backgroundColor: 'rgba(255,255,255,0.95)', 
+                borderRadius: 12, 
+                paddingHorizontal: 12,
+                marginBottom: 12
+              }}>
+                <Ionicons name="search-outline" size={20} color="#64748b" />
+                <TextInput
+                  value={codOrdersSearchText}
+                  onChangeText={handleSearchCODOrders}
+                  placeholder={t.searchOrder}
+                  placeholderTextColor="#94a3b8"
+                  style={{ 
+                    flex: 1, 
+                    paddingVertical: 10, 
+                    paddingHorizontal: 8, 
+                    fontSize: 15,
+                    color: '#1e293b'
+                  }}
+                />
+                {codOrdersSearchText.length > 0 && (
+                  <TouchableOpacity onPress={() => handleSearchCODOrders('')} style={{ padding: 4 }}>
+                    <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* 统计信息 */}
+              {codOrders.length > 0 && (
+                <View style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  borderRadius: 12,
+                  padding: 12
+                }}>
+                  <View>
+                    <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 2 }}>
+                      {language === 'zh' ? '显示' : 'Showing'} {codOrders.length} / {codOrdersTotal}
+                    </Text>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
+                      {t.totalAmount}: {calculateTotalAmount().toLocaleString()} MMK
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={refreshCODOrders}
+                    style={{ 
+                      padding: 8, 
+                      backgroundColor: 'rgba(255,255,255,0.2)', 
+                      borderRadius: 8 
+                    }}
+                  >
+                    <Ionicons name="refresh" size={20} color="white" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </LinearGradient>
             
-            <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
               {codOrdersLoading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
                   <ActivityIndicator size="large" color={theme.colors.primary.DEFAULT} />
                   <Text style={{ marginTop: 12, color: theme.colors.text.secondary }}>{t.loading}</Text>
                 </View>
               ) : (
-                  <FlatList
+                <FlatList
                   data={codOrders}
                   keyExtractor={(item) => item.orderId}
                   style={{ flex: 1 }}
@@ -1282,7 +1389,15 @@ export default function ProfileScreen({ navigation }: any) {
                   onEndReached={loadMoreCODOrders}
                   onEndReachedThreshold={0.2}
                   showsVerticalScrollIndicator={true}
-                  renderItem={({ item }) => {
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={codOrdersLoading}
+                      onRefresh={refreshCODOrders}
+                      colors={['#3b82f6']}
+                      tintColor="#3b82f6"
+                    />
+                  }
+                  renderItem={({ item, index }) => {
                     const formatDate = (dateStr?: string) => {
                       if (!dateStr) return '-';
                       try {
@@ -1293,73 +1408,124 @@ export default function ProfileScreen({ navigation }: any) {
                       }
                     };
                     return (
-                    <View style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingVertical: 16,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#f1f5f9'
-                    }}>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                          <Ionicons name="time-outline" size={14} color="#94a3b8" style={{ marginRight: 4 }} />
-                          <Text style={{ color: theme.colors.text.tertiary, fontSize: 13 }}>
-                            {formatDate(item.deliveryTime)}
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="cube-outline" size={16} color={theme.colors.primary.DEFAULT} style={{ marginRight: 6 }} />
-                          <Text style={{ color: theme.colors.text.primary, fontSize: 16, fontWeight: '600', fontFamily: 'System' }}>
-                            {item.orderId}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-                        <Text style={{ color: '#3b82f6', fontSize: 18, fontWeight: 'bold' }}>
-                          {item.codAmount.toLocaleString()} <Text style={{ fontSize: 12, fontWeight: 'normal', color: '#64748b' }}>MMK</Text>
-                        </Text>
-                        <View style={{ 
-                          backgroundColor: '#ecfdf5', 
-                          paddingHorizontal: 8, 
-                          paddingVertical: 2, 
-                          borderRadius: 10,
-                          marginTop: 4
-                        }}>
-                          <Text style={{ color: '#059669', fontSize: 10, fontWeight: '600' }}>
-                            {language === 'zh' ? '已送达' : 'Delivered'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  );}}
-                  ListEmptyComponent={
-                    <View style={{ padding: 40, alignItems: 'center', marginTop: 40 }}>
-                      <View style={{ 
-                        width: 80, 
-                        height: 80, 
-                        borderRadius: 40, 
-                        backgroundColor: '#f1f5f9', 
-                        justifyContent: 'center', 
-                        alignItems: 'center',
-                        marginBottom: 16
+                      <View style={{
+                        backgroundColor: 'white',
+                        borderRadius: 16,
+                        padding: 16,
+                        marginBottom: 12,
+                        ...theme.shadows.small,
+                        borderLeftWidth: 4,
+                        borderLeftColor: '#3b82f6'
                       }}>
-                        <Ionicons name="receipt-outline" size={40} color="#94a3b8" />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                              <View style={{ 
+                                width: 32, 
+                                height: 32, 
+                                borderRadius: 16, 
+                                backgroundColor: '#eff6ff', 
+                                justifyContent: 'center', 
+                                alignItems: 'center',
+                                marginRight: 10
+                              }}>
+                                <Ionicons name="cube" size={18} color="#3b82f6" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>
+                                  {t.orderId}
+                                </Text>
+                                <Text style={{ color: theme.colors.text.primary, fontSize: 16, fontWeight: '700', fontFamily: 'monospace' }}>
+                                  {item.orderId}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                              <Ionicons name="time-outline" size={14} color="#94a3b8" style={{ marginRight: 6 }} />
+                              <Text style={{ color: theme.colors.text.tertiary, fontSize: 12 }}>
+                                {formatDate(item.deliveryTime)}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                            <View style={{ 
+                              backgroundColor: '#eff6ff',
+                              borderRadius: 12,
+                              padding: 12,
+                              minWidth: 100,
+                              alignItems: 'center'
+                            }}>
+                              <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>
+                                {t.codAmount}
+                              </Text>
+                              <Text style={{ color: '#3b82f6', fontSize: 20, fontWeight: 'bold', lineHeight: 24 }}>
+                                {item.codAmount.toLocaleString()}
+                              </Text>
+                              <Text style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>
+                                MMK
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
                       </View>
-                      <Text style={{ color: theme.colors.text.secondary, fontSize: 15, fontWeight: '500' }}>
-                        {language === 'zh' ? '本月暂无代收款订单' : language === 'en' ? 'No COD orders this month' : 'အော်ဒါမရှိပါ'}
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={{ padding: 60, alignItems: 'center', marginTop: 40 }}>
+                      <LinearGradient
+                        colors={['#f1f5f9', '#e2e8f0']}
+                        style={{ 
+                          width: 100, 
+                          height: 100, 
+                          borderRadius: 50, 
+                          justifyContent: 'center', 
+                          alignItems: 'center',
+                          marginBottom: 20
+                        }}
+                      >
+                        <Ionicons name="receipt-outline" size={50} color="#94a3b8" />
+                      </LinearGradient>
+                      <Text style={{ color: theme.colors.text.secondary, fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+                        {codOrdersSearchText.trim() 
+                          ? (language === 'zh' ? '未找到匹配的订单' : language === 'en' ? 'No matching orders' : 'အော်ဒါမတွေ့ရှိပါ')
+                          : (language === 'zh' ? '本月暂无代收款订单' : language === 'en' ? 'No COD orders this month' : 'အော်ဒါမရှိပါ')
+                        }
                       </Text>
+                      {codOrdersSearchText.trim() && (
+                        <TouchableOpacity 
+                          onPress={() => handleSearchCODOrders('')}
+                          style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#3b82f6', borderRadius: 8 }}
+                        >
+                          <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>
+                            {language === 'zh' ? '清除搜索' : language === 'en' ? 'Clear Search' : 'ရှာဖွေမှုရှင်းလင်းရန်'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   }
                   ListFooterComponent={
                     codOrdersLoadingMore ? (
-                      <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                      <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                         <ActivityIndicator size="small" color="#3b82f6" />
+                        <Text style={{ marginTop: 8, color: '#94a3b8', fontSize: 12 }}>{t.loading}</Text>
                       </View>
-                    ) : (codOrders.length >= codOrdersTotal && codOrdersTotal > 0) ? (
-                      <Text style={{ textAlign: 'center', paddingVertical: 20, color: '#cbd5e1', fontSize: 12 }}>
-                        - {t.noMoreData} -
-                      </Text>
+                    ) : (allCodOrders.length >= codOrdersTotal && codOrdersTotal > 0 && !codOrdersSearchText.trim()) ? (
+                      <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                        <View style={{ 
+                          width: 40, 
+                          height: 40, 
+                          borderRadius: 20, 
+                          backgroundColor: '#f1f5f9', 
+                          justifyContent: 'center', 
+                          alignItems: 'center',
+                          marginBottom: 8
+                        }}>
+                          <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                        </View>
+                        <Text style={{ textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+                          {t.noMoreData}
+                        </Text>
+                      </View>
                     ) : null
                   }
                 />
