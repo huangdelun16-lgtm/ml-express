@@ -98,6 +98,7 @@ const FinanceManagement: React.FC = () => {
 const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [cashSettlementStatus, setCashSettlementStatus] = useState<'unsettled' | 'settled' | 'all'>('unsettled');
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
@@ -4097,13 +4098,38 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     今天
                   </button>
                 </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>状态:</span>
+                  <select
+                    value={cashSettlementStatus}
+                    onChange={(e) => setCashSettlementStatus(e.target.value as any)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'white',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="unsettled">未结清</option>
+                    <option value="settled">已结清</option>
+                    <option value="all">全部</option>
+                  </select>
+                </div>
               </div>
               
               {/* 统计卡片 */}
               {(() => {
                 const cashPackages = packages.filter(pkg => {
-                  // 只统计未结清的现金包裹
-                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达' || pkg.rider_settled) return false;
+                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                  
+                  // 结清状态过滤
+                  if (cashSettlementStatus === 'unsettled' && pkg.rider_settled) return false;
+                  if (cashSettlementStatus === 'settled' && !pkg.rider_settled) return false;
+                  
                   // 日期筛选：检查送达时间是否包含选定日期
                   const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
                   return deliveryDate.includes(cashCollectionDate);
@@ -4202,9 +4228,14 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
             {/* 快递员列表 */}
             {(() => {
-              // 筛选符合条件的包裹：现金支付、已送达、未结清、且符合日期
+              // 筛选符合条件的包裹：现金支付、已送达、符合结清状态、且符合日期
               const cashPackages = packages.filter(pkg => {
-                if (pkg.payment_method !== 'cash' || pkg.status !== '已送达' || pkg.rider_settled) return false;
+                if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                
+                // 结清状态过滤
+                if (cashSettlementStatus === 'unsettled' && pkg.rider_settled) return false;
+                if (cashSettlementStatus === 'settled' && !pkg.rider_settled) return false;
+                
                 const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
                 return deliveryDate.includes(cashCollectionDate);
               });
