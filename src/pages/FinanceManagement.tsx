@@ -4100,7 +4100,8 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {/* 统计卡片 */}
               {(() => {
                 const cashPackages = packages.filter(pkg => {
-                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                  // 只统计未结清的现金包裹
+                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达' || pkg.rider_settled) return false;
                   // 日期筛选：检查送达时间是否包含选定日期
                   const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
                   return deliveryDate.includes(cashCollectionDate);
@@ -4199,7 +4200,13 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
             {/* 快递员列表 */}
             {(() => {
-              const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
+              // 筛选符合条件的包裹：现金支付、已送达、未结清、且符合日期
+              const cashPackages = packages.filter(pkg => {
+                if (pkg.payment_method !== 'cash' || pkg.status !== '已送达' || pkg.rider_settled) return false;
+                const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
+                return deliveryDate.includes(cashCollectionDate);
+              });
+              
               const courierCashMap: Record<string, { packages: Package[], total: number }> = {};
               
               cashPackages.forEach(pkg => {
