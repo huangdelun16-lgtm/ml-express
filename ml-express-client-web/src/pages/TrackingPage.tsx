@@ -359,16 +359,27 @@ const TrackingPage: React.FC = () => {
             <span style={{ 
               color: 'white',
               fontSize: window.innerWidth < 768 ? '1.6rem' : '2.2rem',
-              fontWeight: '800',
-              textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-              background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
+              fontWeight: '900',
+              textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 50%, #b3d9ff 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
-              letterSpacing: '-1px',
-              whiteSpace: 'nowrap'
+              letterSpacing: '1px',
+              whiteSpace: 'nowrap',
+              fontFamily: "'Montserrat', 'Roboto', sans-serif",
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
             }}>
-              MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
+              MARKET LINK <span style={{ 
+                fontSize: '1em', 
+                fontStyle: 'italic', 
+                fontWeight: '900',
+                background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                marginLeft: '4px'
+              }}>EXPRESS</span>
             </span>
             <span style={{
               color: 'white',
