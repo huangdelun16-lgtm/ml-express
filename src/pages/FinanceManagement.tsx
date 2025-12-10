@@ -97,6 +97,7 @@ const FinanceManagement: React.FC = () => {
   const { language } = useLanguage();
 const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
+  const [cashCollectionDate, setCashCollectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
@@ -1025,7 +1026,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {key === 'analytics' && '📈 数据分析'}
               {key === 'package_records' && '📦 包裹收支记录'}
               {key === 'courier_records' && '🚚 骑手收支记录'}
-              {key === 'cash_collection' && '💵 现金收款管理'}
+              {key === 'cash_collection' && '💵 当日收款管理'}
               {key === 'partner_collection' && '🤝 合伙代收款'}
             </button>
           ))}
@@ -4007,13 +4008,37 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               marginBottom: '24px',
               border: '1px solid rgba(255, 255, 255, 0.18)'
             }}>
-              <h3 style={{ margin: '0 0 20px 0', color: 'white', fontSize: '1.5rem' }}>
-                💵 现金收款管理
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem' }}>
+                  💵 当日收款管理
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>日期:</span>
+                  <input
+                    type="date"
+                    value={cashCollectionDate}
+                    onChange={(e) => setCashCollectionDate(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+              </div>
               
               {/* 统计卡片 */}
               {(() => {
-                const cashPackages = packages.filter(pkg => pkg.payment_method === 'cash' && pkg.status === '已送达');
+                const cashPackages = packages.filter(pkg => {
+                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                  // 日期筛选：检查送达时间是否包含选定日期
+                  const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
+                  return deliveryDate.includes(cashCollectionDate);
+                });
                 
                 let totalDeliveryFee = 0;
                 let totalCOD = 0;
