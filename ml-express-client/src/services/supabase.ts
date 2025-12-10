@@ -761,11 +761,11 @@ export const packageService = {
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getPartnerCODOrders(userId: string, storeName?: string, month?: string) {
+  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
-        .select('id, cod_amount, delivery_time')
+        .select('id, cod_amount, delivery_time', { count: 'exact' })
         .eq('status', '已送达')
         .gt('cod_amount', 0);
 
@@ -784,18 +784,25 @@ export const packageService = {
         q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
       }
       
-      const { data, error } = await q.order('delivery_time', { ascending: false });
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error, count } = await q
+        .order('delivery_time', { ascending: false })
+        .range(from, to);
       
       if (error) throw error;
       
-      return (data || []).map(pkg => ({
+      const orders = (data || []).map(pkg => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time
       }));
+      
+      return { orders, total: count || 0 };
     } catch (error) {
       console.error('获取代收款订单列表失败:', error);
-      return [];
+      return { orders: [], total: 0 };
     }
   },
 

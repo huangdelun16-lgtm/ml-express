@@ -10,7 +10,9 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  Linking
+  Linking,
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -52,6 +54,15 @@ export default function ProfileScreen({ navigation }: any) {
   });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
   const [codOrders, setCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
+  const [codOrdersPage, setCodOrdersPage] = useState(1);
+  const [codOrdersTotal, setCodOrdersTotal] = useState(0);
+  const [codOrdersLoading, setCodOrdersLoading] = useState(false);
+  const [codOrdersLoadingMore, setCodOrdersLoadingMore] = useState(false);
+  
+  // 月份选择器状态
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [tempSelectedYear, setTempSelectedYear] = useState(new Date().getFullYear());
+  const [tempSelectedMonth, setTempSelectedMonth] = useState(new Date().getMonth() + 1);
   
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -158,6 +169,11 @@ export default function ProfileScreen({ navigation }: any) {
       orderId: '订单号',
       codAmount: '代收金额',
       close: '关闭',
+      loading: '加载中...',
+      noMoreData: '没有更多数据了',
+      selectDate: '选择日期',
+      year: '年',
+      month: '月',
     },
     en: {
       title: 'Profile',
@@ -228,6 +244,11 @@ export default function ProfileScreen({ navigation }: any) {
       orderId: 'Order ID',
       codAmount: 'COD Amount',
       close: 'Close',
+      loading: 'Loading...',
+      noMoreData: 'No more data',
+      selectDate: 'Select Date',
+      year: 'Year',
+      month: 'Month',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -298,6 +319,11 @@ export default function ProfileScreen({ navigation }: any) {
       orderId: 'အော်ဒါနံပါတ်',
       codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
       close: 'ပိတ်ရန်',
+      loading: 'ဆွဲယူနေသည်...',
+      noMoreData: 'ဒေတာမရှိတော့ပါ',
+      selectDate: 'ရက်စွဲရွေးချယ်ပါ',
+      year: 'နှစ်',
+      month: 'လ',
     },
   };
 
@@ -375,6 +401,47 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, [selectedMonth]);
 
+  // 处理月份切换
+  const handlePrevMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    let newYear = year;
+    let newMonth = month - 1;
+    if (newMonth < 1) {
+      newMonth = 12;
+      newYear -= 1;
+    }
+    setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    let newYear = year;
+    let newMonth = month + 1;
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear += 1;
+    }
+    const nextMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+    // 允许查看未来月份吗？通常不允许，但这里先不做严格限制，或者只限制到当前月份
+    // const now = new Date();
+    // const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // if (nextMonthStr <= currentMonthStr) {
+       setSelectedMonth(nextMonthStr);
+    // }
+  };
+
+  const openMonthPicker = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    setTempSelectedYear(year);
+    setTempSelectedMonth(month);
+    setShowMonthPicker(true);
+  };
+
+  const confirmMonthPicker = () => {
+    setSelectedMonth(`${tempSelectedYear}-${String(tempSelectedMonth).padStart(2, '0')}`);
+    setShowMonthPicker(false);
+  };
+
   // 查看代收款订单
   const handleViewCODOrders = async () => {
     try {
@@ -387,12 +454,49 @@ export default function ProfileScreen({ navigation }: any) {
         storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
       }
       
-      const orders = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth);
-      setCodOrders(orders);
+      setCodOrdersLoading(true);
       setShowCODOrdersModal(true);
+      setCodOrdersPage(1);
+      
+      // 注意：getPartnerCODOrders 现在返回 { orders, total }
+      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, 1, 20);
+      setCodOrders(result.orders);
+      setCodOrdersTotal(result.total);
     } catch (error) {
       console.error('加载代收款订单失败:', error);
       showToast('加载订单列表失败', 'error');
+    } finally {
+      setCodOrdersLoading(false);
+    }
+  };
+
+  // 加载更多代收款订单
+  const loadMoreCODOrders = async () => {
+    if (codOrdersLoadingMore || codOrders.length >= codOrdersTotal) return;
+
+    try {
+      const currentUser = await AsyncStorage.getItem('currentUser');
+      if (!currentUser) return;
+      
+      const user = JSON.parse(currentUser);
+      let storeName: string | undefined = undefined;
+      if (userType === 'partner') {
+        storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
+      }
+      
+      setCodOrdersLoadingMore(true);
+      const nextPage = codOrdersPage + 1;
+      
+      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, nextPage, 20);
+      
+      if (result.orders.length > 0) {
+        setCodOrders(prev => [...prev, ...result.orders]);
+        setCodOrdersPage(nextPage);
+      }
+    } catch (error) {
+      console.error('加载更多代收款订单失败:', error);
+    } finally {
+      setCodOrdersLoadingMore(false);
     }
   };
 
@@ -645,45 +749,25 @@ export default function ProfileScreen({ navigation }: any) {
     <View style={styles.section}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <Text style={styles.sectionTitle}>{t.codStats}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TextInput
-            value={selectedMonth}
-            onChangeText={(text) => {
-              // 只允许数字和连字符
-              const cleaned = text.replace(/[^\d-]/g, '');
-              // 自动添加连字符
-              let formatted = cleaned;
-              if (cleaned.length > 4 && !cleaned.includes('-')) {
-                formatted = cleaned.slice(0, 4) + '-' + cleaned.slice(4, 6);
-              }
-              // 限制长度
-              if (formatted.length <= 7) {
-                setSelectedMonth(formatted);
-              }
-            }}
-            onBlur={() => {
-              // 验证格式，如果不正确则重置为当前月份
-              if (!/^\d{4}-\d{2}$/.test(selectedMonth)) {
-                const now = new Date();
-                setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-              }
-            }}
-            placeholder="YYYY-MM"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              color: 'white',
-              fontSize: 14,
-              minWidth: 100,
-              textAlign: 'center',
-            }}
-            maxLength={7}
-            keyboardType="numeric"
-          />
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          backgroundColor: 'rgba(0,0,0,0.2)', 
+          borderRadius: 20, 
+          paddingHorizontal: 4, 
+          paddingVertical: 2,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)'
+        }}>
+          <TouchableOpacity onPress={handlePrevMonth} style={{ padding: 8 }}>
+            <Ionicons name="chevron-back" size={20} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openMonthPicker} style={{ paddingHorizontal: 12 }}>
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', fontFamily: 'System' }}>{selectedMonth}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleNextMonth} style={{ padding: 8 }}>
+            <Ionicons name="chevron-forward" size={20} color="white" />
+          </TouchableOpacity>
         </View>
       </View>
       <View style={styles.codCard}>
@@ -1058,6 +1142,82 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </Modal>
 
+      {/* 月份选择器模态框 */}
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: 320, padding: 0, overflow: 'hidden' }]}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#f8fafc' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', color: '#334155' }}>{t.selectDate}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', height: 240 }}>
+              {/* 年份列表 */}
+              <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#eee', backgroundColor: 'white' }}>
+                <Text style={{ textAlign: 'center', padding: 12, fontWeight: '600', color: '#64748b', backgroundColor: '#f1f5f9' }}>{t.year}</Text>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                    <TouchableOpacity
+                      key={year}
+                      style={{
+                        paddingVertical: 16,
+                        backgroundColor: tempSelectedYear === year ? '#eff6ff' : 'transparent',
+                        borderLeftWidth: 4,
+                        borderLeftColor: tempSelectedYear === year ? theme.colors.primary.DEFAULT : 'transparent'
+                      }}
+                      onPress={() => setTempSelectedYear(year)}
+                    >
+                      <Text style={{ 
+                        textAlign: 'center', 
+                        color: tempSelectedYear === year ? theme.colors.primary.DEFAULT : '#334155',
+                        fontWeight: tempSelectedYear === year ? 'bold' : 'normal',
+                        fontSize: 16
+                      }}>{year}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              {/* 月份列表 */}
+              <View style={{ flex: 1, backgroundColor: 'white' }}>
+                <Text style={{ textAlign: 'center', padding: 12, fontWeight: '600', color: '#64748b', backgroundColor: '#f1f5f9' }}>{t.month}</Text>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                    <TouchableOpacity
+                      key={month}
+                      style={{
+                        paddingVertical: 16,
+                        backgroundColor: tempSelectedMonth === month ? '#eff6ff' : 'transparent',
+                        borderLeftWidth: 4,
+                        borderLeftColor: tempSelectedMonth === month ? theme.colors.primary.DEFAULT : 'transparent'
+                      }}
+                      onPress={() => setTempSelectedMonth(month)}
+                    >
+                      <Text style={{ 
+                        textAlign: 'center', 
+                        color: tempSelectedMonth === month ? theme.colors.primary.DEFAULT : '#334155',
+                        fontWeight: tempSelectedMonth === month ? 'bold' : 'normal',
+                        fontSize: 16
+                      }}>{String(month).padStart(2, '0')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+            <View style={[styles.modalButtons, { padding: 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#eee', marginTop: 0 }]}>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => setShowMonthPicker(false)}>
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonConfirm]} onPress={confirmMonthPicker}>
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>{t.confirm}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 代收款订单列表模态框 */}
       <Modal
         visible={showCODOrdersModal}
@@ -1066,53 +1226,97 @@ export default function ProfileScreen({ navigation }: any) {
         onRequestClose={() => setShowCODOrdersModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-            <Text style={styles.modalTitle}>{t.codOrders}</Text>
+          <View style={[styles.modalContent, { maxHeight: '85%', padding: 0, overflow: 'hidden' }]}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.text.primary }}>
+                {t.codOrders} <Text style={{ fontSize: 14, color: '#64748b', fontWeight: 'normal' }}>({codOrdersTotal})</Text>
+              </Text>
+              <TouchableOpacity onPress={() => setShowCODOrdersModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
             
-            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={true}>
-              {codOrders.length > 0 ? (
-                codOrders.map((order, index) => (
-                  <View
-                    key={index}
-                    style={{
+            <View style={{ flex: 1, paddingHorizontal: 16 }}>
+              {codOrdersLoading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+                  <ActivityIndicator size="large" color={theme.colors.primary.DEFAULT} />
+                  <Text style={{ marginTop: 12, color: theme.colors.text.secondary }}>{t.loading}</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={codOrders}
+                  keyExtractor={(item) => item.orderId}
+                  contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}
+                  onEndReached={loadMoreCODOrders}
+                  onEndReachedThreshold={0.2}
+                  showsVerticalScrollIndicator={true}
+                  renderItem={({ item }) => (
+                    <View style={{
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      padding: 12,
-                      marginBottom: 8,
-                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                      borderRadius: 8,
+                      padding: 16,
+                      marginBottom: 12,
+                      backgroundColor: 'white',
+                      borderRadius: 12,
                       borderWidth: 1,
-                      borderColor: 'rgba(59, 130, 246, 0.3)',
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.colors.text.primary, fontSize: 14, fontWeight: '600' }}>
-                        {t.orderId}: {order.orderId}
+                      borderColor: '#e2e8f0',
+                      ...theme.shadows.small
+                    }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: theme.colors.text.tertiary, fontSize: 12, marginBottom: 4 }}>
+                          {item.deliveryTime ? new Date(item.deliveryTime).toLocaleString('zh-CN', {
+                            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                          }) : '-'}
+                        </Text>
+                        <Text style={{ color: theme.colors.text.primary, fontSize: 15, fontWeight: '600' }}>
+                          {t.orderId}: <Text style={{ fontFamily: 'System' }}>{item.orderId}</Text>
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                        <Text style={{ color: theme.colors.text.tertiary, fontSize: 11, marginBottom: 2 }}>
+                          {t.codAmount}
+                        </Text>
+                        <Text style={{ color: '#3b82f6', fontSize: 16, fontWeight: 'bold' }}>
+                          {item.codAmount.toLocaleString()}
+                        </Text>
+                        <Text style={{ color: '#3b82f6', fontSize: 10 }}>MMK</Text>
+                      </View>
+                    </View>
+                  )}
+                  ListEmptyComponent={
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 40, marginBottom: 16 }}>📭</Text>
+                      <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>
+                        {language === 'zh' ? '本月暂无代收款订单' : language === 'en' ? 'No COD orders this month' : 'အော်ဒါမရှိပါ'}
                       </Text>
                     </View>
-                    <Text style={{ color: '#3b82f6', fontSize: 16, fontWeight: 'bold' }}>
-                      {order.codAmount.toLocaleString()} MMK
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>
-                    {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
-                  </Text>
-                </View>
+                  }
+                  ListFooterComponent={
+                    codOrdersLoadingMore ? (
+                      <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color="#3b82f6" />
+                      </View>
+                    ) : (codOrders.length >= codOrdersTotal && codOrdersTotal > 0) ? (
+                      <Text style={{ textAlign: 'center', paddingVertical: 16, color: '#94a3b8', fontSize: 12 }}>
+                        {t.noMoreData}
+                      </Text>
+                    ) : null
+                  }
+                />
               )}
-            </ScrollView>
+            </View>
 
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonConfirm, { marginTop: 16 }]}
-              onPress={() => setShowCODOrdersModal(false)}
-            >
-              <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                {t.close}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: 'white' }}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, { flex: 0, width: '100%' }]}
+                onPress={() => setShowCODOrdersModal(false)}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                  {t.close}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

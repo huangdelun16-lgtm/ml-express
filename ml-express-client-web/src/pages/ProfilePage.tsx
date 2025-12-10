@@ -207,7 +207,8 @@ const ProfilePage: React.FC = () => {
       const userId = currentUser.id || storeInfo?.id;
       
       if (userId) {
-        const orders = await packageService.getPartnerCODOrders(userId, storeName, selectedMonth);
+        // 分页获取第一页
+        const { orders } = await packageService.getPartnerCODOrders(userId, storeName, selectedMonth);
         setCodOrders(orders);
         setShowCODOrdersModal(true);
       }
@@ -391,9 +392,9 @@ const ProfilePage: React.FC = () => {
       noSettlement: '暂无结清记录',
       view: '查看',
       codOrders: '代收款订单',
-      orderId: '订单号',
+      // orderId: '订单号', // 已存在
       codAmount: '代收金额',
-      close: '关闭'
+      // close: '关闭' // 已存在
     },
     en: {
       nav: {
@@ -447,9 +448,9 @@ const ProfilePage: React.FC = () => {
       noSettlement: 'No Settlement Record',
       view: 'View',
       codOrders: 'COD Orders',
-      orderId: 'Order ID',
+      // orderId: 'Order ID', // Exists
       codAmount: 'COD Amount',
-      close: 'Close'
+      // close: 'Close' // Exists
     },
     my: {
       nav: {
@@ -503,9 +504,9 @@ const ProfilePage: React.FC = () => {
       noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ',
       view: 'ကြည့်ရန်',
       codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
-      orderId: 'အော်ဒါနံပါတ်',
+      // orderId: 'အော်ဒါနံပါတ်', // Exists
       codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
-      close: 'ပိတ်ရန်'
+      // close: 'ပိတ်ရန်' // Exists
     }
   };
 

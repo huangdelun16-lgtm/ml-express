@@ -403,11 +403,11 @@ export const packageService = {
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getPartnerCODOrders(userId: string, storeName?: string, month?: string) {
+  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
-        .select('id, cod_amount, delivery_time')
+        .select('id, cod_amount, delivery_time', { count: 'exact' })
         .eq('status', '已送达')
         .gt('cod_amount', 0);
 
@@ -426,18 +426,30 @@ export const packageService = {
         q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
       }
       
-      const { data, error } = await q.order('delivery_time', { ascending: false });
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error, count } = await q
+        .order('delivery_time', { ascending: false })
+        .range(from, to);
       
       if (error) throw error;
       
-      return (data || []).map(pkg => ({
+      const orders = (data || []).map(pkg => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time
       }));
+      
+      // 为了兼容Web端现有调用，直接返回数组，但也返回total以防未来需要
+      // 注意：Web端目前期望返回 Promise<Array<...>>，所以这里可能需要改Web端代码或者稍微hack一下
+      // 实际上，Web端调用是 const orders = await ...; setCodOrders(orders);
+      // 所以我必须返回数组，或者改Web端。
+      // 为了简单，我让它返回 { orders, total }，然后去改Web端。
+      return { orders, total: count || 0 };
     } catch (error) {
       console.error('获取代收款订单列表失败:', error);
-      return [];
+      return { orders: [], total: 0 };
     }
   }
 };
