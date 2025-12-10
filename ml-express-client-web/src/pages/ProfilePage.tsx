@@ -392,9 +392,7 @@ const ProfilePage: React.FC = () => {
       noSettlement: '暂无结清记录',
       view: '查看',
       codOrders: '代收款订单',
-      // orderId: '订单号', // 已存在
       codAmount: '代收金额',
-      // close: '关闭' // 已存在
     },
     en: {
       nav: {
@@ -448,9 +446,7 @@ const ProfilePage: React.FC = () => {
       noSettlement: 'No Settlement Record',
       view: 'View',
       codOrders: 'COD Orders',
-      // orderId: 'Order ID', // Exists
       codAmount: 'COD Amount',
-      // close: 'Close' // Exists
     },
     my: {
       nav: {
@@ -504,9 +500,7 @@ const ProfilePage: React.FC = () => {
       noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ',
       view: 'ကြည့်ရန်',
       codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
-      // orderId: 'အော်ဒါနံပါတ်', // Exists
       codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
-      // close: 'ပိတ်ရန်' // Exists
     }
   };
 
@@ -3026,7 +3020,7 @@ const ProfilePage: React.FC = () => {
                   >
                     <div>
                       <div style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        {t.orderId}
+                        {t.packageId}
                       </div>
                       <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '600' }}>
                         {order.orderId}
