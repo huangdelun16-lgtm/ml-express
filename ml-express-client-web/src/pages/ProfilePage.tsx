@@ -33,10 +33,12 @@ const ProfilePage: React.FC = () => {
     unclearedCount: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
-  const [codOrders, setCodOrders] = useState<Array<{ orderId: string; codAmount: number; deliveryTime?: string }>>([]);
+  const [codOrders, setCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
 
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
@@ -181,34 +183,13 @@ const ProfilePage: React.FC = () => {
       const userId = currentUser.id || storeInfo?.id;
       
       if (userId) {
-        const stats = await packageService.getPartnerStats(userId, storeName, selectedYear, selectedMonth);
+        const stats = await packageService.getPartnerStats(userId, storeName, selectedMonth);
         setPartnerCODStats(stats);
       }
     } catch (error) {
       console.error('加载代收款统计失败:', error);
     }
-  }, [currentUser, isPartnerStore, storeInfo, selectedYear, selectedMonth]);
-  
-  // 加载代收款订单列表
-  const loadCODOrders = async () => {
-    if (!currentUser || !isPartnerStore) {
-      return;
-    }
-
-    try {
-      const storeName = currentUser.name || storeInfo?.store_name;
-      const userId = currentUser.id || storeInfo?.id;
-      
-      if (userId) {
-        const orders = await packageService.getPartnerCODOrders(userId, storeName, selectedYear, selectedMonth);
-        setCodOrders(orders);
-        setShowCODOrdersModal(true);
-      }
-    } catch (error) {
-      console.error('加载代收款订单列表失败:', error);
-      alert(language === 'zh' ? '加载订单列表失败' : language === 'en' ? 'Failed to load orders' : 'အော်ဒါစာရင်းကို ဖွင့်ရန် မအောင်မြင်ပါ');
-    }
-  };
+  }, [currentUser, isPartnerStore, storeInfo, selectedMonth]);
 
   useEffect(() => {
     loadUserPackages();
@@ -216,6 +197,25 @@ const ProfilePage: React.FC = () => {
       loadPartnerCODStats();
     }
   }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
+
+  // 查看代收款订单
+  const handleViewCODOrders = async () => {
+    if (!currentUser || !isPartnerStore) return;
+    
+    try {
+      const storeName = currentUser.name || storeInfo?.store_name;
+      const userId = currentUser.id || storeInfo?.id;
+      
+      if (userId) {
+        const orders = await packageService.getPartnerCODOrders(userId, storeName, selectedMonth);
+        setCodOrders(orders);
+        setShowCODOrdersModal(true);
+      }
+    } catch (error) {
+      console.error('加载代收款订单失败:', error);
+      alert('加载订单列表失败');
+    }
+  };
 
   // 当包裹列表变化时，重置到第一页
   useEffect(() => {
@@ -390,9 +390,9 @@ const ProfilePage: React.FC = () => {
       lastSettledAt: '上次结清日期',
       noSettlement: '暂无结清记录',
       view: '查看',
-      orderId: '订单号码',
-      codAmount: '代收金额',
       codOrders: '代收款订单',
+      orderId: '订单号',
+      codAmount: '代收金额',
       close: '关闭'
     },
     en: {
@@ -446,9 +446,9 @@ const ProfilePage: React.FC = () => {
       lastSettledAt: 'Last Settled Date',
       noSettlement: 'No Settlement Record',
       view: 'View',
+      codOrders: 'COD Orders',
       orderId: 'Order ID',
       codAmount: 'COD Amount',
-      codOrders: 'COD Orders',
       close: 'Close'
     },
     my: {
@@ -496,15 +496,15 @@ const ProfilePage: React.FC = () => {
       storeType: 'ဆိုင်အမျိုးအစား',
       storeCode: 'ဆိုင်ကုဒ်',
       codStats: 'ငွေကောက်ခံမှုစာရင်း',
-      totalCOD: 'လစဉ်ငွေကောက်ခံမှု',
+      totalCOD: 'လတစ်လငွေကောက်ခံမှု',
       unclearedCOD: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောငွေ',
       unclearedCount: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောအော်ဒါ',
       lastSettledAt: 'နောက်ဆုံးရှင်းလင်းထားသောရက်စွဲ',
       noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ',
       view: 'ကြည့်ရန်',
+      codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
       orderId: 'အော်ဒါနံပါတ်',
       codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
-      codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
       close: 'ပိတ်ရန်'
     }
   };
@@ -1315,61 +1315,31 @@ const ProfilePage: React.FC = () => {
             <div style={{
               marginBottom: '2.5rem'
             }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem',
-                paddingBottom: '0.75rem',
-                borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h3 style={{
                   color: 'white',
                   fontSize: '1.5rem',
                   fontWeight: '600',
-                  margin: 0
+                  margin: 0,
+                  paddingBottom: '0.75rem',
+                  borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
                 }}>
                   {t.codStats}
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      color: 'white',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                      <option key={year} value={year} style={{ background: '#1a1a2e', color: 'white' }}>{year}</option>
-                    ))}
-                  </select>
-                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>/</span>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      color: 'white',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                      <option key={month} value={month} style={{ background: '#1a1a2e', color: 'white' }}>
-                        {month.toString().padStart(2, '0')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    color: 'white',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                  }}
+                />
               </div>
               
               <div style={{
@@ -1378,7 +1348,7 @@ const ProfilePage: React.FC = () => {
                 gap: '1.5rem',
                 marginBottom: '1.5rem'
               }}>
-                {/* 总代收款 */}
+                {/* 本月代收款 */}
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.15))',
                   borderRadius: '16px',
@@ -1403,29 +1373,29 @@ const ProfilePage: React.FC = () => {
                       {t.totalCOD}
                     </div>
                   </div>
-                  <div style={{ color: '#60a5fa', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2' }}>
+                  <div style={{ color: '#60a5fa', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2', marginBottom: '0.75rem' }}>
                     {partnerCODStats.totalCOD.toLocaleString()}
                     <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
                   </div>
                   <button
-                    onClick={loadCODOrders}
+                    onClick={handleViewCODOrders}
                     style={{
-                      marginTop: '1rem',
+                      width: '100%',
                       padding: '8px 16px',
-                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                      border: '1px solid rgba(59, 130, 246, 0.5)',
                       borderRadius: '8px',
-                      color: '#3b82f6',
-                      fontSize: '0.85rem',
+                      color: '#60a5fa',
+                      fontSize: '0.9rem',
                       fontWeight: '600',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)';
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
                     }}
                   >
                     {t.view}
@@ -3010,132 +2980,71 @@ const ProfilePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          background: 'rgba(26, 54, 93, 0.8)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10000,
-          padding: '20px'
-        }}
-        onClick={() => setShowCODOrdersModal(false)}
-        >
+          zIndex: 2000,
+          backdropFilter: 'blur(5px)'
+        }}>
           <div style={{
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-            borderRadius: '20px',
-            padding: '2rem',
+            background: 'white',
+            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
+            borderRadius: '15px',
             maxWidth: '600px',
-            width: '100%',
+            width: '90%',
             maxHeight: '80vh',
             overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-            border: '2px solid rgba(255, 255, 255, 0.1)'
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
+          }}>
+            <h2 style={{
+              color: '#2c5282',
+              marginTop: 0,
               marginBottom: '1.5rem',
-              paddingBottom: '1rem',
-              borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
+              fontSize: '1.5rem',
+              fontWeight: '600'
             }}>
-              <h3 style={{
-                color: 'white',
-                fontSize: '1.5rem',
-                fontWeight: '600',
-                margin: 0
-              }}>
-                {t.codOrders}
-              </h3>
-              <button
-                onClick={() => setShowCODOrdersModal(false)}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.05)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                  e.currentTarget.style.color = '#ef4444';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
-                  e.currentTarget.style.color = '#64748b';
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{
-              maxHeight: '400px',
-              overflowY: 'auto',
-              marginBottom: '1.5rem'
-            }}>
-              {codOrders.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  padding: '2rem'
-                }}>
-                  {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
-                </div>
-              ) : (
+              {t.codOrders}
+            </h2>
+            
+            <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+              {codOrders.length > 0 ? (
                 codOrders.map((order, index) => (
-                  <div key={index} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '1rem',
-                    marginBottom: '0.75rem',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }}>
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '1rem',
+                      marginBottom: '0.75rem',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                    }}
+                  >
                     <div>
-                      <div style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: '0.85rem',
-                        marginBottom: '0.25rem'
-                      }}>
+                      <div style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
                         {t.orderId}
                       </div>
-                      <div style={{
-                        color: 'white',
-                        fontSize: '1rem',
-                        fontWeight: '600'
-                      }}>
+                      <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '600' }}>
                         {order.orderId}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: '0.85rem',
-                        marginBottom: '0.25rem'
-                      }}>
+                      <div style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
                         {t.codAmount}
                       </div>
-                      <div style={{
-                        color: '#3b82f6',
-                        fontSize: '1.1rem',
-                        fontWeight: '700'
-                      }}>
+                      <div style={{ color: '#3b82f6', fontSize: '1.2rem', fontWeight: 'bold' }}>
                         {order.codAmount.toLocaleString()} MMK
                       </div>
                     </div>
                   </div>
                 ))
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                  {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
+                </div>
               )}
             </div>
 
@@ -3143,6 +3052,7 @@ const ProfilePage: React.FC = () => {
               onClick={() => setShowCODOrdersModal(false)}
               style={{
                 width: '100%',
+                marginTop: '1.5rem',
                 padding: '0.875rem',
                 background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                 color: 'white',

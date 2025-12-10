@@ -687,7 +687,7 @@ export const packageService = {
   },
 
   // 获取合伙人代收款统计
-  async getPartnerStats(userId: string, storeName?: string, year?: number, month?: number) {
+  async getPartnerStats(userId: string, storeName?: string, month?: string) {
     try {
       // 构建查询函数
       const runQuery = async (fields: string) => {
@@ -704,10 +704,11 @@ export const packageService = {
         
         q = q.or(conditions.join(','));
         
-        // 添加年月筛选
-        if (year !== undefined && month !== undefined) {
-          const startDate = new Date(year, month - 1, 1).toISOString();
-          const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+        // 如果指定了月份，添加日期过滤
+        if (month) {
+          const [year, monthNum] = month.split('-');
+          const startDate = `${year}-${monthNum}-01`;
+          const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
           q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
         }
         
@@ -715,12 +716,12 @@ export const packageService = {
       };
 
       // 尝试查询所有字段
-      let { data, error } = await runQuery('cod_amount, cod_settled, cod_settled_at, status');
+      let { data, error } = await runQuery('cod_amount, cod_settled, cod_settled_at, status, delivery_time');
 
       // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
       if (error && error.code === '42703') {
         console.warn('cod_settled 字段不存在，使用降级查询');
-        const retryResult = await runQuery('cod_amount, status');
+        const retryResult = await runQuery('cod_amount, status, delivery_time');
         data = retryResult.data;
         error = retryResult.error;
       }
@@ -759,8 +760,8 @@ export const packageService = {
     }
   },
 
-  // 获取合伙店铺代收款订单列表（订单号码和代收金额）
-  async getPartnerCODOrders(userId: string, storeName?: string, year?: number, month?: number) {
+  // 获取指定月份的有代收款的订单列表
+  async getPartnerCODOrders(userId: string, storeName?: string, month?: string) {
     try {
       let q = supabase
         .from('packages')
@@ -775,20 +776,21 @@ export const packageService = {
       
       q = q.or(conditions.join(','));
       
-      // 添加年月筛选
-      if (year !== undefined && month !== undefined) {
-        const startDate = new Date(year, month - 1, 1).toISOString();
-        const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+      // 如果指定了月份，添加日期过滤
+      if (month) {
+        const [year, monthNum] = month.split('-');
+        const startDate = `${year}-${monthNum}-01`;
+        const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
         q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
       }
       
       const { data, error } = await q.order('delivery_time', { ascending: false });
-
+      
       if (error) throw error;
-
+      
       return (data || []).map(pkg => ({
         orderId: pkg.id,
-        codAmount: Number(pkg.cod_amount || 0),
+        codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time
       }));
     } catch (error) {
