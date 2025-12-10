@@ -241,17 +241,74 @@ const ContactPage: React.FC = () => {
               }}>EXPRESS</span>
             </span>
             <span style={{
-              color: 'white',
-              fontSize: window.innerWidth < 768 ? '0.6rem' : '0.8rem',
+              display: 'flex',
+              alignItems: 'center',
               fontStyle: 'italic',
-              fontWeight: '400',
-              letterSpacing: '1px',
-              opacity: 0.9,
-              marginTop: '-2px',
-              textAlign: 'right',
-              paddingRight: '4px'
+              fontSize: window.innerWidth < 768 ? '0.5rem' : '0.7rem',
+              fontWeight: '600',
+              letterSpacing: window.innerWidth < 768 ? '2px' : '4px',
+              textTransform: 'uppercase',
+              color: 'rgba(255, 255, 255, 0.9)',
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              fontFamily: "'Roboto', sans-serif",
+              marginTop: '4px',
+              marginLeft: window.innerWidth < 768 ? '0' : '0'
             }}>
-              Delivery Services
+              <span style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'flex-end',
+                marginRight: '6px',
+                gap: '2px',
+                justifyContent: 'center'
+              }}>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '16px' : '24px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '24px' : '36px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '32px' : '48px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+              </span>
+              DELIVERY SERVICES
+              <span style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'flex-start',
+                marginLeft: '6px',
+                gap: '2px',
+                justifyContent: 'center'
+              }}>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '16px' : '24px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '24px' : '36px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+                <span style={{ 
+                  width: window.innerWidth < 768 ? '32px' : '48px',
+                  height: '1.5px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  display: 'block'
+                }}></span>
+              </span>
             </span>
           </div>
         </div>
@@ -751,17 +808,73 @@ const ContactPage: React.FC = () => {
                 }}>EXPRESS</span>
               </span>
               <span style={{
-                color: 'white',
-                fontSize: '0.6rem',
+                display: 'flex',
+                alignItems: 'center',
                 fontStyle: 'italic',
-                fontWeight: '400',
-                letterSpacing: '1px',
-                opacity: 0.9,
-                marginTop: '-2px',
-                textAlign: 'right',
-                paddingRight: '4px'
+                fontSize: '0.5rem',
+                fontWeight: '600',
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                color: 'rgba(255, 255, 255, 0.9)',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                fontFamily: "'Roboto', sans-serif",
+                marginTop: '4px'
               }}>
-                Delivery Services
+                <span style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'flex-end',
+                  marginRight: '6px',
+                  gap: '2px',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{ 
+                    width: '16px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                  <span style={{ 
+                    width: '24px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                  <span style={{ 
+                    width: '32px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                </span>
+                DELIVERY SERVICES
+                <span style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'flex-start',
+                  marginLeft: '6px',
+                  gap: '2px',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{ 
+                    width: '16px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                  <span style={{ 
+                    width: '24px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                  <span style={{ 
+                    width: '32px',
+                    height: '1.5px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    display: 'block'
+                  }}></span>
+                </span>
               </span>
             </div>
           </div>
