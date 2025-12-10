@@ -278,6 +278,9 @@ export default function HomeScreen({ navigation }: any) {
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
       const storedUserName = await AsyncStorage.getItem('userName');
+      const storedUserEmail = await AsyncStorage.getItem('userEmail');
+      const storedUserPhone = await AsyncStorage.getItem('userPhone');
+      const storedUserType = await AsyncStorage.getItem('userType');
       const guestMode = await AsyncStorage.getItem('isGuest');
       
       setUserId(storedUserId);
@@ -286,21 +289,21 @@ export default function HomeScreen({ navigation }: any) {
 
       // 如果是已登录用户（非访客），加载订单数据
       if (storedUserId && guestMode !== 'true') {
-        await loadOrderData(storedUserId);
+        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, storedUserType || undefined);
       }
     } catch (error) {
       errorService.handleError(error, { context: 'HomeScreen.loadUserData', silent: true });
     }
   };
 
-  const loadOrderData = async (customerId: string) => {
+  const loadOrderData = async (customerId: string, email?: string, phone?: string, userType?: string) => {
     try {
       // 获取订单统计
-      const stats = await packageService.getOrderStats(customerId);
+      const stats = await packageService.getOrderStats(customerId, email, phone, userType);
       setOrderStats(stats);
 
       // 获取最近的订单
-      const orders = await packageService.getRecentOrders(customerId, 3);
+      const orders = await packageService.getRecentOrders(customerId, 3, email, phone, userType);
       setRecentOrders(orders as RecentOrder[]);
     } catch (error) {
       errorService.handleError(error, { context: 'HomeScreen.loadOrderData', silent: true });
@@ -400,11 +403,36 @@ export default function HomeScreen({ navigation }: any) {
                 resizeMode="contain"
               />
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Text style={styles.title}>{currentT.title}</Text>
-              <Text style={[styles.title, { fontStyle: 'italic', marginLeft: 8, fontSize: 14 }]}>Delivery Service</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.title}>MARKET LINK</Text>
+              <Text style={[styles.title, { 
+                fontStyle: 'italic', 
+                fontSize: 20, 
+                color: '#f59e0b', // 金色
+                marginTop: -4,
+                textShadowColor: 'rgba(0,0,0,0.2)',
+                textShadowOffset: {width: 1, height: 1},
+                textShadowRadius: 2
+              }]}>EXPRESS</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
+                {/* 左侧装饰线 - 短中长 */}
+                <View style={{ flexDirection: 'column', alignItems: 'flex-end', marginRight: 8, gap: 2 }}>
+                  <View style={{ width: 6, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                  <View style={{ width: 12, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                  <View style={{ width: 24, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                </View>
+                
+                <Text style={[styles.subtitle, { marginBottom: 0, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, fontStyle: 'italic' }]}>DELIVERY SERVICES</Text>
+                
+                {/* 右侧装饰线 - 长中短 */}
+                <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginLeft: 8, gap: 2 }}>
+                  <View style={{ width: 24, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                  <View style={{ width: 12, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                  <View style={{ width: 6, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                </View>
+              </View>
             </View>
-            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
             
             {/* 用户欢迎信息 */}
             <View style={styles.welcomeContainer} accessibilityRole="header">
@@ -781,8 +809,8 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </LinearGradient>
-              </View>
             </View>
+          </View>
 
             {/* 第五张卡片：缅甸风格定位广告 */}
             <View style={styles.bannerCardWrapper}>
@@ -1147,11 +1175,11 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.serviceGradient}
               >
                 <View style={styles.iconContainer}>
-                  <Text style={styles.serviceIcon}>⚡</Text>
+                <Text style={styles.serviceIcon}>⚡</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
-                  <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
+                <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
                 </View>
               </LinearGradient>
             </View>
@@ -1164,11 +1192,11 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.serviceGradient}
               >
                 <View style={styles.iconContainer}>
-                  <Text style={styles.serviceIcon}>🛡️</Text>
+                <Text style={styles.serviceIcon}>🛡️</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
-                  <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
+                <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
                 </View>
               </LinearGradient>
             </View>
@@ -1181,11 +1209,11 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.serviceGradient}
               >
                 <View style={styles.iconContainer}>
-                  <Text style={styles.serviceIcon}>📍</Text>
+                <Text style={styles.serviceIcon}>📍</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
-                  <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
+                <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
                 </View>
               </LinearGradient>
             </View>
@@ -1198,11 +1226,11 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.serviceGradient}
               >
                 <View style={styles.iconContainer}>
-                  <Text style={styles.serviceIcon}>💰</Text>
+                <Text style={styles.serviceIcon}>💰</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
-                  <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
+                <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
+                <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
                 </View>
               </LinearGradient>
             </View>
@@ -1240,10 +1268,10 @@ export default function HomeScreen({ navigation }: any) {
                 style={styles.contactGradient}
               >
                 <View style={styles.iconContainer}>
-                  <Text style={styles.contactIcon}>📞</Text>
+                <Text style={styles.contactIcon}>📞</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.contactLabel}>{currentT.phone}</Text>
+                <Text style={styles.contactLabel}>{currentT.phone}</Text>
                   <Text style={styles.contactValue}>{hotlineDisplay}</Text>
                 </View>
               </LinearGradient>
@@ -1263,7 +1291,7 @@ export default function HomeScreen({ navigation }: any) {
                   <Text style={styles.contactIcon}>🤝</Text>
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={styles.contactLabel}>{currentT.email}</Text>
+                <Text style={styles.contactLabel}>{currentT.email}</Text>
                   <View style={styles.businessInfoContainer}>
                     <View style={styles.businessRow}>
                       <Text style={styles.contactSubLabel}>{currentT.wechatId}: </Text>

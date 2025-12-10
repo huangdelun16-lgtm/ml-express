@@ -1884,13 +1884,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 0,
     borderTopWidth: 0,
   },
-  scanInstruction: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
   scanStartContent: {
     flex: 1,
     justifyContent: 'center',

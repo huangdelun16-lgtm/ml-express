@@ -687,7 +687,7 @@ export const packageService = {
   },
 
   // 获取合伙人代收款统计
-  async getPartnerStats(userId: string, storeName?: string) {
+  async getPartnerStats(userId: string, storeName?: string, year?: number, month?: number) {
     try {
       // 构建查询函数
       const runQuery = async (fields: string) => {
@@ -702,7 +702,16 @@ export const packageService = {
           conditions.push(`sender_name.eq.${storeName}`);
         }
         
-        return q.or(conditions.join(','));
+        q = q.or(conditions.join(','));
+        
+        // 添加年月筛选
+        if (year !== undefined && month !== undefined) {
+          const startDate = new Date(year, month - 1, 1).toISOString();
+          const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+          q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+        }
+        
+        return q;
       };
 
       // 尝试查询所有字段
@@ -747,6 +756,44 @@ export const packageService = {
         unclearedCount: 0,
         lastSettledAt: null
       };
+    }
+  },
+
+  // 获取合伙店铺代收款订单列表（订单号码和代收金额）
+  async getPartnerCODOrders(userId: string, storeName?: string, year?: number, month?: number) {
+    try {
+      let q = supabase
+        .from('packages')
+        .select('id, cod_amount, delivery_time')
+        .eq('status', '已送达')
+        .gt('cod_amount', 0);
+
+      const conditions = [`delivery_store_id.eq.${userId}`];
+      if (storeName) {
+        conditions.push(`sender_name.eq.${storeName}`);
+      }
+      
+      q = q.or(conditions.join(','));
+      
+      // 添加年月筛选
+      if (year !== undefined && month !== undefined) {
+        const startDate = new Date(year, month - 1, 1).toISOString();
+        const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+        q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+      }
+      
+      const { data, error } = await q.order('delivery_time', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(pkg => ({
+        orderId: pkg.id,
+        codAmount: Number(pkg.cod_amount || 0),
+        deliveryTime: pkg.delivery_time
+      }));
+    } catch (error) {
+      console.error('获取代收款订单列表失败:', error);
+      return [];
     }
   },
 

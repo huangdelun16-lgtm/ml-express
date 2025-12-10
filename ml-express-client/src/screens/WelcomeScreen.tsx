@@ -142,12 +142,34 @@ export default function WelcomeScreen({ navigation }: any) {
             ]}
           >
             <Text style={styles.welcomeTitle}>{currentT.welcomeTitle}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Text style={styles.brandName}>{currentT.welcomeSubtitle}</Text>
-              <Text style={[styles.brandName, { fontStyle: 'italic', marginLeft: 8, fontSize: 16 }]}>Delivery Service</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.brandName}>MARKET LINK</Text>
+              <Text style={[styles.brandName, { 
+                fontStyle: 'italic', 
+                fontSize: 32, 
+                color: '#f59e0b', // 金色
+                marginTop: -5
+              }]}>EXPRESS</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                {/* 左侧装饰线 - 短中长 */}
+                <View style={{ flexDirection: 'column', alignItems: 'flex-end', marginRight: 10, gap: 3 }}>
+                  <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                  <View style={{ width: 20, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                  <View style={{ width: 40, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                </View>
+                
+                <Text style={[styles.description, { fontSize: 14, fontWeight: 'bold', letterSpacing: 2, fontStyle: 'italic' }]}>DELIVERY SERVICES</Text>
+                
+                {/* 右侧装饰线 - 长中短 */}
+                <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginLeft: 10, gap: 3 }}>
+                  <View style={{ width: 40, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                  <View style={{ width: 20, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                  <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+                </View>
+              </View>
             </View>
-            <View style={styles.separator} />
-            <Text style={styles.description}>{currentT.description}</Text>
+            <Text style={[styles.description, { marginTop: 20 }]}>{currentT.description}</Text>
           </Animated.View>
         </View>
 

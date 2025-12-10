@@ -33,6 +33,10 @@ const ProfilePage: React.FC = () => {
     unclearedCount: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
+  const [codOrders, setCodOrders] = useState<Array<{ orderId: string; codAmount: number; deliveryTime?: string }>>([]);
 
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
@@ -177,13 +181,34 @@ const ProfilePage: React.FC = () => {
       const userId = currentUser.id || storeInfo?.id;
       
       if (userId) {
-        const stats = await packageService.getPartnerStats(userId, storeName);
+        const stats = await packageService.getPartnerStats(userId, storeName, selectedYear, selectedMonth);
         setPartnerCODStats(stats);
       }
     } catch (error) {
       console.error('加载代收款统计失败:', error);
     }
-  }, [currentUser, isPartnerStore, storeInfo]);
+  }, [currentUser, isPartnerStore, storeInfo, selectedYear, selectedMonth]);
+  
+  // 加载代收款订单列表
+  const loadCODOrders = async () => {
+    if (!currentUser || !isPartnerStore) {
+      return;
+    }
+
+    try {
+      const storeName = currentUser.name || storeInfo?.store_name;
+      const userId = currentUser.id || storeInfo?.id;
+      
+      if (userId) {
+        const orders = await packageService.getPartnerCODOrders(userId, storeName, selectedYear, selectedMonth);
+        setCodOrders(orders);
+        setShowCODOrdersModal(true);
+      }
+    } catch (error) {
+      console.error('加载代收款订单列表失败:', error);
+      alert(language === 'zh' ? '加载订单列表失败' : language === 'en' ? 'Failed to load orders' : 'အော်ဒါစာရင်းကို ဖွင့်ရန် မအောင်မြင်ပါ');
+    }
+  };
 
   useEffect(() => {
     loadUserPackages();
@@ -359,11 +384,16 @@ const ProfilePage: React.FC = () => {
       storeType: '店铺类型',
       storeCode: '店铺代码',
       codStats: '代收款统计',
-      totalCOD: '总代收款',
+      totalCOD: '本月代收款',
       unclearedCOD: '待结清金额',
       unclearedCount: '待结清订单数',
       lastSettledAt: '上次结清日期',
-      noSettlement: '暂无结清记录'
+      noSettlement: '暂无结清记录',
+      view: '查看',
+      orderId: '订单号码',
+      codAmount: '代收金额',
+      codOrders: '代收款订单',
+      close: '关闭'
     },
     en: {
       nav: {
@@ -410,11 +440,16 @@ const ProfilePage: React.FC = () => {
       storeType: 'Store Type',
       storeCode: 'Store Code',
       codStats: 'COD Statistics',
-      totalCOD: 'Total COD',
+      totalCOD: 'Monthly COD',
       unclearedCOD: 'Uncleared Amount',
       unclearedCount: 'Uncleared Orders',
       lastSettledAt: 'Last Settled Date',
-      noSettlement: 'No Settlement Record'
+      noSettlement: 'No Settlement Record',
+      view: 'View',
+      orderId: 'Order ID',
+      codAmount: 'COD Amount',
+      codOrders: 'COD Orders',
+      close: 'Close'
     },
     my: {
       nav: {
@@ -461,11 +496,16 @@ const ProfilePage: React.FC = () => {
       storeType: 'ဆိုင်အမျိုးအစား',
       storeCode: 'ဆိုင်ကုဒ်',
       codStats: 'ငွေကောက်ခံမှုစာရင်း',
-      totalCOD: 'စုစုပေါင်းငွေကောက်ခံမှု',
+      totalCOD: 'လစဉ်ငွေကောက်ခံမှု',
       unclearedCOD: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောငွေ',
       unclearedCount: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောအော်ဒါ',
       lastSettledAt: 'နောက်ဆုံးရှင်းလင်းထားသောရက်စွဲ',
-      noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ'
+      noSettlement: 'ရှင်းလင်းမှုမှတ်တမ်းမရှိပါ',
+      view: 'ကြည့်ရန်',
+      orderId: 'အော်ဒါနံပါတ်',
+      codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
+      codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
+      close: 'ပိတ်ရန်'
     }
   };
 
@@ -1275,16 +1315,62 @@ const ProfilePage: React.FC = () => {
             <div style={{
               marginBottom: '2.5rem'
             }}>
-              <h3 style={{
-                color: 'white',
-                fontSize: '1.5rem',
-                fontWeight: '600',
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 marginBottom: '1.5rem',
                 paddingBottom: '0.75rem',
                 borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
               }}>
-                {t.codStats}
-              </h3>
+                <h3 style={{
+                  color: 'white',
+                  fontSize: '1.5rem',
+                  fontWeight: '600',
+                  margin: 0
+                }}>
+                  {t.codStats}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'white',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                      <option key={year} value={year} style={{ background: '#1a1a2e', color: 'white' }}>{year}</option>
+                    ))}
+                  </select>
+                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>/</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'white',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <option key={month} value={month} style={{ background: '#1a1a2e', color: 'white' }}>
+                        {month.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               
               <div style={{
                 display: 'grid',
@@ -1321,6 +1407,29 @@ const ProfilePage: React.FC = () => {
                     {partnerCODStats.totalCOD.toLocaleString()}
                     <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
                   </div>
+                  <button
+                    onClick={loadCODOrders}
+                    style={{
+                      marginTop: '1rem',
+                      padding: '8px 16px',
+                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      borderRadius: '8px',
+                      color: '#3b82f6',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                    }}
+                  >
+                    {t.view}
+                  </button>
                 </div>
 
                 {/* 待结清金额 */}
@@ -2889,6 +2998,173 @@ const ProfilePage: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 代收款订单列表模态框 */}
+      {showCODOrdersModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}
+        onClick={() => setShowCODOrdersModal(false)}
+        >
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            borderRadius: '20px',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            border: '2px solid rgba(255, 255, 255, 0.1)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              paddingBottom: '1rem',
+              borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <h3 style={{
+                color: 'white',
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                margin: 0
+              }}>
+                {t.codOrders}
+              </h3>
+              <button
+                onClick={() => setShowCODOrdersModal(false)}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.05)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.color = '#ef4444';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              maxHeight: '400px',
+              overflowY: 'auto',
+              marginBottom: '1.5rem'
+            }}>
+              {codOrders.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  padding: '2rem'
+                }}>
+                  {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
+                </div>
+              ) : (
+                codOrders.map((order, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '1rem',
+                    marginBottom: '0.75rem',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <div>
+                      <div style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: '0.85rem',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {t.orderId}
+                      </div>
+                      <div style={{
+                        color: 'white',
+                        fontSize: '1rem',
+                        fontWeight: '600'
+                      }}>
+                        {order.orderId}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: '0.85rem',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {t.codAmount}
+                      </div>
+                      <div style={{
+                        color: '#3b82f6',
+                        fontSize: '1.1rem',
+                        fontWeight: '700'
+                      }}>
+                        {order.codAmount.toLocaleString()} MMK
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowCODOrdersModal(false)}
+              style={{
+                width: '100%',
+                padding: '0.875rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+              }}
+            >
+              {t.close}
+            </button>
           </div>
         </div>
       )}
