@@ -23,6 +23,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [totalStats, setTotalStats] = useState({ deliveryFee: 0, cod: 0 });
   const [showCODModal, setShowCODModal] = useState(false);
+  const [lastSettledDate, setLastSettledDate] = useState<string | null>(null);
 
   useEffect(() => {
     loadHistory();
@@ -54,6 +55,17 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
         }
       });
       setTotalStats({ deliveryFee, cod });
+
+      // 获取上次结清日期
+      const settledPackages = allPackages.filter(pkg => 
+        pkg.courier === currentUser && pkg.rider_settled && pkg.rider_settled_at
+      );
+      if (settledPackages.length > 0) {
+        settledPackages.sort((a, b) => new Date(b.rider_settled_at!).getTime() - new Date(a.rider_settled_at!).getTime());
+        setLastSettledDate(settledPackages[0].rider_settled_at || null);
+      } else {
+        setLastSettledDate(null);
+      }
 
     } catch (error) {
       console.error('加载历史失败:', error);
@@ -188,6 +200,16 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           </Text>
         </View>
       </View>
+
+      {/* 上次结清日期 */}
+      {lastSettledDate && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, alignItems: 'flex-end', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' }}>
+          <Text style={{ fontSize: 11, color: '#888' }}>
+            {language === 'zh' ? '上次结清: ' : 'Last Settled: '}
+            {new Date(lastSettledDate).toLocaleString()}
+          </Text>
+        </View>
+      )}
 
       {/* 搜索区域 */}
       <View style={styles.searchContainer}>
@@ -430,7 +452,7 @@ const styles = StyleSheet.create({
   summaryBar: {
     backgroundColor: '#fff',
     flexDirection: 'row',
-    padding: 20,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -442,14 +464,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryNumber: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2c5282',
   },
   summaryLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
   },
   summaryDivider: {
     width: 1,
