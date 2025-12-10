@@ -43,6 +43,74 @@ const RealTimeTracking: React.FC = () => {
     coordinates: Coordinates;
   } | null>(null);
 
+  // 音频提示相关状态
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundEnabledRef = useRef(soundEnabled);
+
+  // 更新 ref 以便在闭包中使用最新状态
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  // 监听新订单
+  useEffect(() => {
+    // 请求通知权限
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    console.log('📡 启动新订单实时监听...');
+    const channel = supabase
+      .channel('realtime-tracking-packages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'packages'
+        },
+        (payload) => {
+          const newPackage = payload.new as Package;
+          // 只有待处理的订单才提示
+          if (newPackage.status === '待取件' || newPackage.status === '待收款') {
+            console.log('🔔 收到新订单通知:', newPackage.id);
+            
+            // 刷新列表
+            loadPackages();
+            loadCouriers();
+            
+            // 播放声音
+            if (soundEnabledRef.current && audioRef.current) {
+              audioRef.current.currentTime = 0;
+              audioRef.current.play().catch(e => console.error('播放提示音失败:', e));
+            }
+            
+            // 浏览器通知
+            if (Notification.permission === 'granted') {
+              try {
+                new Notification('📦 新订单提醒', {
+                  body: `收到新订单 ${newPackage.id}\n${newPackage.sender_address ? `从: ${newPackage.sender_address}` : ''}`,
+                  icon: '/favicon.ico'
+                });
+              } catch (e) {
+                console.error('通知发送失败:', e);
+              }
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ 新订单监听已连接');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // 缅甸主要城市数据（以曼德勒为中心）
   const myanmarCities: Record<CityKey, { name: string; nameEn: string; nameMm: string; lat: number; lng: number }> = {
     mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 }, // 总部
@@ -394,6 +462,37 @@ const RealTimeTracking: React.FC = () => {
           <h1 style={{ margin: 0, color: '#1f2937', fontSize: '1.8rem' }}>
             📍 实时跟踪管理
           </h1>
+          
+          {/* 声音开关按钮 */}
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            style={{
+              background: soundEnabled ? '#10b981' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginLeft: '1rem',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            title={soundEnabled ? "点击关闭新订单提示音" : "点击开启新订单提示音"}
+          >
+            {soundEnabled ? '🔔 提示音: 开' : '🔕 提示音: 关'}
+          </button>
+          
+          {/* 隐藏的音频元素 - 使用清脆的提示音效 */}
+          <audio 
+            ref={audioRef} 
+            src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
+            preload="auto"
+          />
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {/* 区域按钮 - 显示当前选中的城市 */}
