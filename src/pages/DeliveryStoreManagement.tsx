@@ -1495,118 +1495,168 @@ const DeliveryStoreManagement: React.FC = () => {
                       position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
                       onCloseClick={() => setSelectedStore(null)}
                     >
-                      <div style={{ 
-                        color: '#000', 
-                        padding: '8px',
-                        minWidth: '200px',
-                        fontFamily: 'Arial, sans-serif'
+                      <div style={{
+                        padding: '0',
+                        minWidth: '280px',
+                        maxWidth: '320px',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        backgroundColor: '#fff'
                       }}>
-                        <h3 style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: '16px',
-                          fontWeight: 'bold',
-                          color: '#2c5282'
-                        }}>
-                          {selectedStore.store_name}
-                        </h3>
-                        <p style={{ 
-                          margin: '0 0 6px 0', 
-                          fontSize: '14px',
-                          color: '#4a5568'
-                        }}>
-                          📍 {selectedStore.address}
-                        </p>
-                        <p style={{ 
-                          margin: '0 0 6px 0', 
-                          fontSize: '14px',
-                          color: '#4a5568',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          <span style={{ color: '#e53e3e' }}>📞</span> {selectedStore.phone}
-                        </p>
-                        <p style={{ 
-                          margin: '0 0 6px 0', 
-                          fontSize: '14px',
-                          color: '#4a5568',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          <span style={{ color: '#805ad5' }}>👤</span> {selectedStore.manager_name}
-                        </p>
-                        <p style={{ 
-                          margin: '0 0 6px 0', 
-                          fontSize: '14px',
-                          color: '#4a5568',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          <span style={{ color: '#e53e3e' }}>⏰</span> {selectedStore.operating_hours}
-                        </p>
+                        {/* 头部：店铺名称 */}
                         <div style={{
-                          marginTop: '8px',
-                          padding: '4px 8px',
-                          background: selectedStore.status === 'active' ? '#c6f6d5' : '#fed7d7',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          color: selectedStore.status === 'active' ? '#22543d' : '#742a2a',
-                          fontWeight: '500',
-                          marginBottom: '8px'
+                          background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
+                          padding: '16px',
+                          color: 'white',
+                          position: 'relative'
                         }}>
-                          {selectedStore.status === 'active' && '🟢 营业中'}
-                          {selectedStore.status === 'inactive' && '🔴 暂停营业'}
-                          {selectedStore.status === 'maintenance' && '🟡 维护中'}
-                        </div>
-                        <button
-                          onClick={async () => {
-                            // 关闭地图弹窗
-                            setSelectedStore(null);
-                            // 打开店铺包裹查看模态框
-                            if (selectedStore && selectedStore.id) {
-                              setCurrentViewStore(selectedStore);
-                              setShowStorePackagesModal(true);
-                              setLoadingStorePackages(true);
-                              
-                              try {
-                                const packages = await packageService.getPackagesByStoreId(selectedStore.id);
-                                setStorePackages(packages);
-                              } catch (error) {
-                                console.error('加载店铺包裹失败:', error);
-                                setErrorMessage('加载店铺包裹失败，请重试');
-                                setStorePackages([]);
-                              } finally {
-                                setLoadingStorePackages(false);
-                              }
-                            }
-                          }}
-                          style={{
-                            width: '100%',
+                          <h3 style={{
+                            margin: 0,
+                            fontSize: '18px',
+                            fontWeight: 'bold',
+                            letterSpacing: '0.5px',
+                            lineHeight: '1.4'
+                          }}>
+                            {selectedStore.store_name}
+                          </h3>
+                          <div style={{
+                            fontSize: '12px',
+                            opacity: 0.9,
                             marginTop: '8px',
-                            padding: '8px 16px',
-                            background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            boxShadow: '0 2px 4px rgba(56, 161, 105, 0.3)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(56, 161, 105, 0.4)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(56, 161, 105, 0.3)';
-                          }}
-                        >
-                          🔍 进店查看
-                        </button>
+                            display: 'flex',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '6px'
+                          }}>
+                            <span style={{ 
+                              background: 'rgba(255,255,255,0.2)', 
+                              padding: '2px 8px', 
+                              borderRadius: '12px',
+                              fontWeight: '500'
+                            }}>
+                              {selectedStore.store_code || '无编号'}
+                            </span>
+                            {selectedStore.store_type && (
+                              <span style={{ 
+                                background: 'rgba(255,255,255,0.2)', 
+                                padding: '2px 8px', 
+                                borderRadius: '12px',
+                                fontWeight: '500'
+                              }}>
+                                {{
+                                  restaurant: '餐厅',
+                                  tea_shop: '茶馆',
+                                  drinks_snacks: '饮料小吃',
+                                  grocery: '杂货店',
+                                  transit_station: '中转站'
+                                }[selectedStore.store_type] || selectedStore.store_type}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 内容区域 */}
+                        <div style={{ padding: '16px' }}>
+                          {/* 地址 */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '14px' }}>
+                            <span style={{ fontSize: '18px', marginTop: '-2px' }}>📍</span>
+                            <span style={{ fontSize: '14px', color: '#4a5568', lineHeight: '1.5', flex: 1 }}>{selectedStore.address}</span>
+                          </div>
+
+                          {/* 联系信息 Grid */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>📞</span>
+                              <span style={{ fontSize: '14px', color: '#2d3748', fontWeight: '500' }}>{selectedStore.phone}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>👤</span>
+                              <span style={{ fontSize: '14px', color: '#2d3748' }}>{selectedStore.manager_name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>⏰</span>
+                              <span style={{ fontSize: '14px', color: '#2d3748' }}>{selectedStore.operating_hours}</span>
+                            </div>
+                          </div>
+
+                          {/* 状态和按钮区域 */}
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            marginTop: '16px', 
+                            paddingTop: '16px', 
+                            borderTop: '1px solid #e2e8f0' 
+                          }}>
+                            {/* 状态标签 */}
+                            <div style={{
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              backgroundColor: selectedStore.status === 'active' ? '#def7ec' : selectedStore.status === 'maintenance' ? '#fefcbf' : '#fed7d7',
+                              color: selectedStore.status === 'active' ? '#03543f' : selectedStore.status === 'maintenance' ? '#744210' : '#9b2c2c',
+                            }}>
+                              <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor' }}></div>
+                              {selectedStore.status === 'active' ? '营业中' : selectedStore.status === 'maintenance' ? '维护中' : '暂停营业'}
+                            </div>
+
+                            {/* 按钮 */}
+                            <button
+                              onClick={async () => {
+                                // 关闭地图弹窗
+                                setSelectedStore(null);
+                                // 打开店铺包裹查看模态框
+                                if (selectedStore && selectedStore.id) {
+                                  setCurrentViewStore(selectedStore);
+                                  setShowStorePackagesModal(true);
+                                  setLoadingStorePackages(true);
+                                  
+                                  try {
+                                    const packages = await packageService.getPackagesByStoreId(selectedStore.id);
+                                    setStorePackages(packages);
+                                  } catch (error) {
+                                    console.error('加载店铺包裹失败:', error);
+                                    setErrorMessage('加载店铺包裹失败，请重试');
+                                    setStorePackages([]);
+                                  } finally {
+                                    setLoadingStorePackages(false);
+                                  }
+                                }
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #38a169 0%, #2f855a 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '8px 16px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(47, 133, 90, 0.3)',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(47, 133, 90, 0.4)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(47, 133, 90, 0.3)';
+                              }}
+                            >
+                              进店查看 →
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </InfoWindow>
                   )}
