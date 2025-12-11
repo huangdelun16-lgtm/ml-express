@@ -454,7 +454,7 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   // 查看代收款订单
-  const handleViewCODOrders = async () => {
+  const handleViewCODOrders = async (isRefresh = false) => {
     try {
       const currentUser = await AsyncStorage.getItem('currentUser');
       if (!currentUser) return;
@@ -465,8 +465,10 @@ export default function ProfileScreen({ navigation }: any) {
         storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
       }
       
-      setCodOrdersLoading(true);
-      setShowCODOrdersModal(true);
+      if (!isRefresh) {
+        setCodOrdersLoading(true);
+        setShowCODOrdersModal(true);
+      }
       setCodOrdersPage(1);
       
       // 注意：getPartnerCODOrders 现在返回 { orders, total }
@@ -480,7 +482,9 @@ export default function ProfileScreen({ navigation }: any) {
       console.error('加载代收款订单失败:', error);
       showToast('加载订单列表失败', 'error');
     } finally {
-      setCodOrdersLoading(false);
+      if (!isRefresh) {
+        setCodOrdersLoading(false);
+      }
     }
   };
 
@@ -499,7 +503,13 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 刷新订单列表
   const refreshCODOrders = async () => {
-    await handleViewCODOrders();
+    // 使用本地 refreshing 状态或直接调用
+    // 这里我们简单地复用 handleViewCODOrders 但不显示全屏 loading
+    // 为了配合 RefreshControl，我们需要一个状态来控制它，但这里复用了 codOrdersLoading 有点冲突
+    // 让我们增加一个专门的 refreshing 状态给 modal list
+    setCodOrdersLoading(true); // 让 RefreshControl 转圈
+    await handleViewCODOrders(true);
+    setCodOrdersLoading(false);
   };
 
   // 计算总金额
@@ -828,7 +838,7 @@ export default function ProfileScreen({ navigation }: any) {
               {partnerCODStats.totalCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
-              onPress={handleViewCODOrders}
+              onPress={() => handleViewCODOrders(false)}
               style={{
                 marginTop: 8,
                 paddingVertical: 6,
@@ -1206,7 +1216,7 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#eee', backgroundColor: 'white' }}>
                 <Text style={{ textAlign: 'center', padding: 12, fontWeight: '600', color: '#64748b', backgroundColor: '#f1f5f9' }}>{t.year}</Text>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                  {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(year => (
                     <TouchableOpacity
                       key={year}
                       style={{

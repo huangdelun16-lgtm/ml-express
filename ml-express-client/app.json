@@ -45,7 +45,7 @@
           "UIInterfaceOrientationLandscapeRight"
         ]
       },
-        "config": {
+      "config": {
         "usesNonExemptEncryption": false,
         "googleMapsApiKey": ""
       },
@@ -60,7 +60,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
