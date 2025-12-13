@@ -52,6 +52,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   // 寄件人信息
   const [senderName, setSenderName] = useState('');
@@ -579,6 +580,28 @@ export default function PlaceOrderScreen({ navigation }: any) {
       const id = await AsyncStorage.getItem('userId');
       const name = await AsyncStorage.getItem('userName');
       const phone = await AsyncStorage.getItem('userPhone');
+      const currentUserStr = await AsyncStorage.getItem('currentUser');
+      
+      if (currentUserStr) {
+        try {
+          const user = JSON.parse(currentUserStr);
+          setCurrentUser(user);
+        } catch (e) {
+          console.error('解析用户信息失败:', e);
+        }
+      } else {
+        // 如果没有 currentUser，尝试构造一个（虽然通常应该有）
+        if (id) {
+          // 尝试读取 userType
+          const type = await AsyncStorage.getItem('userType');
+          setCurrentUser({
+            id,
+            name: name || '',
+            phone: phone || '',
+            user_type: type || 'customer'
+          });
+        }
+      }
       
       if (id) setUserId(id);
       if (name) {
