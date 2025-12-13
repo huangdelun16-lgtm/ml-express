@@ -564,6 +564,18 @@ export default function PlaceOrderScreen({ navigation }: any) {
           if (store) {
             console.log('✅ App端已加载合伙店铺信息:', store.store_name);
             setPartnerStore(store);
+            
+            // 自动填充寄件人信息
+            setSenderName(store.store_name);
+            setSenderPhone(store.contact_phone || store.manager_phone);
+            setSenderAddress(store.address);
+            
+            // 自动设置坐标
+            setSenderCoordinates({
+              lat: store.latitude,
+              lng: store.longitude
+            });
+            console.log('✅ 已自动填充店铺信息和坐标');
           }
         } catch (error) {
           console.error('加载合伙店铺失败:', error);
@@ -629,13 +641,26 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 切换使用我的信息
   useEffect(() => {
     if (useMyInfo) {
-      setSenderName(userName);
-      setSenderPhone(userPhone);
+      if (currentUser?.user_type === 'partner' && partnerStore) {
+        setSenderName(partnerStore.store_name);
+        setSenderPhone(partnerStore.contact_phone || partnerStore.manager_phone);
+        // 如果没有地址，则使用店铺地址
+        if (!senderAddress) {
+            setSenderAddress(partnerStore.address);
+            setSenderCoordinates({
+                lat: partnerStore.latitude,
+                lng: partnerStore.longitude
+            });
+        }
+      } else {
+        setSenderName(userName);
+        setSenderPhone(userPhone);
+      }
     } else {
       setSenderName('');
       setSenderPhone('');
     }
-  }, [useMyInfo]);
+  }, [useMyInfo, userName, userPhone, currentUser, partnerStore]);
 
   // 计算价格
   // 使用当前位置（在地图Modal中）- 优化：使用缓存和超时
