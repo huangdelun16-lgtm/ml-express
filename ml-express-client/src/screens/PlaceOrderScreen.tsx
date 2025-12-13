@@ -194,6 +194,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   
   // 支付方式（默认现金，二维码开发中）
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash');
+  const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
   
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
@@ -544,6 +545,35 @@ export default function PlaceOrderScreen({ navigation }: any) {
     loadPricingSettings();
   }, []);
 
+  // 加载合伙店铺信息（当currentUser变化时）
+  useEffect(() => {
+    // 检查 currentUser 是否包含 user_type
+    // 注意：App端 currentUser 是从 localStorage 加载的，可能需要检查结构
+    if (currentUser?.user_type === 'partner') {
+      const loadPartnerStore = async () => {
+        try {
+          // 在App端使用 supabase
+          const { data: store } = await supabase
+            .from('delivery_stores')
+            .select('*')
+            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
+            .limit(1)
+            .maybeSingle();
+          
+          if (store) {
+            console.log('✅ App端已加载合伙店铺信息:', store.store_name);
+            setPartnerStore(store);
+          }
+        } catch (error) {
+          console.error('加载合伙店铺失败:', error);
+        }
+      };
+      loadPartnerStore();
+    } else {
+      setPartnerStore(null);
+    }
+  }, [currentUser]);
+
   const loadUserInfo = async () => {
     try {
       const id = await AsyncStorage.getItem('userId');
@@ -665,6 +695,21 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const openMapSelector = useCallback(async (type: 'sender' | 'receiver') => {
     try {
       setMapType(type);
+
+      // 如果是 Partner 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
+      if (currentUser?.user_type === 'partner' && type === 'sender' && partnerStore) {
+          console.log('📍 Partner账号(App)，自动锁定店铺位置:', partnerStore.store_name);
+          setSelectedLocation({
+            latitude: partnerStore.latitude,
+            longitude: partnerStore.longitude,
+          });
+          // 可以在这里设置地址输入框的值，但App端MapModal可能处理方式不同
+          // mapAddressInput 是 MapModal 的 prop，可以在这里设置
+          setMapAddressInput(partnerStore.address);
+          
+          setShowMapModal(true);
+          return; // 跳过后续的自动定位逻辑
+      }
       
       // 如果已有地址，填充到输入框
       if (type === 'sender' && senderAddress) {

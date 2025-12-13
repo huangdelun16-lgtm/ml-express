@@ -171,6 +171,7 @@ const HomePage: React.FC = () => {
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
+  const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
   // const [orderData, setOrderData] = useState<any>(null);
   
   // 用户认证相关状态
@@ -296,6 +297,32 @@ const HomePage: React.FC = () => {
       }
     }
   };
+
+  // 加载合伙店铺信息（当currentUser变化时）
+  useEffect(() => {
+    if (currentUser?.user_type === 'partner') {
+      const loadPartnerStore = async () => {
+        try {
+          const { data: store } = await supabase
+            .from('delivery_stores')
+            .select('*')
+            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
+            .limit(1)
+            .maybeSingle();
+          
+          if (store) {
+            console.log('✅ 已加载合伙店铺信息:', store.store_name);
+            setPartnerStore(store);
+          }
+        } catch (error) {
+          console.error('加载合伙店铺失败:', error);
+        }
+      };
+      loadPartnerStore();
+    } else {
+      setPartnerStore(null);
+    }
+  }, [currentUser]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
   const loadPricingSettings = async () => {
@@ -823,6 +850,34 @@ const HomePage: React.FC = () => {
   // 打开地图模态框时自动定位
   const handleOpenMapModal = async (type: 'sender' | 'receiver') => {
     setMapSelectionType(type);
+    
+    // 如果是 Partner 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
+    if (currentUser?.user_type === 'partner' && type === 'sender' && partnerStore) {
+        console.log('📍 Partner账号，自动锁定店铺位置:', partnerStore.store_name);
+        
+        // 设置地图中心和选中位置
+        setMapCenter({ lat: partnerStore.latitude, lng: partnerStore.longitude });
+        setSelectedLocation({
+            lat: partnerStore.latitude,
+            lng: partnerStore.longitude,
+            address: partnerStore.address
+        });
+        
+        // 根据店铺位置自动切换到对应城市
+        const detectedCity = detectCityFromLocation(partnerStore.latitude, partnerStore.longitude);
+        setSelectedCity(detectedCity);
+        
+        // 自动填充地址输入框（如果存在）
+        setTimeout(() => {
+          const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
+          if (addressInput) {
+            addressInput.value = partnerStore.address;
+          }
+        }, 100);
+
+        setShowMapModal(true);
+        return; // 跳过后续的自动定位逻辑
+    }
     
     // 尝试获取用户位置
     if (navigator.geolocation) {
