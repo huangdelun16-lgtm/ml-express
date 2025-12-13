@@ -57,6 +57,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [codOrdersPage, setCodOrdersPage] = useState(1);
   const [codOrdersTotal, setCodOrdersTotal] = useState(0);
   const [codOrdersLoading, setCodOrdersLoading] = useState(false);
+  const [codOrdersRefreshing, setCodOrdersRefreshing] = useState(false);
   const [codOrdersLoadingMore, setCodOrdersLoadingMore] = useState(false);
   const [codOrdersSearchText, setCodOrdersSearchText] = useState('');
   const [allCodOrders, setAllCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
@@ -503,13 +504,12 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 刷新订单列表
   const refreshCODOrders = async () => {
-    // 使用本地 refreshing 状态或直接调用
-    // 这里我们简单地复用 handleViewCODOrders 但不显示全屏 loading
-    // 为了配合 RefreshControl，我们需要一个状态来控制它，但这里复用了 codOrdersLoading 有点冲突
-    // 让我们增加一个专门的 refreshing 状态给 modal list
-    setCodOrdersLoading(true); // 让 RefreshControl 转圈
-    await handleViewCODOrders(true);
-    setCodOrdersLoading(false);
+    try {
+      setCodOrdersRefreshing(true);
+      await handleViewCODOrders(true);
+    } finally {
+      setCodOrdersRefreshing(false);
+    }
   };
 
   // 计算总金额
@@ -1401,7 +1401,7 @@ export default function ProfileScreen({ navigation }: any) {
                   showsVerticalScrollIndicator={true}
                   refreshControl={
                     <RefreshControl
-                      refreshing={codOrdersLoading}
+                      refreshing={codOrdersRefreshing}
                       onRefresh={refreshCODOrders}
                       colors={['#3b82f6']}
                       tintColor="#3b82f6"

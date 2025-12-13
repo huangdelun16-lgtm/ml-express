@@ -1030,14 +1030,40 @@ export default function PlaceOrderScreen({ navigation }: any) {
       });
 
       // 准备订单数据
+      let finalSenderLat = senderCoordinates?.lat;
+      let finalSenderLng = senderCoordinates?.lng;
+      let finalSenderAddr = extractAddress(senderAddress);
+
+      // 如果是 Partner 账号，强制使用店铺信息
+      if (currentUser?.user_type === 'partner') {
+        try {
+          console.log('正在查找合伙人店铺信息...', currentUser);
+          const { data: store } = await supabase
+            .from('delivery_stores')
+            .select('*')
+            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (store) {
+            console.log('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
+            finalSenderLat = store.latitude;
+            finalSenderLng = store.longitude;
+            // finalSenderAddr = store.address; // 可选：是否强制覆盖地址文本
+          }
+        } catch (err) {
+          console.error('查找合伙人店铺异常:', err);
+        }
+      }
+
       const orderData = {
         id: orderId,
         customer_id: userId,
         sender_name: senderName,
         sender_phone: senderPhone,
-        sender_address: extractAddress(senderAddress),
-        sender_latitude: senderCoordinates?.lat || null,
-        sender_longitude: senderCoordinates?.lng || null,
+        sender_address: finalSenderAddr,
+        sender_latitude: finalSenderLat || null,
+        sender_longitude: finalSenderLng || null,
         receiver_name: receiverName,
         receiver_phone: receiverPhone,
         receiver_address: extractAddress(receiverAddress),
