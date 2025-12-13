@@ -1,4 +1,4 @@
-# Google Play Console - Store Listing 填写指南
+·# Google Play Console - Store Listing 填写指南
 
 ## 📱 应用信息
 
