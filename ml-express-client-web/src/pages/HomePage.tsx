@@ -1847,7 +1847,8 @@ const HomePage: React.FC = () => {
       try {
         console.log('正在查找合伙人店铺信息...', currentUser);
         // 尝试通过多种方式匹配店铺（优先匹配 store_code，即 name）
-        const { data: store, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { data: store } = await supabase
           .from('delivery_stores')
           .select('*')
           .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
