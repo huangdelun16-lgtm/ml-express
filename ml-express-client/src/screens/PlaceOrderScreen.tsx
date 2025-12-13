@@ -1453,6 +1453,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         onSetShowSuggestions={setShowSuggestions}
         onLocationChange={setSelectedLocation}
         onPlaceChange={setSelectedPlace}
+        markerTitle={currentUser?.user_type === 'partner' && mapType === 'sender' ? partnerStore?.store_name : undefined}
       />
 
       {/* 包裹类型说明模态框 */}

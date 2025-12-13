@@ -30,6 +30,7 @@ interface MapModalProps {
   onSetShowSuggestions: (show: boolean) => void;
   onLocationChange: (coords: { latitude: number; longitude: number }) => void;
   onPlaceChange: (place: { name?: string; address?: string; rating?: number } | null) => void;
+  markerTitle?: string;
 }
 
 const MapModal = memo<MapModalProps>(({
@@ -52,6 +53,7 @@ const MapModal = memo<MapModalProps>(({
   onSetShowSuggestions,
   onLocationChange,
   onPlaceChange,
+  markerTitle,
 }) => {
   const handleMapPress = useCallback((e: any) => {
     onLocationChange(e.nativeEvent.coordinate);
@@ -209,8 +211,8 @@ const MapModal = memo<MapModalProps>(({
             coordinate={selectedLocation}
             draggable
             onDragEnd={handleMarkerDragEnd}
-            title="选择的位置"
-            description="拖动或点击地图调整位置"
+            title={markerTitle || "选择的位置"}
+            description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
           />
         </MapView>
 
