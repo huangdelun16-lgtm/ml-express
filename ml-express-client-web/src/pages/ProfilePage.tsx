@@ -1463,7 +1463,14 @@ const ProfilePage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '1.5rem' }}>💰</div>
-                    <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
+                    <div style={{ 
+                      color: '#1e40af', 
+                      fontSize: '1.1rem', 
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      textTransform: 'uppercase'
+                    }}>
                       {t.totalCOD}
                     </div>
                   </div>
@@ -1517,7 +1524,14 @@ const ProfilePage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ fontSize: '1.5rem' }}>⏰</div>
-                    <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem', fontWeight: '500' }}>
+                    <div style={{ 
+                      color: '#991b1b', 
+                      fontSize: '1.1rem', 
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      textTransform: 'uppercase'
+                    }}>
                       {t.unclearedCOD}
                     </div>
                   </div>

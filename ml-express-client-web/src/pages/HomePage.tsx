@@ -1786,6 +1786,36 @@ const HomePage: React.FC = () => {
       alert(t.errors.addressRequired || '请填写完整的寄件和收件地址');
       return;
     }
+
+    // 如果是 Partner 账号，强制使用店铺信息（地址和经纬度）
+    if (currentUser?.user_type === 'partner') {
+      try {
+        console.log('正在查找合伙人店铺信息...', currentUser);
+        // 尝试通过多种方式匹配店铺（优先匹配 store_code，即 name）
+        const { data: store, error } = await supabase
+          .from('delivery_stores')
+          .select('*')
+          .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (store) {
+          console.log('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
+          // 覆盖 orderInfo 中的寄件经纬度
+          orderInfo.senderLatitude = store.latitude;
+          orderInfo.senderLongitude = store.longitude;
+          // 可选：覆盖地址文本，确保一致性
+          // orderInfo.senderAddress = store.address; 
+          
+          // 更新状态，确保后续逻辑（如距离计算）使用新坐标
+          setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
+        } else {
+          console.warn('未找到关联的合伙店铺');
+        }
+      } catch (err) {
+        console.error('查找合伙人店铺异常:', err);
+      }
+    }
     
     // 根据包裹类型决定是否需要重量
     const needWeight = orderInfo.packageType === '超重件' || orderInfo.packageType === '超规件';
