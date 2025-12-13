@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { packageService, auditLogService, Package, deliveryPhotoService, deliveryStoreService, supabase } from '../services/supabase';
+import { useApp } from '../contexts/AppContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -20,6 +21,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { geofenceService } from '../services/geofenceService';
 
 export default function PackageDetailScreen({ route, navigation }: any) {
+  const { t } = useApp();
   const { package: pkg } = route.params;
   const [currentPackage, setCurrentPackage] = useState<Package>(pkg);
   const [updating, setUpdating] = useState(false);
@@ -36,6 +38,17 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const [scanning, setScanning] = useState(false);
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case '待取件': return t.pending;
+      case '已取件': return t.pickedUp;
+      case '配送中': return t.delivering;
+      case '已送达': return t.delivered;
+      case '已取消': return t.cancelled;
+      default: return status;
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -583,9 +596,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       {/* 头部 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>← 返回</Text>
+          <Text style={styles.backText}>← {t.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>包裹详情</Text>
+        <Text style={styles.headerTitle}>{t.packageDetail}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -594,53 +607,53 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         <View style={styles.section}>
           <Text style={styles.packageId}>{currentPackage.id}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentPackage.status) }]}>
-            <Text style={styles.statusText}>{currentPackage.status}</Text>
+            <Text style={styles.statusText}>{getStatusText(currentPackage.status)}</Text>
           </View>
         </View>
 
         {/* 收件信息 */}
         <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>📍 收件信息</Text>
+          <Text style={styles.sectionTitle}>📍 {t.receiverInfo}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>收件人</Text>
+            <Text style={styles.infoLabel}>{t.receiver}</Text>
             <Text style={styles.infoValue}>{currentPackage.receiver_name}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>电话</Text>
+            <Text style={styles.infoLabel}>{t.phone}</Text>
             <Text style={styles.infoValue}>{currentPackage.receiver_phone}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>地址</Text>
+            <Text style={styles.infoLabel}>{t.address}</Text>
             <Text style={[styles.infoValue, { flex: 1 }]}>{currentPackage.receiver_address}</Text>
           </View>
         </View>
 
         {/* 寄件信息 */}
         <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>📤 寄件信息</Text>
+          <Text style={styles.sectionTitle}>📤 {t.senderInfo}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>寄件人</Text>
+            <Text style={styles.infoLabel}>{t.name}</Text>
             <Text style={styles.infoValue}>{currentPackage.sender_name}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>电话</Text>
+            <Text style={styles.infoLabel}>{t.phone}</Text>
             <Text style={styles.infoValue}>{currentPackage.sender_phone}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>地址</Text>
+            <Text style={styles.infoLabel}>{t.address}</Text>
             <Text style={[styles.infoValue, { flex: 1 }]}>{currentPackage.sender_address}</Text>
           </View>
         </View>
 
         {/* 包裹信息 */}
         <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>📦 包裹信息</Text>
+          <Text style={styles.sectionTitle}>📦 {t.packageInfo}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>类型</Text>
+            <Text style={styles.infoLabel}>{t.packageType}</Text>
             <Text style={styles.infoValue}>{currentPackage.package_type}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>重量</Text>
+            <Text style={styles.infoLabel}>{t.weight}</Text>
             <Text style={styles.infoValue}>{currentPackage.weight}</Text>
           </View>
           
@@ -648,7 +661,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           <View style={styles.divider} />
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>💰 跑腿费</Text>
+            <Text style={styles.infoLabel}>💰 {t.shippingFee}</Text>
             <Text style={[styles.infoValue, { color: '#3b82f6', fontWeight: '700' }]}>
               {(() => {
                 const deliveryFee = parseFloat(currentPackage.delivery_fee?.toString() || '0');
@@ -669,9 +682,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
              if (shouldShow) {
                return (
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>🏦 代收款</Text>
+                  <Text style={styles.infoLabel}>🏦 {t.cod}</Text>
                   <Text style={[styles.infoValue, { color: '#ef4444', fontWeight: '700' }]}>
-                    {codAmount > 0 ? `${codAmount.toLocaleString()} MMK` : '无'}
+                    {codAmount > 0 ? `${codAmount.toLocaleString()} MMK` : t.none || '无'}
                   </Text>
                 </View>
                );
@@ -680,7 +693,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           })()}
 
           <View style={[styles.infoRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>💵 总金额</Text>
+            <Text style={styles.totalLabel}>💵 {t.totalAmount}</Text>
             <Text style={styles.totalValue}>
               {(() => {
                 const codAmount = Number(currentPackage.cod_amount || currentPackage.store_fee || 0);
@@ -695,7 +708,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
           {currentPackage.description && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>备注</Text>
+              <Text style={styles.infoLabel}>{t.note}</Text>
               <Text style={[styles.infoValue, { flex: 1 }]}>{currentPackage.description}</Text>
             </View>
           )}
@@ -704,32 +717,32 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         {/* 操作按钮 */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
-            <Text style={styles.actionButtonText}>📞 拨打电话</Text>
+            <Text style={styles.actionButtonText}>📞 {t.call}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton} onPress={handleNavigate}>
-            <Text style={styles.actionButtonText}>🗺️ 导航</Text>
+            <Text style={styles.actionButtonText}>🗺️ {t.navigate}</Text>
           </TouchableOpacity>
         </View>
 
         {/* 新增功能按钮 */}
         <View style={styles.newActionsContainer}>
           <TouchableOpacity style={styles.newActionButton} onPress={handleShowAddress}>
-            <Text style={styles.newActionButtonText}>📍 送货地址</Text>
+            <Text style={styles.newActionButtonText}>📍 {t.receiverAddress}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.newActionButton} onPress={handleOpenScanModal}>
-            <Text style={styles.newActionButtonText}>📱 扫码</Text>
+            <Text style={styles.newActionButtonText}>📱 {t.scan}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.newActionButton} onPress={() => setShowPhotoModal(true)}>
-            <Text style={styles.newActionButtonText}>📸 上传照片</Text>
+            <Text style={styles.newActionButtonText}>📸 {t.uploadPhoto}</Text>
           </TouchableOpacity>
         </View>
 
         {/* 状态更新按钮 */}
         <View style={styles.statusUpdateContainer}>
-          <Text style={styles.sectionTitle}>更新状态</Text>
+          <Text style={styles.sectionTitle}>{t.updateStatus}</Text>
           <View style={styles.statusButtons}>
             {currentPackage.status === '待取件' && (
               <TouchableOpacity
@@ -740,7 +753,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                 {updating ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.statusUpdateText}>✓ 已取件</Text>
+                  <Text style={styles.statusUpdateText}>✓ {t.pickedUp}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -754,7 +767,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                 {updating ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.statusUpdateText}>🚚 配送中</Text>
+                  <Text style={styles.statusUpdateText}>🚚 {t.delivering}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -768,7 +781,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                 {updating ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.statusUpdateText}>✓ 已送达</Text>
+                  <Text style={styles.statusUpdateText}>✓ {t.delivered}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -786,7 +799,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📍 送货地址</Text>
+              <Text style={styles.modalTitle}>📍 {t.receiverAddress}</Text>
               <TouchableOpacity
                 onPress={() => setShowAddressModal(false)}
                 style={styles.closeButton}
@@ -796,22 +809,22 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             </View>
             
             <View style={styles.addressContent}>
-              <Text style={styles.addressLabel}>收件人：</Text>
+              <Text style={styles.addressLabel}>{t.receiver}：</Text>
               <Text style={styles.addressValue}>{currentPackage.receiver_name}</Text>
               
-              <Text style={styles.addressLabel}>联系电话：</Text>
+              <Text style={styles.addressLabel}>{t.phone}：</Text>
               <Text style={styles.addressValue}>{currentPackage.receiver_phone}</Text>
               
-              <Text style={styles.addressLabel}>详细地址：</Text>
+              <Text style={styles.addressLabel}>{t.address}：</Text>
               <Text style={styles.addressDetail}>{currentPackage.receiver_address}</Text>
               
               <View style={styles.addressActions}>
                 <TouchableOpacity style={styles.addressActionButton} onPress={handleCall}>
-                  <Text style={styles.addressActionText}>📞 拨打电话</Text>
+                  <Text style={styles.addressActionText}>📞 {t.call}</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.addressActionButton} onPress={handleNavigate}>
-                  <Text style={styles.addressActionText}>🗺️ 导航前往</Text>
+                  <Text style={styles.addressActionText}>🗺️ {t.navigate}</Text>
                 </TouchableOpacity>
               </View>
             </View>

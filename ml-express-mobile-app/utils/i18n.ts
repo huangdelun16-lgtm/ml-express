@@ -145,6 +145,33 @@ export interface LanguageTexts {
   shippingCost: string;
   shippingTime: string;
   securityGuarantee: string;
+  
+  // 操作与详情
+  call: string;
+  navigate: string;
+  uploadPhoto: string;
+  updateStatus: string;
+  camera: string;
+  startCamera: string;
+  packageDetail: string;
+  cod: string;
+  shippingFee: string;
+  totalAmount: string;
+  note: string;
+  confirmUpdate: string;
+  statusUpdateSuccess: string;
+  statusUpdateFailed: string;
+  photoUploaded: string;
+  scanSuccess: string;
+  confirmDelivery: string;
+  locationVerified: string;
+  locationWarning: string;
+  retry: string;
+  rephoto: string;
+  confirmUpload: string;
+  uploading: string;
+  scanInstruction: string;
+  scanResult: string;
 }
 
 export const translations: { [key: string]: LanguageTexts } = {
@@ -294,6 +321,33 @@ export const translations: { [key: string]: LanguageTexts } = {
     shippingCost: '配送费用',
     shippingTime: '配送时间',
     securityGuarantee: '安全保障',
+    
+    // 操作与详情
+    call: '拨打电话',
+    navigate: '导航',
+    uploadPhoto: '上传照片',
+    updateStatus: '更新状态',
+    camera: '拍照功能',
+    startCamera: '开始拍照',
+    packageDetail: '包裹详情',
+    cod: '代收款',
+    shippingFee: '跑腿费',
+    totalAmount: '总金额',
+    note: '备注',
+    confirmUpdate: '确认更新',
+    statusUpdateSuccess: '状态更新成功',
+    statusUpdateFailed: '状态更新失败',
+    photoUploaded: '照片已上传',
+    scanSuccess: '扫码成功',
+    confirmDelivery: '确认送达',
+    locationVerified: '位置验证通过',
+    locationWarning: '位置验证警告',
+    retry: '重试',
+    rephoto: '重新拍照',
+    confirmUpload: '确认上传',
+    uploading: '上传中...',
+    scanInstruction: '将二维码/条形码对准扫描框',
+    scanResult: '扫描结果',
   },
   
   en: {
@@ -442,6 +496,33 @@ export const translations: { [key: string]: LanguageTexts } = {
     shippingCost: 'Shipping Cost',
     shippingTime: 'Shipping Time',
     securityGuarantee: 'Security Guarantee',
+    
+    // 操作与详情
+    call: 'Call',
+    navigate: 'Navigate',
+    uploadPhoto: 'Upload Photo',
+    updateStatus: 'Update Status',
+    camera: 'Camera',
+    startCamera: 'Take Photo',
+    packageDetail: 'Package Detail',
+    cod: 'COD Amount',
+    shippingFee: 'Shipping Fee',
+    totalAmount: 'Total Amount',
+    note: 'Note',
+    confirmUpdate: 'Confirm Update',
+    statusUpdateSuccess: 'Status Updated',
+    statusUpdateFailed: 'Update Failed',
+    photoUploaded: 'Photo Uploaded',
+    scanSuccess: 'Scan Success',
+    confirmDelivery: 'Confirm Delivery',
+    locationVerified: 'Location Verified',
+    locationWarning: 'Location Warning',
+    retry: 'Retry',
+    rephoto: 'Retake',
+    confirmUpload: 'Confirm Upload',
+    uploading: 'Uploading...',
+    scanInstruction: 'Align QR/Barcode within frame',
+    scanResult: 'Scan Result',
   },
   
   my: {
@@ -590,6 +671,33 @@ export const translations: { [key: string]: LanguageTexts } = {
     shippingCost: 'ပေးပို့ခ',
     shippingTime: 'ပေးပို့ချိန်',
     securityGuarantee: 'လုံခြုံရေးအာမခံချက်',
+    
+    // 操作与详情
+    call: 'ဖုန်းခေါ်မည်',
+    navigate: 'လမ်းညွှန်',
+    uploadPhoto: 'ဓာတ်ပုံတင်မည်',
+    updateStatus: 'အခြေအနေပြောင်းမည်',
+    camera: 'ကင်မရာ',
+    startCamera: 'ဓာတ်ပုံရိုက်မည်',
+    packageDetail: 'ပက်ကေ့ဂျ်အသေးစိတ်',
+    cod: 'ငွေကောက်ခံရန်',
+    shippingFee: 'ပို့ဆောင်ခ',
+    totalAmount: 'စုစုပေါင်းငွေပမာဏ',
+    note: 'မှတ်ချက်',
+    confirmUpdate: 'အတည်ပြုမည်',
+    statusUpdateSuccess: 'အခြေအနေပြောင်းလဲပြီးပါပြီ',
+    statusUpdateFailed: 'မအောင်မြင်ပါ',
+    photoUploaded: 'ဓာတ်ပုံတင်ပြီးပါပြီ',
+    scanSuccess: 'စကင်န်အောင်မြင်သည်',
+    confirmDelivery: 'ပို့ဆောင်မှုအတည်ပြုမည်',
+    locationVerified: 'တည်နေရာအတည်ပြုပြီး',
+    locationWarning: 'တည်နေရာသတိပေးချက်',
+    retry: 'ထပ်မံကြိုးစားမည်',
+    rephoto: 'ပြန်ရိုက်မည်',
+    confirmUpload: 'အတည်ပြုသည်',
+    uploading: 'တင်နေသည်...',
+    scanInstruction: 'QR/ဘားကုဒ်ကို ဘောင်အတွင်းထားပါ',
+    scanResult: 'စကင်န်ရလဒ်',
   }
 };
 

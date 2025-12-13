@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 骑手App AAB文件构建脚本
+# 客户端App AAB文件构建脚本
 # 使用方法：
 #   1. 设置环境变量: export EXPO_TOKEN="your-token-here"
 #   2. 或在项目根目录创建 .env 文件: EXPO_TOKEN=your-token-here
@@ -8,7 +8,7 @@
 
 set -e
 
-echo "🚀 开始构建骑手App AAB文件..."
+echo "🚀 开始构建客户端App AAB文件..."
 echo ""
 
 # 检查并设置Expo Token
@@ -35,8 +35,8 @@ cd "$(dirname "$0")"
 
 # 显示当前版本信息
 echo "📋 当前版本信息："
-echo "   - Version: 1.1.2"
-echo "   - Version Code: 12"
+echo "   - Version: 1.1.0"
+echo "   - Version Code: 自动递增"
 echo ""
 
 # 检查EAS CLI
@@ -63,5 +63,10 @@ echo "📥 下载AAB文件："
 echo "   1. 访问构建日志中的链接"
 echo "   2. 或运行：eas build:list --platform android --limit 1"
 echo "   3. 下载 Application Archive URL 中的 .aab 文件"
+echo ""
+echo "⚠️  重要提示："
+echo "   如果 Google Play Console 仍然显示签名密钥错误，"
+echo "   请在 Google Play Console 中注册新的上传密钥："
+echo "   SHA1: EF:87:EA:D3:35:56:9B:A2:15:F8:E9:A2:A7:8E:2B:AE:40:DB:E1:3A"
 echo ""
 
