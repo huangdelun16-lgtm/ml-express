@@ -19,7 +19,7 @@ import * as Location from 'expo-location';
 import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { packageService, systemSettingsService } from '../services/supabase';
+import { packageService, systemSettingsService, supabase } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
