@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { supabase, auditLogService, deliveryStoreService } from '../services/supabase';
+import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -179,19 +179,44 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // 1. 获取普通用户（客户）
+      const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('获取用户列表失败:', error);
-        // 使用模拟数据
-        setUsers(getMockUsers());
-      } else {
-        // 只使用数据库数据
-        setUsers(data || []);
-      }
+      if (usersError) throw usersError;
+
+      // 2. 获取系统管理员账号
+      const adminAccounts = await adminAccountService.getAllAccounts();
+      const adminUsers = adminAccounts
+        .filter(acc => acc.role === 'admin')
+        .map(acc => ({
+          id: acc.id || `ADM-${acc.employee_id}`,
+          name: acc.employee_name || acc.username,
+          phone: acc.phone,
+          email: acc.email,
+          address: acc.address || '',
+          user_type: 'admin' as const,
+          status: acc.status,
+          registration_date: acc.created_at ? new Date(acc.created_at).toLocaleDateString('zh-CN') : '未知',
+          last_login: acc.last_login ? new Date(acc.last_login).toLocaleString('zh-CN') : '从未登录',
+          total_orders: 0,
+          total_spent: 0,
+          rating: 0,
+          notes: acc.notes,
+          created_at: acc.created_at
+        }));
+
+      // 3. 合并数据，优先使用 admin_accounts 中的管理员数据
+      // 过滤掉 users 表中可能存在的旧管理员数据（如果需要）或者直接合并
+      // 这里我们选择直接合并，但确保 ID 唯一
+      const allUsers = [...(usersData || []), ...adminUsers];
+      
+      // 去重（以防万一 ID 冲突）
+      const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.id, item])).values());
+
+      setUsers(uniqueUsers);
     } catch (error) {
       console.error('加载用户数据失败:', error);
       setUsers(getMockUsers());
