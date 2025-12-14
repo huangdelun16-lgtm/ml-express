@@ -1992,7 +1992,7 @@ const HomePage: React.FC = () => {
           transition: 'opacity 0.3s ease',
           paddingRight
         }}
-        onClick={() => window.location.href = '/'}
+        onClick={() => navigate('/')}
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
         onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
       >
