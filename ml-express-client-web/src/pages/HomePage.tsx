@@ -376,18 +376,24 @@ const HomePage: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 动态判断验证方式（邮箱或手机号）
+    const isPhoneLogin = !!registerForm.phone && !registerForm.email;
+    const currentVerificationType = isPhoneLogin ? 'sms' : 'email';
+    
     // 验证手机号
-    // 注册模式下验证电话号码（登录模式不需要）
+    // 注册模式下验证电话号码（登录模式不需要严格验证格式，只要有值即可）
     let normalizedPhone = '';
-    if (!isLoginMode) {
+    
+    if (isPhoneLogin) {
       if (!registerForm.phone) {
         alert(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
         return;
       }
 
-      // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
+      // 在注册模式下，或者登录模式下输入了不符合基本格式的号码时进行提示
+      // 登录时稍微放宽一点，但基本格式还是要对
       const phoneRegex = /^0?9\d{7,9}$/;
-      if (!phoneRegex.test(registerForm.phone)) {
+      if (!isLoginMode && !phoneRegex.test(registerForm.phone)) {
         alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
               language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
               'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
@@ -404,7 +410,7 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    if (registerForm.password.length < 6) {
+    if (!isLoginMode && registerForm.password.length < 6) {
       alert(language === 'zh' ? '密码至少需要6位' : language === 'en' ? 'Password must be at least 6 characters' : 'စကားဝှက်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
       return;
     }
@@ -412,87 +418,72 @@ const HomePage: React.FC = () => {
     try {
       // 检查用户是否已注册（根据验证方式检查）
       let existingUser;
-      if (verificationType === 'email') {
+      if (currentVerificationType === 'email') {
         // 邮箱验证：根据邮箱查找用户
-        const emailToSearch = registerForm.email.trim().toLowerCase();
-        console.log('开始查询用户，邮箱:', emailToSearch);
-        
-        try {
-          // 方法1: 先尝试精确匹配（不区分大小写，不限制类型）
-          let { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .ilike('email', emailToSearch)
-            .maybeSingle();
+        if (registerForm.email) {
+          const emailToSearch = registerForm.email.trim().toLowerCase();
+          console.log('开始查询用户，邮箱:', emailToSearch);
           
-          console.log('方法1 - 精确匹配结果:', { 
-            found: !!data, 
-            error: error?.code, 
-            message: error?.message,
-            userType: data?.user_type 
-          });
-          
-          // 方法2: 如果没找到，尝试查找所有匹配的邮箱（可能有多个）
-          if (!data) {
-            console.log('方法2 - 尝试查找所有匹配的邮箱...');
-            const { data: allMatches, error: allError } = await supabase
+          try {
+            // 方法1: 先尝试精确匹配（不区分大小写，不限制类型）
+            let { data, error } = await supabase
               .from('users')
               .select('*')
               .ilike('email', emailToSearch)
-              .limit(5);
+              .maybeSingle();
             
-            console.log('方法2 - 所有匹配结果:', { 
-              count: allMatches?.length || 0, 
-              error: allError?.code,
-              users: allMatches?.map(u => ({ email: u.email, user_type: u.user_type, id: u.id }))
-            });
-            
-            // 如果有多个匹配，优先选择客户类型
-            if (allMatches && allMatches.length > 0) {
-              const customerMatch = allMatches.find(u => u.user_type === 'customer');
-              data = customerMatch || allMatches[0];
-              console.log('从多个匹配中选择:', customerMatch ? '客户类型' : '第一个匹配');
+            // 方法2: 如果没找到，尝试查找所有匹配的邮箱（可能有多个）
+            if (!data) {
+              const { data: allMatches } = await supabase
+                .from('users')
+                .select('*')
+                .ilike('email', emailToSearch)
+                .limit(5);
+              
+              // 如果有多个匹配，优先选择客户类型
+              if (allMatches && allMatches.length > 0) {
+                const customerMatch = allMatches.find(u => u.user_type === 'customer');
+                data = customerMatch || allMatches[0];
+              }
             }
-          }
-          
-          // 方法3: 如果还是没找到，尝试模糊匹配
-          if (!data) {
-            console.log('方法3 - 尝试模糊匹配...');
-            const { data: fuzzyMatches, error: fuzzyError } = await supabase
-              .from('users')
-              .select('*')
-              .like('email', `%${emailToSearch}%`)
-              .limit(5);
             
-            console.log('方法3 - 模糊匹配结果:', { 
-              count: fuzzyMatches?.length || 0, 
-              error: fuzzyError?.code,
-              users: fuzzyMatches?.map(u => ({ email: u.email, user_type: u.user_type }))
-            });
-            
-            if (fuzzyMatches && fuzzyMatches.length > 0) {
-              const customerMatch = fuzzyMatches.find(u => u.user_type === 'customer');
-              data = customerMatch || fuzzyMatches[0];
-              console.log('从模糊匹配中选择:', customerMatch ? '客户类型' : '第一个匹配');
+            // 方法3: 如果还是没找到，尝试模糊匹配
+            if (!data) {
+              const { data: fuzzyMatches } = await supabase
+                .from('users')
+                .select('*')
+                .like('email', `%${emailToSearch}%`)
+                .limit(5);
+              
+              if (fuzzyMatches && fuzzyMatches.length > 0) {
+                const customerMatch = fuzzyMatches.find(u => u.user_type === 'customer');
+                data = customerMatch || fuzzyMatches[0];
+              }
             }
+            
+            existingUser = data;
+          } catch (err) {
+            console.error('查询用户异常:', err);
+            existingUser = null;
           }
-          
-          if (error && error.code !== 'PGRST116') {
-            // PGRST116 = no rows returned (正常情况)
-            console.error('查询用户失败:', error);
-          }
-          
-          existingUser = data;
-          console.log('最终查询结果:', existingUser ? 
-            `✅ 找到用户: ${existingUser.email} (类型: ${existingUser.user_type || '未设置'}, ID: ${existingUser.id})` : 
-            '❌ 未找到用户');
-        } catch (err) {
-          console.error('查询用户异常:', err);
-          existingUser = null;
         }
       } else {
         // 短信验证：根据手机号查找用户
-        existingUser = await userService.getUserByPhone(normalizedPhone);
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('phone', normalizedPhone)
+            .maybeSingle();
+            
+          if (error && error.code !== 'PGRST116') {
+             console.error('查询用户失败(手机):', error);
+          }
+          existingUser = data;
+        } catch (err) {
+          console.error('查询用户异常(手机):', err);
+          existingUser = null;
+        }
       }
       
       if (isLoginMode) {
@@ -563,9 +554,9 @@ const HomePage: React.FC = () => {
           return;
         }
         
-        // 普通登录：验证邮箱和密码
-        if (!registerForm.email) {
-          alert(language === 'zh' ? '请输入邮箱' : language === 'en' ? 'Please enter email' : 'အီးမေးလ်ထည့်ပါ');
+        // 普通登录：验证邮箱或手机号和密码
+        if (!registerForm.email && !registerForm.phone) {
+          alert(language === 'zh' ? '请输入邮箱或手机号' : language === 'en' ? 'Please enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ');
           return;
         }
 
@@ -576,21 +567,12 @@ const HomePage: React.FC = () => {
 
         if (!existingUser) {
           console.error('登录失败：未找到用户', {
-            email: registerForm.email,
-            emailTrimmed: registerForm.email.trim().toLowerCase(),
-            verificationType,
+            account: registerForm.email || normalizedPhone,
+            verificationType: currentVerificationType,
             error: '用户不存在或查询失败'
           });
           
-          // 尝试直接查询（不区分大小写，不限制类型）用于调试
-          const debugResult = await supabase
-            .from('users')
-            .select('id, email, user_type, name')
-            .ilike('email', `%${registerForm.email.trim()}%`)
-            .limit(5);
-          console.log('调试查询结果（相似邮箱）:', debugResult.data);
-          
-          alert(language === 'zh' ? '该邮箱未注册，请先注册' : language === 'en' ? 'Email not registered, please register first' : 'အီးမေးလ်မှတ်ပုံမတင်ရသေးပါ');
+          alert(language === 'zh' ? '该账号未注册，请先注册' : language === 'en' ? 'Account not registered, please register first' : 'အကောင့်မရှိပါ၊ မှတ်ပုံတင်ပါ');
           setIsLoginMode(false);
           return;
         }
