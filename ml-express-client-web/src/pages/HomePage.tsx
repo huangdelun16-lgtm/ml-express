@@ -1627,7 +1627,7 @@ const HomePage: React.FC = () => {
                 resolve(roundedDistance);
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
-                alert('无法计算两地之间的距离，可能地址不够详细\n使用默认距离: 5 km');
+                alert(`${language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်'}\n${language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'}`);
                 resolve(5);
               } else {
                 console.warn('⚠️ 距离计算状态异常:', element?.status);
@@ -1635,11 +1635,11 @@ const HomePage: React.FC = () => {
               }
             } else if (status === 'OVER_QUERY_LIMIT') {
               console.error('❌ Google Maps API 查询限额已达上限');
-              alert('系统繁忙，使用默认距离: 5 km');
+              alert(`${language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km'}`);
               resolve(5);
             } else if (status === 'REQUEST_DENIED') {
               console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
-              alert('地图服务配置错误，使用默认距离: 5 km');
+              alert(`${language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km'}`);
               resolve(5);
             } else {
               console.warn('⚠️ 距离计算失败，状态:', status);

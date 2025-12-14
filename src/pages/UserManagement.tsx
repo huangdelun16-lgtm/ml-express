@@ -88,6 +88,7 @@ const UserManagement: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   // const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
   
   // 批量操作状态
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
@@ -234,6 +235,7 @@ const UserManagement: React.FC = () => {
     const newUser: User = {
       id: newId,
       ...userForm,
+      email: userForm.email.trim() || '', // 如果邮箱为空，设置为空字符串
       registration_date: new Date().toLocaleDateString('zh-CN'),
       last_login: '从未登录',
       total_orders: 0,
@@ -248,13 +250,15 @@ const UserManagement: React.FC = () => {
       
       if (error) {
         console.error('创建用户失败:', error);
+        window.alert(`创建用户失败: ${error.message}`);
         // 添加到本地状态
         setUsers([newUser, ...users]);
       } else {
         await loadUsers();
+        window.alert('用户创建成功！');
       }
       
-      // setShowUserForm(false);
+      setShowAddUserForm(false);
       setUserForm({
         name: '',
         phone: '',
@@ -267,8 +271,9 @@ const UserManagement: React.FC = () => {
       });
     } catch (error) {
       console.error('创建用户异常:', error);
+      window.alert(`创建用户异常: ${error instanceof Error ? error.message : '未知错误'}`);
       setUsers([newUser, ...users]);
-      // setShowUserForm(false);
+      setShowAddUserForm(false);
     }
   };
 
@@ -310,9 +315,10 @@ const UserManagement: React.FC = () => {
         setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
       } else {
         await loadUsers();
+        window.alert('用户更新成功！');
       }
       
-      // setShowUserForm(false);
+      setShowAddUserForm(false);
       setEditingUser(null);
       setUserForm({
         name: '',
@@ -326,8 +332,9 @@ const UserManagement: React.FC = () => {
       });
     } catch (error) {
       console.error('更新用户异常:', error);
+      window.alert(`更新用户异常: ${error instanceof Error ? error.message : '未知错误'}`);
       setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
-      // setShowUserForm(false);
+      setShowAddUserForm(false);
       setEditingUser(null);
     }
   };
@@ -908,7 +915,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* 用户列表 (客户/管理员) */}
-      {(activeTab === 'customer_list' || activeTab === 'admin_list') && !editingUser && (
+      {(activeTab === 'customer_list' || activeTab === 'admin_list') && !editingUser && !showAddUserForm && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
@@ -1070,6 +1077,49 @@ const UserManagement: React.FC = () => {
               </button>
             )}
             
+            {activeTab === 'customer_list' && (
+              <button
+                onClick={() => {
+                  setShowAddUserForm(true);
+                  setEditingUser(null);
+                  setUserForm({
+                    name: '',
+                    phone: '',
+                    email: '',
+                    address: '',
+                    password: '123456',
+                    user_type: 'customer',
+                    status: 'active',
+                    notes: ''
+                  });
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
+                }}
+              >
+                ➕ 新增用户
+              </button>
+            )}
             <button
               onClick={handleSelectAll}
               style={{
@@ -1320,8 +1370,8 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {/* 创建/编辑用户表单 - 仅在编辑模式下显示，或者后续添加新建按钮时启用 */}
-      {editingUser && (
+      {/* 创建/编辑用户表单 */}
+      {(editingUser || showAddUserForm) && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(20px)',
@@ -1335,7 +1385,7 @@ const UserManagement: React.FC = () => {
           margin: '0 auto'
         }}>
           <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px' }}>
-            {editingUser ? '编辑用户' : '创建新用户'}
+            {editingUser ? '编辑用户' : '新增用户'}
           </h2>
           
           <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
@@ -1384,10 +1434,9 @@ const UserManagement: React.FC = () => {
                 />
                 <input
                   type="email"
-                  placeholder="邮箱"
+                  placeholder="邮箱（可选，如果没有gmail可留空）"
                   value={userForm.email}
                   onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                  required
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -1524,6 +1573,7 @@ const UserManagement: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setEditingUser(null);
+                  setShowAddUserForm(false);
                   setUserForm({
                     name: '',
                     phone: '',
