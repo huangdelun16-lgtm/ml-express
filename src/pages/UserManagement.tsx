@@ -1373,234 +1373,390 @@ const UserManagement: React.FC = () => {
       {/* 创建/编辑用户表单 */}
       {(editingUser || showAddUserForm) && (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '15px',
-          padding: '30px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: '800px',
-          margin: '0 auto'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '20px'
         }}>
-          <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px' }}>
-            {editingUser ? '编辑用户' : '新增用户'}
-          </h2>
-          
-          <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+            borderRadius: '20px',
+            padding: isMobile ? '24px' : '40px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+            maxWidth: '600px',
+            width: '100%',
+            position: 'relative',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            overflow: 'hidden'
+          }}>
+            {/* 装饰背景 */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: isMobile ? '12px' : '20px',
-              marginBottom: '30px'
+              position: 'absolute',
+              top: '-50px',
+              right: '-50px',
+              width: '150px',
+              height: '150px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              filter: 'blur(30px)'
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              bottom: '-30px',
+              left: '-30px',
+              width: '100px',
+              height: '100px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '50%',
+              filter: 'blur(20px)'
+            }}></div>
+
+            <h2 style={{ 
+              color: 'white', 
+              textAlign: 'center', 
+              marginBottom: '30px', 
+              fontSize: '1.8rem', 
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              position: 'relative',
+              zIndex: 1
             }}>
-              {/* 基本信息 */}
-              <div>
-                <h3 style={{ color: '#C0C0C0', marginBottom: '15px' }}>基本信息</h3>
-                <input
-                  type="text"
-                  placeholder="姓名"
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({...userForm, name: e.target.value})}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    marginBottom: '10px',
-                    fontSize: '1rem'
-                  }}
-                />
-                <input
-                  type="tel"
-                  placeholder="电话"
-                  value={userForm.phone}
-                  onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    marginBottom: '10px',
-                    fontSize: '1rem'
-                  }}
-                />
-                <input
-                  type="email"
-                  placeholder="邮箱（可选，如果没有gmail可留空）"
-                  value={userForm.email}
-                  onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    marginBottom: '10px',
-                    fontSize: '1rem'
-                  }}
-                />
-                <textarea
-                  placeholder="地址"
-                  value={userForm.address}
-                  onChange={(e) => setUserForm({...userForm, address: e.target.value})}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    height: '80px',
-                    resize: 'vertical',
-                    fontSize: '1rem',
-                    marginBottom: '10px'
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder={editingUser ? "密码（留空则不修改）" : "密码（默认：123456）"}
-                  value={userForm.password}
-                  onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '1rem'
-                  }}
-                />
+              {editingUser ? '编辑用户' : '新增用户'}
+            </h2>
+            
+            <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{
+                display: 'grid',
+                gap: '20px',
+                marginBottom: '30px'
+              }}>
+                {/* 基本信息 */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '20px', borderRadius: '15px' }}>
+                  <h3 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '15px', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
+                    👤 基本信息
+                  </h3>
+                  <div style={{ display: 'grid', gap: '15px' }}>
+                    <input
+                      type="text"
+                      placeholder="姓名"
+                      value={userForm.name}
+                      onChange={(e) => setUserForm({...userForm, name: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="电话"
+                      value={userForm.phone}
+                      onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                    <input
+                      type="email"
+                      placeholder="邮箱（可选，如果没有gmail可留空）"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm({...userForm, email: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                    <textarea
+                      placeholder="地址"
+                      value={userForm.address}
+                      onChange={(e) => setUserForm({...userForm, address: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        height: '100px',
+                        resize: 'vertical',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease',
+                        fontFamily: 'inherit'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder={editingUser ? "密码（留空则不修改）" : "密码（默认：123456）"}
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 账户设置 */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '20px', borderRadius: '15px' }}>
+                  <h3 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '15px', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
+                    ⚙️ 账户设置
+                  </h3>
+                  <div style={{ display: 'grid', gap: '15px' }}>
+                    {/* 仅在编辑模式且非普通用户时显示用户类型选择，否则默认为客户 */}
+                    {editingUser && userForm.user_type !== 'customer' ? (
+                      <select
+                        value={userForm.user_type}
+                        onChange={(e) => setUserForm({...userForm, user_type: e.target.value as 'customer' | 'courier' | 'admin'})}
+                        style={{
+                          width: '100%',
+                          padding: '14px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '10px',
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          color: 'white',
+                          fontSize: '1rem',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="customer">客户</option>
+                        <option value="courier">快递员</option>
+                        <option value="admin">管理员</option>
+                      </select>
+                    ) : (
+                       // 隐藏用户类型选择，显示固定文本
+                       <div style={{
+                         padding: '14px',
+                         border: '1px solid rgba(255, 255, 255, 0.1)',
+                         borderRadius: '10px',
+                         background: 'rgba(255, 255, 255, 0.05)',
+                         color: 'rgba(255, 255, 255, 0.7)',
+                         fontSize: '1rem',
+                         display: 'flex',
+                         alignItems: 'center',
+                         gap: '10px'
+                       }}>
+                         <span>👤 用户类型:</span>
+                         <span style={{ color: 'white', fontWeight: 'bold' }}>客户</span>
+                       </div>
+                    )}
+                    
+                    <select
+                      value={userForm.status}
+                      onChange={(e) => setUserForm({...userForm, status: e.target.value as 'active' | 'inactive' | 'suspended'})}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="active">✅ 活跃</option>
+                      <option value="inactive">💤 非活跃</option>
+                      <option value="suspended">🚫 已暂停</option>
+                    </select>
+                    <textarea
+                      placeholder="备注"
+                      value={userForm.notes}
+                      onChange={(e) => setUserForm({...userForm, notes: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '10px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        height: '80px',
+                        resize: 'vertical',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.3s ease',
+                        fontFamily: 'inherit'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* 账户设置 */}
-              <div>
-                <h3 style={{ color: '#C0C0C0', marginBottom: '15px' }}>账户设置</h3>
-                <select
-                  value={userForm.user_type}
-                  onChange={(e) => setUserForm({...userForm, user_type: e.target.value as 'customer' | 'courier' | 'admin'})}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(7, 23, 53, 0.65)',
-                    color: 'white',
-                    marginBottom: '10px',
-                    fontSize: '1rem'
+              {/* 提交按钮 */}
+              <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingUser(null);
+                    setShowAddUserForm(false);
+                    setUserForm({
+                      name: '',
+                      phone: '',
+                      email: '',
+                      address: '',
+                      password: '123456',
+                      user_type: 'customer',
+                      status: 'active',
+                      notes: ''
+                    });
                   }}
-                >
-                  <option value="customer">客户</option>
-                  <option value="courier">快递员</option>
-                  <option value="admin">管理员</option>
-                </select>
-                <select
-                  value={userForm.status}
-                  onChange={(e) => setUserForm({...userForm, status: e.target.value as 'active' | 'inactive' | 'suspended'})}
                   style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(7, 23, 53, 0.65)',
-                    color: 'white',
-                    marginBottom: '10px',
-                    fontSize: '1rem'
-                  }}
-                >
-                  <option value="active">活跃</option>
-                  <option value="inactive">非活跃</option>
-                  <option value="suspended">已暂停</option>
-                </select>
-                <textarea
-                  placeholder="备注"
-                  value={userForm.notes}
-                  onChange={(e) => setUserForm({...userForm, notes: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
                     background: 'rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    height: '80px',
-                    resize: 'vertical',
-                    fontSize: '1rem'
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    padding: '14px 40px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(5px)'
                   }}
-                />
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '14px 60px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 15px rgba(0, 114, 255, 0.3)',
+                    transition: 'all 0.3s ease',
+                    flex: '1',
+                    maxWidth: '200px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 114, 255, 0.5)';
+                    e.currentTarget.style.filter = 'brightness(1.1)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 114, 255, 0.3)';
+                    e.currentTarget.style.filter = 'brightness(1)';
+                  }}
+                >
+                  {editingUser ? '更新' : '创建'}
+                </button>
               </div>
-            </div>
-
-            {/* 提交按钮 */}
-            <div style={{ textAlign: 'center' }}>
-              <button
-                type="submit"
-                style={{
-                  background: 'linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%)',
-                  color: '#2C3E50',
-                  border: 'none',
-                  padding: '15px 30px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 15px rgba(192, 192, 192, 0.3)',
-                  transition: 'all 0.3s ease',
-                  marginRight: '10px'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(192, 192, 192, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(192, 192, 192, 0.3)';
-                }}
-              >
-                {editingUser ? '更新用户' : '创建用户'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingUser(null);
-                  setShowAddUserForm(false);
-                  setUserForm({
-                    name: '',
-                    phone: '',
-                    email: '',
-                    address: '',
-                    password: '123456',
-                    user_type: 'customer',
-                    status: 'active',
-                    notes: ''
-                  });
-                }}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  padding: '15px 30px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                取消
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
