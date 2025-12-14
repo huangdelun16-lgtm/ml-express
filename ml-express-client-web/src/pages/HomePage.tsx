@@ -426,7 +426,7 @@ const HomePage: React.FC = () => {
           
           try {
             // 方法1: 先尝试精确匹配（不区分大小写，不限制类型）
-            let { data, error } = await supabase
+            let { data } = await supabase
               .from('users')
               .select('*')
               .ilike('email', emailToSearch)
