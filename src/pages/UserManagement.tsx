@@ -1393,10 +1393,18 @@ const UserManagement: React.FC = () => {
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
             maxWidth: '600px',
             width: '100%',
+            maxHeight: '90vh', // 限制最大高度
+            overflowY: 'auto', // 允许垂直滚动
             position: 'relative',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            overflow: 'hidden'
+            scrollbarWidth: 'none', // Firefox隐藏滚动条
+            msOverflowStyle: 'none' // IE/Edge隐藏滚动条
           }}>
+            <style dangerouslySetInnerHTML={{__html: `
+              div::-webkit-scrollbar { 
+                display: none; 
+              }
+            `}} />
             {/* 装饰背景 */}
             <div style={{
               position: 'absolute',
