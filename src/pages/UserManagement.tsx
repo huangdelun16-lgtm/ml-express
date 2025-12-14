@@ -399,9 +399,9 @@ const UserManagement: React.FC = () => {
 
   const getUserTypeText = (type: string) => {
     switch (type) {
-      case 'customer': return '客户';
-      case 'courier': return '快递员';
-      case 'admin': return '管理员';
+      case 'customer': return 'Member';
+      case 'courier': return 'Courier';
+      case 'admin': return 'Admin';
       default: return type;
     }
   };
@@ -1618,9 +1618,9 @@ const UserManagement: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="customer">客户</option>
-                        <option value="courier">快递员</option>
-                        <option value="admin">管理员</option>
+                        <option value="customer">Member</option>
+                        <option value="courier">Courier</option>
+                        <option value="admin">Admin</option>
                       </select>
                     ) : (
                        // 隐藏用户类型选择，显示固定文本
@@ -1636,7 +1636,7 @@ const UserManagement: React.FC = () => {
                          gap: '10px'
                        }}>
                          <span>👤 用户类型:</span>
-                         <span style={{ color: 'white', fontWeight: 'bold' }}>客户</span>
+                         <span style={{ color: 'white', fontWeight: 'bold' }}>Member</span>
                        </div>
                     )}
                     
