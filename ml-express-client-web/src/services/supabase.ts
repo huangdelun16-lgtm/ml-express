@@ -232,18 +232,24 @@ export const packageService = {
   },
 
   // 根据用户邮箱或手机号获取该用户的所有包裹
-  async getPackagesByUser(email?: string, phone?: string): Promise<Package[]> {
+  // startDate: 可选，如果有值，只查询该时间之后的订单（用于解决新账户看到旧手机号关联的历史订单问题）
+  async getPackagesByUser(email?: string, phone?: string, startDate?: string): Promise<Package[]> {
     try {
       if (!email && !phone) {
         console.log('getPackagesByUser: 没有邮箱和手机号，返回空数组');
         return [];
       }
 
-      console.log('getPackagesByUser: 开始查询，email:', email, 'phone:', phone);
+      console.log('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate);
 
       // 构建查询条件：根据邮箱或手机号查询
       // 查询条件：customer_email 匹配 OR sender_phone 匹配 OR receiver_phone 匹配
       let query = supabase.from('packages').select('*');
+
+      // 如果有开始时间，添加时间过滤
+      if (startDate) {
+        query = query.gte('created_at', startDate);
+      }
 
       const conditions: string[] = [];
       

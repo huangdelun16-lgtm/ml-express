@@ -170,12 +170,15 @@ const ProfilePage: React.FC = () => {
       console.log('开始加载用户包裹，用户信息:', {
         email: currentUser.email,
         phone: currentUser.phone,
-        name: currentUser.name
+        name: currentUser.name,
+        created_at: currentUser.created_at
       });
       
+      // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
-        currentUser.phone
+        currentUser.phone,
+        currentUser.created_at // 传入注册时间
       );
       
       console.log('查询到的包裹数量:', packages.length);
