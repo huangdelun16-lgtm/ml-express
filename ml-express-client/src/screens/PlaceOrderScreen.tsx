@@ -1371,39 +1371,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
             </View>
             
             <View style={styles.paymentMethodContainer}>
-              {/* 二维码支付 - 开发中 */}
-              <TouchableOpacity
-                style={[
-                  styles.paymentMethodOption,
-                  { opacity: 0.6, backgroundColor: '#f3f4f6' }
-                ]}
-                onPress={() => {
-                  Alert.alert(
-                    language === 'zh' ? '开发中' : language === 'en' ? 'Under Development' : 'ဖွံ့ဖြိုးဆဲ',
-                    language === 'zh' ? '二维码支付功能正在开发中，请选择现金支付' : 
-                    language === 'en' ? 'QR code payment is under development, please use cash payment' :
-                    'QR ကုဒ်ပေးချေမှုသည် ဖွံ့ဖြိုးဆဲဖြစ်ပြီး ငွေသားပေးချေမှုကို ရွေးချယ်ပါ'
-                  );
-                }}
-                activeOpacity={0.5}
-                disabled={true}
-              >
-                <View style={[styles.paymentMethodRadio, { borderColor: '#9ca3af' }]}>
-                  {/* 禁用单选按钮 */}
-                </View>
-                <View style={styles.paymentMethodContent}>
-                  <Text style={[
-                    styles.paymentMethodLabel,
-                    { color: '#6b7280' }
-                  ]}>
-                    📱 {language === 'zh' ? '二维码支付' : language === 'en' ? 'QR Code Payment' : 'QR ကုဒ်ပေးချေမှု'}
-                  </Text>
-                  <Text style={[styles.paymentMethodDesc, { color: '#ef4444', fontWeight: 'bold' }]}>
-                    {language === 'zh' ? '开发中' : language === 'en' ? 'Under Development' : 'ဖွံ့ဖြိုးဆဲ'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
               {/* 现金支付 */}
               <TouchableOpacity
                 style={[
@@ -1428,7 +1395,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
                   </Text>
                 </View>
               </TouchableOpacity>
-
             </View>
           </View>
         </ScaleInView>
