@@ -165,7 +165,6 @@ const HomePage: React.FC = () => {
   const [showWeightInput, setShowWeightInput] = useState<boolean>(false);
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
-  const [paymentQRCode, setPaymentQRCode] = useState<string>('');
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
@@ -1762,34 +1761,6 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 生成收款二维码（已暂停，开发中）
-  // const generatePaymentQRCode = async (amount: number, orderId: string) => {
-  //   try {
-  //     // 生成支付信息（可以根据实际支付方式调整）
-  //     const paymentInfo = {
-  //       amount: amount,
-  //       currency: 'MMK',
-  //       orderId: orderId,
-  //       merchant: 'ML Express',
-  //       description: '快递费用'
-  //     };
-  //     
-  //     const paymentString = JSON.stringify(paymentInfo);
-  //     const qrDataUrl = await QRCode.toDataURL(paymentString, {
-  //       width: 300,
-  //       margin: 2,
-  //       color: {
-  //         dark: '#2c5282',
-  //         light: '#ffffff'
-  //       }
-  //     });
-  //     
-  //     setPaymentQRCode(qrDataUrl);
-  //   } catch (error) {
-  //     console.error('生成收款二维码失败:', error);
-  //   }
-  // };
-
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
@@ -1901,13 +1872,7 @@ const HomePage: React.FC = () => {
       const tempOrderId = generateMyanmarPackageId(orderInfo.senderAddress);
       console.log('订单ID:', tempOrderId);
       
-      // 5. 生成收款二维码（仅当选择二维码支付时）- 已暂停，开发中
-      // console.log('生成收款二维码...');
-      // if (paymentMethod === 'qr') {
-      //   await generatePaymentQRCode(price, tempOrderId);
-      // }
-      
-      // 6. 存储订单信息到Supabase数据库（替代localStorage）
+      // 5. 存储订单信息到Supabase数据库（替代localStorage）
       console.log('保存临时订单到数据库...');
       const pendingOrderData = {
         temp_order_id: tempOrderId,
@@ -4692,7 +4657,7 @@ const HomePage: React.FC = () => {
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💳</div>
               <h2 style={{ color: '#2c5282', margin: 0 }}>
-                {t.ui.paymentQRCode}
+                {t.ui.selectPaymentMethod}
             </h2>
             </div>
             
@@ -4741,45 +4706,10 @@ const HomePage: React.FC = () => {
                 flexDirection: window.innerWidth < 768 ? 'column' : 'row',
                 marginBottom: '1rem'
               }}>
-                {/* 二维码支付选项 - 开发中 */}
-                <button
-                  onClick={() => {
-                    // 禁用点击，显示提示
-                    alert(t.ui.underDevelopment || '开发中');
-                  }}
-                  disabled={true}
-                  style={{
-                    flex: 1,
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    border: '2px solid #d1d5db',
-                    background: '#f3f4f6',
-                    cursor: 'not-allowed',
-                    opacity: 0.6,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{ fontSize: '2rem' }}>📱</div>
-                  <div style={{ fontWeight: 'bold', color: '#6b7280' }}>{t.ui.qrPayment}</div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    color: '#ef4444', 
-                    fontWeight: 'bold',
-                    marginTop: '0.25rem'
-                  }}>
-                    {t.ui.underDevelopment || '开发中'}
-                  </div>
-                </button>
-                
                 {/* 现金支付选项 */}
                 <button
                   onClick={async () => {
                     setPaymentMethod('cash');
-                    setPaymentQRCode(''); // 清除二维码
                     // 更新数据库中的支付方式
                     if (tempOrderId) {
                       try {
@@ -4854,48 +4784,6 @@ const HomePage: React.FC = () => {
               )}
             </div>
 
-            {/* 收款二维码（仅当选择二维码支付时显示）- 已暂停，开发中 */}
-            {false && paymentMethod === 'qr' && (
-              <div style={{
-                background: '#f8f9fa',
-                padding: '1.5rem',
-                borderRadius: '10px',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{ fontSize: '1rem', color: '#2c5282', marginBottom: '1rem', fontWeight: 'bold', textAlign: 'center' }}>
-                  📱 {t.ui.scanToPay}
-                </div>
-                {paymentQRCode ? (
-                  <img 
-                    src={paymentQRCode} 
-                    alt="Payment QR Code"
-                    style={{
-                      width: '250px',
-                      height: '250px',
-                      margin: '0 auto',
-                      display: 'block',
-                      borderRadius: '10px',
-                      border: '3px solid #2c5282'
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '250px',
-                    height: '250px',
-                    background: '#e9ecef',
-                    margin: '0 auto',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666'
-                  }}>
-                    {t.ui.calculating}
-                  </div>
-                )}
-              </div>
-            )}
-            
             <div style={{ 
               display: 'flex', 
               gap: '1rem', 
@@ -4983,8 +4871,7 @@ const HomePage: React.FC = () => {
                     
                     // 根据支付方式设置订单状态
                     // 现金支付：状态设为"待收款"，骑手代收
-                    // 二维码支付：状态设为"待取件"，已支付
-                    const orderStatus = currentPaymentMethod === 'cash' ? '待收款' : '待取件';
+                    const orderStatus = '待收款';
                     
                     // 构建包裹数据，只包含数据库表中存在的字段
                     const packageData: any = {
