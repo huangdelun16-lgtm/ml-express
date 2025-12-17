@@ -128,55 +128,54 @@ class LoggerService {
   /**
    * 调试日志（仅在开发环境）
    */
-  static debug(message: string, data?: any): void {
-    const sanitizedData = sanitizeData(data);
+  static debug(message: string, ...args: any[]): void {
+    const sanitizedArgs = args.map(arg => sanitizeData(arg));
     
     if (isDevelopment && currentLogLevel <= LogLevel.DEBUG) {
-      console.log('[DEBUG]', message, sanitizedData);
+      console.log('[DEBUG]', message, ...sanitizedArgs);
     }
   }
 
   /**
    * 信息日志（仅在开发环境）
    */
-  static info(message: string, data?: any): void {
-    const sanitizedData = sanitizeData(data);
+  static info(message: string, ...args: any[]): void {
+    const sanitizedArgs = args.map(arg => sanitizeData(arg));
     
     if (isDevelopment && currentLogLevel <= LogLevel.INFO) {
-      console.info('[INFO]', message, sanitizedData);
+      console.info('[INFO]', message, ...sanitizedArgs);
     }
   }
 
   /**
    * 警告日志（开发环境 + 生产环境）
    */
-  static warn(message: string, data?: any): void {
-    const sanitizedData = sanitizeData(data);
+  static warn(message: string, ...args: any[]): void {
+    const sanitizedArgs = args.map(arg => sanitizeData(arg));
     
     if (currentLogLevel <= LogLevel.WARN) {
-      console.warn('[WARN]', message, sanitizedData);
+      console.warn('[WARN]', message, ...sanitizedArgs);
     }
     
     // 生产环境发送警告到日志服务
     if (!isDevelopment) {
-      sendToLogService(LogLevel.WARN, message, data);
+      sendToLogService(LogLevel.WARN, message, args);
     }
   }
 
   /**
    * 错误日志（始终输出，但会清理敏感信息）
    */
-  static error(message: string, error?: Error | any, context?: any): void {
-    const sanitizedError = sanitizeData(error);
-    const sanitizedContext = sanitizeData(context);
+  static error(message: string, ...args: any[]): void {
+    const sanitizedArgs = args.map(arg => sanitizeData(arg));
     
     if (currentLogLevel <= LogLevel.ERROR) {
-      console.error('[ERROR]', message, sanitizedError, sanitizedContext);
+      console.error('[ERROR]', message, ...sanitizedArgs);
     }
     
     // 生产环境发送错误到日志服务
     if (!isDevelopment) {
-      sendToLogService(LogLevel.ERROR, message, { error, context });
+      sendToLogService(LogLevel.ERROR, message, { args });
     }
   }
 
