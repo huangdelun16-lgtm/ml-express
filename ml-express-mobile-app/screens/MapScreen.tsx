@@ -1436,6 +1436,40 @@ export default function MapScreen({ navigation }: any) {
     return null;
   };
 
+  // 📍 导航到指定坐标
+  const startNavigationToPoint = async (lat: number, lng: number) => {
+    if (!location) {
+      Alert.alert('提示', '正在获取当前位置，请稍候...');
+      return;
+    }
+
+    const origin = `${location.latitude},${location.longitude}`;
+    const destination = `${lat},${lng}`;
+
+    // 尝试多种URL方案，确保iOS和Android都能正常工作
+    const urls = [
+      `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`, // Google Maps App (iOS/Android)
+      `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`, // Web fallback
+    ];
+    
+    // 尝试打开Google Maps应用，失败则使用浏览器
+    let opened = false;
+    for (const url of urls) {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        opened = true;
+        break;
+      }
+    }
+    
+    if (!opened) {
+      // 如果都失败，使用Apple Maps作为iOS备选
+      const appleMapsUrl = `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`;
+      await Linking.openURL(appleMapsUrl);
+    }
+  };
+
   const handleNavigate = async (pkg: PackageWithExtras) => {
     // 添加触觉反馈
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2390,6 +2424,23 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.coordsText}>
                   {item.pickupCoords.lat.toFixed(6)}, {item.pickupCoords.lng.toFixed(6)}
                 </Text>
+                <TouchableOpacity
+                  style={{
+                    marginLeft: 8,
+                    backgroundColor: '#3b82f6',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 4,
+                  }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    startNavigationToPoint(item.pickupCoords.lat, item.pickupCoords.lng);
+                  }}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>
+                    {language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
             {item.pickupDistance !== null && item.pickupDistance !== undefined && (
