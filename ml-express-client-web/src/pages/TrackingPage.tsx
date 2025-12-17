@@ -70,6 +70,7 @@ const TrackingPage: React.FC = () => {
     return () => {
       if (refreshInterval) {
         clearInterval(refreshInterval);
+      }
     };
   }, [trackingResult]);
   // 加载快递员位置（带隐私权限检查）
