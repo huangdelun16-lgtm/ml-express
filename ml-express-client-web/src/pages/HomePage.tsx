@@ -101,6 +101,8 @@ const HomePage: React.FC = () => {
   const [senderName, setSenderName] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
   const [senderAddressText, setSenderAddressText] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
   const [receiverAddressText, setReceiverAddressText] = useState('');
   const [codAmount, setCodAmount] = useState(''); // 代收款金额
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
@@ -353,8 +355,8 @@ const HomePage: React.FC = () => {
           try {
             // 方法1: 先尝试精确匹配（不区分大小写，不限制类型）
             let { data } = await supabase
-              .from('users')
-              .select('*')
+          .from('users')
+          .select('*')
               .ilike('email', emailToSearch)
               .maybeSingle();
             
@@ -387,7 +389,7 @@ const HomePage: React.FC = () => {
               }
             }
             
-            existingUser = data;
+        existingUser = data;
           } catch (err) {
             console.error('查询用户异常:', err);
             existingUser = null;
@@ -418,7 +420,7 @@ const HomePage: React.FC = () => {
         // 合伙登录
         if (loginType === 'partner') {
           // 验证店铺代码和密码
-          if (!registerForm.email) {
+        if (!registerForm.email) {
             alert(language === 'zh' ? '请输入店铺代码' : language === 'en' ? 'Please enter store code' : 'ဆိုင်ကုဒ် ထည့်ပါ');
             return;
           }
@@ -1829,17 +1831,17 @@ const HomePage: React.FC = () => {
       if (!savedPendingOrder) {
         console.warn('保存临时订单到数据库失败，回退到localStorage');
         // 如果数据库保存失败，回退到localStorage
-        const orderWithPrice = {
-          ...orderInfo,
-          price: price,
-          distance: distance,
-          tempOrderId: tempOrderId,
+      const orderWithPrice = {
+        ...orderInfo,
+        price: price,
+        distance: distance,
+        tempOrderId: tempOrderId,
           codAmount: orderInfo.codAmount, // 添加代收款金额
-          customerEmail: currentUser?.email || '',
+        customerEmail: currentUser?.email || '',
           customerName: currentUser?.name || orderInfo.senderName,
           paymentMethod: paymentMethod
-        };
-        localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
+      };
+      localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
         setTempOrderId(tempOrderId); // 保存到状态中
       } else {
         console.log('临时订单已保存到数据库:', savedPendingOrder.temp_order_id);
@@ -2069,8 +2071,8 @@ const HomePage: React.FC = () => {
         filter: 'blur(40px)',
         zIndex: 1
       }}></div>
-      <div style={{
-        position: 'absolute',
+              <div style={{
+                position: 'absolute',
         bottom: '5%',
         left: '5%',
         width: '150px',
@@ -2088,8 +2090,8 @@ const HomePage: React.FC = () => {
         onLogout={handleLogout}
         onShowRegisterModal={(isLoginMode) => {
           setIsLoginMode(isLoginMode);
-          setShowRegisterModal(true);
-        }}
+                  setShowRegisterModal(true);
+                }}
         translations={t}
       />
 
@@ -2114,7 +2116,7 @@ const HomePage: React.FC = () => {
         position: 'relative',
         zIndex: 5,
         background: 'transparent',
-        color: 'white',
+                color: 'white',
         padding: 0,
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
@@ -2501,9 +2503,9 @@ const HomePage: React.FC = () => {
                     background: paymentMethod === 'cash' ? '#e8f5e9' : 'white',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
-                    display: 'flex',
+              display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
+              alignItems: 'center',
                     gap: '0.5rem'
                   }}
                   onMouseOver={(e) => {
@@ -2540,7 +2542,7 @@ const HomePage: React.FC = () => {
                 </div>
               )}
             </div>
-
+            
             <div style={{ 
               display: 'flex', 
               gap: '1rem', 
@@ -3689,21 +3691,21 @@ const HomePage: React.FC = () => {
                 📍 点击地图、右键选择位置或点击店铺图标选择位置
               </div>
               <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  id="map-address-input"
-                  placeholder={t.order.mapPlaceholder}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease'
-                  }}
+              <input
+                type="text"
+                id="map-address-input"
+                placeholder={t.order.mapPlaceholder}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                     if (e.currentTarget.value.trim()) {
@@ -4253,17 +4255,17 @@ const HomePage: React.FC = () => {
       {showRegisterModal && (
         <div 
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: 'linear-gradient(135deg, rgba(44, 82, 130, 0.6) 0%, rgba(49, 130, 206, 0.5) 100%)',
             backdropFilter: 'blur(20px) saturate(180%)',
             WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
             zIndex: 3000,
             animation: 'fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             padding: '1rem'
@@ -4873,32 +4875,32 @@ const HomePage: React.FC = () => {
               {/* 注册模式：电子邮箱 */}
               {!isLoginMode && (
                 <div style={{ marginBottom: '1.2rem' }}>
-                  <label style={{ 
+                <label style={{ 
                     color: '#475569', 
-                    display: 'block', 
+                  display: 'block', 
                     marginBottom: '0.6rem',
                     fontWeight: '600',
                     fontSize: '0.875rem',
                     letterSpacing: '0.3px'
                   }}>
                     {language === 'zh' ? '电子邮箱' : language === 'en' ? 'Email' : 'အီးမေးလ်'}
-                  </label>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <input
-                      type="email"
-                      value={registerForm.email}
-                      onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                </label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <input
+                    type="email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       placeholder={language === 'zh' ? 'example@gmail.com' : 'example@gmail.com'}
-                      required
-                      style={{
+                    required
+                    style={{
                         flex: '1.2',
                         padding: '0.875rem 1.125rem',
                         border: '2px solid #e2e8f0',
                         borderRadius: '14px',
-                        fontSize: '1rem',
+                      fontSize: '1rem',
                         background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
                         color: '#1e293b',
-                        outline: 'none',
+                      outline: 'none',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
                         fontFamily: 'inherit'
@@ -4915,9 +4917,9 @@ const HomePage: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
-                    />
-                    
-                    {/* 获取验证码按钮（仅注册模式显示） */}
+                  />
+                  
+                  {/* 获取验证码按钮（仅注册模式显示） */}
                     <button
                       type="button"
                       onClick={handleSendVerificationCode}
@@ -4951,7 +4953,7 @@ const HomePage: React.FC = () => {
                         if (countdown === 0) {
                           e.currentTarget.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
                           e.currentTarget.style.borderColor = '#93c5fd';
-                          e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.transform = 'translateY(0)';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.2)';
                         }
                       }}
@@ -4961,7 +4963,7 @@ const HomePage: React.FC = () => {
                         (language === 'zh' ? '获取验证码' : language === 'en' ? 'Get Code' : 'ကုဒ်ယူရန်')
                       }
                     </button>
-                  </div>
+                </div>
                 </div>
               )}
 
@@ -5120,14 +5122,14 @@ const HomePage: React.FC = () => {
                     <>
                       {language === 'zh' ? '还没有账户？' : language === 'en' ? "Don't have an account? " : 'အကောင့်မရှိသေးဘူးလား? '}
                       <span 
-                        onClick={() => {
+                  onClick={() => {
                           setIsLoginMode(false);
                           setLoginType('normal'); // 切换到注册模式时重置登录类型
-                        }}
-                        style={{ 
+                  }}
+                  style={{
                           color: '#2563eb', 
                           fontWeight: '700', 
-                          cursor: 'pointer',
+                    cursor: 'pointer',
                           textDecoration: 'none',
                           marginLeft: '0.5rem',
                           transition: 'all 0.2s ease',
