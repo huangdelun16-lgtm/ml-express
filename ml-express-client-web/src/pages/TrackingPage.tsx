@@ -92,7 +92,10 @@ const TrackingPage: React.FC = () => {
         setShowLanguageDropdown(false);
     if (showLanguageDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [showLanguageDropdown]);
   const translations = {
     zh: {
