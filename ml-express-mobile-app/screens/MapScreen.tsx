@@ -2604,19 +2604,6 @@ export default function MapScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-            
-            {/* 导航按钮 */}
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleNavigate(item);
-              }}
-            >
-              <Text style={styles.navButtonLabel}>
-                {language === 'zh' ? '导航' : language === 'en' ? 'Navigate' : 'လမ်းညွှန်'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
