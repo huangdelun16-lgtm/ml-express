@@ -2469,6 +2469,23 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.coordsText}>
                   {item.deliveryCoords.lat.toFixed(6)}, {item.deliveryCoords.lng.toFixed(6)}
                 </Text>
+                <TouchableOpacity
+                  style={{
+                    marginLeft: 8,
+                    backgroundColor: '#3b82f6',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 4,
+                  }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    startNavigationToPoint(item.deliveryCoords.lat, item.deliveryCoords.lng);
+                  }}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>
+                    {language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
             {item.deliveryDistance !== null && item.deliveryDistance !== undefined && (
