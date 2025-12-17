@@ -409,13 +409,23 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
       const netProfit = totalIncome - totalExpense;
       const pendingPayments = records.filter(r => r.status === 'pending').reduce((sum, record) => sum + (record.amount || 0), 0);
       
-      // 计算包裹收入（只统计已送达的包裹）
+      // 计算订单收入（统计已送达且已结清的包裹）
       const deliveredPackages = packages.filter(pkg => pkg.status === '已送达');
-      const packageIncome = deliveredPackages.reduce((sum, pkg) => {
+      
+      let packageIncome = 0;
+      let settledPackageCount = 0;
+
+      deliveredPackages.forEach(pkg => {
+        // 如果是现金支付，必须已结清才计入收入
+        if (pkg.payment_method === 'cash' && !pkg.rider_settled) {
+          return;
+        }
         const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-        return sum + price;
-      }, 0);
-      const packageCount = deliveredPackages.length;
+        packageIncome += price;
+        settledPackageCount++;
+      });
+
+      const packageCount = settledPackageCount;
       
       // 计算快递员公里费用（只统计已送达包裹的送货距离，不包含取件距离）
       const COURIER_KM_RATE = 500; // 每公里500 MMK
@@ -1070,7 +1080,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             {renderSummaryCard('总支出', summary.totalExpense, '已完成的所有支出记录总和', '#ff7979')}
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
-            {renderSummaryCard('包裹收入', summary.packageIncome, `已送达包裹总收入 (${summary.packageCount}个)`, '#6c5ce7')}
+            {renderSummaryCard('订单收入', summary.packageIncome, `已结算订单总收入 (${summary.packageCount}个)`, '#6c5ce7')}
             {renderSummaryCard('骑手送货费用', summary.courierKmCost, `总送货距离 ${summary.totalKm.toFixed(2)} KM (500 MMK/KM)`, '#fd79a8')}
           </div>
         )}
