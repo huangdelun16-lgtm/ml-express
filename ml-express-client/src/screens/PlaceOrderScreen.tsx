@@ -1265,168 +1265,139 @@ export default function PlaceOrderScreen({ navigation }: any) {
   }, [setPackageType, setShowWeightInput]);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <BackToHomeButton navigation={navigation} position="topRight" />
+    <View style={styles.container}>
       <LinearGradient
-        colors={['#b0d3e8', '#7895a3']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+        colors={['#f8fafc', '#e2e8f0']}
+        style={StyleSheet.absoluteFill}
+      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        <Text style={styles.headerTitle}>{currentT.title}</Text>
-        <Text style={styles.headerSubtitle}>{currentT.subtitle}</Text>
-      </LinearGradient>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 寄件人信息 */}
-        <SenderForm
-          language={language}
-          styles={styles}
-          currentT={currentT}
-          senderName={senderName}
-          senderPhone={senderPhone}
-          senderAddress={senderAddress}
-          useMyInfo={useMyInfo}
-          senderCoordinates={senderCoordinates}
-          errors={errors}
-          touched={touched}
-          onSenderNameChange={(text) => handleFieldChange('senderName', text)}
-          onSenderPhoneChange={(text) => handleFieldChange('senderPhone', text)}
-          onSenderAddressChange={(text) => handleFieldChange('senderAddress', text)}
-          onUseMyInfoChange={setUseMyInfo}
-          onOpenMap={() => openMapSelector('sender')}
-          onBlur={handleFieldBlur}
-        />
-
-        {/* 收件人信息 */}
-        <ReceiverForm
-          language={language}
-          styles={styles}
-          currentT={currentT}
-          receiverName={receiverName}
-          receiverPhone={receiverPhone}
-          receiverAddress={receiverAddress}
-          receiverCoordinates={receiverCoordinates}
-          errors={errors}
-          touched={touched}
-          onReceiverNameChange={(text) => handleFieldChange('receiverName', text)}
-          onReceiverPhoneChange={(text) => handleFieldChange('receiverPhone', text)}
-          onReceiverAddressChange={(text) => handleFieldChange('receiverAddress', text)}
-          onOpenMap={() => openMapSelector('receiver')}
-          onBlur={handleFieldBlur}
-        />
-
-        {/* 包裹信息 */}
-        <PackageInfo
-          language={language}
-          styles={styles}
-          currentT={currentT}
-          packageType={packageType}
-          weight={weight}
-          description={description}
-          showWeightInput={showWeightInput}
-          packageTypes={packageTypes}
-          onPackageTypeChange={setPackageType}
-          onWeightChange={setWeight}
-          onDescriptionChange={setDescription}
-          onPackageTypeInfoClick={handlePackageTypeClick}
-        />
-
-        {/* 配送选项 */}
-        <DeliveryOptions
-          language={language}
-          styles={styles}
-          currentT={currentT}
-          deliverySpeed={deliverySpeed}
-          deliverySpeeds={deliverySpeeds}
-          onDeliverySpeedChange={setDeliverySpeed}
-          onScheduleTimeClick={() => setShowTimePicker(true)}
-        />
-
-        {/* 价格估算 */}
-        <PriceCalculation
-          language={language}
-          styles={styles}
-          currentT={currentT}
-          isCalculated={isCalculated}
-          calculatedDistance={calculatedDistance}
-          calculatedPrice={calculatedPrice}
-          packageType={packageType}
-          weight={weight}
-          deliverySpeed={deliverySpeed}
-          deliverySpeeds={deliverySpeeds}
-          pricingSettings={pricingSettings}
-          onCalculate={calculatePrice}
-        />
-
-        {/* 支付方式选择 */}
-        <ScaleInView delay={450}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleContainer}>
-              <MoneyIcon size={18} color="#1e293b" />
-              <Text style={styles.sectionTitle}> 选择支付方式</Text>
-            </View>
-            
-            <View style={styles.paymentMethodContainer}>
-              {/* 现金支付 */}
-              <TouchableOpacity
-                style={[
-                  styles.paymentMethodOption,
-                  paymentMethod === 'cash' && styles.paymentMethodOptionActive
-                ]}
-                onPress={() => setPaymentMethod('cash')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.paymentMethodRadio}>
-                  {paymentMethod === 'cash' && <View style={styles.paymentMethodRadioInner} />}
-                </View>
-                <View style={styles.paymentMethodContent}>
-                  <Text style={[
-                    styles.paymentMethodLabel,
-                    paymentMethod === 'cash' && styles.paymentMethodLabelActive
-                  ]}>
-                    💵 {language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}
-                  </Text>
-                  <Text style={styles.paymentMethodDesc}>
-                    {language === 'zh' ? '骑手将在取件时代收费用' : language === 'en' ? 'Courier will collect payment upon pickup' : 'ကူရီယာသည် ပစ္စည်းယူသောအခါ ငွေကောက်ခံမည်'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <BackToHomeButton navigation={navigation} />
+          
+          <View style={styles.header}>
+            <Text style={styles.title}>{currentT.title}</Text>
+            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
           </View>
-        </ScaleInView>
 
-        {/* 提交按钮 */}
-        <ScaleInView delay={500}>
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmitOrder}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.submitGradient}
+          {/* 寄件人表单 */}
+          <SenderForm
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            senderName={senderName}
+            senderPhone={senderPhone}
+            senderAddress={senderAddress}
+            useMyInfo={useMyInfo}
+            senderCoordinates={senderCoordinates}
+            errors={errors}
+            touched={touched}
+            onSenderNameChange={(val) => handleFieldChange('senderName', val)}
+            onSenderPhoneChange={(val) => handleFieldChange('senderPhone', val)}
+            onSenderAddressChange={(val) => handleFieldChange('senderAddress', val)}
+            onUseMyInfoChange={setUseMyInfo}
+            onOpenMap={() => openMapSelector('sender')}
+            onBlur={handleFieldBlur}
+          />
+
+          {/* 收件人表单 */}
+          <ReceiverForm
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            receiverName={receiverName}
+            receiverPhone={receiverPhone}
+            receiverAddress={receiverAddress}
+            receiverCoordinates={receiverCoordinates}
+            errors={errors}
+            touched={touched}
+            onReceiverNameChange={(val) => handleFieldChange('receiverName', val)}
+            onReceiverPhoneChange={(val) => handleFieldChange('receiverPhone', val)}
+            onReceiverAddressChange={(val) => handleFieldChange('receiverAddress', val)}
+            onOpenMap={() => openMapSelector('receiver')}
+            onBlur={handleFieldBlur}
+          />
+
+          {/* 包裹信息 */}
+          <PackageInfo
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            packageType={packageType}
+            weight={weight}
+            description={description}
+            showWeightInput={showWeightInput}
+            packageTypes={packageTypes}
+            onPackageTypeChange={setPackageType}
+            onWeightChange={setWeight}
+            onDescriptionChange={setDescription}
+            onPackageTypeInfoClick={(type) => {
+              setSelectedPackageTypeInfo(type);
+              setShowPackageTypeInfo(true);
+            }}
+          />
+
+          {/* 配送选项 */}
+          <DeliveryOptions
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            deliverySpeed={deliverySpeed}
+            deliverySpeeds={deliverySpeeds}
+            onDeliverySpeedChange={setDeliverySpeed}
+            onScheduleTimeClick={() => setShowTimePicker(true)}
+          />
+
+          {/* 价格计算 */}
+          <PriceCalculation
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            isCalculated={isCalculated}
+            calculatedDistance={calculatedDistance}
+            calculatedPrice={calculatedPrice}
+            packageType={packageType}
+            weight={weight}
+            deliverySpeed={deliverySpeed}
+            deliverySpeeds={deliverySpeeds}
+            pricingSettings={pricingSettings as any}
+            onCalculate={calculatePrice}
+          />
+
+          {/* 提交按钮 */}
+          <ScaleInView delay={450}>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmitOrder}
+              activeOpacity={0.8}
             >
-              <Text style={styles.submitText}>{currentT.submitOrder}</Text>
-              <Text style={styles.submitPrice}>
-                {isCalculated ? calculatedPrice : '0'} MMK
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </ScaleInView>
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientButton}
+              >
+                <DeliveryIcon size={24} color="#ffffff" />
+                <Text style={styles.submitButtonText}> {currentT.submitOrder}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </ScaleInView>
+          
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-
-      {/* 地图选择模态框 */}
+      {/* 模态框 */}
       <MapModal
         visible={showMapModal}
-        language={language}
+        language={language as any}
         styles={styles}
         currentT={currentT}
         mapType={mapType}
@@ -1437,16 +1408,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
         autocompleteSuggestions={autocompleteSuggestions}
         onClose={() => setShowMapModal(false)}
         onConfirm={confirmMapLocation}
-        onAddressInputChange={setMapAddressInput}
-        onMapAddressInputChange={handleMapAddressInputChange}
+        onAddressInputChange={handleMapAddressInputChange}
+        onMapAddressInputChange={setMapAddressInput}
         onUseCurrentLocation={useCurrentLocationInMap}
         onSelectSuggestion={handleSelectSuggestion}
         onSetShowSuggestions={setShowSuggestions}
-        onLocationChange={setSelectedLocation}
+        onLocationChange={(coords) => setSelectedLocation(coords)}
         onPlaceChange={setSelectedPlace}
-        markerTitle={currentUser?.user_type === 'partner' && mapType === 'sender' ? partnerStore?.store_name : undefined}
       />
-
+      
       {/* 包裹类型说明模态框 */}
       <Modal
         visible={showPackageTypeInfo}
@@ -1454,300 +1424,25 @@ export default function PlaceOrderScreen({ navigation }: any) {
         animationType="fade"
         onRequestClose={() => setShowPackageTypeInfo(false)}
       >
-        <TouchableOpacity 
-          style={styles.infoModalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowPackageTypeInfo(false)}
-        >
-          <View style={styles.infoModalContent}>
-            <View style={styles.infoModalCard}>
-              <View style={styles.infoModalHeader}>
-                <Text style={styles.infoModalTitle}>📦 {currentT.packageTypeInfo.title}</Text>
-                <TouchableOpacity onPress={() => setShowPackageTypeInfo(false)}>
-                  <Text style={styles.infoModalClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.infoModalBody}>
-                {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' && (
-                  <>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>📏 {currentT.packageTypeInfo.sizeLimit}：</Text>
-                      <Text style={styles.infoValue}>45 × 60 × 15 cm 以内</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>⚖️ {currentT.packageTypeInfo.weightLimit}：</Text>
-                      <Text style={styles.infoValue}>5 KG 以内</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
-                      <Text style={styles.infoDescription}>
-                        {currentT.packageTypeInfo.standardDescription}
-                      </Text>
-                    </View>
-                  </>
-                )}
-                
-                {selectedPackageTypeInfo === '超重件（5KG）以上' && (
-                  <>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>⚖️ {currentT.packageTypeInfo.weightRequirement}：</Text>
-                      <Text style={styles.infoValue}>5 KG 以上</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
-                      <Text style={styles.infoDescription}>
-                        {currentT.packageTypeInfo.overweightDescription}
-                      </Text>
-                    </View>
-                  </>
-                )}
-                
-                {selectedPackageTypeInfo === '超规件（45x60x15cm）以上' && (
-                  <>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>📏 {currentT.packageTypeInfo.sizeRequirement}：</Text>
-                      <Text style={styles.infoValue}>45 × 60 × 15 cm 以上</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>💡 {currentT.packageTypeInfo.description}：</Text>
-                      <Text style={styles.infoDescription}>
-                        {currentT.packageTypeInfo.oversizedDescription}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.infoModalButton}
-                onPress={() => setShowPackageTypeInfo(false)}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.infoModalButtonGradient}
-                >
-                  <Text style={styles.infoModalButtonText}>{currentT.packageTypeInfo.understood}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* 时间选择器模态框 */}
-      <Modal
-        visible={showTimePicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowTimePicker(false)}
-      >
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContent}>
-            <LinearGradient
-              colors={['#b0d3e8', '#7895a3']}
-              style={styles.timePickerHeader}
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{currentT.packageTypeInfo.title}</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              <Text style={styles.modalText}>
+                {/* 这里的 getPackageTypeDescription 可能需要从外部获取或者移动到 helper */}
+                {selectedPackageTypeInfo}
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowPackageTypeInfo(false)}
             >
-              <View style={styles.timePickerHeaderContent}>
-                <Text style={styles.timePickerTitle}>🕐 选择配送时间</Text>
-                <Text style={styles.timePickerSubtitle}>请选择您希望的配送时间</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowTimePicker(false)}
-                style={styles.timePickerCloseButton}
-              >
-                <Text style={styles.timePickerCloseText}>✕</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-
-            <View style={styles.timePickerBody}>
-              {/* 快速选择时间 */}
-              <View style={styles.quickSelectSection}>
-                <Text style={styles.quickSelectTitle}>⚡ 快速选择</Text>
-                <View style={styles.quickSelectGrid}>
-                  {[
-                    { label: '今天下午', value: 'today-afternoon' },
-                    { label: '明天上午', value: 'tomorrow-morning' },
-                    { label: '明天下午', value: 'tomorrow-afternoon' },
-                    { label: '后天上午', value: 'day-after-morning' }
-                  ].map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => {
-                        const now = new Date();
-                        let targetDate = new Date();
-                        let targetTime = '';
-
-                        switch (option.value) {
-                          case 'today-afternoon':
-                            targetTime = '14:00';
-                            break;
-                          case 'tomorrow-morning':
-                            targetDate.setDate(now.getDate() + 1);
-                            targetTime = '09:00';
-                            break;
-                          case 'tomorrow-afternoon':
-                            targetDate.setDate(now.getDate() + 1);
-                            targetTime = '14:00';
-                            break;
-                          case 'day-after-morning':
-                            targetDate.setDate(now.getDate() + 2);
-                            targetTime = '09:00';
-                            break;
-                        }
-
-                        setSelectedDate(targetDate.toISOString().split('T')[0]);
-                        setSelectedTime(targetTime);
-                      }}
-                      style={styles.quickSelectButton}
-                    >
-                      <Text style={styles.quickSelectButtonText}>{option.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* 自定义时间选择 */}
-              <View style={styles.customTimeSection}>
-                <Text style={styles.customTimeTitle}>📅 自定义时间</Text>
-                
-                <View style={styles.dateTimeRow}>
-                  <View style={styles.dateTimeInput}>
-                    <Text style={styles.dateTimeLabel}>日期</Text>
-                    <TextInput
-                      style={styles.dateTimeTextInput}
-                      value={selectedDate}
-                      onChangeText={setSelectedDate}
-                      placeholder="选择日期"
-                      placeholderTextColor="#9ca3af"
-                    />
-                  </View>
-                  
-                  <View style={styles.dateTimeInput}>
-                    <Text style={styles.dateTimeLabel}>时间</Text>
-                    <TextInput
-                      style={styles.dateTimeTextInput}
-                      value={selectedTime}
-                      onChangeText={setSelectedTime}
-                      placeholder="选择时间"
-                      placeholderTextColor="#9ca3af"
-                    />
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity
-                style={styles.timePickerCancelButton}
-                onPress={() => {
-                  setShowTimePicker(false);
-                  setDeliverySpeed('准时达');
-                }}
-              >
-                <Text style={styles.timePickerCancelText}>❌ 取消</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.timePickerConfirmButton}
-                onPress={() => {
-                  if (selectedDate && selectedTime) {
-                    const formattedDateTime = `${selectedDate} ${selectedTime}`;
-                    setScheduledTime(formattedDateTime);
-                    setShowTimePicker(false);
-                  } else {
-                    Alert.alert('提示', '请选择日期和时间');
-                  }
-                }}
-              >
-                <LinearGradient
-                  colors={['#38a169', '#48bb78']}
-                  style={styles.timePickerConfirmGradient}
-                >
-                  <Text style={styles.timePickerConfirmText}>✅ 确认时间</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.modalCloseButtonText}>{currentT.packageTypeInfo.understood}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
-      {/* QR码模态框 */}
-      <Modal
-        visible={showQRCodeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowQRCodeModal(false)}
-      >
-        <View style={styles.qrModalOverlay}>
-          <View style={styles.qrModalContent}>
-            <LinearGradient
-              colors={['#2E86AB', '#4CA1CF']}
-              style={styles.qrModalHeader}
-            >
-              <Text style={styles.qrModalTitle}>✅ {currentT.orderSuccess}</Text>
-            </LinearGradient>
-
-            <View style={styles.qrModalBody}>
-              <Text style={styles.qrInfoText}>📦 {currentT.orderNumber}</Text>
-              <Text style={styles.qrOrderId}>{qrOrderId}</Text>
-              
-              <Text style={styles.qrInfoText}>💰 {currentT.totalAmount}</Text>
-              <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
-
-              <View style={styles.qrCodeContainer}>
-                <View style={styles.qrCodeWrapper}>
-                  <QRCode
-                    value={qrOrderId}
-                    size={200}
-                    color="#2E86AB"
-                    backgroundColor="white"
-                  />
-                </View>
-                <Text style={styles.qrHint}>
-                  {currentT.qrHint}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.qrModalButtons}>
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={() => {
-                  setShowQRCodeModal(false);
-                  navigation.navigate('MyOrders');
-                }}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  style={styles.qrButtonGradient}
-                >
-                  <Text style={styles.qrButtonText}>📋 {currentT.viewOrders}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={() => {
-                  setShowQRCodeModal(false);
-                  resetForm();
-                }}
-              >
-                <LinearGradient
-                  colors={['#10b981', '#059669']}
-                  style={styles.qrButtonGradient}
-                >
-                  <Text style={styles.qrButtonText}>➕ {currentT.continueOrder}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

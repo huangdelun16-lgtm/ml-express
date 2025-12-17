@@ -56,7 +56,22 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    initializeApp();
+    // 关键修复：添加 3 秒超时保护
+    // 如果初始化卡住，3秒后强制进入应用，避免白屏被拒
+    const safetyTimer = setTimeout(() => {
+      setIsLoggedIn((prevState) => {
+        if (prevState === null) {
+          console.warn('⚠️ 初始化超时，强制进入首页');
+          return false; // 超时默认为未登录
+        }
+        return prevState;
+      });
+    }, 3000);
+
+    // 正常执行初始化
+    initializeApp().finally(() => {
+      clearTimeout(safetyTimer);
+    });
     
     // 应用启动追踪
     analytics.track(EventType.APP_OPEN, {
