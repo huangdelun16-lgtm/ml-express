@@ -60,7 +60,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
