@@ -1282,8 +1282,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
           <BackToHomeButton navigation={navigation} />
           
           <View style={styles.header}>
-            <Text style={styles.title}>{currentT.title}</Text>
-            <Text style={styles.subtitle}>{currentT.subtitle}</Text>
+            <Text style={styles.headerTitle}>{currentT.title}</Text>
+            <Text style={styles.headerSubtitle}>{currentT.subtitle}</Text>
           </View>
 
           {/* 寄件人表单 */}
@@ -1381,11 +1381,11 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 colors={['#3b82f6', '#2563eb', '#1d4ed8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
+                style={styles.submitGradient}
               >
                 <DeliveryIcon size={24} color="#ffffff" />
-                <Text style={styles.submitButtonText}> {currentT.submitOrder}</Text>
-              </LinearGradient>
+                <Text style={styles.submitText}>{currentT.submitOrder}</Text>
+              </LinearGradient>>
             </TouchableOpacity>
           </ScaleInView>
           
@@ -2308,5 +2308,53 @@ const baseStyles = StyleSheet.create({
   selectedPlaceAddress: {
     fontSize: 12,
     color: '#0369a1',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  modalText: {
+    fontSize: 15,
+    color: '#475569',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  modalCloseButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
 });
