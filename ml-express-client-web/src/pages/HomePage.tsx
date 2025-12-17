@@ -2098,19 +2098,6 @@ const HomePage: React.FC = () => {
 
       <HomeBanner />
 
-      {/* 运单追踪 */}
-      <TrackingSection
-        language={language}
-        onTrack={(id) => navigate(`/tracking?id=${id}`)}
-        onScan={() => {
-          if (window.innerWidth < 768) {
-            alert('扫码功能开发中');
-          } else {
-            alert(language === 'zh' ? '请使用手机访问以使用扫码功能' : language === 'en' ? 'Please use mobile device to scan' : 'ဖုန်းဖြင့်အသုံးပြုပါ');
-          }
-        }}
-      />
-
       {/* 英雄区域 */}
       <section id="home" style={{
         position: 'relative',
