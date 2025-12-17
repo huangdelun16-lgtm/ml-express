@@ -1,4 +1,5 @@
 import React from 'react';
+import LoggerService from '../services/LoggerService';
 import { TouchableOpacity, Text, StyleSheet, Alert, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
@@ -8,10 +9,8 @@ interface LogoutButtonProps {
   position?: 'topRight' | 'topLeft' | 'bottomRight' | 'bottomLeft';
   style?: any;
 }
-
 export default function LogoutButton({ navigation, position = 'topRight', style }: LogoutButtonProps) {
   const { language } = useApp();
-
   const t = {
     zh: {
       logout: '退出',
@@ -32,9 +31,7 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
       confirm: 'အတည်ပြုရန်',
     },
   };
-
   const currentT = t[language] || t.zh;
-
   const handleLogout = () => {
     Alert.alert(
       currentT.logout,
@@ -51,15 +48,13 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
                 routes: [{ name: 'Login' }],
               });
             } catch (error) {
-              console.error('退出登录失败:', error);
+              LoggerService.error('退出登录失败:', error);
               Alert.alert('', currentT.logout + '失败，请重试');
             }
           },
         },
       ]
     );
-  };
-
   const getPositionStyle = () => {
     switch (position) {
       case 'topRight':
@@ -71,10 +66,7 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
       case 'bottomLeft':
         return { position: 'absolute' as const, bottom: 20, left: 20, zIndex: 1000 };
       default:
-        return { position: 'absolute' as const, top: 50, right: 20, zIndex: 1000 };
     }
-  };
-
   return (
     <TouchableOpacity
       style={[getPositionStyle(), styles.button, style]}
@@ -87,8 +79,6 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
       </View>
     </TouchableOpacity>
   );
-}
-
 const styles = StyleSheet.create({
   button: {
     backgroundColor: 'rgba(231, 76, 60, 0.9)',
@@ -115,4 +105,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

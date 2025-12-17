@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LoggerService from './../services/LoggerService';
 import { 
   View, 
   Text, 
@@ -382,7 +383,7 @@ export default function ProfileScreen({ navigation }: any) {
             const codStats = await packageService.getPartnerStats(user.id, storeName, selectedMonth);
             setPartnerCODStats(codStats);
           } catch (error) {
-            console.error('加载代收款统计失败:', error);
+            LoggerService.error('加载代收款统计失败:', error);
           }
         }
 
@@ -396,7 +397,7 @@ export default function ProfileScreen({ navigation }: any) {
         setOrderStats(stats);
       }
     } catch (error) {
-      console.error('加载用户数据失败:', error);
+      LoggerService.error('加载用户数据失败:', error);
     }
   };
 
@@ -474,13 +475,13 @@ export default function ProfileScreen({ navigation }: any) {
       
       // 注意：getPartnerCODOrders 现在返回 { orders, total }
       const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, 1, 20);
-      console.log('COD Orders result:', result);
+      LoggerService.debug('COD Orders result:', result);
       setAllCodOrders(result.orders);
       setCodOrders(result.orders);
       setCodOrdersTotal(result.total);
       setCodOrdersSearchText(''); // 重置搜索
     } catch (error) {
-      console.error('加载代收款订单失败:', error);
+      LoggerService.error('加载代收款订单失败:', error);
       showToast('加载订单列表失败', 'error');
     } finally {
       if (!isRefresh) {
@@ -551,7 +552,7 @@ export default function ProfileScreen({ navigation }: any) {
         setCodOrdersPage(nextPage);
       }
     } catch (error) {
-      console.error('加载更多代收款订单失败:', error);
+      LoggerService.error('加载更多代收款订单失败:', error);
     } finally {
       setCodOrdersLoadingMore(false);
     }
@@ -636,7 +637,7 @@ export default function ProfileScreen({ navigation }: any) {
         showToast(t.updateFailed, 'error');
       }
     } catch (error) {
-      console.error('更新用户资料失败:', error);
+      LoggerService.error('更新用户资料失败:', error);
       showToast(t.updateFailed, 'error');
     }
   };
@@ -680,7 +681,7 @@ export default function ProfileScreen({ navigation }: any) {
         setNotificationSettings(JSON.parse(settings));
       }
     } catch (error) {
-      console.error('加载通知设置失败:', error);
+      LoggerService.error('加载通知设置失败:', error);
     }
   };
 
@@ -691,7 +692,7 @@ export default function ProfileScreen({ navigation }: any) {
       setNotificationSettings(newSettings);
       showToast(t.settingsSaved, 'success');
     } catch (error) {
-      console.error('保存通知设置失败:', error);
+      LoggerService.error('保存通知设置失败:', error);
       showToast(t.settingsSaveFailed, 'error');
     }
   };

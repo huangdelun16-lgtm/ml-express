@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LoggerService from './../services/LoggerService';
 import {
   View,
   Text,
@@ -161,7 +162,7 @@ export default function LoginScreen({ navigation }: any) {
         hideLoading();
 
         if (storeError) {
-          console.error('查询合伙店铺失败:', storeError);
+          LoggerService.error('查询合伙店铺失败:', storeError);
           feedbackService.error(currentT.queryStoreFailed);
           return;
         }
@@ -209,7 +210,7 @@ export default function LoginScreen({ navigation }: any) {
       }
     } catch (error: any) {
       hideLoading();
-      console.error('登录错误:', error);
+      LoggerService.error('登录错误:', error);
       feedbackService.error(error.message || currentT.loginFailed);
     } finally {
       setLoading(false);

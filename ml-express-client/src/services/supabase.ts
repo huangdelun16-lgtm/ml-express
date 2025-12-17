@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
 import { retry } from '../utils/retry';
@@ -145,7 +146,7 @@ export const customerService = {
         .single();
 
       if (error) {
-        console.error('注册失败:', error);
+        LoggerService.error('注册失败:', error);
         throw error;
       }
 
@@ -175,13 +176,13 @@ export const customerService = {
         .single();
 
       if (error) {
-        console.error('更新用户信息失败:', error);
+        LoggerService.error('更新用户信息失败:', error);
         throw error;
       }
 
       return { success: true, data };
     } catch (error: any) {
-      console.error('更新用户信息失败:', error);
+      LoggerService.error('更新用户信息失败:', error);
       return { 
         success: false, 
         error: { message: error.message || '更新失败，请重试' }
@@ -275,7 +276,7 @@ export const customerService = {
       }
       return null;
     } catch (error) {
-      console.error('获取客户信息失败:', error);
+      LoggerService.error('获取客户信息失败:', error);
       return null;
     }
   },
@@ -295,7 +296,7 @@ export const customerService = {
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('更新客户信息失败:', error);
+      LoggerService.error('更新客户信息失败:', error);
       return false;
     }
   },
@@ -330,7 +331,7 @@ export const customerService = {
 
       return { success: true };
     } catch (error: any) {
-      console.error('修改密码失败:', error);
+      LoggerService.error('修改密码失败:', error);
       return { 
         success: false, 
         error: { message: error.message || '修改密码失败' }
@@ -368,7 +369,7 @@ export const customerService = {
 
       return { success: true };
     } catch (error: any) {
-      console.error('重置密码失败:', error);
+      LoggerService.error('重置密码失败:', error);
       return { 
         success: false, 
         error: { message: error.message || '重置密码失败' }
@@ -434,7 +435,7 @@ export const packageService = {
   // createPackage 别名（为了兼容性，接受完整的包裹数据）
   async createPackage(packageData: any) {
     try {
-      // console.log('开始创建订单，数据：', packageData); // 使用统一日志服务后可移除
+      // LoggerService.debug('开始创建订单，数据：', packageData); // 使用统一日志服务后可移除
 
       // 提取需要的字段并添加默认值
       // 注意：packages表没有customer_id字段，我们将客户ID添加到description中
@@ -476,7 +477,7 @@ export const packageService = {
         insertData.id = packageData.id;
       }
 
-      // console.log('准备插入数据库的数据：', insertData);
+      // LoggerService.debug('准备插入数据库的数据：', insertData);
 
       const { data, error } = await supabase
         .from('packages')
@@ -488,7 +489,7 @@ export const packageService = {
         throw error;
       }
 
-      // console.log('订单创建成功：', data);
+      // LoggerService.debug('订单创建成功：', data);
       
       // 更新用户订单统计（如果提供了customer_id）
       if (packageData.customer_id) {
@@ -598,7 +599,7 @@ export const packageService = {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('获取最近订单失败:', error);
+      LoggerService.error('获取最近订单失败:', error);
       return [];
     }
   },
@@ -661,7 +662,7 @@ export const packageService = {
       const { data, error } = await query;
 
       if (error) {
-        console.error('获取订单统计失败:', error);
+        LoggerService.error('获取订单统计失败:', error);
         throw error;
       }
 
@@ -675,7 +676,7 @@ export const packageService = {
 
       return stats;
     } catch (error) {
-      console.error('获取订单统计失败:', error);
+      LoggerService.error('获取订单统计失败:', error);
       return {
         total: 0,
         pending: 0,
@@ -720,7 +721,7 @@ export const packageService = {
 
       // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
       if (error && error.code === '42703') {
-        console.warn('cod_settled 字段不存在，使用降级查询');
+        LoggerService.warn('cod_settled 字段不存在，使用降级查询');
         const retryResult = await runQuery('cod_amount, status, delivery_time');
         data = retryResult.data;
         error = retryResult.error;
@@ -750,7 +751,7 @@ export const packageService = {
         lastSettledAt
       };
     } catch (error) {
-      console.error('获取合伙人统计失败:', error);
+      LoggerService.error('获取合伙人统计失败:', error);
       return {
         totalCOD: 0,
         unclearedCOD: 0,
@@ -793,7 +794,7 @@ export const packageService = {
       
       if (error) throw error;
       
-      console.log(`[getPartnerCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
+      LoggerService.debug(`[getPartnerCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
       
       const orders = (data || []).map(pkg => ({
         orderId: pkg.id,
@@ -803,7 +804,7 @@ export const packageService = {
       
       return { orders, total: count || 0 };
     } catch (error) {
-      console.error('获取代收款订单列表失败:', error);
+      LoggerService.error('获取代收款订单列表失败:', error);
       return { orders: [], total: 0 };
     }
   },
@@ -820,7 +821,7 @@ export const packageService = {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('获取订单详情失败:', error);
+      LoggerService.error('获取订单详情失败:', error);
       return null;
     }
   },
@@ -828,7 +829,7 @@ export const packageService = {
   // 追踪订单（通过包裹ID）
   async trackOrder(trackingCode: string) {
     try {
-      console.log('正在查询订单:', trackingCode);
+      LoggerService.debug('正在查询订单:', trackingCode);
       
       const { data, error } = await supabase
         .from('packages')
@@ -836,16 +837,16 @@ export const packageService = {
         .eq('id', trackingCode.trim())
         .maybeSingle();
 
-      console.log('查询结果:', { data, error });
+      LoggerService.debug('查询结果:', { data, error });
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Supabase查询错误:', error);
+        LoggerService.error('Supabase查询错误:', error);
         throw error;
       }
       
       return data;
     } catch (error) {
-      console.error('追踪订单失败:', error);
+      LoggerService.error('追踪订单失败:', error);
       return null;
     }
   },
@@ -889,7 +890,7 @@ export const packageService = {
       if (error) throw error;
       return { success: true, message: '订单已取消' };
     } catch (error) {
-      console.error('取消订单失败:', error);
+      LoggerService.error('取消订单失败:', error);
       return { success: false, message: '取消订单失败' };
     }
   },
@@ -939,7 +940,7 @@ export const packageService = {
       if (error) throw error;
       return { success: true, message: '评价成功' };
     } catch (error) {
-      console.error('评价订单失败:', error);
+      LoggerService.error('评价订单失败:', error);
       return { success: false, message: '评价订单失败' };
     }
   },
@@ -956,7 +957,7 @@ export const packageService = {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('获取追踪历史失败:', error);
+      LoggerService.error('获取追踪历史失败:', error);
       return [];
     }
   },
@@ -1042,7 +1043,7 @@ export const packageService = {
       if (error) throw error;
       return { orders: data || [], total: count || 0 };
     } catch (error) {
-      console.error('获取订单列表失败:', error);
+      LoggerService.error('获取订单列表失败:', error);
       return { orders: [], total: 0 };
     }
   },
@@ -1060,7 +1061,7 @@ export const systemSettingsService = {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('获取系统设置失败:', error);
+      LoggerService.error('获取系统设置失败:', error);
       return null;
     }
   },

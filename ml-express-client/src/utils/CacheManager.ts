@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoggerService from './LoggerService';
 
 // 缓存配置
 interface CacheConfig {
@@ -141,7 +142,7 @@ class PersistentCache<T> {
     try {
       await AsyncStorage.setItem(this.getKey(key), JSON.stringify(entry));
     } catch (error) {
-      console.error('Failed to set cache:', error);
+      LoggerService.error('Failed to set cache:', error);
     }
   }
 
@@ -161,7 +162,7 @@ class PersistentCache<T> {
 
       return entry.data;
     } catch (error) {
-      console.error('Failed to get cache:', error);
+      LoggerService.error('Failed to get cache:', error);
       return null;
     }
   }
@@ -171,7 +172,7 @@ class PersistentCache<T> {
     try {
       await AsyncStorage.removeItem(this.getKey(key));
     } catch (error) {
-      console.error('Failed to delete cache:', error);
+      LoggerService.error('Failed to delete cache:', error);
     }
   }
 
@@ -182,7 +183,7 @@ class PersistentCache<T> {
       const cacheKeys = keys.filter(key => key.startsWith(this.prefix));
       await AsyncStorage.multiRemove(cacheKeys);
     } catch (error) {
-      console.error('Failed to clear cache:', error);
+      LoggerService.error('Failed to clear cache:', error);
     }
   }
 
@@ -320,7 +321,7 @@ class PreloadManager {
         try {
           await task();
         } catch (error) {
-          console.error('Preload task failed:', error);
+          LoggerService.error('Preload task failed:', error);
         }
       }
     }
@@ -362,7 +363,7 @@ export const CacheUtils = {
   // 清理过期缓存
   cleanup: async (): Promise<void> => {
     // 这里可以添加清理逻辑
-    console.log('Cache cleanup completed');
+    LoggerService.debug('Cache cleanup completed');
   },
 };
 

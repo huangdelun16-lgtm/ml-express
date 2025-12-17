@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import LoggerService from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Language = 'zh' | 'en' | 'my';
-
 interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
 }
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 interface AppProviderProps {
@@ -16,7 +15,6 @@ interface AppProviderProps {
 
 export function AppProvider({ children }: AppProviderProps) {
   const [language, setLanguageState] = useState<Language>('zh');
-
   // 从本地存储加载语言设置
   useEffect(() => {
     const loadLanguage = async () => {
@@ -26,21 +24,19 @@ export function AppProvider({ children }: AppProviderProps) {
           setLanguageState(savedLang as Language);
         }
       } catch (error) {
-        console.error('加载语言设置失败:', error);
+        LoggerService.error('加载语言设置失败:', error);
       }
     };
     loadLanguage();
   }, []);
-
   const setLanguage = async (lang: Language) => {
     setLanguageState(lang);
     try {
       await AsyncStorage.setItem('ml-express-language', lang);
     } catch (error) {
-      console.error('保存语言设置失败:', error);
+      LoggerService.error('保存语言设置失败:', error);
     }
   };
-
   return (
     <AppContext.Provider value={{ language, setLanguage }}>
       {children}
@@ -55,4 +51,3 @@ export function useApp() {
   }
   return context;
 }
-

@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useMemo } from 'react';
+import LoggerService from './../../services/LoggerService';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { errorService } from '../../services/ErrorService';
@@ -203,7 +204,7 @@ const MapModal = memo<MapModalProps>(({
           onPoiClick={handlePoiClick}
           onMapReady={() => {
             if (__DEV__) {
-              console.log('地图已准备就绪');
+              LoggerService.debug('地图已准备就绪');
             }
           }}
         >

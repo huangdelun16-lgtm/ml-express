@@ -39,7 +39,7 @@ export async function sendVerificationCode(
       };
     }
   } catch (error) {
-    console.error('发送验证码失败:', error);
+    LoggerService.error('发送验证码失败:', error);
     return {
       success: false,
       message: language === 'zh' ? '发送验证码失败，请稍后重试' : 
@@ -81,7 +81,7 @@ export async function verifyVerificationCode(
       };
     }
   } catch (error) {
-    console.error('验证验证码失败:', error);
+    LoggerService.error('验证验证码失败:', error);
     return {
       success: false,
       message: language === 'zh' ? '验证失败，请稍后重试' : 

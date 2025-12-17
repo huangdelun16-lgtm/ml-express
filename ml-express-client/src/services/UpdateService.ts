@@ -1,13 +1,13 @@
 import * as Updates from 'expo-updates';
+import LoggerService from './LoggerService';
 import { Alert } from 'react-native';
 
 export class UpdateService {
   static async checkForUpdates() {
     if (__DEV__) {
-      console.log('Update check skipped in development mode');
+      LoggerService.debug('Update check skipped in development mode');
       return;
     }
-
     try {
       const update = await Updates.checkForUpdateAsync();
       
@@ -15,14 +15,10 @@ export class UpdateService {
         await this.downloadAndRestart();
       }
     } catch (error) {
-      console.error('Update check failed:', error);
-    }
+      LoggerService.error('Update check failed:', error);
   }
-
   static async downloadAndRestart() {
-    try {
       await Updates.fetchUpdateAsync();
-      
       Alert.alert(
         '发现新版本',
         '应用已更新到最新版本，需要重启应用。',
@@ -37,8 +33,5 @@ export class UpdateService {
         ],
         { cancelable: false }
       );
-    } catch (error) {
-      console.error('Update download failed:', error);
-    }
-  }
+      LoggerService.error('Update download failed:', error);
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LoggerService from './../services/LoggerService';
 import {
   View,
   Text,
@@ -201,7 +202,7 @@ export default function TrackOrderScreen({ navigation }: any) {
         showToast(t.notFound, 'error');
       }
     } catch (error: any) {
-      console.error('查询失败:', error);
+      LoggerService.error('查询失败:', error);
       setPackageData(null);
       setTrackingHistory([]);
       showToast(t.searchError, 'error');

@@ -1,4 +1,5 @@
 import * as Linking from 'expo-linking';
+import LoggerService from './LoggerService';
 
 class LinkingService {
   private navigationRef: any = null;
@@ -17,7 +18,7 @@ class LinkingService {
   }
 
   handleDeepLink(url: string) {
-    console.log('Deep link:', url);
+    LoggerService.debug('Deep link:', url);
     if (!this.navigationRef) return;
     const { path, queryParams } = Linking.parse(url);
     

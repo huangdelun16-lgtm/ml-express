@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import LoggerService from './LoggerService';
 
 type SyncStatus = 'pending' | 'synced';
 
@@ -42,7 +43,7 @@ class DatabaseService {
 
   async saveOrder(order: any, options?: { syncStatus?: SyncStatus; errorMessage?: string }) {
     if (!order?.id) {
-      console.warn('无法保存离线订单：缺少id');
+      LoggerService.warn('无法保存离线订单：缺少id');
       return;
     }
 

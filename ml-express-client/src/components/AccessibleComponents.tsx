@@ -1,4 +1,5 @@
 import React from 'react';
+import LoggerService from '../services/LoggerService';
 import {
   View,
   Text,
@@ -72,7 +73,6 @@ export const AccessibleButton: React.FC<AccessibleButtonProps> = ({
     </TouchableOpacity>
   );
 };
-
 // 无障碍文本输入组件
 interface AccessibleTextInputProps extends AccessibilityProps {
   placeholder?: string;
@@ -81,8 +81,10 @@ interface AccessibleTextInputProps extends AccessibilityProps {
   secureTextEntry?: boolean;
   keyboardType?: any;
   multiline?: boolean;
-  style?: any;
   label?: string;
+  style?: any;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export const AccessibleTextInput: React.FC<AccessibleTextInputProps> = ({
@@ -92,8 +94,8 @@ export const AccessibleTextInput: React.FC<AccessibleTextInputProps> = ({
   secureTextEntry = false,
   keyboardType = 'default',
   multiline = false,
-  style,
   label,
+  style,
   accessibilityLabel,
   accessibilityHint,
   ...accessibilityProps
@@ -130,17 +132,17 @@ export const AccessibleTextInput: React.FC<AccessibleTextInputProps> = ({
 interface AccessibleCardProps extends AccessibilityProps {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: any;
   title?: string;
   subtitle?: string;
+  style?: any;
 }
 
 export const AccessibleCard: React.FC<AccessibleCardProps> = ({
   children,
   onPress,
-  style,
   title,
   subtitle,
+  style,
   accessibilityLabel,
   accessibilityHint,
   ...accessibilityProps
@@ -148,11 +150,9 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
   const CardComponent = onPress ? TouchableOpacity : View;
   
   return (
+  
     <CardComponent
       style={[styles.card, style]}
-      onPress={onPress}
-      accessible={true}
-      accessibilityLabel={accessibilityLabel || title}
       accessibilityHint={accessibilityHint || subtitle}
       accessibilityRole={onPress ? 'button' : 'summary'}
       {...accessibilityProps}
@@ -175,30 +175,25 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
 // 无障碍图片组件
 interface AccessibleImageProps extends AccessibilityProps {
   source: { uri: string } | number;
-  style?: any;
   resizeMode?: any;
   alt?: string; // 替代文本
+  style?: any;
 }
 
 export const AccessibleImage: React.FC<AccessibleImageProps> = ({
   source,
-  style,
   resizeMode = 'cover',
   alt,
+  style,
   accessibilityLabel,
-  accessibilityHint,
-  ...accessibilityProps
 }) => {
   return (
     <Image
       source={source}
       style={style}
       resizeMode={resizeMode}
-      accessible={true}
       accessibilityLabel={accessibilityLabel || alt}
-      accessibilityHint={accessibilityHint}
       accessibilityRole="image"
-      {...accessibilityProps}
     />
   );
 };
@@ -207,39 +202,28 @@ export const AccessibleImage: React.FC<AccessibleImageProps> = ({
 interface AccessibleSwitchProps extends AccessibilityProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
-  disabled?: boolean;
   label?: string;
+  disabled?: boolean;
+  style?: any;
 }
 
 export const AccessibleSwitch: React.FC<AccessibleSwitchProps> = ({
   value,
   onValueChange,
-  disabled = false,
   label,
+  disabled = false,
+  style,
   accessibilityLabel,
-  accessibilityHint,
-  ...accessibilityProps
 }) => {
   return (
     <View style={styles.switchContainer}>
-      {label && (
-        <Text
           style={styles.switchLabel}
-          accessibilityRole="text"
-        >
-          {label}
-        </Text>
-      )}
       <Switch
-        value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        accessible={true}
         accessibilityLabel={accessibilityLabel || label}
-        accessibilityHint={accessibilityHint}
         accessibilityRole="switch"
         accessibilityState={{ checked: value, disabled }}
-        {...accessibilityProps}
       />
     </View>
   );
@@ -250,28 +234,23 @@ interface AccessibleListProps extends AccessibilityProps {
   data: any[];
   renderItem: ({ item, index }: { item: any; index: number }) => React.ReactElement;
   keyExtractor: (item: any, index: number) => string;
-  style?: any;
   title?: string;
+  style?: any;
 }
 
 export const AccessibleList: React.FC<AccessibleListProps> = ({
   data,
   renderItem,
   keyExtractor,
-  style,
   title,
+  style,
   accessibilityLabel,
-  accessibilityHint,
-  ...accessibilityProps
 }) => {
   return (
     <ScrollView
       style={[styles.list, style]}
-      accessible={true}
-      accessibilityLabel={accessibilityLabel || title}
-      accessibilityHint={accessibilityHint}
       accessibilityRole="list"
-      {...accessibilityProps}
+      accessibilityLabel={accessibilityLabel}
     >
       {title && (
         <Text style={styles.listTitle} accessibilityRole="header">
@@ -304,22 +283,17 @@ export const AccessibleHeading: React.FC<AccessibleHeadingProps> = ({
   children,
   style,
   accessibilityLabel,
-  ...accessibilityProps
 }) => {
   const headingStyle = [
     styles.heading,
     styles[`heading${level}` as keyof typeof styles],
     style,
   ];
-
-  return (
     <Text
       style={headingStyle}
-      accessible={true}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="header"
       accessibilityLevel={level}
-      {...accessibilityProps}
     >
       {children}
     </Text>
@@ -339,24 +313,19 @@ export const AccessibleLink: React.FC<AccessibleLinkProps> = ({
   children,
   style,
   textStyle,
-  accessibilityLabel,
   accessibilityHint,
-  ...accessibilityProps
 }) => {
   const handlePress = () => {
     // 这里应该使用 Linking.openURL(url)
-    console.log('打开链接:', url);
+    LoggerService.debug('打开链接', url);
   };
-
+  
   return (
     <TouchableOpacity
       style={[styles.link, style]}
       onPress={handlePress}
-      accessible={true}
-      accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint || `打开链接: ${url}`}
       accessibilityRole="link"
-      {...accessibilityProps}
     >
       <Text style={[styles.linkText, textStyle]}>
         {children}
@@ -364,36 +333,30 @@ export const AccessibleLink: React.FC<AccessibleLinkProps> = ({
     </TouchableOpacity>
   );
 };
-
 // 无障碍工具函数
 export const AccessibilityUtils = {
   // 生成无障碍标签
   generateLabel: (prefix: string, ...parts: string[]): string => {
     return [prefix, ...parts].filter(Boolean).join(', ');
   },
-
   // 生成无障碍提示
   generateHint: (action: string, context?: string): string => {
     return context ? `${action} ${context}` : action;
   },
-
   // 检查无障碍设置
   isAccessibilityEnabled: (): boolean => {
     // 在实际应用中，这里应该检查系统的无障碍设置
     return true;
   },
-
   // 获取屏幕阅读器状态
   isScreenReaderEnabled: (): boolean => {
     // 在实际应用中，这里应该检查屏幕阅读器状态
     return false;
   },
-
   // 生成数字的无障碍描述
   formatNumber: (num: number): string => {
     return num.toString();
   },
-
   // 生成日期的无障碍描述
   formatDate: (date: Date): string => {
     return date.toLocaleDateString('zh-CN', {
@@ -402,7 +365,6 @@ export const AccessibilityUtils = {
       day: 'numeric',
     });
   },
-
   // 生成时间的无障碍描述
   formatTime: (date: Date): string => {
     return date.toLocaleTimeString('zh-CN', {
@@ -436,22 +398,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',
-    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 16,
     backgroundColor: 'white',
   },
   card: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -463,39 +420,26 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 8,
   },
   cardSubtitle: {
     fontSize: 14,
     color: '#6b7280',
-    marginBottom: 12,
   },
   switchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   switchLabel: {
-    fontSize: 16,
-    color: '#374151',
     flex: 1,
   },
   list: {
-    flex: 1,
   },
   listTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
-    paddingHorizontal: 16,
   },
   heading: {
-    fontWeight: 'bold',
-    color: '#1f2937',
   },
   heading1: {
     fontSize: 32,
@@ -507,20 +451,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   heading4: {
-    fontSize: 20,
   },
   heading5: {
-    fontSize: 18,
   },
   heading6: {
-    fontSize: 16,
   },
   link: {
     paddingVertical: 8,
   },
   linkText: {
     color: '#2E86AB',
-    fontSize: 16,
     textDecorationLine: 'underline',
   },
 });

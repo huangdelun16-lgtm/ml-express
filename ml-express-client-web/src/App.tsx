@@ -1,4 +1,5 @@
 import React from 'react';
+import LoggerService from '../services/LoggerService';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import ServicesPage from './pages/ServicesPage';
@@ -19,15 +20,12 @@ class ErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
-
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('应用错误:', error, errorInfo);
+    LoggerService.error('应用错误:', error, errorInfo);
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -66,11 +64,9 @@ class ErrorBoundary extends React.Component<
         </div>
       );
     }
-
     return this.props.children;
   }
 }
-
 function App() {
   return (
     <ErrorBoundary>
@@ -93,5 +89,4 @@ function App() {
     </ErrorBoundary>
   );
 }
-
 export default App;

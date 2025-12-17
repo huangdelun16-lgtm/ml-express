@@ -1,4 +1,5 @@
 import { Image } from 'react-native';
+import LoggerService from './LoggerService';
 
 // 图片压缩配置
 interface CompressionConfig {
@@ -52,7 +53,7 @@ export class ImageOptimizer {
       
       return compressedUri;
     } catch (error) {
-      console.error('图片压缩失败:', error);
+      LoggerService.error('图片压缩失败:', error);
       return imageUri; // 压缩失败时返回原始URI
     }
   }
@@ -73,7 +74,7 @@ export class ImageOptimizer {
         });
         results[size.name] = compressedUri;
       } catch (error) {
-        console.error(`生成${size.name}尺寸失败:`, error);
+        LoggerService.error(`生成${size.name}尺寸失败:`, error);
         results[size.name] = imageUri;
       }
     }
@@ -103,7 +104,7 @@ export class ImageOptimizer {
         imageUri,
         (width, height) => resolve({ width, height }),
         (error) => {
-          console.error('获取图片信息失败:', error);
+          LoggerService.error('获取图片信息失败:', error);
           resolve(null);
         }
       );
@@ -258,7 +259,7 @@ export class LazyLoadManager {
       await Image.prefetch(imageUri);
       this.markImageAsLoaded(imageUri);
     } catch (error) {
-      console.error('预加载图片失败:', error);
+      LoggerService.error('预加载图片失败:', error);
       this.loadingImages.delete(imageUri);
     }
   }

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoggerService from './LoggerService';
 
 // 事件类型枚举
 export enum EventType {
@@ -122,9 +123,9 @@ export class AnalyticsService {
         page_title: 'MARKET LINK EXPRESS',
       });
       
-      console.log('Analytics service initialized');
+      LoggerService.debug('Analytics service initialized');
     } catch (error) {
-      console.error('Failed to initialize analytics:', error);
+      LoggerService.error('Failed to initialize analytics:', error);
     }
   }
 
@@ -154,7 +155,7 @@ export class AnalyticsService {
       this.flush();
     }
 
-    console.log('Event tracked:', type, properties);
+    LoggerService.debug('Event tracked:', type, properties);
   }
 
   // 设置用户属性
@@ -164,7 +165,7 @@ export class AnalyticsService {
     try {
       await AsyncStorage.setItem('analytics_user_properties', JSON.stringify(properties));
     } catch (error) {
-      console.error('Failed to save user properties:', error);
+      LoggerService.error('Failed to save user properties:', error);
     }
   }
 
@@ -267,9 +268,9 @@ export class AnalyticsService {
     try {
       // 这里应该发送到分析服务器
       await this.sendEventsToServer(eventsToSend);
-      console.log(`Sent ${eventsToSend.length} events to server`);
+      LoggerService.debug(`Sent ${eventsToSend.length} events to server`);
     } catch (error) {
-      console.error('Failed to send events:', error);
+      LoggerService.error('Failed to send events:', error);
       // 发送失败时重新添加到队列
       this.events.unshift(...eventsToSend);
     }
@@ -300,7 +301,7 @@ export class AnalyticsService {
       await AsyncStorage.removeItem('analytics_session');
       await AsyncStorage.removeItem('analytics_user_properties');
     } catch (error) {
-      console.error('Failed to clear analytics data:', error);
+      LoggerService.error('Failed to clear analytics data:', error);
     }
   }
 
@@ -332,7 +333,7 @@ export class AnalyticsService {
         }
       }
     } catch (error) {
-      console.error('Failed to load session info:', error);
+      LoggerService.error('Failed to load session info:', error);
     }
 
     // 创建新会话
@@ -347,7 +348,7 @@ export class AnalyticsService {
     try {
       await AsyncStorage.setItem('analytics_session', JSON.stringify(newSession));
     } catch (error) {
-      console.error('Failed to save session info:', error);
+      LoggerService.error('Failed to save session info:', error);
     }
 
     return newSession;
@@ -359,7 +360,7 @@ export class AnalyticsService {
       const stored = await AsyncStorage.getItem('analytics_user_properties');
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
-      console.error('Failed to load user properties:', error);
+      LoggerService.error('Failed to load user properties:', error);
       return null;
     }
   }
@@ -383,7 +384,7 @@ export class AnalyticsService {
     
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('Events sent to server:', events.length);
+        LoggerService.debug('Events sent to server:', events.length);
         resolve();
       }, 100);
     });
@@ -410,7 +411,7 @@ export class CrashReportingService {
     // 设置未处理的Promise拒绝处理器
     this.setupUnhandledRejectionHandler();
     
-    console.log('Crash reporting initialized');
+    LoggerService.debug('Crash reporting initialized');
   }
 
   // 记录崩溃
@@ -432,7 +433,7 @@ export class CrashReportingService {
     // 发送崩溃报告到服务器
     this.sendCrashReport(crashReport);
     
-    console.error('Crash recorded:', crashReport);
+    LoggerService.error('Crash recorded:', crashReport);
   }
 
   // 记录异常
@@ -450,7 +451,7 @@ export class CrashReportingService {
     // 发送异常报告到服务器
     this.sendExceptionReport(exceptionReport);
     
-    console.error('Exception recorded:', exceptionReport);
+    LoggerService.error('Exception recorded:', exceptionReport);
   }
 
   // 设置全局错误处理器
@@ -501,13 +502,13 @@ export class CrashReportingService {
   private async sendCrashReport(report: any): Promise<void> {
     // 在实际项目中，这里应该发送到崩溃报告服务
     // 例如：Crashlytics, Sentry, Bugsnag 等
-    console.log('Crash report sent:', report);
+    LoggerService.debug('Crash report sent:', report);
   }
 
   // 发送异常报告
   private async sendExceptionReport(report: any): Promise<void> {
     // 在实际项目中，这里应该发送到异常报告服务
-    console.log('Exception report sent:', report);
+    LoggerService.debug('Exception report sent:', report);
   }
 
   // 启用/禁用崩溃报告

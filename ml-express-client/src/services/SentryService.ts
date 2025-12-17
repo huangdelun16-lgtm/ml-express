@@ -2,6 +2,7 @@
 // 如果需要启用 Sentry，请确保安装了所有必要的依赖包
 
 import Constants from 'expo-constants';
+import LoggerService from './LoggerService';
 
 class SentryService {
   private initialized = false;
@@ -10,7 +11,7 @@ class SentryService {
   init() {
     // 暂时禁用 Sentry，避免依赖问题
     if (__DEV__) {
-      console.log('Sentry 已禁用（开发模式）');
+      LoggerService.debug('Sentry 已禁用（开发模式）');
       return;
     }
 
@@ -27,18 +28,18 @@ class SentryService {
       this.initialized = true;
       this.enabled = true;
     } catch (error) {
-      console.warn('Sentry 初始化失败:', error);
+      LoggerService.warn('Sentry 初始化失败:', error);
     }
     */
     
-    console.log('Sentry 已禁用（暂时关闭以避免依赖问题）');
+    LoggerService.debug('Sentry 已禁用（暂时关闭以避免依赖问题）');
   }
 
   captureException(error: Error, context?: Record<string, any>) {
     if (!this.enabled || !this.initialized) {
       // 在开发模式下，至少打印错误到控制台
       if (__DEV__) {
-        console.error('错误:', error, context);
+        LoggerService.error('错误:', error, context);
       }
       return;
     }

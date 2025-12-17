@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LoggerService from './../services/LoggerService';
 import {
   View,
   Text,
@@ -278,7 +279,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       await Clipboard.setStringAsync(order?.id || '');
       showToast(t.copied, 'success');
     } catch (error) {
-      console.error('复制订单号失败:', error);
+      LoggerService.error('复制订单号失败:', error);
       showToast('复制失败', 'error');
     }
   };
@@ -312,7 +313,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       const history = await packageService.getTrackingHistory(orderId);
       setTrackingHistory(history);
     } catch (error: any) {
-      console.error('加载订单详情失败:', error);
+      LoggerService.error('加载订单详情失败:', error);
       const errorMsg = error?.message || '加载订单详情失败，请稍后重试';
       showToast(errorMsg, 'error');
     } finally {

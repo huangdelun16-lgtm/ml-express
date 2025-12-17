@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import LoggerService from '../services/LoggerService';
 import { errorService, AppError } from '../services/ErrorService';
 
 interface ErrorHandlerProps {
@@ -113,7 +114,7 @@ export class ErrorBoundary extends React.Component<
   componentDidCatch(error: Error, errorInfo: any) {
     // 使用 ErrorService 记录错误
     errorService.handleError(error, { context: 'ErrorBoundary', silent: true });
-    console.error('ErrorBoundary caught error:', error, errorInfo);
+    LoggerService.error('ErrorBoundary caught error:', error, errorInfo);
   }
 
   render() {

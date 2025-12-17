@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { toastService } from './ToastService';
+import LoggerService from './LoggerService';
 
 export interface AppError {
   message: string;
@@ -177,21 +178,13 @@ class ErrorService {
     return appError;
   }
 
-  // 记录错误（后续可对接 Sentry 等）
+  // 记录错误（使用统一的 LoggerService）
   private logError(error: AppError, context?: string) {
-    const timestamp = new Date().toISOString();
     const contextMsg = context ? `[${context}]` : '';
-
-    if (__DEV__) {
-      console.error(
-        `${timestamp} ${contextMsg} Error:`,
-        error.message,
-        error.originalError || ''
-      );
-    } else {
-      // 生产环境：发送到日志服务
-      // SentryService.captureException(error.originalError || new Error(error.message));
-    }
+    const message = `${contextMsg} ${error.message}`;
+    
+    // 使用统一的 LoggerService
+    LoggerService.error(message, error.originalError || error, { context });
   }
 
   // 显示错误提示（Alert）

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LoggerService from '../services/LoggerService';
 import { 
   View, 
   Text, 
@@ -15,7 +16,6 @@ import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 
 const { width } = Dimensions.get('window');
-
 interface NotificationSettings {
   orderUpdates: boolean;
   deliveryReminders: boolean;
@@ -25,7 +25,6 @@ interface NotificationSettings {
   emailNotifications: boolean;
   smsNotifications: boolean;
 }
-
 export default function NotificationSettingsScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { settings: initialSettings, onSave } = route.params || {};
@@ -39,18 +38,15 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
     emailNotifications: false,
     smsNotifications: false,
   });
-
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
     setToastVisible(true);
   };
-
   // 多语言翻译
   const translations = {
     zh: {
@@ -132,9 +128,8 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       confirm: 'သေချာပါတယ်',
     },
   };
-
+  
   const t = translations[language as keyof typeof translations];
-
   // 处理设置变更
   const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -149,7 +144,7 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
         navigation.goBack();
       }
     } catch (error) {
-      console.error('保存通知设置失败:', error);
+      LoggerService.error('保存通知设置失败:', error);
       showToast(t.settingsSaveFailed, 'error');
     }
   };
@@ -205,7 +200,6 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       />
     </View>
   );
-
   return (
     <View style={styles.container}>
       <BackToHomeButton navigation={navigation} position="topRight" />
@@ -219,12 +213,10 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
         <Text style={styles.headerTitle}>{t.title}</Text>
         <View style={styles.headerRight} />
       </LinearGradient>
-
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.descriptionContainer}>
           <Text style={styles.description}>{t.description}</Text>
         </View>
-
         <View style={styles.settingsContainer}>
           <Text style={styles.sectionTitle}>📱 推送通知</Text>
           {renderSettingItem('pushNotifications', t.pushNotifications, t.pushNotificationsDesc, '🔔')}
@@ -232,23 +224,18 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
           <Text style={styles.sectionTitle}>📦 订单相关</Text>
           {renderSettingItem('orderUpdates', t.orderUpdates, t.orderUpdatesDesc, '📋')}
           {renderSettingItem('deliveryReminders', t.deliveryReminders, t.deliveryRemindersDesc, '🚚')}
-          
           <Text style={styles.sectionTitle}>📢 营销消息</Text>
           {renderSettingItem('promotionalMessages', t.promotionalMessages, t.promotionalMessagesDesc, '🎯')}
-          
           <Text style={styles.sectionTitle}>ℹ️ 系统消息</Text>
           {renderSettingItem('systemAnnouncements', t.systemAnnouncements, t.systemAnnouncementsDesc, '📢')}
-          
           <Text style={styles.sectionTitle}>📧 其他通知方式</Text>
           {renderSettingItem('emailNotifications', t.emailNotifications, t.emailNotificationsDesc, '📧')}
           {renderSettingItem('smsNotifications', t.smsNotifications, t.smsNotificationsDesc, '📱')}
         </View>
-
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.resetButton} onPress={handleResetToDefault}>
             <Text style={styles.resetButtonText}>{t.resetToDefault}</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
             <LinearGradient
               colors={['#10b981', '#059669']}
@@ -259,7 +246,6 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
       <Toast
         visible={toastVisible}
         message={toastMessage}
@@ -268,7 +254,7 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -296,7 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
-    flex: 1,
     textAlign: 'center',
   },
   headerRight: {
@@ -306,7 +291,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   descriptionContainer: {
     backgroundColor: '#ffffff',
@@ -323,7 +308,6 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: '#6b7280',
-    textAlign: 'center',
     lineHeight: 20,
   },
   settingsContainer: {
@@ -331,15 +315,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 20,
     borderRadius: 12,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    overflow: 'hidden',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#374151',
     paddingHorizontal: 16,
@@ -359,7 +343,6 @@ const styles = StyleSheet.create({
   },
   settingLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
     marginRight: 16,
   },
@@ -382,26 +365,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   buttonContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
+    margin: 20,
     gap: 12,
   },
   resetButton: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    backgroundColor: '#f3f4f6',
     borderWidth: 1,
     borderColor: '#d1d5db',
   },
   resetButtonText: {
+    color: '#4b5563',
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b7280',
   },
   saveButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
     shadowColor: '#10b981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -409,12 +389,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   saveButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
   },
 });
+

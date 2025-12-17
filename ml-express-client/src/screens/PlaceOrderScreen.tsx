@@ -29,6 +29,7 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { analytics } from '../services/AnalyticsService';
+import LoggerService from '../services/LoggerService';
 // 导入拆分后的组件
 import SenderForm from '../components/placeOrder/SenderForm';
 import ReceiverForm from '../components/placeOrder/ReceiverForm';
@@ -562,7 +563,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
             .maybeSingle();
           
           if (store) {
-            console.log('✅ App端已加载合伙店铺信息:', store.store_name);
+            LoggerService.debug('✅ App端已加载合伙店铺信息:', store.store_name);
             setPartnerStore(store);
             
             // 自动填充寄件人信息
@@ -575,10 +576,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
               lat: store.latitude,
               lng: store.longitude
             });
-            console.log('✅ 已自动填充店铺信息和坐标');
+            LoggerService.debug('✅ 已自动填充店铺信息和坐标');
           }
         } catch (error) {
-          console.error('加载合伙店铺失败:', error);
+          LoggerService.error('加载合伙店铺失败:', error);
         }
       };
       loadPartnerStore();
@@ -599,7 +600,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           const user = JSON.parse(currentUserStr);
           setCurrentUser(user);
         } catch (e) {
-          console.error('解析用户信息失败:', e);
+          LoggerService.error('解析用户信息失败:', e);
         }
       } else {
         // 如果没有 currentUser，尝试构造一个（虽然通常应该有）
@@ -678,7 +679,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
       // 设置超时和优化选项
       const locationPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
-        maximumAge: 60000, // 接受1分钟内的缓存位置
       });
       
       const timeoutPromise = new Promise((_, reject) => 
@@ -729,7 +729,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
         setSenderAddress(addressWithCoords);
         setSenderCoordinates(coords);
-        console.log('✅ 当前位置坐标已保存:', coords);
+        LoggerService.debug('✅ 当前位置坐标已保存:', coords);
       }
       
       hideLoading();
@@ -746,7 +746,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
       // 如果是 Partner 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
       if (currentUser?.user_type === 'partner' && type === 'sender' && partnerStore) {
-          console.log('📍 Partner账号(App)，自动锁定店铺位置:', partnerStore.store_name);
+          LoggerService.debug('📍 Partner账号(App)，自动锁定店铺位置:', partnerStore.store_name);
           setSelectedLocation({
             latitude: partnerStore.latitude,
             longitude: partnerStore.longitude,
@@ -805,7 +805,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
-            console.log('位置权限未授予，使用默认位置');
+            LoggerService.debug('位置权限未授予，使用默认位置');
             return;
           }
 
@@ -828,7 +828,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
           // 更新地图位置（如果获取成功）
           setSelectedLocation(currentLocation);
         } catch (error) {
-          console.log('获取当前位置失败，使用默认位置:', error);
+          LoggerService.debug('获取当前位置失败，使用默认位置:', error);
           // 使用默认位置，不显示错误提示
         }
       })();
@@ -876,13 +876,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
         const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
         setSenderAddress(addressWithCoords);
         setSenderCoordinates(coords);
-        console.log('✅ 寄件地址坐标已保存:', coords);
+        LoggerService.debug('✅ 寄件地址坐标已保存:', coords);
       } else {
         // 将地址和坐标一起添加到输入框
         const addressWithCoords = `${finalAddress}\n📍 ${currentT.coordinates}: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
         setReceiverAddress(addressWithCoords);
         setReceiverCoordinates(coords);
-        console.log('✅ 收件地址坐标已保存:', coords);
+        LoggerService.debug('✅ 收件地址坐标已保存:', coords);
       }
       
       // 清空地图地址输入框
@@ -1130,7 +1130,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       // 如果是 Partner 账号，强制使用店铺信息
       if (currentUser?.user_type === 'partner') {
         try {
-          console.log('正在查找合伙人店铺信息...', currentUser);
+          LoggerService.debug('正在查找合伙人店铺信息...', currentUser);
           const { data: store } = await supabase
             .from('delivery_stores')
             .select('*')
@@ -1139,13 +1139,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
             .maybeSingle();
 
           if (store) {
-            console.log('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
+            LoggerService.debug('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
             finalSenderLat = store.latitude;
             finalSenderLng = store.longitude;
             // finalSenderAddr = store.address; // 可选：是否强制覆盖地址文本
           }
         } catch (err) {
-          console.error('查找合伙人店铺异常:', err);
+          LoggerService.error('查找合伙人店铺异常:', err);
         }
       }
 

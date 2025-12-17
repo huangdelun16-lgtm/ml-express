@@ -1,4 +1,5 @@
 import { errorService } from './ErrorService';
+import LoggerService from './../services/LoggerService';
 import { toastService } from './ToastService';
 
 export interface RequestOptions extends RequestInit {
@@ -148,7 +149,7 @@ class NetworkService {
           if (shouldRetry) {
             const delay = this.calculateRetryDelay(attempt, retryDelay);
             if (__DEV__) {
-              console.log(
+              LoggerService.debug(
                 `请求失败，${delay}ms 后重试 (${attempt + 1}/${retries})`,
                 error.message
               );
@@ -184,7 +185,7 @@ class NetworkService {
         if (shouldRetry) {
           const delay = this.calculateRetryDelay(attempt, retryDelay);
           if (__DEV__) {
-            console.log(
+            LoggerService.debug(
               `请求异常，${delay}ms 后重试 (${attempt + 1}/${retries})`,
               error.message
             );

@@ -26,7 +26,7 @@ export async function sendEmailVerificationCode(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ 发送验证码失败:', response.status, errorText);
+      LoggerService.error('❌ 发送验证码失败:', response.status, errorText);
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
     
@@ -49,7 +49,7 @@ export async function sendEmailVerificationCode(
       };
     }
   } catch (error: any) {
-    console.error('发送验证码失败:', error);
+    LoggerService.error('发送验证码失败:', error);
     return {
       success: false,
       message: language === 'zh' ? `发送验证码失败，请稍后重试${error.message ? ': ' + error.message : ''}` : 
@@ -91,7 +91,7 @@ export async function verifyEmailCode(
       };
     }
   } catch (error) {
-    console.error('验证验证码失败:', error);
+    LoggerService.error('验证验证码失败:', error);
     return {
       success: false,
       message: language === 'zh' ? '验证失败，请稍后重试' : 

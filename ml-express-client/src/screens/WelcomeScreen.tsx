@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import LoggerService from '../services/LoggerService';
 import {
   View,
   Text,
@@ -14,13 +15,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 
 const { width, height } = Dimensions.get('window');
-
 export default function WelcomeScreen({ navigation }: any) {
   const { language } = useApp();
   const [countdown, setCountdown] = useState(5);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
-
   const t = {
     zh: {
       skip: '跳过',
@@ -32,21 +31,17 @@ export default function WelcomeScreen({ navigation }: any) {
     en: {
       skip: 'Skip',
       welcomeTitle: 'Welcome to',
-      welcomeSubtitle: 'MARKET LINK EXPRESS',
       description: 'Fast, Safe, and Reliable Same-City Delivery',
       start: 'Get Started',
     },
     my: {
       skip: 'ကျော်သွားမည်',
       welcomeTitle: 'ကြိုဆိုပါတယ်',
-      welcomeSubtitle: 'MARKET LINK EXPRESS',
       description: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်ရသော ပို့ဆောင်ရေး',
       start: 'စတင်လိုက်ပါ',
     },
   };
-
   const currentT = t[language] || t.zh;
-
   const navigateToNextScreen = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -56,7 +51,7 @@ export default function WelcomeScreen({ navigation }: any) {
         navigation.replace('Login');
       }
     } catch (error) {
-      console.error('Navigation check failed:', error);
+      LoggerService.error('Navigation check failed:', error);
       navigation.replace('Login');
     }
   };
@@ -76,7 +71,6 @@ export default function WelcomeScreen({ navigation }: any) {
         useNativeDriver: true,
       }),
     ]).start();
-
     // 倒计时逻辑
     const timer = setInterval(() => {
       setCountdown((prev) => {
@@ -88,10 +82,8 @@ export default function WelcomeScreen({ navigation }: any) {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -111,7 +103,6 @@ export default function WelcomeScreen({ navigation }: any) {
             {currentT.skip} {countdown}s
           </Text>
         </TouchableOpacity>
-
         {/* 内容区域 */}
         <View style={styles.contentContainer}>
           <Animated.View
@@ -131,48 +122,31 @@ export default function WelcomeScreen({ navigation }: any) {
               />
             </View>
           </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.textContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
+          <View style={styles.textContainer}>
             <Text style={styles.welcomeTitle}>{currentT.welcomeTitle}</Text>
             <View style={{ alignItems: 'center' }}>
-              <Text style={styles.brandName}>MARKET LINK</Text>
+              <Text style={[styles.brandName, { letterSpacing: 1 }]}>MARKET LINK</Text>
               <Text style={[styles.brandName, { 
                 fontStyle: 'italic', 
-                fontSize: 32, 
+                fontSize: 36, 
                 color: '#f59e0b', // 金色
-                marginTop: -5
+                marginTop: -8,
+                letterSpacing: 2,
+                textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                textShadowOffset: { width: 0, height: 2 },
+                textShadowRadius: 4,
               }]}>EXPRESS</Text>
               
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-                {/* 左侧装饰线 - 短中长 */}
-                <View style={{ flexDirection: 'column', alignItems: 'flex-end', marginRight: 10, gap: 3 }}>
-                  <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                  <View style={{ width: 20, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                  <View style={{ width: 40, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                </View>
-                
-                <Text style={[styles.description, { fontSize: 14, fontWeight: 'bold', letterSpacing: 2, fontStyle: 'italic' }]}>DELIVERY SERVICES</Text>
-                
-                {/* 右侧装饰线 - 长中短 */}
-                <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginLeft: 10, gap: 3 }}>
-                  <View style={{ width: 40, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                  <View style={{ width: 20, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                  <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-                </View>
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>DELIVERY SERVICES</Text>
+                <View style={styles.dividerLine} />
               </View>
+              
+              <Text style={styles.description}>{currentT.description}</Text>
             </View>
-            <Text style={[styles.description, { marginTop: 20 }]}>{currentT.description}</Text>
-          </Animated.View>
+          </View>
         </View>
-
         {/* 底部按钮 */}
         <Animated.View
           style={[
@@ -188,12 +162,12 @@ export default function WelcomeScreen({ navigation }: any) {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+              colors={['#ffffff', '#f0f9ff']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 0, y: 1 }}
               style={styles.buttonGradient}
             >
-              <Text style={styles.startButtonText}>{currentT.start}</Text>
+              <Text style={[styles.startButtonText, { color: '#0284c7' }]}>{currentT.start}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -201,7 +175,6 @@ export default function WelcomeScreen({ navigation }: any) {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -212,13 +185,15 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: 'absolute',
-    top: 50,
+    top: StatusBar.currentHeight ? StatusBar.currentHeight + 20 : 50,
     right: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   skipText: {
     color: '#ffffff',
@@ -230,80 +205,98 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    marginTop: -40, // 稍微上移一点，视觉更平衡
   },
   logoContainer: {
-    marginBottom: 40,
+    marginBottom: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
   logoCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: '#ffffff',
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   logo: {
-    width: '100%',
-    height: '100%',
+    width: '90%',
+    height: '90%',
   },
   textContainer: {
     alignItems: 'center',
+    width: '100%',
   },
   welcomeTitle: {
-    fontSize: 20,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
-    letterSpacing: 1,
+    fontSize: 22,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 12,
+    letterSpacing: 2,
+    fontWeight: '500',
   },
   brandName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
-  separator: {
-    width: 60,
-    height: 4,
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 2,
-    marginVertical: 24,
+    flex: 1,
+    maxWidth: 60,
+  },
+  dividerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 3,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginHorizontal: 15,
+    fontStyle: 'italic',
   },
   description: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
     lineHeight: 24,
     fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: 8,
   },
   bottomContainer: {
+    paddingBottom: 50,
     paddingHorizontal: 32,
-    paddingBottom: 60,
+    width: '100%',
   },
   startButton: {
-    borderRadius: 16,
-    shadowColor: '#3b82f6',
+    borderRadius: 30,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    width: '100%',
   },
   buttonGradient: {
-    paddingVertical: 18,
-    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
+    borderRadius: 30,
   },
   startButtonText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 1,

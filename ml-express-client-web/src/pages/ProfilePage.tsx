@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { packageService, supabase } from '../services/supabase';
 import QRCode from 'qrcode';
+import LoggerService from '../services/LoggerService';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -106,14 +107,14 @@ const ProfilePage: React.FC = () => {
         .limit(1);
       
       if (error) {
-        console.error('检查合伙店铺失败:', error);
+        LoggerService.error('检查合伙店铺失败:', error);
         return false;
       }
       
       // 如果找到匹配的记录，说明是合伙店铺账号（在admin web中注册的）
       return data && data.length > 0;
     } catch (error) {
-      console.error('检查合伙店铺异常:', error);
+      LoggerService.error('检查合伙店铺异常:', error);
       return false;
     }
   }, []);
@@ -144,11 +145,11 @@ const ProfilePage: React.FC = () => {
               setStoreInfo(store);
             }
           } catch (error) {
-            console.error('加载店铺信息失败:', error);
+            LoggerService.error('加载店铺信息失败:', error);
           }
         }
       } catch (error) {
-        console.error('加载用户信息失败:', error);
+        LoggerService.error('加载用户信息失败:', error);
         setCurrentUser(null);
         setIsPartnerStore(false);
       }
@@ -167,7 +168,7 @@ const ProfilePage: React.FC = () => {
     
     setLoading(true);
     try {
-      console.log('开始加载用户包裹，用户信息:', {
+      LoggerService.debug('开始加载用户包裹，用户信息:', {
         email: currentUser.email,
         phone: currentUser.phone,
         name: currentUser.name,
@@ -181,12 +182,12 @@ const ProfilePage: React.FC = () => {
         currentUser.created_at // 传入注册时间
       );
       
-      console.log('查询到的包裹数量:', packages.length);
-      console.log('包裹列表:', packages);
+      LoggerService.debug('查询到的包裹数量:', packages.length);
+      LoggerService.debug('包裹列表:', packages);
       
       setUserPackages(packages);
     } catch (error) {
-      console.error('加载包裹列表失败:', error);
+      LoggerService.error('加载包裹列表失败:', error);
       setUserPackages([]);
     } finally {
       setLoading(false);
@@ -213,7 +214,7 @@ const ProfilePage: React.FC = () => {
         setPartnerCODStats(stats);
       }
     } catch (error) {
-      console.error('加载代收款统计失败:', error);
+      LoggerService.error('加载代收款统计失败:', error);
     }
   }, [currentUser, isPartnerStore, storeInfo, selectedMonth]);
 
@@ -239,7 +240,7 @@ const ProfilePage: React.FC = () => {
         setShowCODOrdersModal(true);
       }
     } catch (error) {
-      console.error('加载代收款订单失败:', error);
+      LoggerService.error('加载代收款订单失败:', error);
       alert('加载订单列表失败');
     }
   };
@@ -310,7 +311,7 @@ const ProfilePage: React.FC = () => {
         .eq('id', storeInfo.id);
 
       if (error) {
-        console.error('更新密码失败:', error);
+        LoggerService.error('更新密码失败:', error);
         alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
               language === 'en' ? 'Failed to update password, please try again later' : 
               'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
@@ -328,7 +329,7 @@ const ProfilePage: React.FC = () => {
             language === 'en' ? 'Password changed successfully!' : 
             'စကားဝှက် ပြောင်းလဲခြင်း အောင်မြင်ပါသည်!');
     } catch (error) {
-      console.error('更新密码异常:', error);
+      LoggerService.error('更新密码异常:', error);
       alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
             language === 'en' ? 'Failed to update password, please try again later' : 
             'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
@@ -625,7 +626,7 @@ const ProfilePage: React.FC = () => {
       });
       setQrCodeDataUrl(qrCodeUrl);
     } catch (error) {
-      console.error('生成二维码失败:', error);
+      LoggerService.error('生成二维码失败:', error);
     }
   };
 

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import LoggerService from './LoggerService';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -6,10 +7,10 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // 验证 API key 是否有效
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ 错误：Supabase 环境变量未配置！');
-  console.error('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
-  console.error('  - REACT_APP_SUPABASE_URL');
-  console.error('  - REACT_APP_SUPABASE_ANON_KEY');
+  LoggerService.error('❌ 错误：Supabase 环境变量未配置！');
+  LoggerService.error('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
+  LoggerService.error('  - REACT_APP_SUPABASE_URL');
+  LoggerService.error('  - REACT_APP_SUPABASE_ANON_KEY');
   throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
@@ -68,13 +69,13 @@ export const packageService = {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('获取包裹列表失败:', error);
+        LoggerService.error('获取包裹列表失败:', error);
         return [];
       }
       
       return data || [];
     } catch (err) {
-      console.error('获取包裹列表异常:', err);
+      LoggerService.error('获取包裹列表异常:', err);
       return [];
     }
   },
@@ -82,7 +83,7 @@ export const packageService = {
   // 创建新包裹
   async createPackage(packageData: Omit<Package, 'id' | 'created_at' | 'updated_at'>): Promise<Package | null> {
     try {
-      console.log('尝试创建包裹:', packageData);
+      LoggerService.debug('尝试创建包裹:', packageData);
       
       // 如果 customer_email 或 customer_name 字段不存在，从数据中移除它们
       // 这样可以避免数据库列不存在的错误
@@ -107,7 +108,7 @@ export const packageService = {
         error.message.includes('cod_amount') ||
         error.code === 'PGRST204'
       )) {
-        console.warn('检测到列不存在，尝试移除可选字段后重试:', error.message);
+        LoggerService.warn('检测到列不存在，尝试移除可选字段后重试:', error.message);
         
         // 如果是特定字段错误，只移除该字段；如果是通用错误(PGRST204)，移除所有可能的新字段
         if (error.message.includes('customer_')) {
@@ -149,7 +150,7 @@ export const packageService = {
       }
       
       if (error) {
-        console.error('【Supabase错误】创建包裹失败:', {
+        LoggerService.error('【Supabase错误】创建包裹失败:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
@@ -170,10 +171,10 @@ export const packageService = {
         throw new Error(`数据库错误: ${error.message} (代码: ${error.code || '未知'})`);
       }
       
-      console.log('包裹创建成功:', data);
+      LoggerService.debug('包裹创建成功:', data);
       return data;
     } catch (err: any) {
-      console.error('【服务层异常】创建包裹时发生未知错误:', err);
+      LoggerService.error('【服务层异常】创建包裹时发生未知错误:', err);
       throw err;
     }
   },
@@ -188,13 +189,13 @@ export const packageService = {
         .single();
       
       if (error) {
-        console.error('获取包裹详情失败:', error);
+        LoggerService.error('获取包裹详情失败:', error);
         return null;
       }
       
       return data;
     } catch (err) {
-      console.error('获取包裹详情异常:', err);
+      LoggerService.error('获取包裹详情异常:', err);
       return null;
     }
   },
@@ -226,7 +227,7 @@ export const packageService = {
       
       return data;
     } catch (err) {
-      console.error('搜索包裹异常:', err);
+      LoggerService.error('搜索包裹异常:', err);
       return null;
     }
   },
@@ -236,11 +237,11 @@ export const packageService = {
   async getPackagesByUser(email?: string, phone?: string, startDate?: string): Promise<Package[]> {
     try {
       if (!email && !phone) {
-        console.log('getPackagesByUser: 没有邮箱和手机号，返回空数组');
+        LoggerService.debug('getPackagesByUser: 没有邮箱和手机号，返回空数组');
         return [];
       }
 
-      console.log('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate);
+      LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate);
 
       // 构建查询条件：根据邮箱或手机号查询
       // 查询条件：customer_email 匹配 OR sender_phone 匹配 OR receiver_phone 匹配
@@ -258,16 +259,16 @@ export const packageService = {
         // 同时查询 sender_phone 和 receiver_phone
         conditions.push(`sender_phone.eq.${phone}`);
         conditions.push(`receiver_phone.eq.${phone}`);
-        console.log('添加查询条件: sender_phone =', phone, '和 receiver_phone =', phone);
+        LoggerService.debug('添加查询条件: sender_phone =', phone, '和 receiver_phone =', phone);
       }
 
       if (conditions.length > 0) {
         // 使用 OR 连接所有条件
         const orCondition = conditions.join(',');
-        console.log('最终查询条件:', orCondition);
+        LoggerService.debug('最终查询条件:', orCondition);
         query = query.or(orCondition);
       } else {
-        console.log('没有查询条件，返回空数组');
+        LoggerService.debug('没有查询条件，返回空数组');
         return [];
       }
 
@@ -275,7 +276,7 @@ export const packageService = {
       
       // 如果查询失败且是因为 customer_email 字段不存在，只使用手机号查询
       if (error && (error.message.includes('customer_email') || error.code === 'PGRST204')) {
-        console.warn('customer_email 字段不存在，只使用手机号查询');
+        LoggerService.warn('customer_email 字段不存在，只使用手机号查询');
         // 重新构建查询，只使用手机号
         if (phone) {
           query = supabase.from('packages').select('*');
@@ -291,36 +292,36 @@ export const packageService = {
       }
       
       if (error) {
-        console.error('获取用户包裹列表失败:', error);
-        console.error('错误详情:', {
+        LoggerService.error('获取用户包裹列表失败:', error);
+        LoggerService.error('错误详情:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code
         });
-        console.error('查询条件:', conditions);
+        LoggerService.error('查询条件:', conditions);
         return [];
       }
       
       // 如果邮箱存在，在结果中进一步过滤（客户端过滤，避免数据库查询错误）
       if (email && data) {
-        console.log('使用邮箱过滤结果，邮箱:', email);
+        LoggerService.debug('使用邮箱过滤结果，邮箱:', email);
         data = data.filter((pkg: any) => {
           // 如果包裹有 customer_email 字段且匹配，或者通过手机号匹配
           return pkg.customer_email === email || 
                  pkg.sender_phone === phone || 
                  pkg.receiver_phone === phone;
         });
-        console.log('过滤后的包裹数量:', data.length);
+        LoggerService.debug('过滤后的包裹数量:', data.length);
       }
       
-      console.log('查询成功，包裹数量:', data?.length || 0);
+      LoggerService.debug('查询成功，包裹数量:', data?.length || 0);
       if (data && data.length > 0) {
-        console.log('包裹ID列表:', data.map(p => p.id));
+        LoggerService.debug('包裹ID列表:', data.map(p => p.id));
       }
       return data || [];
     } catch (err) {
-      console.error('获取用户包裹列表异常:', err);
+      LoggerService.error('获取用户包裹列表异常:', err);
       return [];
     }
   },
@@ -359,7 +360,7 @@ export const packageService = {
 
       // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
       if (error && error.code === '42703') {
-        console.warn('cod_settled 字段不存在，使用降级查询');
+        LoggerService.warn('cod_settled 字段不存在，使用降级查询');
         const retryResult = await runQuery('cod_amount, status, delivery_time');
         data = retryResult.data;
         error = retryResult.error;
@@ -398,7 +399,7 @@ export const packageService = {
         lastSettledAt
       };
     } catch (error) {
-      console.error('获取合伙人统计失败:', error);
+      LoggerService.error('获取合伙人统计失败:', error);
       return {
         totalCOD: 0,
         unclearedCOD: 0,
@@ -454,7 +455,7 @@ export const packageService = {
       // 为了简单，我让它返回 { orders, total }，然后去改Web端。
       return { orders, total: count || 0 };
     } catch (error) {
-      console.error('获取代收款订单列表失败:', error);
+      LoggerService.error('获取代收款订单列表失败:', error);
       return { orders: [], total: 0 };
     }
   }
@@ -488,7 +489,7 @@ export const userService = {
       }
       return data;
     } catch (err) {
-      console.error('获取用户失败:', err);
+      LoggerService.error('获取用户失败:', err);
       return null;
     }
   },
@@ -512,12 +513,12 @@ export const userService = {
         .single();
       
       if (error) {
-        console.error('创建用户失败:', error);
+        LoggerService.error('创建用户失败:', error);
         return null;
       }
       return data;
     } catch (err) {
-      console.error('创建用户异常:', err);
+      LoggerService.error('创建用户异常:', err);
       return null;
     }
   },
@@ -571,12 +572,12 @@ export const pendingOrderService = {
         .single();
       
       if (error) {
-        console.error('创建临时订单失败:', error);
+        LoggerService.error('创建临时订单失败:', error);
         return null;
       }
       return data;
     } catch (err) {
-      console.error('创建临时订单异常:', err);
+      LoggerService.error('创建临时订单异常:', err);
       return null;
     }
   },
@@ -595,7 +596,7 @@ export const pendingOrderService = {
       }
       return data;
     } catch (err) {
-      console.error('获取临时订单异常:', err);
+      LoggerService.error('获取临时订单异常:', err);
       return null;
     }
   },
@@ -609,12 +610,12 @@ export const pendingOrderService = {
         .eq('temp_order_id', tempOrderId);
       
       if (error) {
-        console.error('删除临时订单失败:', error);
+        LoggerService.error('删除临时订单失败:', error);
         return false;
       }
       return true;
     } catch (err) {
-      console.error('删除临时订单异常:', err);
+      LoggerService.error('删除临时订单异常:', err);
       return false;
     }
   }
@@ -631,7 +632,7 @@ export const systemSettingsService = {
         .like('settings_key', 'pricing.%');
 
       if (error) {
-        console.error('获取计费设置失败:', error);
+        LoggerService.error('获取计费设置失败:', error);
         // 返回默认值
         return {
           baseFee: 1500,
@@ -674,7 +675,7 @@ export const systemSettingsService = {
         freeKmThreshold: settings.free_km_threshold || 3
       };
     } catch (error) {
-      console.error('获取计费设置失败:', error);
+      LoggerService.error('获取计费设置失败:', error);
       // 返回默认值
       return {
         baseFee: 1500,
