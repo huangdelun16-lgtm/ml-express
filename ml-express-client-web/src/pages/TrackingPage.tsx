@@ -24,6 +24,7 @@ const TrackingPage: React.FC = () => {
     }
     if (mapLoadError) {
       LoggerService.error('[TrackingPage] Google Maps 加载失败:', mapLoadError);
+    }
   }, [mapLoadError]);
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
