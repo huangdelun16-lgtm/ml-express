@@ -2586,11 +2586,17 @@ export default function MapScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
             ) : item.status === '待取件' ? (
-              <View style={styles.placeholderButton}>
+              <TouchableOpacity
+                style={styles.placeholderButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  navigation.navigate('Scan');
+                }}
+              >
                 <Text style={styles.placeholderText}>
                   {language === 'zh' ? '请先扫码取件' : language === 'en' ? 'Please scan to pickup' : 'အမှာစာရယူရန်စကင်န်ပါ'}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ) : item.status === '已送达' ? (
               <View style={styles.completedButton}>
                 <Text style={styles.completedText}>
