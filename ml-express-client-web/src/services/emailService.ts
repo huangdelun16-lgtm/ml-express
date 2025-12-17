@@ -1,3 +1,5 @@
+import LoggerService from './LoggerService';
+
 // 简化的邮箱验证服务（客户端版本）
 // 注意：实际的验证码验证应该通过 Netlify Function 或后端 API 完成
 
