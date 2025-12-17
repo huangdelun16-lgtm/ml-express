@@ -812,7 +812,6 @@ export default function PlaceOrderScreen({ navigation }: any) {
           // 设置超时，避免等待太久
           const locationPromise = Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced, // 使用平衡精度，更快
-            maximumAge: 60000, // 接受1分钟内的缓存位置
           });
           
           const timeoutPromise = new Promise((_, reject) => 
