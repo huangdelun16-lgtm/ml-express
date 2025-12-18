@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Platform, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
 import NotificationService from './src/services/notificationService';
 import { AppProvider } from './src/contexts/AppContext';
@@ -49,6 +50,11 @@ const linking = {
 };
 
 import { analytics, EventType } from './src/services/AnalyticsService';
+
+// 保持启动屏幕可见，直到我们准备好渲染 UI
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might trigger some race conditions, ignore them */
+});
 
 // ...
 
@@ -130,8 +136,16 @@ export default function App() {
     }
   };
 
+  const onLayoutRootView = useCallback(async () => {
+    await SplashScreen.hideAsync();
+  }, []);
+
   if (isLoggedIn === null) {
-    return <DeliveryLoadingAnimation message="正在启动应用..." showOverlay={true} />;
+    return (
+      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <DeliveryLoadingAnimation message="正在启动应用..." showOverlay={true} />
+      </View>
+    );
   }
 
   return (
