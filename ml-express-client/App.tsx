@@ -98,8 +98,9 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      // 只有当应用准备好后，才隐藏启动屏幕
-      await SplashScreen.hideAsync();
+      await SplashScreen.hideAsync().catch((e) => {
+        console.warn('Splash screen hide failed:', e);
+      });
     }
   }, [appIsReady]);
 
@@ -152,6 +153,13 @@ export default function App() {
       setIsLoggedIn(false);
     }
   };
+
+  // const onLayoutRootView = useCallback(async () => {
+  //   if (appIsReady) {
+  //     // 只有当应用准备好后，才隐藏启动屏幕
+  //     await SplashScreen.hideAsync();
+  //   }
+  // }, [appIsReady]);
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
