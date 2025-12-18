@@ -9,7 +9,7 @@ import NavigationBar from '../components/home/NavigationBar';
 import Logo from '../components/Logo';
 import OrderModal from '../components/home/OrderModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
-import { getNearestCityKey } from '../utils/locationUtils';
+// import { getNearestCityKey } from '../utils/locationUtils';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
