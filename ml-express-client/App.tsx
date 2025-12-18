@@ -161,14 +161,6 @@ export default function App() {
   //   }
   // }, [appIsReady]);
 
-  const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) {
-      await SplashScreen.hideAsync().catch((e) => {
-        console.warn('Splash screen hide failed:', e);
-      });
-    }
-  }, [appIsReady]);
-
   if (!appIsReady || isLoggedIn === null) {
     return (
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
