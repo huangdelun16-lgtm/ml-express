@@ -51,40 +51,57 @@ const linking = {
 
 import { analytics, EventType } from './src/services/AnalyticsService';
 
-// 保持启动屏幕可见，直到我们准备好渲染 UI
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* reloading the app might trigger some race conditions, ignore them */
-});
-
 // ...
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
-    // 关键修复：添加 3 秒超时保护
-    // 如果初始化卡住，3秒后强制进入应用，避免白屏被拒
-    const safetyTimer = setTimeout(() => {
-      setIsLoggedIn((prevState) => {
-        if (prevState === null) {
-          console.warn('⚠️ 初始化超时，强制进入首页');
-          return false; // 超时默认为未登录
-        }
-        return prevState;
-      });
-    }, 3000);
+    async function prepare() {
+      try {
+        // 保持启动屏幕可见
+        await SplashScreen.preventAutoHideAsync();
+        
+        // 关键修复：添加 3 秒超时保护
+        // 如果初始化卡住，3秒后强制进入应用，避免白屏被拒
+        const safetyTimer = setTimeout(() => {
+          setIsLoggedIn((prevState) => {
+            if (prevState === null) {
+              console.warn('⚠️ 初始化超时，强制进入首页');
+              return false; // 超时默认为未登录
+            }
+            return prevState;
+          });
+        }, 3000);
 
-    // 正常执行初始化
-    initializeApp().finally(() => {
-      clearTimeout(safetyTimer);
-    });
-    
-    // 应用启动追踪
-    analytics.track(EventType.APP_OPEN, {
-      platform: Platform.OS,
-      version: '1.1.0'
-    });
+        // 正常执行初始化
+        await initializeApp();
+        
+        clearTimeout(safetyTimer);
+        
+        // 应用启动追踪
+        analytics.track(EventType.APP_OPEN, {
+          platform: Platform.OS,
+          version: '1.1.0'
+        });
+      } catch (e) {
+        console.warn('应用准备阶段出错:', e);
+      } finally {
+        // 告诉应用已准备好
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
   }, []);
+
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      // 只有当应用准备好后，才隐藏启动屏幕
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
 
   const initializeApp = async () => {
     try {
@@ -137,10 +154,12 @@ export default function App() {
   };
 
   const onLayoutRootView = useCallback(async () => {
-    await SplashScreen.hideAsync();
-  }, []);
+    if (appIsReady) {
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
 
-  if (isLoggedIn === null) {
+  if (!appIsReady || isLoggedIn === null) {
     return (
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <DeliveryLoadingAnimation message="正在启动应用..." showOverlay={true} />
