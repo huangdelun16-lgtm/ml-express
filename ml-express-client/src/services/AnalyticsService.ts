@@ -4,6 +4,7 @@ import LoggerService from './LoggerService';
 // 事件类型枚举
 export enum EventType {
   // 用户行为事件
+  APP_OPEN = 'app_open',
   USER_LOGIN = 'user_login',
   USER_LOGOUT = 'user_logout',
   USER_REGISTER = 'user_register',

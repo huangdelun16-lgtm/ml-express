@@ -1385,7 +1385,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
               >
                 <DeliveryIcon size={24} color="#ffffff" />
                 <Text style={styles.submitText}>{currentT.submitOrder}</Text>
-              </LinearGradient>>
+              </LinearGradient>
             </TouchableOpacity>
           </ScaleInView>
           

@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Platform, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
-import DeliveryLoadingAnimation from './src/components/DeliveryLoadingAnimation';
 import NotificationService from './src/services/notificationService';
 import { AppProvider } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
@@ -57,6 +56,22 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [appIsReady, setAppIsReady] = useState(false);
 
+  // 将致命错误保存到本地，方便无 adb 时查看
+  const saveErrorToStorage = useCallback(async (tag: string, error: any, isFatal?: boolean) => {
+    try {
+      const payload = {
+        tag,
+        isFatal: !!isFatal,
+        message: error?.message || String(error),
+        stack: error?.stack || '',
+        time: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem('lastFatalError', JSON.stringify(payload));
+    } catch (e) {
+      console.warn('保存错误信息失败', e);
+    }
+  }, []);
+
   useEffect(() => {
     async function prepare() {
       try {
@@ -96,11 +111,57 @@ export default function App() {
     prepare();
   }, []);
 
+  // 全局错误兜底：无 adb 时在机上弹窗并写入本地
+  useEffect(() => {
+    const originalHandler = (ErrorUtils as any)?.getGlobalHandler?.();
+    const globalHandler = (error: any, isFatal?: boolean) => {
+      saveErrorToStorage('global_error', error, isFatal);
+      Alert.alert(
+        '应用错误',
+        `${isFatal ? '[致命]' : ''}${error?.message || error}`,
+      );
+      originalHandler?.(error, isFatal);
+    };
+
+    (ErrorUtils as any)?.setGlobalHandler?.(globalHandler);
+
+    const originalUnhandled = (global as any).onunhandledrejection;
+    (global as any).onunhandledrejection = (event: any) => {
+      const reason = event?.reason || event;
+      const err = reason instanceof Error ? reason : new Error(String(reason));
+      saveErrorToStorage('unhandled_rejection', err, false);
+      Alert.alert('Promise 未处理错误', err.message);
+      originalUnhandled?.(event);
+    };
+
+    return () => {
+      if ((ErrorUtils as any)?.setGlobalHandler && originalHandler) {
+        (ErrorUtils as any).setGlobalHandler(originalHandler);
+      }
+      (global as any).onunhandledrejection = originalUnhandled;
+    };
+  }, [saveErrorToStorage]);
+
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
       await SplashScreen.hideAsync().catch((e) => {
         console.warn('Splash screen hide failed:', e);
       });
+    }
+  }, [appIsReady]);
+
+  // 新增：安全兜底 useEffect
+  // 如果 onLayoutRootView 因为组件切换没有被调用，这个 useEffect 会作为双重保险
+  useEffect(() => {
+    if (appIsReady) {
+      const hideSplash = async () => {
+        try {
+          await SplashScreen.hideAsync();
+        } catch (e) {
+          console.warn('Effect: Splash screen hide failed:', e);
+        }
+      };
+      hideSplash();
     }
   }, [appIsReady]);
 
@@ -163,132 +224,127 @@ export default function App() {
 
   if (!appIsReady || isLoggedIn === null) {
     return (
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <DeliveryLoadingAnimation message="正在启动应用..." showOverlay={true} />
-      </View>
+      <View style={{ flex: 1 }} onLayout={onLayoutRootView} />
     );
   }
 
   return (
-    <ErrorBoundary>
-      <AppProvider>
-        <LoadingProvider>
-          <NetworkStatus />
-          <GlobalToast />
-          <NavigationContainer 
-            linking={linking}
-            onReady={() => {
-              // 导航容器准备就绪时的回调
-              console.log('Navigation container ready');
-            }}
-            onStateChange={(state) => {
-              // 可以在这里添加导航状态变化监听
-              // 例如：页面访问统计
-            }}
-          >
-          <Stack.Navigator
-            initialRouteName="Welcome"
-            screenOptions={{
-              headerShown: false,
-                animation: 'slide_from_right',
-                animationDuration: 300,
-                // 优化性能：禁用不必要的动画
-                animationEnabled: true,
-                // 优化内存：启用懒加载
-                lazy: true,
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <ErrorBoundary>
+        <AppProvider>
+          <LoadingProvider>
+            <NetworkStatus />
+            <GlobalToast />
+            <NavigationContainer 
+              linking={linking}
+              onReady={() => {
+                // 导航容器准备就绪时的回调
+                console.log('Navigation container ready');
+              }}
+              onStateChange={(state) => {
+                // 可以在这里添加导航状态变化监听
+                // 例如：页面访问统计
               }}
             >
-            {/* 欢迎页面（广告/通知） */}
-            <Stack.Screen 
-              name="Welcome" 
-              component={WelcomeScreen}
-              options={{
-                animation: 'fade',
-              }}
-            />
-            
-            {/* 登录注册页面 */}
-            <Stack.Screen 
-              name="Login" 
-              component={LoginScreen}
-              options={{
-                animation: 'fade',
-              }}
-            />
-            <Stack.Screen 
-              name="Register" 
-              component={RegisterScreen}
-              options={{
-                animation: 'slide_from_bottom',
-              }}
-            />
-            
-            {/* 主应用 - 直接显示首页，不使用底部导航 */}
-            <Stack.Screen 
-              name="Main" 
-              component={HomeScreen}
-              options={{
-                animation: 'fade',
-              }}
-            />
-            
-            {/* 使用Stack导航，代替Tab导航 */}
-            <Stack.Screen 
-              name="PlaceOrder" 
-              component={PlaceOrderScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen 
-              name="MyOrders" 
-              component={MyOrdersScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen 
-              name="TrackOrder" 
-              component={TrackOrderScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen 
-              name="Profile" 
-              component={ProfileScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            
-            {/* 其他页面 */}
-            <Stack.Screen 
-              name="OrderDetail" 
-              component={OrderDetailScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen 
-              name="NotificationSettings" 
-              component={NotificationSettingsScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            <Stack.Screen 
-              name="NotificationWorkflow" 
-              component={NotificationWorkflowScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
-            </Stack.Navigator>
-          </NavigationContainer>
-        </LoadingProvider>
-      </AppProvider>
-    </ErrorBoundary>
+            <Stack.Navigator
+              initialRouteName="Welcome"
+              screenOptions={{
+                headerShown: false,
+              animation: 'slide_from_right',
+            }}
+              >
+              {/* 欢迎页面（广告/通知） */}
+              <Stack.Screen 
+                name="Welcome" 
+                component={WelcomeScreen}
+                options={{
+                  animation: 'fade',
+                }}
+              />
+              
+              {/* 登录注册页面 */}
+              <Stack.Screen 
+                name="Login" 
+                component={LoginScreen}
+                options={{
+                  animation: 'fade',
+                }}
+              />
+              <Stack.Screen 
+                name="Register" 
+                component={RegisterScreen}
+                options={{
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              
+              {/* 主应用 - 直接显示首页，不使用底部导航 */}
+              <Stack.Screen 
+                name="Main" 
+                component={HomeScreen}
+                options={{
+                  animation: 'fade',
+                }}
+              />
+              
+              {/* 使用Stack导航，代替Tab导航 */}
+              <Stack.Screen 
+                name="PlaceOrder" 
+                component={PlaceOrderScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="MyOrders" 
+                component={MyOrdersScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="TrackOrder" 
+                component={TrackOrderScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="Profile" 
+                component={ProfileScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              
+              {/* 其他页面 */}
+              <Stack.Screen 
+                name="OrderDetail" 
+                component={OrderDetailScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="NotificationSettings" 
+                component={NotificationSettingsScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="NotificationWorkflow" 
+                component={NotificationWorkflowScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </LoadingProvider>
+        </AppProvider>
+      </ErrorBoundary>
+    </View>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -53,6 +54,30 @@ export default function HomeScreen({ navigation }: any) {
   useEffect(() => {
     analytics.trackPageView('HomeScreen');
   }, []);
+
+  // 每次页面获得焦点时，重新检查登录状态和数据
+  useFocusEffect(
+    useCallback(() => {
+      const checkAuthAndLoadData = async () => {
+        try {
+          const storedUserId = await AsyncStorage.getItem('userId');
+          const guestMode = await AsyncStorage.getItem('isGuest');
+
+          // 强制检查：如果未登录且非访客模式，直接跳转到登录页
+          if (!storedUserId && guestMode !== 'true') {
+            navigation.replace('Login');
+            return;
+          }
+
+          loadUserData();
+        } catch (error) {
+          console.error('Auth check failed:', error);
+        }
+      };
+
+      checkAuthAndLoadData();
+    }, [])
+  );
 
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
