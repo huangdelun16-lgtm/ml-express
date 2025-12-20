@@ -48,6 +48,16 @@ interface Courier {
   updated_at?: string;
 }
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -80,7 +90,7 @@ const UserManagement: React.FC = () => {
     department: '',
     position: '',
     role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
-    region: 'yangon' as 'yangon' | 'mandalay'
+    region: 'yangon'
   });
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -462,8 +472,9 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const generateEmployeeId = (region: string, position: string, role: string): string => {
-    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+  const generateEmployeeId = (regionId: string, position: string, role: string): string => {
+    const region = REGIONS.find(r => r.id === regionId);
+    const regionPrefix = region ? region.prefix : 'MDY';
     let positionType = '';
     if (position.includes('骑手') || position === '骑手') {
       positionType = 'RIDER';
@@ -1991,7 +2002,8 @@ const UserManagement: React.FC = () => {
                           </div>
                           <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1' }}>
                              <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>🏠 {courier.address}</p>
-                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>🆔 {courier.license_number}</p>
+                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>🌍 区域: {REGIONS.find(r => r.id === courier.region)?.name || courier.region || '-'}</p>
+                             <p style={{ margin: '0 0 5px 0', color: '#48bb78', fontWeight: 'bold' }}>🆔 编号: {courier.employee_id || '-'}</p>
                              <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>📅 {courier.join_date}</p>
                           </div>
                           <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1' }}>
@@ -2038,6 +2050,14 @@ const UserManagement: React.FC = () => {
                       
                       <input placeholder="驾驶证号" value={courierForm.license_number} onChange={e => setCourierForm({...courierForm, license_number: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
                       
+                      <select value={courierForm.region} onChange={e => handleCourierFormChange('region', e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
+                         {REGIONS.map(r => (
+                           <option key={r.id} value={r.id}>{r.name} ({r.prefix})</option>
+                         ))}
+                      </select>
+
+                      <input placeholder="员工编号（自动生成）" value={courierForm.employee_id} readOnly style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(72, 187, 120, 0.5)', background: 'rgba(72, 187, 120, 0.1)', color: '#48bb78', fontWeight: 'bold' }} />
+
                       <select value={courierForm.status} onChange={e => setCourierForm({...courierForm, status: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
                          <option value="active">✅ 活跃</option>
                          <option value="inactive">💤 非活跃</option>

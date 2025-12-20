@@ -7,6 +7,16 @@ import { fileValidationService } from '../services/FileValidationService';
 import { BatchProgress, UploadProgress } from '../components/UploadProgress';
 import { useResponsive } from '../hooks/useResponsive';
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 const AccountManagement: React.FC = () => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
@@ -66,7 +76,7 @@ const AccountManagement: React.FC = () => {
     emergency_phone: '',
     address: '',
     notes: '',
-    region: 'yangon' as 'yangon' | 'mandalay'
+    region: 'yangon'
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -106,8 +116,9 @@ const AccountManagement: React.FC = () => {
   };
 
   // 自动生成员工编号
-  const generateEmployeeId = (region: string, position: string, role: string): string => {
-    const regionPrefix = region === 'yangon' ? 'YGN' : 'MDY';
+  const generateEmployeeId = (regionId: string, position: string, role: string): string => {
+    const region = REGIONS.find(r => r.id === regionId);
+    const regionPrefix = region ? region.prefix : 'MDY';
     
     // 根据角色确定职位类型
     let positionType = '';
@@ -158,7 +169,8 @@ const AccountManagement: React.FC = () => {
         emergency_contact: formData.emergency_contact,
         emergency_phone: formData.emergency_phone,
         address: formData.address,
-        notes: formData.notes
+        notes: formData.notes,
+        region: formData.region
       };
 
       await adminAccountService.createAccount(newAccount);
@@ -617,8 +629,11 @@ const AccountManagement: React.FC = () => {
                   onMouseEnter={(e) => (e.target as HTMLSelectElement).style.borderColor = '#63b3ed'}
                   onMouseLeave={(e) => (e.target as HTMLSelectElement).style.borderColor = '#4299e1'}
                 >
-                  <option value="yangon" style={{ color: '#000' }}>仰光 (YGN)</option>
-                  <option value="mandalay" style={{ color: '#000' }}>曼德勒 (MDY)</option>
+                  {REGIONS.map(r => (
+                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
+                      {r.name} ({r.prefix})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -915,6 +930,7 @@ const AccountManagement: React.FC = () => {
                 <thead>
                   <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>用户名</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>所属区域</th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工姓名</th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工编号</th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>部门</th>
@@ -930,6 +946,9 @@ const AccountManagement: React.FC = () => {
                   {accounts.map((account) => (
                     <tr key={account.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                       <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.username}</td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>
+                        {REGIONS.find(r => r.id === account.region)?.name || account.region || '-'}
+                      </td>
                       <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_name}</td>
                       <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_id}</td>
                       <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.department || '-'}</td>
@@ -1211,6 +1230,12 @@ const AccountManagement: React.FC = () => {
                     <div>
                       <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>员工姓名：</span>
                       <span style={{ fontSize: '1rem', fontWeight: 500 }}>{viewingAccount.employee_name}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>所属区域：</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 500 }}>
+                        {REGIONS.find(r => r.id === viewingAccount.region)?.name || viewingAccount.region || '未填写'}
+                      </span>
                     </div>
                     <div>
                       <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>员工编号：</span>

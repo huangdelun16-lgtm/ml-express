@@ -134,6 +134,7 @@ export interface AdminAccount {
   emergency_phone?: string;
   address?: string;
   notes?: string;
+  region?: string; // 员工所属区域
   cv_images?: string[]; // 新增CV图片字段
   created_by?: string;
   last_login?: string;
