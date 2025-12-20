@@ -145,6 +145,39 @@ const AccountManagement: React.FC = () => {
     return `${regionPrefix}-${positionType}-${nextNumber}`;
   };
 
+  const tableHeaderStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    textAlign: 'left',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)'
+  };
+
+  const tableCellStyle: React.CSSProperties = {
+    padding: '16px',
+    fontSize: '0.9rem',
+    color: 'white',
+    verticalAlign: 'middle'
+  };
+
+  const actionButtonStyle = (color: string): React.CSSProperties => ({
+    background: 'rgba(255,255,255,0.05)',
+    border: `1px solid ${color}44`,
+    borderRadius: '8px',
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    fontSize: '1rem',
+    color: color
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -251,6 +284,17 @@ const AccountManagement: React.FC = () => {
       loadAccounts();
     }
   };
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
+
+  const filteredAccounts = accounts.filter(acc => {
+    const matchesSearch = acc.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         acc.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         acc.employee_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = filterRole === 'all' || acc.role === filterRole;
+    return matchesSearch && matchesRole;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -523,48 +567,68 @@ const AccountManagement: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #2d3748 100%)',
-      padding: isMobile ? '12px' : '20px',
-      color: 'white'
+      background: 'linear-gradient(135deg, #0f172a 0%, #1a202c 50%, #2d3748 100%)',
+      padding: isMobile ? '16px' : '40px',
+      color: 'white',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
     }}>
       <div style={{
         maxWidth: '1400px',
         margin: '0 auto',
-        background: 'rgba(26, 54, 93, 0.3)',
-        borderRadius: '16px',
-        padding: '32px',
-        border: '1px solid rgba(255,255,255,0.1)',
-        backdropFilter: 'blur(10px)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', margin: 0 }}>账号管理</h1>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '40px',
+          background: 'rgba(255,255,255,0.03)',
+          padding: '24px 32px',
+          borderRadius: '20px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div>
+            <h1 style={{ fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
+              账号管理 <span style={{ color: '#4299e1', fontSize: '1rem', fontWeight: 500, verticalAlign: 'middle', marginLeft: '12px' }}>Account Management</span>
+            </h1>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.6, fontSize: '1rem' }}>管理系统管理员、运营经理、操作员及财务人员账号权限</p>
+          </div>
           <div style={{ display: 'flex', gap: isMobile ? '12px' : '16px' }}>
             <button
               onClick={() => setShowForm(!showForm)}
               style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: showForm ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
                 color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
+                border: showForm ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                padding: '12px 28px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontSize: '1rem',
-                fontWeight: 600
+                fontWeight: 600,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: showForm ? 'none' : '0 10px 20px rgba(49, 130, 206, 0.3)'
               }}
             >
-              {showForm ? '取消' : '创建新账号'}
+              <span>{showForm ? '✕ 取消' : '➕ 创建账号'}</span>
             </button>
             <button
               onClick={() => navigate('/admin/dashboard')}
               style={{
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: 'rgba(255, 255, 255, 0.05)',
                 color: 'white',
-                border: '1px solid rgba(255,255,255,0.3)',
+                border: '1px solid rgba(255,255,255,0.15)',
                 padding: '12px 24px',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 cursor: 'pointer',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                fontWeight: 500,
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             >
               返回主页
             </button>
@@ -599,35 +663,37 @@ const AccountManagement: React.FC = () => {
 
         {showForm && (
           <div style={{
-            background: 'rgba(15, 32, 60, 0.4)',
-            borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(15, 32, 60, 0.5)',
+            borderRadius: '20px',
+            padding: isMobile ? '24px' : '32px',
             marginBottom: '32px',
-            border: '1px solid rgba(255,255,255,0.1)'
+            border: '1px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(20px)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ margin: 0 }}>创建新账号</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '1.8rem' }}>📝</span> 创建新员工账号
+              </h2>
               {/* 区域选择下拉框 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>区域：</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>工作区域：</label>
                 <select
                   name="region"
                   value={formData.region}
                   onChange={handleInputChange}
                   style={{
-                    padding: '10px 16px',
+                    padding: '8px 12px',
                     borderRadius: '8px',
-                    border: '2px solid #4299e1',
-                    background: 'rgba(15, 32, 60, 0.55)',
-                    color: 'white',
+                    border: 'none',
+                    background: 'rgba(66, 153, 225, 0.2)',
+                    color: '#63b3ed',
                     fontSize: '0.95rem',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     outline: 'none',
                     transition: 'all 0.2s'
                   }}
-                  onMouseEnter={(e) => (e.target as HTMLSelectElement).style.borderColor = '#63b3ed'}
-                  onMouseLeave={(e) => (e.target as HTMLSelectElement).style.borderColor = '#4299e1'}
                 >
                   {REGIONS.map(r => (
                     <option key={r.id} value={r.id} style={{ color: '#000' }}>
@@ -909,117 +975,254 @@ const AccountManagement: React.FC = () => {
         )}
 
         <div style={{
-          background: 'rgba(15, 32, 60, 0.4)',
-          borderRadius: '12px',
-          padding: '24px',
-          border: '1px solid rgba(255,255,255,0.1)'
+          background: 'rgba(15, 32, 60, 0.45)',
+          borderRadius: '20px',
+          padding: isMobile ? '20px' : '32px',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(15px)'
         }}>
-          <h2 style={{ marginBottom: '24px' }}>现有账号列表</h2>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '28px',
+            flexWrap: 'wrap',
+            gap: '20px'
+          }}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '1.8rem' }}>👥</span> 现有账号列表
+              <span style={{ 
+                fontSize: '0.9rem', 
+                background: 'rgba(255,255,255,0.1)', 
+                padding: '4px 12px', 
+                borderRadius: '20px',
+                fontWeight: 400,
+                opacity: 0.8
+              }}>
+                共 {filteredAccounts.length} 个账号
+              </span>
+            </h2>
+
+            <div style={{ display: 'flex', gap: '12px', flex: isMobile ? '1 1 100%' : 'none' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="搜索用户名/姓名/编号..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    padding: '10px 12px 10px 36px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(0,0,0,0.2)',
+                    color: 'white',
+                    width: isMobile ? '100%' : '260px',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#4299e1'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
+                />
+              </div>
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(0,0,0,0.2)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value="all" style={{ color: '#000' }}>所有角色</option>
+                <option value="admin" style={{ color: '#000' }}>管理员</option>
+                <option value="manager" style={{ color: '#000' }}>经理</option>
+                <option value="operator" style={{ color: '#000' }}>操作员</option>
+                <option value="finance" style={{ color: '#000' }}>财务</option>
+              </select>
+            </div>
+          </div>
           
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '1.2rem' }}>加载中...</div>
+            <div style={{ textAlign: 'center', padding: '60px' }}>
+              <div className="loader" style={{ marginBottom: '16px' }}></div>
+              <div style={{ fontSize: '1.1rem', opacity: 0.7 }}>正在加载数据...</div>
             </div>
-          ) : accounts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.7)' }}>暂无账号数据</div>
+          ) : filteredAccounts.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '80px 40px',
+              background: 'rgba(255,255,255,0.03)',
+              borderRadius: '16px',
+              border: '1px dashed rgba(255,255,255,0.1)'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.5 }}>🔎</div>
+              <div style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.6)' }}>未找到符合条件的账号</div>
+              {searchTerm && (
+                <button 
+                  onClick={() => {setSearchTerm(''); setFilterRole('all');}}
+                  style={{ 
+                    marginTop: '16px', 
+                    background: 'none', 
+                    border: '1px solid rgba(255,255,255,0.3)', 
+                    color: 'white',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  重置筛选
+                </button>
+              )}
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', borderRadius: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>用户名</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>所属区域</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工姓名</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>员工编号</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>部门</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>职位</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>角色</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>手机</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>状态</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>最后登录</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}>操作</th>
+                  <tr>
+                    <th style={tableHeaderStyle}>员工信息</th>
+                    <th style={tableHeaderStyle}>所属区域</th>
+                    <th style={tableHeaderStyle}>员工编号</th>
+                    <th style={tableHeaderStyle}>职位/部门</th>
+                    <th style={tableHeaderStyle}>角色权限</th>
+                    <th style={tableHeaderStyle}>当前状态</th>
+                    <th style={tableHeaderStyle}>最后登录</th>
+                    <th style={{ ...tableHeaderStyle, textAlign: 'center' }}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {accounts.map((account) => (
-                    <tr key={account.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.username}</td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>
-                        {REGIONS.find(r => r.id === account.region)?.name || account.region || '-'}
+                  {filteredAccounts.map((account) => (
+                    <tr key={account.id} style={{ 
+                      background: 'rgba(255,255,255,0.04)',
+                      transition: 'all 0.2s',
+                      cursor: 'default'
+                    }} 
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                    >
+                      <td style={{ ...tableCellStyle, borderRadius: '12px 0 0 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ 
+                            width: '36px', 
+                            height: '36px', 
+                            borderRadius: '50%', 
+                            background: getRoleColor(account.role),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+                          }}>
+                            {account.employee_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{account.employee_name}</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>@{account.username}</div>
+                          </div>
+                        </div>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_name}</td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.employee_id}</td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.department || '-'}</td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.position || '-'}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{
-                          background: getRoleColor(account.role),
-                          color: 'white',
-                          padding: '3px 6px',
+                      <td style={tableCellStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '1rem' }}>📍</span>
+                          <span>{REGIONS.find(r => r.id === account.region)?.name || account.region || '-'}</span>
+                        </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <code style={{ 
+                          background: 'rgba(0,0,0,0.3)', 
+                          padding: '3px 8px', 
                           borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 500
+                          fontSize: '0.85rem',
+                          color: '#63b3ed',
+                          fontFamily: 'monospace'
                         }}>
-                          {account.role === 'admin' ? '管理员' : 
+                          {account.employee_id}
+                        </code>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <div>{account.position || '-'}</div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>{account.department || '-'}</div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <span style={{
+                          background: `${getRoleColor(account.role)}33`, // 20% opacity
+                          color: getRoleColor(account.role),
+                          border: `1px solid ${getRoleColor(account.role)}66`,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {account.role === 'admin' ? '系统管理员' : 
                            account.role === 'manager' ? '经理' : 
                            account.role === 'operator' ? '操作员' : 
-                           account.role === 'finance' ? '财务' : account.role}
+                           account.role === 'finance' ? '财务人员' : account.role}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>{account.phone || '-'}</td>
-                      <td style={{ padding: '12px' }}>
-                        <select
-                          value={account.status || 'active'}
-                          onChange={(e) => handleStatusChange(account.id!, e.target.value as 'active' | 'inactive' | 'suspended')}
-                          style={{
-                            background: getStatusColor(account.status || 'active'),
-                            color: 'white',
-                            border: 'none',
-                            padding: '3px 6px',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="active">正常</option>
-                          <option value="inactive">停用</option>
-                          <option value="suspended">暂停</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem' }}>
-                        {account.last_login ? new Date(account.last_login).toLocaleString('zh-CN') : '从未登录'}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleEditAccount(account)}
+                      <td style={tableCellStyle}>
+                        <div style={{ position: 'relative' }}>
+                          <select
+                            value={account.status || 'active'}
+                            onChange={(e) => handleStatusChange(account.id!, e.target.value as 'active' | 'inactive' | 'suspended')}
                             style={{
-                              padding: '5px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(255,255,255,0.3)',
-                              background: 'rgba(72, 187, 120, 0.3)',
+                              background: getStatusColor(account.status || 'active'),
                               color: 'white',
+                              border: 'none',
+                              padding: '4px 24px 4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
                               cursor: 'pointer',
-                              fontSize: '0.75rem'
+                              appearance: 'none',
+                              outline: 'none',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
                             }}
                           >
-                            编辑
-                          </button>
+                            <option value="active">🟢 正常</option>
+                            <option value="inactive">🟠 停用</option>
+                            <option value="suspended">🔴 暂停</option>
+                          </select>
+                          <div style={{ 
+                            position: 'absolute', 
+                            right: '8px', 
+                            top: '50%', 
+                            transform: 'translateY(-50%)',
+                            pointerEvents: 'none',
+                            fontSize: '0.6rem'
+                          }}>▼</div>
+                        </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <div style={{ fontSize: '0.85rem' }}>
+                          {account.last_login ? new Date(account.last_login).toLocaleDateString('zh-CN') : '-'}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>
+                          {account.last_login ? new Date(account.last_login).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '从未登录'}
+                        </div>
+                      </td>
+                      <td style={{ ...tableCellStyle, borderRadius: '0 12px 12px 0', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                           <button
                             onClick={() => handleViewAccount(account)}
-                            style={{
-                              padding: '5px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(255,255,255,0.3)',
-                              background: 'rgba(66, 153, 225, 0.3)',
-                              color: 'white',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}
+                            title="查看详情"
+                            style={actionButtonStyle('#4299e1')}
                           >
-                            查看
+                            👁️
+                          </button>
+                          <button
+                            onClick={() => handleEditAccount(account)}
+                            title="编辑账号"
+                            style={actionButtonStyle('#48bb78')}
+                          >
+                            ✏️
                           </button>
                         </div>
                       </td>
@@ -1844,6 +2047,19 @@ const AccountManagement: React.FC = () => {
             transform: translateX(0);
             opacity: 1;
           }
+        }
+        .loader {
+          border: 3px solid rgba(255, 255, 255, 0.1);
+          border-radius: 50%;
+          border-top: 3px solid #4299e1;
+          width: 24px;
+          height: 24px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </div>
