@@ -109,7 +109,7 @@ export default function HomeScreen({ navigation }: any) {
   const [isBannerPaused, setIsBannerPaused] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loadingBanners, setLoadingBanners] = useState(true);
-  const TOTAL_BANNERS = banners.length || 5;
+  const TOTAL_BANNERS = banners.length > 0 ? banners.length : 3;
 
   // 自动轮播逻辑
   useEffect(() => {
@@ -603,6 +603,98 @@ export default function HomeScreen({ navigation }: any) {
                           </View>
                           <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
                             <Text style={{fontSize: 24}}>📦</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+
+                {/* 第二张卡片：地址填写 */}
+                <View style={styles.bannerCardWrapper}>
+                  <View 
+                    style={styles.bannerCard}
+                    onStartShouldSetResponder={() => true}
+                    onResponderGrant={() => setIsBannerPaused(true)}
+                    onResponderRelease={() => setIsBannerPaused(false)}
+                  >
+                    <LinearGradient
+                      colors={['#f3f4f6', '#ffffff', '#e5e7eb']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.bannerGradient}
+                    >
+                      <View style={styles.bannerContentRow}>
+                        <View style={styles.bannerTextArea}>
+                          <Text style={[styles.bannerHeadline, { color: '#1f2937' }]}>一键填写地址{'\n'}极速上门取件</Text>
+                          <Text style={[styles.bannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 30分钟送达</Text>
+                          <Text style={[styles.bannerBurmeseText, { color: '#6b7280' }]}>
+                            မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း
+                          </Text>
+                        </View>
+                        <View style={styles.phoneMockupContainer}>
+                          <View style={[styles.phoneMockup, { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }]}>
+                            <View style={[styles.phoneScreen, { backgroundColor: '#ffffff', padding: 8 }]}>
+                              <View style={{ width: '100%', height: 6, backgroundColor: '#e5e7eb', borderRadius: 3, marginBottom: 6 }} />
+                              <View style={{ width: '70%', height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, marginBottom: 12 }} />
+                              <View style={{ borderWidth: 1, borderColor: '#3b82f6', borderRadius: 4, padding: 4, marginBottom: 6, backgroundColor: '#eff6ff' }}>
+                                <Text style={{ fontSize: 6, color: '#1e40af' }}>请输入发件地址...</Text>
+                              </View>
+                              <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 4, marginBottom: 6 }}>
+                                <Text style={{ fontSize: 6, color: '#9ca3af' }}>请输入收件地址...</Text>
+                              </View>
+                              <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8, height: 16, backgroundColor: '#3b82f6', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
+                                <Text style={{ color: 'white', fontSize: 6, fontWeight: 'bold' }}>立即下单</Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={[styles.floatingIcon, { top: 10, right: -5 }]}>
+                            <Text style={{fontSize: 24}}>📝</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+
+                {/* 第三张卡片：上线促销 */}
+                <View style={styles.bannerCardWrapper}>
+                  <View 
+                    style={styles.bannerCard}
+                    onStartShouldSetResponder={() => true}
+                    onResponderGrant={() => setIsBannerPaused(true)}
+                    onResponderRelease={() => setIsBannerPaused(false)}
+                  >
+                    <LinearGradient
+                      colors={['#1e293b', '#334155', '#475569']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.bannerGradient}
+                    >
+                      <View style={styles.bannerContentRow}>
+                        <View style={styles.bannerTextArea}>
+                          <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginBottom: 8 }}>
+                            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>NEW LAUNCH</Text>
+                          </View>
+                          <Text style={[styles.bannerHeadline, { color: 'white', fontSize: 18 }]}>MDY同城2000MMK/趟</Text>
+                          <Text style={[styles.bannerSubHeadline, { color: '#cbd5e1' }]}>活动仅限 2026年1月</Text>
+                          <Text style={[styles.bannerBurmeseText, { color: '#94a3b8' }]}>
+                            Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်
+                          </Text>
+                        </View>
+                        <View style={styles.phoneMockupContainer}>
+                          <View style={[styles.phoneMockup, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]}>
+                            <View style={[styles.phoneScreen, { backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }]}>
+                              <Text style={{ fontSize: 20 }}>🚀</Text>
+                              <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#1e293b', marginTop: 4 }}>GRAND OPENING</Text>
+                              <Text style={{ fontSize: 6, color: '#64748b' }}>Jan 1, 2026</Text>
+                              <View style={{ width: '80%', height: 3, backgroundColor: '#e2e8f0', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                                <View style={{ width: '60%', height: '100%', backgroundColor: '#3b82f6' }} />
+                              </View>
+                            </View>
+                          </View>
+                          <View style={[styles.floatingIcon, { top: -5, right: -5 }]}>
+                            <Text style={{fontSize: 24}}>✨</Text>
                           </View>
                         </View>
                       </View>
