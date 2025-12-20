@@ -441,8 +441,82 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     );
   }
 
+  const handleRate = async () => {
+    if (!order) return;
+    try {
+      const result = await packageService.rateOrder(orderId, customerId, rating, comment);
+      if (result.success) {
+        showToast(t.rateSuccess, 'success');
+        setShowRateModal(false);
+        // 重新加载数据
+        const data = await packageService.getOrderById(orderId);
+        if (data) setOrder(data);
+      } else {
+        showToast(result.message || t.rateFailed, 'error');
+      }
+    } catch (error) {
+      LoggerService.error('提交评价失败:', error);
+      showToast(t.rateFailed, 'error');
+    }
+  };
+
+  const renderRatingModal = () => (
+    <Modal visible={showRateModal} animationType="fade" transparent>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
+        <View style={{ backgroundColor: 'white', borderRadius: 20, padding: 24, ...theme.shadows.large }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: theme.colors.text.primary }}>{t.rateTitle}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24 }}>
+            {[1, 2, 3, 4, 5].map(star => (
+              <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                <Ionicons 
+                  name={star <= rating ? "star" : "star-outline"} 
+                  size={42} 
+                  color={star <= rating ? "#fbbf24" : "#cbd5e1"} 
+                  style={{ marginHorizontal: 6 }}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={{ 
+              backgroundColor: '#f8fafc', 
+              borderRadius: 12, 
+              padding: 14, 
+              height: 120, 
+              textAlignVertical: 'top', 
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: '#e2e8f0',
+              color: theme.colors.text.primary
+            }}
+            placeholder={t.commentPlaceholder}
+            placeholderTextColor="#94a3b8"
+            multiline
+            value={comment}
+            onChangeText={setComment}
+          />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity 
+              style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' }}
+              onPress={() => setShowRateModal(false)}
+            >
+              <Text style={{ fontWeight: '600', color: '#64748b' }}>{t.close}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{ flex: 2, padding: 15, borderRadius: 12, backgroundColor: theme.colors.primary.DEFAULT, alignItems: 'center' }}
+              onPress={handleRate}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>{t.submitRate}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
     return (
       <View style={styles.container}>
+        {renderRatingModal()}
         <BackToHomeButton navigation={navigation} position="topRight" />
       {/* Toast通知 */}
       <Toast

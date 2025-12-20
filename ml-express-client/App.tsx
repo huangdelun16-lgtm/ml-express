@@ -25,6 +25,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import NotificationWorkflowScreen from './src/screens/NotificationWorkflowScreen';
+import AddressBookScreen from './src/screens/AddressBookScreen';
+import NotificationCenterScreen from './src/screens/NotificationCenterScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -44,6 +46,8 @@ const linking = {
       OrderDetail: 'order/:orderId',
       NotificationSettings: 'settings/notifications',
       NotificationWorkflow: 'settings/notifications/workflow',
+      AddressBook: 'address-book',
+      NotificationCenter: 'notifications',
     },
   },
 };
@@ -335,6 +339,20 @@ export default function App() {
               <Stack.Screen 
                 name="NotificationWorkflow" 
                 component={NotificationWorkflowScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="AddressBook" 
+                component={AddressBookScreen}
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
+              <Stack.Screen 
+                name="NotificationCenter" 
+                component={NotificationCenterScreen}
                 options={{
                   animation: 'slide_from_right',
                 }}

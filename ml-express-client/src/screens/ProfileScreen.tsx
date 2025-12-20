@@ -181,6 +181,13 @@ export default function ProfileScreen({ navigation }: any) {
       searchOrder: '搜索订单号',
       totalAmount: '总金额',
       refresh: '刷新',
+      // 注销账号相关
+      deleteAccount: '注销账号',
+      confirmDeleteTitle: '确定要注销账号吗？',
+      deleteWarning: '注销后，您的所有个人数据、订单历史和优惠券将被永久删除，且无法恢复。',
+      deleteSuccess: '账号已注销',
+      deleteFailed: '注销账号失败',
+      deleteProcessing: '正在注销...',
     },
     en: {
       title: 'Profile',
@@ -259,6 +266,13 @@ export default function ProfileScreen({ navigation }: any) {
       searchOrder: 'Search Order ID',
       totalAmount: 'Total Amount',
       refresh: 'Refresh',
+      // Account deletion
+      deleteAccount: 'Delete Account',
+      confirmDeleteTitle: 'Confirm Delete Account?',
+      deleteWarning: 'After deletion, all your personal data, order history, and coupons will be permanently deleted and cannot be recovered.',
+      deleteSuccess: 'Account deleted successfully',
+      deleteFailed: 'Failed to delete account',
+      deleteProcessing: 'Deleting...',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -337,6 +351,13 @@ export default function ProfileScreen({ navigation }: any) {
       searchOrder: 'အော်ဒါနံပါတ်ရှာဖွေရန်',
       totalAmount: 'စုစုပေါင်းငွေ',
       refresh: 'ပြန်လည်စတင်ရန်',
+      // အကောင့်ဖျက်သိမ်းခြင်း
+      deleteAccount: 'အကောင့်ဖျက်သိမ်းရန်',
+      confirmDeleteTitle: 'အကောင့်ဖျက်သိမ်းရန်သေချာပါသလား?',
+      deleteWarning: 'ဖျက်သိမ်းပြီးနောက်၊ သင်၏ကိုယ်ရေးအချက်အလက်များ၊ အော်ဒါမှတ်တမ်းများနှင့် ကူပွန်များအားလုံးကို အမြဲတမ်းဖျက်သိမ်းမည်ဖြစ်ပြီး ပြန်လည်ရယူ၍မရပါ။',
+      deleteSuccess: 'အကောင့်ဖျက်သိမ်းပြီးပါပြီ',
+      deleteFailed: 'အကောင့်ဖျက်သိမ်းမှုမအောင်မြင်ပါ',
+      deleteProcessing: 'ဖျက်သိမ်းနေဆဲ...',
     },
   };
 
@@ -579,6 +600,46 @@ export default function ProfileScreen({ navigation }: any) {
     );
   };
 
+  const handleDeleteAccount = async () => {
+    if (isGuest || !userId) {
+      showToast(t.pleaseLogin, 'warning');
+      return;
+    }
+
+    Alert.alert(
+      t.confirmDeleteTitle,
+      t.deleteWarning,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.deleteAccount,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const result = await customerService.deleteAccount(userId);
+              
+              if (result.success) {
+                showToast(t.deleteSuccess, 'success');
+                await AsyncStorage.clear();
+                setTimeout(() => {
+                  navigation.replace('Login');
+                }, 1500);
+              } else {
+                Alert.alert(t.deleteFailed, result.error?.message || '');
+              }
+            } catch (error) {
+              LoggerService.error('注销账号操作失败:', error);
+              showToast(t.deleteFailed, 'error');
+            } finally {
+              setRefreshing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleEditProfile = () => {
     if (isGuest) {
       showToast(t.pleaseLogin, 'warning');
@@ -656,6 +717,11 @@ export default function ProfileScreen({ navigation }: any) {
         handleEditProfile();
         break;
       case 'address':
+        navigation.navigate('AddressBook');
+        break;
+      case 'notifications':
+        navigation.navigate('NotificationCenter');
+        break;
       case 'coupons':
       case 'help':
         showToast(t.comingSoon, 'info');
@@ -957,6 +1023,17 @@ export default function ProfileScreen({ navigation }: any) {
 
         <TouchableOpacity 
           style={styles.settingItem}
+          onPress={() => navigation.navigate('NotificationCenter')}
+        >
+          <View style={styles.settingLeft}>
+            <Text style={styles.settingIcon}>📩</Text>
+            <Text style={styles.settingLabel}>{t.title === '账户' ? '消息中心' : t.title === 'Profile' ? 'Notification Center' : 'အသိပေးချက်ဗဟို'}</Text>
+          </View>
+          <Text style={styles.settingArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.settingItem}
           onPress={openNotificationSettings}
         >
           <View style={styles.settingLeft}>
@@ -986,6 +1063,19 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
+
+        {!isGuest && (
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={handleDeleteAccount}
+          >
+            <View style={styles.settingLeft}>
+              <Text style={[styles.settingIcon, { color: theme.colors.error.DEFAULT }]}>🗑️</Text>
+              <Text style={[styles.settingLabel, { color: theme.colors.error.DEFAULT }]}>{t.deleteAccount}</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

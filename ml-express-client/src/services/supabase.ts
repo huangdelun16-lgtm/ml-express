@@ -87,6 +87,31 @@ export interface Banner {
   updated_at?: string;
 }
 
+// 常用地址接口
+export interface AddressItem {
+  id?: string;
+  user_id: string;
+  label: string;
+  contact_name: string;
+  contact_phone: string;
+  address_text: string;
+  latitude?: number;
+  longitude?: number;
+  is_default?: boolean;
+}
+
+// 通知接口
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  type: 'system' | 'order' | 'promotion';
+  is_read: boolean;
+  related_id?: string;
+  created_at: string;
+}
+
 // 客户服务（使用users表）
 export const customerService = {
   // 注册客户
@@ -392,6 +417,197 @@ export const customerService = {
       };
     }
   },
+
+  // 注销账号 (Account Deletion - iOS App Store Requirement)
+  async deleteAccount(userId: string) {
+    try {
+      // 1. 检查是否有进行中的订单
+      const { data: activeOrders, error: orderError } = await supabase
+        .from('packages')
+        .select('id')
+        .or(`description.ilike.%[客户ID: ${userId}]%,customer_id.eq.${userId}`)
+        .in('status', ['待取件', '已取件', '配送中']);
+
+      if (orderError && orderError.code !== 'PGRST116') {
+        LoggerService.warn('检查订单状态时出错:', orderError);
+      }
+
+      if (activeOrders && activeOrders.length > 0) {
+        return { 
+          success: false, 
+          error: { message: '您还有正在进行中的订单，请等待订单完成后再注销账号' }
+        };
+      }
+
+      // 2. 删除用户记录
+      const { error: deleteError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (deleteError) {
+        LoggerService.error('删除用户记录失败:', deleteError);
+        throw deleteError;
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      LoggerService.error('注销账号失败:', error);
+      return { 
+        success: false, 
+        error: { message: error.message || '注销账号失败，请稍后重试' }
+      };
+    }
+  },
+};
+
+// 地址簿服务
+export const addressService = {
+  async getAddresses(userId: string): Promise<AddressItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('address_book')
+        .select('*')
+        .eq('user_id', userId)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取地址列表失败:', error);
+      return [];
+    }
+  },
+
+  async addAddress(address: AddressItem) {
+    try {
+      // 如果设置为默认，先取消其他默认
+      if (address.is_default) {
+        await supabase
+          .from('address_book')
+          .update({ is_default: false })
+          .eq('user_id', address.user_id);
+      }
+
+      const { data, error } = await supabase
+        .from('address_book')
+        .insert([address])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('添加地址失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  async updateAddress(id: string, address: Partial<AddressItem>) {
+    try {
+      if (address.is_default && address.user_id) {
+        await supabase
+          .from('address_book')
+          .update({ is_default: false })
+          .eq('user_id', address.user_id);
+      }
+
+      const { data, error } = await supabase
+        .from('address_book')
+        .update(address)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新地址失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteAddress(id: string) {
+    try {
+      const { error } = await supabase
+        .from('address_book')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      LoggerService.error('删除地址失败:', error);
+      return { success: false, error };
+    }
+  }
+};
+
+// 用户通知服务
+export const userNotificationService = {
+  async getNotifications(userId: string): Promise<UserNotification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取通知列表失败:', error);
+      return [];
+    }
+  },
+
+  async markAsRead(notificationId: string) {
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      LoggerService.error('标记已读失败:', error);
+      return false;
+    }
+  },
+
+  async markAllAsRead(userId: string) {
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      LoggerService.error('全部标记已读失败:', error);
+      return false;
+    }
+  },
+
+  async getUnreadCount(userId: string): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('user_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      LoggerService.error('获取未读通知数失败:', error);
+      return 0;
+    }
+  }
 };
 
 // 包裹服务
