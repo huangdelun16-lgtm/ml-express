@@ -1082,21 +1082,46 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <BackToHomeButton navigation={navigation} position="topRight" />
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb', '#60a5fa']}
+        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>{t.title}</Text>
-      </LinearGradient>
+        end={{ x: 0, y: 0.4 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* 背景装饰性圆圈 */}
+      <View style={{
+        position: 'absolute',
+        top: -100,
+        right: -100,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        zIndex: 0
+      }} />
+      <View style={{
+        position: 'absolute',
+        top: 150,
+        left: -50,
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        zIndex: 0
+      }} />
+
+      <BackToHomeButton navigation={navigation} position="topRight" color="white" />
+      
+      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
+        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
+        <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
+      </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
         }
       >
         {renderUserCard()}
@@ -1671,10 +1696,14 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   userCard: {
-    borderRadius: theme.borderRadius.xl,
+    borderRadius: 24,
     padding: theme.spacing.l,
     marginBottom: theme.spacing.xl,
-    ...theme.shadows.medium,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 10,
   },
   userHeaderRow: {
     flexDirection: 'row',
@@ -1785,9 +1814,13 @@ const styles = StyleSheet.create({
   statCard: {
     width: (width - 60) / 2,
     marginBottom: 12,
-    borderRadius: theme.borderRadius.l,
+    borderRadius: 20,
     overflow: 'hidden',
-    ...theme.shadows.small,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
   },
   statGradient: {
     padding: theme.spacing.l,
@@ -1825,6 +1858,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.s,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   actionIconText: {
     fontSize: 24,
@@ -1836,9 +1874,15 @@ const styles = StyleSheet.create({
   },
   settingsList: {
     backgroundColor: theme.colors.background.paper,
-    borderRadius: theme.borderRadius.l,
+    borderRadius: 20,
     overflow: 'hidden',
-    ...theme.shadows.small,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   settingItem: {
     flexDirection: 'row',

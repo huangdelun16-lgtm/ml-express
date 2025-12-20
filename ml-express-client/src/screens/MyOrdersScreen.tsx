@@ -395,16 +395,17 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <BackToHomeButton navigation={navigation} position="topRight" />
         <LinearGradient
-          colors={['#b0d3e8', '#7895a3']}
+          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <Text style={styles.headerTitle}>{t.myOrders}</Text>
-          <Text style={styles.headerSubtitle}>{t.trackPackages}</Text>
-        </LinearGradient>
+          end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <BackToHomeButton navigation={navigation} position="topRight" color="white" />
+        <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 20 }}>
+          <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
+          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
+        </View>
         
         <View style={styles.content}>
           <View style={{ padding: 20 }}>
@@ -419,7 +420,35 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.container}>
-        <BackToHomeButton navigation={navigation} position="topRight" />
+        <LinearGradient
+          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 0.4 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* 背景装饰性圆圈 */}
+        <View style={{
+          position: 'absolute',
+          top: -100,
+          right: -100,
+          width: 300,
+          height: 300,
+          borderRadius: 150,
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          zIndex: 0
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: 150,
+          left: -50,
+          width: 150,
+          height: 150,
+          borderRadius: 75,
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          zIndex: 0
+        }} />
+
+        <BackToHomeButton navigation={navigation} position="topRight" color="white" />
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}
@@ -429,18 +458,13 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         onHide={() => setToastVisible(false)}
       />
 
-      {/* 顶部渐变背景 */}
-      <LinearGradient
-        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>{t.title}</Text>
-        <Text style={styles.headerSubtitle}>
+      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
+        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
+        <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
+        <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16, marginTop: 8 }}>
           {t.all} {orders.length} {language === 'zh' ? '个订单' : language === 'en' ? 'Orders' : 'အော်ဒါ'}
         </Text>
-      </LinearGradient>
+      </View>
 
       {/* 状态筛选器 */}
       <View style={styles.filtersContainer}>
@@ -778,14 +802,16 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   orderHeader: {
     flexDirection: 'row',

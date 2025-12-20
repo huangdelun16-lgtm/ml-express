@@ -238,7 +238,37 @@ export default function TrackOrderScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <BackToHomeButton navigation={navigation} position="topRight" />
+      {/* 优化背景视觉效果 */}
+      <LinearGradient
+        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.4 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* 背景装饰性圆圈 */}
+      <View style={{
+        position: 'absolute',
+        top: -100,
+        right: -100,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        zIndex: 0
+      }} />
+      <View style={{
+        position: 'absolute',
+        top: 150,
+        left: -50,
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        zIndex: 0
+      }} />
+
+      <BackToHomeButton navigation={navigation} position="topRight" color="white" />
+      
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}
@@ -248,20 +278,19 @@ export default function TrackOrderScreen({ navigation }: any) {
         onHide={() => setToastVisible(false)}
       />
 
-      {/* 顶部渐变背景 */}
-      <LinearGradient
-        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 60 }]}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headerTitle}>{t.title}</Text>
-        <Text style={styles.headerSubtitle}>{t.subtitle}</Text>
-      </LinearGradient>
+        <View style={[styles.headerStyle, { marginBottom: 30, paddingHorizontal: 20 }]}>
+          <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
+          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
+          <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }}>{t.subtitle}</Text>
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* 搜索框 */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { marginTop: 0 }]}>
           <View style={styles.searchInputContainer}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
@@ -533,14 +562,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   statusCard: {
-    marginBottom: 20,
-    borderRadius: 16,
+    marginBottom: 24,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 24,
+    elevation: 10,
   },
   statusGradient: {
     padding: 30,
@@ -562,14 +591,16 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   cardTitle: {
     fontSize: 16,
