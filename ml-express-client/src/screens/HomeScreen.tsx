@@ -612,7 +612,6 @@ export default function HomeScreen({ navigation }: any) {
               </>
             )}
           </ScrollView>
-          </ScrollView>
           
           {/* 圆点指示器 - 位于卡片下方中间 */}
           <View style={styles.bannerIndicatorContainer}>
