@@ -271,15 +271,15 @@ const HomePage: React.FC = () => {
       console.log('已从系统设置中心加载计费规则:', pricingSettings);
     } catch (error) {
       console.error('加载价格设置失败:', error);
-      // 使用默认值
+      // 使用系统默认值
       setPricingSettings({
         baseFee: 1500,
-        perKmFee: 500,
+        perKmFee: 250,
         weightSurcharge: 150,
         urgentSurcharge: 500,
         oversizeSurcharge: 300,
         scheduledSurcharge: 200,
-        fragileSurcharge: 200, // 易碎品附加费：每公里200MMK
+        fragileSurcharge: 300,
         foodBeverageSurcharge: 300,
         freeKmThreshold: 3
       });

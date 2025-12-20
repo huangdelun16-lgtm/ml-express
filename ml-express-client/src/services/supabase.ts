@@ -1134,15 +1134,15 @@ export const systemSettingsService = {
         });
 
         return {
-          base_fee: settings.base_fee || 1000,
-          per_km_fee: settings.per_km_fee || 500,
-          weight_surcharge: settings.weight_surcharge || 150,
-          urgent_surcharge: settings.urgent_surcharge || 1500,
-          scheduled_surcharge: settings.scheduled_surcharge || 500,
-          oversize_surcharge: settings.oversize_surcharge || 300,
-          fragile_surcharge: settings.fragile_surcharge || 400,
-          food_beverage_surcharge: settings.food_beverage_surcharge || 300,
-          free_km_threshold: settings.free_km_threshold || 3,
+          base_fee: settings.base_fee !== undefined ? settings.base_fee : 1500,
+          per_km_fee: settings.per_km_fee !== undefined ? settings.per_km_fee : 250,
+          weight_surcharge: settings.weight_surcharge !== undefined ? settings.weight_surcharge : 150,
+          urgent_surcharge: settings.urgent_surcharge !== undefined ? settings.urgent_surcharge : 500,
+          scheduled_surcharge: settings.scheduled_surcharge !== undefined ? settings.scheduled_surcharge : 200,
+          oversize_surcharge: settings.oversize_surcharge !== undefined ? settings.oversize_surcharge : 300,
+          fragile_surcharge: settings.fragile_surcharge !== undefined ? settings.fragile_surcharge : 300,
+          food_beverage_surcharge: settings.food_beverage_surcharge !== undefined ? settings.food_beverage_surcharge : 300,
+          free_km_threshold: settings.free_km_threshold !== undefined ? settings.free_km_threshold : 3,
         };
       } catch (error) {
         throw error; // 抛出错误以触发重试
@@ -1153,15 +1153,15 @@ export const systemSettingsService = {
       shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
     }).catch(error => {
       errorService.handleError(error, { context: 'systemSettingsService.getPricingSettings', silent: true });
-      // 返回默认值
+      // 返回系统默认值
       return {
-        base_fee: 1000,
-        per_km_fee: 500,
+        base_fee: 1500,
+        per_km_fee: 250,
         weight_surcharge: 150,
-        urgent_surcharge: 1500,
-        scheduled_surcharge: 500,
+        urgent_surcharge: 500,
+        scheduled_surcharge: 200,
         oversize_surcharge: 300,
-        fragile_surcharge: 400,
+        fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
       };

@@ -673,15 +673,15 @@ export const systemSettingsService = {
 
       if (error) {
         LoggerService.error('获取计费设置失败:', error);
-        // 返回默认值
+        // 返回系统默认值
         return {
           baseFee: 1500,
-          perKmFee: 500,
+          perKmFee: 250,
           weightSurcharge: 150,
           urgentSurcharge: 500,
           oversizeSurcharge: 300,
           scheduledSurcharge: 200,
-          fragileSurcharge: 200, // 易碎品附加费：每公里200MMK
+          fragileSurcharge: 300,
           foodBeverageSurcharge: 300,
           freeKmThreshold: 3
         };
@@ -691,7 +691,6 @@ export const systemSettingsService = {
       const settings: { [key: string]: number } = {};
       data?.forEach((item: any) => {
         const key = item.settings_key.replace('pricing.', '');
-        // settings_value 可能是 JSON 字符串，需要解析
         let value = item.settings_value;
         if (typeof value === 'string') {
           try {
@@ -704,27 +703,26 @@ export const systemSettingsService = {
       });
 
       return {
-        baseFee: settings.base_fee || 1500,
-        perKmFee: settings.per_km_fee || 500,
-        weightSurcharge: settings.weight_surcharge || 150,
-        urgentSurcharge: settings.urgent_surcharge || 500,
-        oversizeSurcharge: settings.oversize_surcharge || 300,
-        scheduledSurcharge: settings.scheduled_surcharge || 200,
-        fragileSurcharge: settings.fragile_surcharge || 200, // 易碎品附加费：每公里200MMK
-        foodBeverageSurcharge: settings.food_beverage_surcharge || 300,
-        freeKmThreshold: settings.free_km_threshold || 3
+        baseFee: settings.base_fee !== undefined ? settings.base_fee : 1500,
+        perKmFee: settings.per_km_fee !== undefined ? settings.per_km_fee : 250,
+        weightSurcharge: settings.weight_surcharge !== undefined ? settings.weight_surcharge : 150,
+        urgentSurcharge: settings.urgent_surcharge !== undefined ? settings.urgent_surcharge : 500,
+        oversizeSurcharge: settings.oversize_surcharge !== undefined ? settings.oversize_surcharge : 300,
+        scheduledSurcharge: settings.scheduled_surcharge !== undefined ? settings.scheduled_surcharge : 200,
+        fragileSurcharge: settings.fragile_surcharge !== undefined ? settings.fragile_surcharge : 300,
+        foodBeverageSurcharge: settings.food_beverage_surcharge !== undefined ? settings.food_beverage_surcharge : 300,
+        freeKmThreshold: settings.free_km_threshold !== undefined ? settings.free_km_threshold : 3
       };
     } catch (error) {
-      LoggerService.error('获取计费设置失败:', error);
-      // 返回默认值
+      LoggerService.error('获取计费设置异常:', error);
       return {
         baseFee: 1500,
-        perKmFee: 500,
+        perKmFee: 250,
         weightSurcharge: 150,
         urgentSurcharge: 500,
         oversizeSurcharge: 300,
         scheduledSurcharge: 200,
-        fragileSurcharge: 200, // 易碎品附加费：每公里200MMK
+        fragileSurcharge: 300,
         foodBeverageSurcharge: 300,
         freeKmThreshold: 3
       };

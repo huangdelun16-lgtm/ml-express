@@ -69,6 +69,13 @@ const PriceCalculation = memo<PriceCalculationProps>(({
     return 0;
   }, [packageType, calculatedDistance, pricingSettings.oversize_surcharge]);
 
+  const fragileFee = useMemo(() => {
+    if (packageType === '易碎品') {
+      return Math.round(calculatedDistance * pricingSettings.fragile_surcharge);
+    }
+    return 0;
+  }, [packageType, calculatedDistance, pricingSettings.fragile_surcharge]);
+
   const foodFee = useMemo(() => {
     if (packageType === '食品和饮料') {
       return Math.round(calculatedDistance * pricingSettings.food_beverage_surcharge);
@@ -146,10 +153,10 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   <Text style={styles.priceValue}>{oversizeFee} MMK</Text>
                 </View>
               )}
-              {packageType === '易碎品' && (
+              {fragileFee > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>易碎品附加费:</Text>
-                  <Text style={styles.priceValue}>{pricingSettings.fragile_surcharge} MMK</Text>
+                  <Text style={styles.priceValue}>{fragileFee} MMK</Text>
                 </View>
               )}
               {foodFee > 0 && (

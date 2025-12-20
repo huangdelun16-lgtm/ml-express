@@ -954,7 +954,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
         totalPrice += roundedDistance * pricingSettings.oversize_surcharge;
       }
       if (packageType === '易碎品') {
-        totalPrice += pricingSettings.fragile_surcharge;
+        // 易碎品：按距离计算附加费 (MMK/公里)
+        totalPrice += roundedDistance * pricingSettings.fragile_surcharge;
       }
       if (packageType === '食品和饮料') {
         totalPrice += roundedDistance * pricingSettings.food_beverage_surcharge;

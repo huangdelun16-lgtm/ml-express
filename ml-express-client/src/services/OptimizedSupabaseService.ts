@@ -174,32 +174,61 @@ export const optimizedSystemSettingsService = {
   // 获取计费规则（带缓存）
   async getPricingSettings(): Promise<any> {
     const cacheKey = 'pricing_settings';
+    try {
       const cachedData = await settingsCache.get(cacheKey);
+      if (cachedData) return cachedData;
+
+      const { data, error } = await supabase
         .from('system_settings')
         .select('settings_key, settings_value')
-        .eq('settings_key', 'pricing_rules');
+        .like('settings_key', 'pricing.%');
+
       let pricingSettings = {
-        base_fee: 1000,
-        per_km_fee: 500,
+        base_fee: 1500,
+        per_km_fee: 250,
         weight_surcharge: 150,
-        urgent_surcharge: 1500,
-        scheduled_surcharge: 500,
+        urgent_surcharge: 500,
+        scheduled_surcharge: 200,
         oversize_surcharge: 300,
-        fragile_surcharge: 400,
+        fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
+      };
+
       if (data && data.length > 0) {
-        try {
-          const parsedSettings = JSON.parse(data[0].settings_value);
-          pricingSettings = { ...pricingSettings, ...parsedSettings };
-        } catch (parseError) {
-          LoggerService.warn('解析计费规则失败，使用默认值:', parseError);
-        }
+        data.forEach((item: any) => {
+          const key = item.settings_key.replace('pricing.', '');
+          let value = item.settings_value;
+          if (typeof value === 'string') {
+            try {
+              value = JSON.parse(value);
+            } catch {
+              value = parseFloat(value) || 0;
+            }
+          }
+          (pricingSettings as any)[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        });
+      }
+
       await settingsCache.set(cacheKey, pricingSettings);
       return pricingSettings;
+    } catch (error) {
       LoggerService.error('获取计费规则失败:', error);
       // 返回默认值
       return {
+        base_fee: 1500,
+        per_km_fee: 250,
+        weight_surcharge: 150,
+        urgent_surcharge: 500,
+        scheduled_surcharge: 200,
+        oversize_surcharge: 300,
+        fragile_surcharge: 300,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+      };
+    }
+  },
+};
 // 预加载服务
 export const preloadService = {
   // 预加载用户数据
