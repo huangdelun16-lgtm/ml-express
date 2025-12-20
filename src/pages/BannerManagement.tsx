@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bannerService, Banner } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
+import { fileUploadService } from '../services/FileUploadService';
 
 const BannerManagement: React.FC = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [formData, setFormData] = useState({
@@ -31,6 +34,33 @@ const BannerManagement: React.FC = () => {
     const data = await bannerService.getAllBanners();
     setBanners(data);
     setLoading(false);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      // 使用专门的 banners 存储桶
+      fileUploadService.updateConfig({ bucket: 'banners', folder: 'app-banners' });
+      const result = await fileUploadService.uploadFile(file);
+      
+      if (result.success && result.url) {
+        setFormData(prev => ({
+          ...prev,
+          image_url: result.url!
+        }));
+      } else {
+        alert(result.error || '上传失败，请重试');
+      }
+    } catch (error) {
+      console.error('上传图片异常:', error);
+      alert('上传异常，请检查网络连接');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -188,8 +218,41 @@ const BannerManagement: React.FC = () => {
                   <input name="subtitle" value={formData.subtitle} onChange={handleInputChange} placeholder="例如：5分钟接单 · 实时定位" style={inputStyle} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>图片 URL (可选)</label>
-                  <input name="image_url" value={formData.image_url} onChange={handleInputChange} placeholder="https://..." style={inputStyle} />
+                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>图片 (可选)</label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input 
+                      name="image_url" 
+                      value={formData.image_url} 
+                      onChange={handleInputChange} 
+                      placeholder="https://..." 
+                      style={{ ...inputStyle, flex: 1 }} 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      style={{
+                        padding: '0 16px',
+                        borderRadius: '12px',
+                        background: uploading ? 'rgba(255,255,255,0.1)' : '#3b82f6',
+                        border: 'none',
+                        color: 'white',
+                        fontWeight: 600,
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {uploading ? '上传中...' : '上传图片'}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      accept="image/*" 
+                      style={{ display: 'none' }} 
+                    />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>跳转链接 (可选)</label>
