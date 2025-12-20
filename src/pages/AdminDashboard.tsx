@@ -147,6 +147,13 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       icon: '🚨',
       roles: ['admin', 'manager'] // 管理员和经理可访问
     },
+    {
+      title: language === 'zh' ? '广告管理' : language === 'en' ? 'Ad Management' : 'ကြော်ငြာစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '管理移动端首页轮播广告内容' : language === 'en' ? 'Manage mobile app home carousel content' : 'မိုဘိုင်းအက်ပ်ပင်မစာမျက်နှာကြော်ငြာများစီမံခန့်ခွဲမှု',
+      color: '#805ad5',
+      icon: '🖼️',
+      roles: ['admin', 'manager'] // 管理员和经理可访问
+    },
   ];
 
   // 根据当前用户角色筛选可访问的卡片
@@ -168,6 +175,8 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       navigate('/admin/settings');
     } else if (title === '配送警报' || title === 'Delivery Alerts' || title === 'ပို့ဆောင်ရေးသတိပေးချက်များ') {
       navigate('/admin/delivery-alerts');
+    } else if (title === '广告管理' || title === 'Ad Management' || title === 'ကြော်ငြာစီမံခန့်ခွဲမှု') {
+      navigate('/admin/banners');
     }
   };
 

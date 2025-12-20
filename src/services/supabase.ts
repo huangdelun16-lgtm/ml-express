@@ -167,6 +167,21 @@ export interface DeliveryStore {
   updated_at?: string;
 }
 
+export interface Banner {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  burmese_title?: string;
+  image_url?: string;
+  link_url?: string;
+  bg_color_start?: string;
+  bg_color_end?: string;
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 审计日志数据类型定义
 export interface AuditLog {
   id?: string;
@@ -1205,6 +1220,99 @@ export const notificationService = {
       return true;
     } catch (err) {
       console.error('删除通知异常:', err);
+      return false;
+    }
+  }
+};
+
+// 广告管理服务
+export const bannerService = {
+  // 获取所有广告
+  async getAllBanners(onlyActive: boolean = false): Promise<Banner[]> {
+    try {
+      let query = supabase
+        .from('banners')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (onlyActive) {
+        query = query.eq('is_active', true);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('获取广告列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取广告列表异常:', err);
+      return [];
+    }
+  },
+
+  // 创建新广告
+  async createBanner(bannerData: Omit<Banner, 'id' | 'created_at' | 'updated_at'>): Promise<Banner | null> {
+    try {
+      const { data, error } = await supabase
+        .from('banners')
+        .insert([bannerData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('创建广告失败:', error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('创建广告异常:', err);
+      return null;
+    }
+  },
+
+  // 更新广告
+  async updateBanner(id: string, updateData: Partial<Banner>): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('banners')
+        .update({
+          ...updateData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('更新广告失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('更新广告异常:', err);
+      return false;
+    }
+  },
+
+  // 删除广告
+  async deleteBanner(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('banners')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除广告失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除广告异常:', err);
       return false;
     }
   }

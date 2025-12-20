@@ -58,6 +58,22 @@ export interface Package {
   cod_settled_at?: string; // 代收款结清时间
 }
 
+// 广告横幅接口
+export interface Banner {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  burmese_title?: string;
+  image_url?: string;
+  link_url?: string;
+  bg_color_start?: string;
+  bg_color_end?: string;
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
   // 获取所有包裹（用于跟踪页面）
@@ -457,6 +473,30 @@ export const packageService = {
     } catch (error) {
       LoggerService.error('获取代收款订单列表失败:', error);
       return { orders: [], total: 0 };
+    }
+  }
+};
+
+// 广告服务
+export const bannerService = {
+  // 获取所有启用的广告
+  async getActiveBanners(): Promise<Banner[]> {
+    try {
+      const { data, error } = await supabase
+        .from('banners')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        LoggerService.error('获取广告列表失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取广告列表异常:', error);
+      return [];
     }
   }
 };

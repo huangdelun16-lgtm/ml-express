@@ -12,6 +12,7 @@ import UserManagement from './pages/UserManagement';
 import FinanceManagement from './pages/FinanceManagement';
 import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
+import BannerManagement from './pages/BannerManagement';
 import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
@@ -99,6 +100,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['admin']}>
                   <AccountManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/banners" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <BannerManagement />
                 </ProtectedRoute>
               } 
             />
