@@ -1024,6 +1024,60 @@ export const systemSettingsService = {
       console.error('批量更新系统设置异常:', err);
       return false;
     }
+  },
+
+  // 获取计费规则（管理端专用格式）
+  async getPricingSettings(): Promise<Record<string, any>> {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
+
+      if (error) throw error;
+
+      const settings: Record<string, any> = {
+        base_fee: 1500,
+        per_km_fee: 250,
+        weight_surcharge: 150,
+        urgent_surcharge: 500,
+        oversize_surcharge: 300,
+        scheduled_surcharge: 200,
+        fragile_surcharge: 300,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+        courier_km_rate: 500
+      };
+
+      data?.forEach((item: any) => {
+        const key = item.settings_key.replace('pricing.', '');
+        let value = item.settings_value;
+        if (typeof value === 'string') {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            value = parseFloat(value) || 0;
+          }
+        }
+        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+      });
+
+      return settings;
+    } catch (err) {
+      console.error('获取计费规则失败:', err);
+      return {
+        base_fee: 1500,
+        per_km_fee: 250,
+        weight_surcharge: 150,
+        urgent_surcharge: 500,
+        oversize_surcharge: 300,
+        scheduled_surcharge: 200,
+        fragile_surcharge: 300,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+        courier_km_rate: 500
+      };
+    }
   }
 };
 

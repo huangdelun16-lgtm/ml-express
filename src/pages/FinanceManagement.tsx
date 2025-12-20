@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
-import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount, deliveryStoreService, supabase } from '../services/supabase';
+import { financeService, FinanceRecord, auditLogService, packageService, Package, courierSalaryService, CourierSalary, CourierSalaryDetail, CourierPaymentRecord, CourierPerformance, adminAccountService, AdminAccount, deliveryStoreService, systemSettingsService, supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import {
@@ -386,6 +386,9 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [formData, setFormData] = useState<FinanceForm>(defaultForm);
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
+  const [pricingSettings, setPricingSettings] = useState<Record<string, any>>({
+    courier_km_rate: 500
+  });
   const [summary, setSummary] = useState({
     totalIncome: 0,
     totalExpense: 0,
@@ -400,7 +403,13 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   useEffect(() => {
     loadRecords();
+    loadPricingSettings();
   }, []);
+
+  const loadPricingSettings = async () => {
+    const settings = await systemSettingsService.getPricingSettings();
+    setPricingSettings(settings);
+  };
 
   useEffect(() => {
     const calculateSummary = () => {
@@ -428,7 +437,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
       const packageCount = settledPackageCount;
       
       // 计算快递员公里费用（只统计已送达包裹的送货距离，不包含取件距离）
-      const COURIER_KM_RATE = 500; // 每公里500 MMK
+      const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500; 
       const totalKm = deliveredPackages.reduce((sum, pkg) => {
         // 只计算送货距离，不包含取件距离
         return sum + (pkg.delivery_distance || 0);
@@ -616,7 +625,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
         }
         
         // 计算各项费用（仅计算送货距离费用，不包含取件距离）
-        const COURIER_KM_RATE = 500; // MMK/KM（仅送货距离）
+        const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500; 
         const DELIVERY_BONUS_RATE = 1000; // MMK/单
         
         const kmFee = totalKm * COURIER_KM_RATE; // 仅送货距离费用
@@ -1081,7 +1090,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
             {renderSummaryCard('订单收入', summary.packageIncome, `已结算订单总收入 (${summary.packageCount}个)`, '#6c5ce7')}
-            {renderSummaryCard('骑手送货费用', summary.courierKmCost, `总送货距离 ${summary.totalKm.toFixed(2)} KM (500 MMK/KM)`, '#fd79a8')}
+            {renderSummaryCard('骑手送货费用', summary.courierKmCost, `总送货距离 ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
         )}
 
@@ -3474,7 +3483,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    500 MMK
+                    {pricingSettings.courier_km_rate || 500} MMK
                   </div>
                   <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>每公里费率</div>
                 </div>
@@ -3600,7 +3609,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                     {(() => {
                       // 按骑手分组统计
                       const courierStats: Record<string, { count: number, totalKm: number }> = {};
-                      const COURIER_KM_RATE = 500;
+                      const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500;
                       
                       packages.filter(pkg => pkg.status === '已送达' && pkg.courier && pkg.courier !== '待分配').forEach(pkg => {
                         const courierId = pkg.courier;

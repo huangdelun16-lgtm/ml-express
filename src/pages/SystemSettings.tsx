@@ -150,6 +150,15 @@ const settingDefinitions: SettingDefinition[] = [
     suffix: '公里'
   },
   {
+    key: 'pricing.courier_km_rate',
+    label: '骑手配送费 (MMK/KM)',
+    description: '结算给骑手的配送提成，按每公里送货距离计算。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 500,
+    suffix: 'MMK/公里'
+  },
+  {
     key: 'notification.sms_enabled',
     label: '启用短信通知',
     description: '开启后将在订单状态变更时向客户发送短信提醒。',
