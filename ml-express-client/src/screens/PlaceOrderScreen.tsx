@@ -1266,25 +1266,51 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      {/* 优化背景视觉效果 */}
       <LinearGradient
-        colors={['#f8fafc', '#e2e8f0']}
+        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.4 }}
         style={StyleSheet.absoluteFill}
       />
+      {/* 背景装饰性圆圈 */}
+      <View style={{
+        position: 'absolute',
+        top: -100,
+        right: -100,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        zIndex: 0
+      }} />
+      <View style={{
+        position: 'absolute',
+        top: 150,
+        left: -50,
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        zIndex: 0
+      }} />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: 20 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <BackToHomeButton navigation={navigation} />
+          <BackToHomeButton navigation={navigation} color="white" />
           
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>{currentT.title}</Text>
-            <Text style={styles.headerSubtitle}>{currentT.subtitle}</Text>
+          <View style={[styles.header, { marginBottom: 10 }]}>
+            <Text style={[styles.headerTitle, { color: '#ffffff', fontSize: 32, fontWeight: '800' }]}>{currentT.title}</Text>
+            <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
+            <Text style={[styles.headerSubtitle, { color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }]}>{currentT.subtitle}</Text>
           </View>
 
           {/* 寄件人表单 */}
@@ -1452,7 +1478,7 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 40,
     paddingBottom: 24,
     paddingHorizontal: 20,
   },
@@ -1472,14 +1498,16 @@ const baseStyles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20, // 更圆润的角
+    padding: 20, // 增加内边距
     marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#1e3a8a', // 蓝色阴影，增加层次感
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)', // 细白边框，精致感
   },
   sectionHeader: {
     flexDirection: 'row',
