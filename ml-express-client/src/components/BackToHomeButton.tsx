@@ -6,12 +6,13 @@ interface BackToHomeButtonProps {
   navigation: any;
   position?: 'topRight' | 'topLeft' | 'bottomRight' | 'bottomLeft';
   style?: any;
+  color?: string;
 }
 
-export default function BackToHomeButton({ navigation, position = 'topRight', style }: BackToHomeButtonProps) {
+export default function BackToHomeButton({ navigation, position = 'topRight', style, color }: BackToHomeButtonProps) {
   const { language } = useApp();
 
-  const t = {
+  const t: any = {
     zh: {
       backToHome: '返回首页',
     },
@@ -44,15 +45,27 @@ export default function BackToHomeButton({ navigation, position = 'topRight', st
     }
   };
 
+  const buttonStyle = [
+    getPositionStyle(), 
+    styles.button, 
+    color ? { backgroundColor: color === 'white' ? 'rgba(255, 255, 255, 0.9)' : color } : {},
+    style
+  ];
+
+  const textStyle = [
+    styles.text,
+    color === 'white' ? { color: '#1e3a8a' } : {}
+  ];
+
   return (
     <TouchableOpacity
-      style={[getPositionStyle(), styles.button, style]}
+      style={buttonStyle}
       onPress={handleBackToHome}
       activeOpacity={0.7}
     >
       <View style={styles.buttonContent}>
         <Text style={styles.icon}>🏠</Text>
-        <Text style={styles.text}>{currentT.backToHome}</Text>
+        <Text style={textStyle}>{currentT.backToHome}</Text>
       </View>
     </TouchableOpacity>
   );
