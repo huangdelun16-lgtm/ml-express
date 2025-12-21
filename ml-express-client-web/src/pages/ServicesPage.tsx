@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import LoggerService from '../services/LoggerService';
-// import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
 
 const ServicesPage: React.FC = () => {
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });

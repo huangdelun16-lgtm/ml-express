@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Logo from '../Logo';
 
 interface NavigationBarProps {
@@ -27,9 +27,26 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   translations: t
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   const handleNavigation = (path: string) => {
+    if (path === '/') {
+      if (location.pathname === '/') {
+        // 如果已经在首页，滚动到顶部/home
+        const element = document.querySelector('#home');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } else {
+        // 如果不在首页，直接使用 navigate 导航
+        navigate('/');
+      }
+      return;
+    }
+
     if (path.startsWith('#')) {
       // 锚点链接，平滑滚动
       const element = document.querySelector(path);
@@ -38,16 +55,14 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       }
     } else {
       // 路由导航
-      setTimeout(() => {
-        navigate(path);
-      }, 300);
+      navigate(path);
     }
   };
 
   return (
     <nav style={{
       position: 'relative',
-      zIndex: 10,
+      zIndex: 1000,
       background: 'transparent',
       color: 'white',
       padding: 0,
@@ -78,26 +93,35 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           flexWrap: window.innerWidth < 640 ? 'wrap' : 'nowrap',
           rowGap: '0.4rem'
         }}>
-          <a href="#home" style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-medium)',
-            textAlign: 'center',
-            padding: 'var(--spacing-2) var(--spacing-3)',
-            borderRadius: 'var(--radius-md)',
-            transition: 'all var(--transition-fast)',
-            lineHeight: 'var(--line-height-normal)'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          >{t.nav.home}</a>
+          <button 
+            type="button"
+            onClick={() => handleNavigation('/')} 
+            style={{ 
+              color: 'white', 
+              textDecoration: 'none',
+              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+              fontWeight: 'var(--font-weight-medium)',
+              textAlign: 'center',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              borderRadius: 'var(--radius-md)',
+              transition: 'all var(--transition-fast)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              lineHeight: 'var(--line-height-normal)',
+              display: 'inline-block'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'white';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            {t.nav.home}
+          </button>
           <button onClick={() => handleNavigation('/services')} style={{ 
             color: 'white', 
             textDecoration: 'none',
