@@ -19,6 +19,9 @@ import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapModal from '../components/placeOrder/MapModal';
+import { useLanguageStyles } from '../hooks/useLanguageStyles';
+import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
+import * as Location from 'expo-location';
 
 export default function AddressBookScreen({ navigation, route }: any) {
   const { language } = useApp();
@@ -29,11 +32,57 @@ export default function AddressBookScreen({ navigation, route }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPickerMode] = useState(route.params?.pickerMode || false);
 
+  // 基础样式
+  const baseStyles = StyleSheet.create({
+    mapModalContainer: { flex: 1, backgroundColor: 'white' },
+    mapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+    mapCloseButton: { fontSize: 24, color: '#64748b' },
+    mapTitle: { fontSize: 18, fontWeight: 'bold' },
+    mapConfirmButton: { fontSize: 24, color: '#2563eb' },
+    mapAddressInputContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+    mapAddressInput: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 12, fontSize: 16 },
+    suggestionsContainer: { position: 'absolute', top: 80, left: 16, right: 16, backgroundColor: 'white', borderRadius: 8, zIndex: 1000, ...theme.shadows.medium },
+    suggestionsList: { maxHeight: 200 },
+    map: { flex: 1 },
+    selectedPlaceInfo: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: 'white', borderRadius: 12, padding: 16, ...theme.shadows.medium },
+    selectedPlaceName: { fontSize: 16, fontWeight: 'bold' },
+    selectedPlaceAddress: { fontSize: 14, color: '#64748b', marginTop: 4 },
+    suggestionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+    suggestionMainText: { fontSize: 15, color: '#1e293b' },
+    suggestionSecondaryText: { fontSize: 13, color: '#64748b' }
+  });
+
+  const styles = useLanguageStyles(baseStyles);
+
+  // 翻译内容 (PlaceOrderScreen 需要)
+  const currentT = useMemo(() => ({
+    senderAddress: language === 'zh' ? '寄件地址' : 'Sender Address',
+    receiverAddress: language === 'zh' ? '收件地址' : 'Receiver Address',
+    coordinates: language === 'zh' ? '坐标' : 'Coordinates',
+    useCurrentLocation: language === 'zh' ? '使用当前位置' : 'Use Current Location'
+  }), [language]);
+
   // 地图选择相关
   const [showMapSelector, setShowMapSelector] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: 21.9588,
     longitude: 96.0891,
+  });
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
+  const {
+    mapAddressInput,
+    setMapAddressInput,
+    autocompleteSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    handleMapAddressInputChange,
+    handleSelectSuggestion,
+  } = usePlaceAutocomplete({
+    language: language as any,
+    selectedLocation,
+    onLocationChange: setSelectedLocation,
+    onPlaceChange: setSelectedPlace,
   });
 
   const [formData, setFormData] = useState<Partial<AddressItem>>({
@@ -209,14 +258,48 @@ export default function AddressBookScreen({ navigation, route }: any) {
     }
   };
 
-  const handleLocationSelect = (location: any) => {
+  const handleConfirmMapLocation = async () => {
+    let finalAddress = mapAddressInput.trim();
+    
+    // 如果没有输入地址，则使用反向地理编码
+    if (!finalAddress) {
+      try {
+        const address = await Location.reverseGeocodeAsync({
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+        });
+
+        if (address && address[0]) {
+          const addr = address[0];
+          finalAddress = `${addr.street || ''} ${addr.district || ''} ${addr.city || ''} ${addr.region || ''}`.trim();
+        }
+      } catch (e) {
+        console.error('Reverse geocode error:', e);
+      }
+    }
+    
     setFormData({
       ...formData,
-      address_text: location.address,
-      latitude: location.latitude,
-      longitude: location.longitude
+      address_text: finalAddress,
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude
     });
     setShowMapSelector(false);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const location = await Location.getCurrentPositionAsync({});
+      setSelectedLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+    } catch (e) {
+      console.error('Get current location error:', e);
+    }
   };
 
   const renderItem = ({ item }: { item: AddressItem }) => (
@@ -358,10 +441,25 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
       <MapModal
         visible={showMapSelector}
+        language={language as any}
+        styles={styles}
+        currentT={currentT}
+        mapType="receiver"
+        selectedLocation={selectedLocation}
+        selectedPlace={selectedPlace}
+        mapAddressInput={mapAddressInput}
+        showSuggestions={showSuggestions}
+        autocompleteSuggestions={autocompleteSuggestions}
         onClose={() => setShowMapSelector(false)}
-        onSelectLocation={handleLocationSelect}
-        initialLocation={selectedLocation}
-        title={t.selectOnMap}
+        onConfirm={handleConfirmMapLocation}
+        onAddressInputChange={handleMapAddressInputChange}
+        onMapAddressInputChange={setMapAddressInput}
+        onUseCurrentLocation={handleUseCurrentLocation}
+        onSelectSuggestion={handleSelectSuggestion}
+        onSetShowSuggestions={setShowSuggestions}
+        onLocationChange={setSelectedLocation}
+        onPlaceChange={setSelectedPlace}
+        markerTitle={t.selectOnMap}
       />
     </View>
   );
