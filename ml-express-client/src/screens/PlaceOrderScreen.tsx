@@ -1494,6 +1494,92 @@ export default function PlaceOrderScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* QR码模态框 */}
+      <Modal
+        visible={showQRCodeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowQRCodeModal(false);
+          resetForm();
+        }}
+      >
+        <View style={styles.qrModalOverlay}>
+          <View style={styles.qrModalContent}>
+            <LinearGradient
+              colors={['#2E86AB', '#4CA1CF']}
+              style={styles.qrModalHeader}
+            >
+              <Text style={styles.qrModalTitle}>📱 {language === 'zh' ? '订单创建成功' : language === 'en' ? 'Order Created' : 'အော်ဒါအောင်မြင်သည်'}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowQRCodeModal(false);
+                  resetForm();
+                }}
+                style={styles.qrModalClose}
+              >
+                <Text style={styles.qrModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={styles.qrModalBody}>
+              <Text style={styles.qrInfoText}>📦 {language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}</Text>
+              <Text style={styles.qrOrderId}>{qrOrderId}</Text>
+
+              <View style={styles.qrCodeContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  <QRCode
+                    value={qrOrderId}
+                    size={200}
+                    color="#2E86AB"
+                    backgroundColor="white"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.qrHint}>
+                {language === 'zh' ? '请向骑手出示此二维码以供取件扫描' : language === 'en' ? 'Please show this QR code to the courier' : 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို ပြပေးပါ'}
+              </Text>
+
+              <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
+            </View>
+
+            <View style={styles.qrModalButtons}>
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={() => {
+                  setShowQRCodeModal(false);
+                  resetForm();
+                  navigation.navigate('MyOrders');
+                }}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.qrButtonGradient}
+                >
+                  <Text style={styles.qrButtonText}>{language === 'zh' ? '查看订单' : language === 'en' ? 'View Orders' : 'အော်ဒါကြည့်ရန်'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={() => {
+                  setShowQRCodeModal(false);
+                  resetForm();
+                }}
+              >
+                <LinearGradient
+                  colors={['#64748b', '#475569']}
+                  style={styles.qrButtonGradient}
+                >
+                  <Text style={styles.qrButtonText}>{language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1769,26 +1855,48 @@ const baseStyles = StyleSheet.create({
     color: '#3b82f6',
   },
   submitButton: {
-    marginTop: 24,
-    borderRadius: 16,
+    marginTop: 32,
+    marginBottom: 20,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   submitGradient: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 20,
     paddingHorizontal: 24,
+    gap: 12,
   },
   submitText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#ffffff',
+    letterSpacing: 1,
+  },
+  qrModalClose: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  qrModalCloseText: {
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: 'bold',
   },
   submitPrice: {
     fontSize: 22,
