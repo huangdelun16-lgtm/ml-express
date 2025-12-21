@@ -771,20 +771,22 @@ const ProfilePage: React.FC = () => {
                             ? 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)' 
                             : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'))),
                     boxShadow: isPartnerStore 
-                      ? '0 2px 8px rgba(14, 165, 233, 0.3)' 
+                      ? '0 4px 15px rgba(14, 165, 233, 0.4)' 
                       : (currentUser.user_type === 'vip'
-                        ? '0 2px 8px rgba(251, 191, 36, 0.3)'
+                        ? '0 4px 15px rgba(251, 191, 36, 0.4)'
                         : (currentUser.user_type === 'admin'
-                          ? '0 2px 8px rgba(249, 115, 22, 0.3)'
+                          ? '0 4px 15px rgba(249, 115, 22, 0.4)'
                           : (currentUser.user_type === 'courier'
-                            ? '0 2px 8px rgba(168, 85, 247, 0.3)'
-                            : '0 2px 8px rgba(59, 130, 246, 0.3)'))),
+                            ? '0 4px 15px rgba(168, 85, 247, 0.4)'
+                            : '0 4px 15px rgba(59, 130, 246, 0.4)'))),
                     color: 'white',
-                    padding: '0.2rem 0.8rem',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    border: '1px solid rgba(255,255,255,0.2)'
+                    padding: '0.4rem 1.2rem',
+                    borderRadius: '14px',
+                    fontSize: '0.85rem',
+                    fontWeight: '800',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase'
                   }}>
                     {isPartnerStore ? 'Partner' : (
                       currentUser.user_type === 'vip' 
@@ -804,33 +806,34 @@ const ProfilePage: React.FC = () => {
                       background: 'rgba(255, 255, 255, 0.1)',
                       color: 'white',
                       border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '0.5rem 1.2rem',
-                      borderRadius: '12px',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      fontSize: '0.95rem',
+                      fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
+                      gap: '0.6rem',
                       whiteSpace: 'nowrap',
-                      backdropFilter: 'blur(5px)'
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.2)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                       e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }}
                   >
-                    <span>🔒</span>
-                    {language === 'zh' ? '修改密码' : language === 'en' ? 'Change Password' : 'စကားဝှက် ပြောင်းလဲရန်'}
+                    <span style={{ fontSize: '1.1rem' }}>🔐</span>
+                    {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
                   </button>
                 )}
               </div>
@@ -838,119 +841,108 @@ const ProfilePage: React.FC = () => {
               {isPartnerStore && storeInfo ? (
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-                  gap: '1.2rem',
-                  marginTop: '1.5rem',
-                  background: 'rgba(0, 0, 0, 0.2)',
-                  padding: '1.5rem',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                  gap: '1.25rem',
+                  marginTop: '2rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  padding: '1.75rem',
+                  borderRadius: '28px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(15px)',
+                  boxShadow: 'inset 0 0 30px rgba(255, 255, 255, 0.03)'
                 }}>
-                  {/* 第一行：店铺代码, 店铺类型 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.1)', 
-                      width: '36px', 
-                      height: '36px', 
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem'
-                    }}>🔢</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeCode}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontFamily: 'monospace', fontSize: '0.95rem' }}>
-                        {storeInfo.store_code}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.1)', 
-                      width: '36px', 
-                      height: '36px', 
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem'
-                    }}>🏪</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.storeType}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
-                        {getStoreTypeLabel(storeInfo.store_type)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* 第二行：电话号码, 开户日期 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.1)', 
-                      width: '36px', 
-                      height: '36px', 
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem'
-                    }}>📞</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.phone}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
-                        {storeInfo.manager_phone || currentUser.phone}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.1)', 
-                      width: '36px', 
-                      height: '36px', 
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem'
-                    }}>📅</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.accountDate}</span>
-                      <span style={{ color: 'white', fontWeight: '600', fontSize: '0.95rem' }}>
-                        {formatDate(storeInfo.created_at)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 第三行：地址（占满一行） */}
+                  {/* 第一行：店铺代码, 店铺类型, 电话 */}
                   <div style={{ 
                     display: 'flex', 
-                    alignItems: 'flex-start', 
-                    gap: '0.8rem',
-                    gridColumn: window.innerWidth < 768 ? '1' : '1 / -1',
-                    background: 'rgba(255,255,255,0.05)',
-                    padding: '0.8rem',
-                    borderRadius: '12px'
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    transition: 'transform 0.3s ease'
                   }}>
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.1)', 
-                      width: '36px', 
-                      height: '36px', 
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem',
-                      flexShrink: 0
-                    }}>📍</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '2px' }}>{t.address}</span>
-                      <span style={{ color: 'white', fontWeight: '500', lineHeight: '1.5', fontSize: '0.95rem' }}>
-                        {storeInfo.address}
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>🆔</div>
+                      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.storeCode}</span>
                     </div>
+                    <span style={{ color: 'white', fontWeight: '800', fontFamily: 'monospace', fontSize: '1.25rem', letterSpacing: '1px' }}>
+                      {storeInfo.store_code}
+                    </span>
+                  </div>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>🏪</div>
+                      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.storeType}</span>
+                    </div>
+                    <span style={{ color: 'white', fontWeight: '800', fontSize: '1.25rem' }}>
+                      {getStoreTypeLabel(storeInfo.store_type)}
+                    </span>
+                  </div>
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>📞</div>
+                      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.phone}</span>
+                    </div>
+                    <span style={{ color: 'white', fontWeight: '800', fontSize: '1.25rem' }}>
+                      {storeInfo.manager_phone || currentUser.phone}
+                    </span>
+                  </div>
+
+                  {/* 第二行：地址, 开户日期 */}
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    gridColumn: window.innerWidth < 768 ? '1' : '1 / span 2',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>📍</div>
+                      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.address}</span>
+                    </div>
+                    <span style={{ color: 'white', fontWeight: '600', fontSize: '1.1rem', lineHeight: '1.5' }}>
+                      {storeInfo.address}
+                    </span>
+                  </div>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>🗓️</div>
+                      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.accountDate}</span>
+                    </div>
+                    <span style={{ color: 'white', fontWeight: '800', fontSize: '1.25rem' }}>
+                      {formatDate(storeInfo.created_at)}
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -977,92 +969,120 @@ const ProfilePage: React.FC = () => {
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
             gap: '1.5rem',
-            marginBottom: '2.5rem'
+            marginBottom: '3rem'
           }}>
             {/* 全部订单 */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2))',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)',
+              borderRadius: '24px',
+              padding: '1.75rem',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
               textAlign: 'center',
-              transition: 'transform 0.3s ease',
-              cursor: 'default'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'default',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 12px 25px rgba(59, 130, 246, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
-              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
+              <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>📦</div>
+              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.total}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.totalOrders}
               </div>
             </div>
 
             {/* 待取件 */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2))',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.05) 100%)',
+              borderRadius: '24px',
+              padding: '1.75rem',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
               textAlign: 'center',
-              transition: 'transform 0.3s ease',
-              cursor: 'default'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'default',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 12px 25px rgba(245, 158, 11, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
-              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
+              <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>⏳</div>
+              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.pendingPickup}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.pendingPickup}
               </div>
             </div>
 
             {/* 配送中 */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.2))',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.05) 100%)',
+              borderRadius: '24px',
+              padding: '1.75rem',
+              border: '1px solid rgba(139, 92, 246, 0.2)',
               textAlign: 'center',
-              transition: 'transform 0.3s ease',
-              cursor: 'default'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'default',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 12px 25px rgba(139, 92, 246, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🚚</div>
-              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
+              <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>🚚</div>
+              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.inTransit}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.inTransit}
               </div>
             </div>
 
             {/* 已完成 */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2))',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.05) 100%)',
+              borderRadius: '24px',
+              padding: '1.75rem',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
               textAlign: 'center',
-              transition: 'transform 0.3s ease',
-              cursor: 'default'
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'default',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
-              <div style={{ color: 'white', fontSize: '2rem', fontWeight: '800', marginBottom: '0.2rem' }}>
+              <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>✅</div>
+              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.completed}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', fontWeight: '500' }}>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.completed}
               </div>
             </div>
@@ -1071,280 +1091,266 @@ const ProfilePage: React.FC = () => {
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && (
             <div style={{
-              marginBottom: '2.5rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+              marginBottom: '3rem',
+              background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '32px',
+              padding: '2.5rem',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h3 style={{
-                  color: 'white',
-                  fontSize: '1.5rem',
-                  fontWeight: '600',
-                  margin: 0,
-                  paddingBottom: '0.5rem',
-                  borderBottom: '2px solid rgba(255, 255, 255, 0.2)'
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '2.5rem', 
+                flexWrap: 'wrap', 
+                gap: '1.5rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                paddingBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                    borderRadius: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.8rem',
+                    boxShadow: '0 10px 20px rgba(217, 119, 6, 0.4)'
+                  }}>💰</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{
+                      color: 'white',
+                      fontSize: '1.8rem',
+                      fontWeight: '900',
+                      margin: 0,
+                      letterSpacing: '-0.5px'
+                    }}>
+                      {t.codStats}
+                    </h3>
+                    <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
+                      财务收益与结算概览
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
                 }}>
-                  {t.codStats}
-                </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button 
                     onClick={handlePrevMonth}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '36px',
+                      height: '36px',
                       color: 'white',
                       cursor: 'pointer',
-                      padding: '6px 12px',
-                      fontSize: '1.2rem',
-                      lineHeight: '1',
-                      transition: 'all 0.2s ease',
+                      fontSize: '1.4rem',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                  >
-                    ‹
-                  </button>
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.transform = 'translateX(-3px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >‹</button>
                   
                   <div 
-                    style={{
-                      position: 'relative',
-                      cursor: 'pointer'
-                    }}
                     onClick={() => dateInputRef.current?.showPicker()}
-                  >
-                    <div style={{
-                      padding: '8px 16px',
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '8px',
-                      color: 'white',
-                      fontSize: '1rem',
-                      fontWeight: '600',
-                      minWidth: '110px',
+                    style={{ 
+                      color: 'white', 
+                      fontSize: '1.2rem', 
+                      fontWeight: '800', 
+                      cursor: 'pointer',
+                      minWidth: '130px',
                       textAlign: 'center',
+                      fontFamily: 'monospace',
                       letterSpacing: '1px'
-                    }}>
-                      {selectedMonth}
-                    </div>
+                    }}
+                  >
+                    {selectedMonth}
                     <input
                       ref={dateInputRef}
                       type="month"
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        opacity: 0,
-                        cursor: 'pointer',
-                        zIndex: 10
-                      }}
+                      style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0 }}
                     />
                   </div>
 
                   <button 
                     onClick={handleNextMonth}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '36px',
+                      height: '36px',
                       color: 'white',
                       cursor: 'pointer',
-                      padding: '6px 12px',
-                      fontSize: '1.2rem',
-                      lineHeight: '1',
-                      transition: 'all 0.2s ease',
+                      fontSize: '1.4rem',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                  >
-                    ›
-                  </button>
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.transform = 'translateX(3px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >›</button>
                 </div>
               </div>
               
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-                gap: '1.5rem',
-                marginBottom: '1.5rem'
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                gap: '2rem'
               }}>
                 {/* 本月代收款 */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.15))',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  border: '2px solid rgba(59, 130, 246, 0.4)',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                  cursor: 'default',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)'
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.05) 100%)',
+                  padding: '2rem',
+                  borderRadius: '28px',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 10px 30px rgba(59, 130, 246, 0.1)'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-5px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)';
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.1)';
                 }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '1.5rem' }}>💰</div>
-                    <div style={{ 
-                      color: '#1e40af', 
-                      fontSize: '1.1rem', 
-                      fontWeight: '700',
-                      letterSpacing: '0.5px',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                      textTransform: 'uppercase'
-                    }}>
-                      {t.totalCOD}
-                    </div>
-                  </div>
-                  <div style={{ color: '#60a5fa', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2', marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.totalCOD}</div>
+                  <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
                     {partnerCODStats.totalCOD.toLocaleString()}
-                    <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
                   </div>
-                  <button
-                    onClick={handleViewCODOrders}
-                    style={{
-                      width: '100%',
-                      padding: '8px 16px',
-                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
-                      border: '1px solid rgba(59, 130, 246, 0.5)',
-                      borderRadius: '8px',
-                      color: '#60a5fa',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
-                    }}
-                  >
-                    {t.view}
-                  </button>
+                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>📈</div>
                 </div>
 
                 {/* 待结清金额 */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.15))',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  border: '2px solid rgba(239, 68, 68, 0.4)',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                  cursor: 'default',
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.05) 100%)',
+                  padding: '2rem',
+                  borderRadius: '28px',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 10px 30px rgba(245, 158, 11, 0.1)'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-5px)';
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.3)';
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(245, 158, 11, 0.2)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(245, 158, 11, 0.1)';
                 }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '1.5rem' }}>⏰</div>
-                    <div style={{ 
-                      color: '#991b1b', 
-                      fontSize: '1.1rem', 
-                      fontWeight: '700',
-                      letterSpacing: '0.5px',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                      textTransform: 'uppercase'
-                    }}>
-                      {t.unclearedCOD}
-                    </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.unclearedCOD}</div>
+                    {partnerCODStats.unclearedCount > 0 && (
+                      <button 
+                        onClick={handleViewCODOrders}
+                        style={{ 
+                          padding: '6px 16px', 
+                          borderRadius: '12px', 
+                          background: '#f59e0b', 
+                          border: 'none', 
+                          color: 'white', 
+                          fontSize: '0.85rem', 
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          boxShadow: '0 6px 15px rgba(245, 158, 11, 0.4)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {t.view}
+                      </button>
+                    )}
                   </div>
-                  <div style={{ color: '#f87171', fontSize: '2.5rem', fontWeight: '800', lineHeight: '1.2' }}>
+                  <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#fbbf24', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
                     {partnerCODStats.unclearedCOD.toLocaleString()}
-                    <span style={{ fontSize: '1rem', fontWeight: '500', marginLeft: '0.25rem' }}>MMK</span>
+                    <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
                   </div>
+                  <div style={{ fontSize: '1rem', color: 'rgba(251, 191, 36, 0.9)', fontWeight: '700', background: 'rgba(251, 191, 36, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px' }}>
+                    {partnerCODStats.unclearedCount} 笔订单待结算
+                  </div>
+                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>⏳</div>
                 </div>
-              </div>
 
-              {/* 详细信息行 */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }}>
+                {/* 上次结算 */}
                 <div style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.05) 100%)',
+                  padding: '2rem',
+                  borderRadius: '28px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  paddingBottom: '1rem',
-                  marginBottom: '1rem',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-                }}>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
-                    {t.unclearedCount}
-                  </span>
-                  <div style={{
-                    background: 'rgba(239, 68, 68, 0.2)',
-                    borderRadius: '12px',
-                    padding: '0.5rem 1rem',
-                    border: '1px solid rgba(239, 68, 68, 0.3)'
-                  }}>
-                    <span style={{ color: '#f87171', fontSize: '1.1rem', fontWeight: '700' }}>
-                      {partnerCODStats.unclearedCount}
-                    </span>
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 10px 30px rgba(16, 185, 129, 0.1)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(16, 185, 129, 0.1)';
+                }}
+                >
+                  <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.lastSettledAt}</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white', marginTop: '0.5rem', lineHeight: '1.4' }}>
+                    {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : (
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.2rem' }}>{t.noSettlement}</span>
+                    )}
                   </div>
+                  <div style={{ fontSize: '0.9rem', color: 'rgba(16, 185, 129, 0.8)', fontWeight: '700', background: 'rgba(16, 185, 129, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px', marginTop: 'auto' }}>
+                    结算完成将自动更新
+                  </div>
+                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>✅</div>
                 </div>
-                
-                {partnerCODStats.lastSettledAt ? (
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
-                      {t.lastSettledAt}
-                    </span>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '1rem', fontWeight: '600' }}>
-                      {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                ) : partnerCODStats.totalCOD > 0 ? (
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '1rem', fontWeight: '500' }}>
-                      {t.lastSettledAt}
-                    </span>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '1rem', fontStyle: 'italic' }}>
-                      {t.noSettlement}
-                    </span>
-                  </div>
-                ) : null}
               </div>
             </div>
           )}
@@ -1355,23 +1361,33 @@ const ProfilePage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: '1.5rem',
-              padding: '1.5rem',
-              background: 'rgba(0, 0, 0, 0.2)',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
+              padding: '1.75rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 0 20px rgba(255, 255, 255, 0.02)'
             }}>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
                 gap: '1.5rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ fontSize: '1.5rem' }}>📅</div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '1.25rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  padding: '1.25rem',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.05)'
+                }}>
+                  <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🗓️</div>
                   <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                       {t.accountDate}
                     </label>
-                    <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '700' }}>
                       {currentUser.created_at 
                         ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
                             year: 'numeric',
@@ -1382,13 +1398,21 @@ const ProfilePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ fontSize: '1.5rem' }}>📍</div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '1.25rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  padding: '1.25rem',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.05)'
+                }}>
+                  <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</div>
                   <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.2rem' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                       {t.address}
                     </label>
-                    <div style={{ color: 'white', fontSize: '1rem', fontWeight: '500' }}>
+                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '700' }}>
                       {currentUser.address || '-'}
                     </div>
                   </div>
