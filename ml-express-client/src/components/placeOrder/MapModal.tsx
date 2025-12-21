@@ -89,12 +89,16 @@ const MapModal = memo<MapModalProps>(({
     setTimeout(() => onSetShowSuggestions(false), 200);
   }, [onSetShowSuggestions]);
 
-  const mapRegion = useMemo(() => ({
-    latitude: selectedLocation.latitude,
-    longitude: selectedLocation.longitude,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  }), [selectedLocation]);
+  const mapRegion = useMemo(() => {
+    const lat = selectedLocation?.latitude || 21.9588;
+    const lng = selectedLocation?.longitude || 96.0891;
+    return {
+      latitude: lat,
+      longitude: lng,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+  }, [selectedLocation]);
 
   const mapTitle = useMemo(() => {
     return mapType === 'sender' ? currentT.senderAddress : currentT.receiverAddress;
@@ -208,13 +212,18 @@ const MapModal = memo<MapModalProps>(({
             }
           }}
         >
-          <Marker
-            coordinate={selectedLocation}
-            draggable
-            onDragEnd={handleMarkerDragEnd}
-            title={markerTitle || "选择的位置"}
-            description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
-          />
+          {selectedLocation && (
+            <Marker
+              coordinate={{
+                latitude: selectedLocation.latitude || 21.9588,
+                longitude: selectedLocation.longitude || 96.0891
+              }}
+              draggable
+              onDragEnd={handleMarkerDragEnd}
+              title={markerTitle || "选择的位置"}
+              description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
+            />
+          )}
         </MapView>
 
         {selectedPlace && (

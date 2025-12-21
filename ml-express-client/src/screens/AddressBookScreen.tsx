@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,88 @@ import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import * as Location from 'expo-location';
 
+const baseStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  backBtn: { width: 40 },
+  title: { fontSize: 20, fontWeight: 'bold', color: 'white' },
+  list: { padding: 16, paddingBottom: 100 },
+  addressCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    ...theme.shadows.small
+  },
+  addressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  labelContainer: { flexDirection: 'row', alignItems: 'center' },
+  label: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginRight: 8 },
+  defaultBadge: { backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  defaultText: { fontSize: 10, color: '#3b82f6', fontWeight: 'bold' },
+  deleteBtn: { padding: 4 },
+  contactText: { fontSize: 14, color: '#64748b', marginBottom: 4 },
+  addressText: { fontSize: 15, color: '#1e293b', lineHeight: 22 },
+  editHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8 },
+  editHintText: { fontSize: 12, color: '#94a3b8', marginRight: 4 },
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyText: { marginTop: 16, color: '#94a3b8', fontSize: 16 },
+  fab: { position: 'absolute', bottom: 30, right: 30, borderRadius: 30, ...theme.shadows.medium },
+  fabGradient: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold' },
+  form: { marginBottom: 20 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
+  input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 16 },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 16,
+    gap: 8
+  },
+  mapBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2563eb'
+  },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  checkboxLabel: { marginLeft: 8, fontSize: 15, color: '#1e293b' },
+  saveBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center' },
+  saveBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  
+  // 地图模态框样式
+  mapModalContainer: { flex: 1, backgroundColor: 'white' },
+  mapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  mapCloseButton: { fontSize: 24, color: '#64748b' },
+  mapTitle: { fontSize: 18, fontWeight: 'bold' },
+  mapConfirmButton: { fontSize: 24, color: '#2563eb' },
+  mapAddressInputContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  mapAddressInput: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 12, fontSize: 16 },
+  suggestionsContainer: { position: 'absolute', top: 120, left: 16, right: 16, backgroundColor: 'white', borderRadius: 8, zIndex: 1000, ...theme.shadows.medium },
+  suggestionsList: { maxHeight: 200 },
+  map: { flex: 1 },
+  selectedPlaceInfo: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: 'white', borderRadius: 12, padding: 16, ...theme.shadows.medium },
+  selectedPlaceName: { fontSize: 16, fontWeight: 'bold' },
+  selectedPlaceAddress: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  suggestionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  suggestionMainText: { fontSize: 15, color: '#1e293b' },
+  suggestionSecondaryText: { fontSize: 13, color: '#64748b' }
+});
+
 export default function AddressBookScreen({ navigation, route }: any) {
   const { language } = useApp();
   const [loading, setLoading] = useState(true);
@@ -32,29 +114,9 @@ export default function AddressBookScreen({ navigation, route }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPickerMode] = useState(route.params?.pickerMode || false);
 
-  // 基础样式
-  const baseStyles = StyleSheet.create({
-    mapModalContainer: { flex: 1, backgroundColor: 'white' },
-    mapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-    mapCloseButton: { fontSize: 24, color: '#64748b' },
-    mapTitle: { fontSize: 18, fontWeight: 'bold' },
-    mapConfirmButton: { fontSize: 24, color: '#2563eb' },
-    mapAddressInputContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-    mapAddressInput: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 12, fontSize: 16 },
-    suggestionsContainer: { position: 'absolute', top: 80, left: 16, right: 16, backgroundColor: 'white', borderRadius: 8, zIndex: 1000, ...theme.shadows.medium },
-    suggestionsList: { maxHeight: 200 },
-    map: { flex: 1 },
-    selectedPlaceInfo: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: 'white', borderRadius: 12, padding: 16, ...theme.shadows.medium },
-    selectedPlaceName: { fontSize: 16, fontWeight: 'bold' },
-    selectedPlaceAddress: { fontSize: 14, color: '#64748b', marginTop: 4 },
-    suggestionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-    suggestionMainText: { fontSize: 15, color: '#1e293b' },
-    suggestionSecondaryText: { fontSize: 13, color: '#64748b' }
-  });
-
   const styles = useLanguageStyles(baseStyles);
 
-  // 翻译内容 (PlaceOrderScreen 需要)
+  // 翻译内容 (MapModal 需要)
   const currentT = useMemo(() => ({
     senderAddress: language === 'zh' ? '寄件地址' : 'Sender Address',
     receiverAddress: language === 'zh' ? '收件地址' : 'Receiver Address',
@@ -464,68 +526,4 @@ export default function AddressBookScreen({ navigation, route }: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  backBtn: { width: 40 },
-  title: { fontSize: 20, fontWeight: 'bold', color: 'white' },
-  list: { padding: 16, paddingBottom: 100 },
-  addressCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    ...theme.shadows.small
-  },
-  addressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  labelContainer: { flexDirection: 'row', alignItems: 'center' },
-  label: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginRight: 8 },
-  defaultBadge: { backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  defaultText: { fontSize: 10, color: '#3b82f6', fontWeight: 'bold' },
-  deleteBtn: { padding: 4 },
-  contactText: { fontSize: 14, color: '#64748b', marginBottom: 4 },
-  addressText: { fontSize: 15, color: '#1e293b', lineHeight: 22 },
-  editHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8 },
-  editHintText: { fontSize: 12, color: '#94a3b8', marginRight: 4 },
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
-  emptyText: { marginTop: 16, color: '#94a3b8', fontSize: 16 },
-  fab: { position: 'absolute', bottom: 30, right: 30, borderRadius: 30, ...theme.shadows.medium },
-  fabGradient: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  form: { marginBottom: 20 },
-  inputLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
-  input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 16 },
-  mapBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    marginBottom: 16,
-    gap: 8
-  },
-  mapBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2563eb'
-  },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  checkboxLabel: { marginLeft: 8, fontSize: 15, color: '#1e293b' },
-  saveBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center' },
-  saveBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
-});
 
