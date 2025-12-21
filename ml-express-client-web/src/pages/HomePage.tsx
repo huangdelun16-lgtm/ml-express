@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
 import QRCode from 'qrcode';
@@ -68,6 +68,18 @@ class ErrorBoundary extends React.Component<
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // 处理从其他页面跳转过来的登录/注册请求
+  useEffect(() => {
+    if (location.state && (location.state as any).showModal) {
+      const { isLoginMode } = location.state as any;
+      setIsLoginMode(isLoginMode);
+      setShowRegisterModal(true);
+      // 清除 state，防止刷新时再次弹出
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
   
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({

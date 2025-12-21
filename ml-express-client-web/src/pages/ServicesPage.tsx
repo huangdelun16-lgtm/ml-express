@@ -221,7 +221,9 @@ const ServicesPage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onShowRegisterModal={() => {}} 
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
         translations={t}
       />
 

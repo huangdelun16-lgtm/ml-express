@@ -1,8 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NavigationBar from '../components/home/NavigationBar';
 
 const DeleteAccountPage: React.FC = () => {
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // 从本地存储加载用户信息
+  useEffect(() => {
+    const savedUser = localStorage.getItem('ml-express-customer');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('加载用户信息失败:', error);
+      }
+    }
+  }, []);
+
+  // 退出登录
+  const handleLogout = () => {
+    localStorage.removeItem('ml-express-customer');
+    setCurrentUser(null);
+    window.location.reload();
+  };
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
@@ -290,127 +311,21 @@ const DeleteAccountPage: React.FC = () => {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '20px',
+      padding: window.innerWidth < 768 ? '12px' : '20px',
       opacity: isVisible ? 1 : 0,
       transition: 'opacity 0.5s ease-in-out'
     }}>
       {/* 导航栏 */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto 30px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '15px 20px',
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        backdropFilter: 'blur(10px)'
-      }}>
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#2E86AB',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            ← {t.backToHome}
-          </button>
-        </div>
-        <div style={{ position: 'relative' }} data-language-dropdown>
-          <button
-            onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-            style={{
-              background: 'rgba(46, 134, 171, 0.1)',
-              border: '2px solid #2E86AB',
-              color: '#2E86AB',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            {t.language} {language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'} ▼
-          </button>
-          {showLanguageDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: '8px',
-              background: 'white',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              overflow: 'hidden',
-              zIndex: 1000,
-              minWidth: '150px'
-            }}>
-              <button
-                onClick={() => handleLanguageChange('zh')}
-                style={{
-                  width: '100%',
-                  padding: '12px 20px',
-                  background: language === 'zh' ? '#2E86AB' : 'white',
-                  color: language === 'zh' ? 'white' : '#333',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                  fontWeight: language === 'zh' ? '600' : '400'
-                }}
-              >
-                中文
-              </button>
-              <button
-                onClick={() => handleLanguageChange('en')}
-                style={{
-                  width: '100%',
-                  padding: '12px 20px',
-                  background: language === 'en' ? '#2E86AB' : 'white',
-                  color: language === 'en' ? 'white' : '#333',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                  fontWeight: language === 'en' ? '600' : '400',
-                  borderTop: '1px solid #eee'
-                }}
-              >
-                English
-              </button>
-              <button
-                onClick={() => handleLanguageChange('my')}
-                style={{
-                  width: '100%',
-                  padding: '12px 20px',
-                  background: language === 'my' ? '#2E86AB' : 'white',
-                  color: language === 'my' ? 'white' : '#333',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                  fontWeight: language === 'my' ? '600' : '400',
-                  borderTop: '1px solid #eee'
-                }}
-              >
-                မြန်မာ
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <NavigationBar
+        language={language}
+        onLanguageChange={handleLanguageChange}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
+        translations={t as any}
+      />
 
       {/* 主要内容 */}
       <div style={{

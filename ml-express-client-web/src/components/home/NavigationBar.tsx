@@ -62,7 +62,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   return (
     <nav style={{
       position: 'relative',
-      zIndex: 1000,
+      zIndex: 9999,
+      pointerEvents: 'auto',
       background: 'transparent',
       color: 'white',
       padding: 0,
@@ -275,7 +276,10 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             }}>
               {/* 注册按钮 */}
               <button
-                onClick={() => onShowRegisterModal(false)}
+                onClick={() => {
+                  console.log('Register button clicked');
+                  onShowRegisterModal(false);
+                }}
                 style={{
                   background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                   color: 'white',
@@ -302,7 +306,10 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
               
               {/* 登录按钮 */}
               <button
-                onClick={() => onShowRegisterModal(true)}
+                onClick={() => {
+                  console.log('Login button clicked');
+                  onShowRegisterModal(true);
+                }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
                   color: 'white',
