@@ -18,6 +18,7 @@ import { addressService, AddressItem } from '../services/supabase';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MapModal from '../components/placeOrder/MapModal';
 
 export default function AddressBookScreen({ navigation, route }: any) {
   const { language } = useApp();
@@ -27,6 +28,13 @@ export default function AddressBookScreen({ navigation, route }: any) {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPickerMode] = useState(route.params?.pickerMode || false);
+
+  // 地图选择相关
+  const [showMapSelector, setShowMapSelector] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState({
+    latitude: 21.9588,
+    longitude: 96.0891,
+  });
 
   const [formData, setFormData] = useState<Partial<AddressItem>>({
     label: '',
@@ -56,6 +64,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
       name: '联系人姓名',
       phone: '联系人电话',
       address: '详细地址',
+      selectOnMap: '地图中选择',
       default: '设为默认地址',
       save: '保存',
       cancel: '取消',
@@ -74,6 +83,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
       name: 'Contact Name',
       phone: 'Phone Number',
       address: 'Detail Address',
+      selectOnMap: 'Select on Map',
       default: 'Set as Default',
       save: 'Save',
       cancel: 'Cancel',
@@ -92,6 +102,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
       name: 'အမည်',
       phone: 'ဖုန်းနံပါတ်',
       address: 'လိပ်စာအပြည့်အစုံ',
+      selectOnMap: 'မြေပုံမှရွေးချယ်ရန်',
       default: 'မူလလိပ်စာအဖြစ်သတ်မှတ်ရန်',
       save: 'သိမ်းဆည်းရန်',
       cancel: 'မလုပ်တော့ပါ',
@@ -198,6 +209,16 @@ export default function AddressBookScreen({ navigation, route }: any) {
     }
   };
 
+  const handleLocationSelect = (location: any) => {
+    setFormData({
+      ...formData,
+      address_text: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude
+    });
+    setShowMapSelector(false);
+  };
+
   const renderItem = ({ item }: { item: AddressItem }) => (
     <TouchableOpacity
       style={styles.addressCard}
@@ -300,6 +321,14 @@ export default function AddressBookScreen({ navigation, route }: any) {
                 onChangeText={v => setFormData({ ...formData, address_text: v })}
                 multiline
               />
+
+              <TouchableOpacity 
+                style={styles.mapBtn} 
+                onPress={() => setShowMapSelector(true)}
+              >
+                <Ionicons name="map-outline" size={20} color="#2563eb" />
+                <Text style={styles.mapBtnText}>{t.selectOnMap}</Text>
+              </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.checkboxRow}
@@ -325,6 +354,14 @@ export default function AddressBookScreen({ navigation, route }: any) {
         message={toastMessage}
         type={toastType}
         onHide={() => setToastVisible(false)}
+      />
+
+      <MapModal
+        visible={showMapSelector}
+        onClose={() => setShowMapSelector(false)}
+        onSelectLocation={handleLocationSelect}
+        initialLocation={selectedLocation}
+        title={t.selectOnMap}
       />
     </View>
   );
@@ -371,6 +408,23 @@ const styles = StyleSheet.create({
   form: { marginBottom: 20 },
   inputLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
   input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 16 },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 16,
+    gap: 8
+  },
+  mapBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2563eb'
+  },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   checkboxLabel: { marginLeft: 8, fontSize: 15, color: '#1e293b' },
   saveBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center' },
