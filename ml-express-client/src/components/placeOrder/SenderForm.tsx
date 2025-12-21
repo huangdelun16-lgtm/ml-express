@@ -50,10 +50,16 @@ const SenderForm = memo<SenderFormProps>(({
   };
 
   const chooseAddressT = {
-    zh: '使用常用地址',
-    en: 'Use Saved Address',
-    my: 'လိပ်စာစာအုပ်မှရွေးရန်'
-  }[language] || '使用常用地址';
+    zh: '常用地址',
+    en: 'Saved Address',
+    my: 'လိပ်စာစာအုပ်'
+  }[language] || '常用地址';
+
+  const myInfoT = {
+    zh: '我的信息',
+    en: 'My Info',
+    my: 'ကျွန်ုပ်၏အချက်အလက်'
+  }[language] || '我的信息';
 
   return (
     <FadeInView delay={100}>
@@ -77,15 +83,21 @@ const SenderForm = memo<SenderFormProps>(({
             >
               <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
             </TouchableOpacity>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
+            <TouchableOpacity 
+              onPress={() => onUseMyInfoChange(!useMyInfo)}
+              activeOpacity={0.7}
+              style={styles.switchContainer}
+            >
+              <Text style={styles.switchLabel}>{myInfoT}</Text>
               <Switch
                 value={useMyInfo}
                 onValueChange={onUseMyInfoChange}
                 trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
                 thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
+                ios_backgroundColor="#d1d5db"
+                pointerEvents="none" // 让父容器响应点击
               />
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

@@ -1292,9 +1292,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
     <View style={styles.container}>
       {/* 优化背景视觉效果 */}
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+        colors={['#0f172a', '#1e3a8a', '#334155']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.4 }}
+        end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
       {/* 背景装饰性圆圈 */}
@@ -1524,22 +1524,22 @@ const baseStyles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#ffffff',
-    borderRadius: 20, // 更圆润的角
-    padding: 20, // 增加内边距
-    marginTop: 16,
-    shadowColor: '#1e3a8a', // 蓝色阴影，增加层次感
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    borderRadius: 24,
+    padding: 24,
+    marginTop: 20,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)', // 细白边框，精致感
+    borderColor: 'rgba(255, 255, 255, 0.9)',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   calculateButton: {
     borderRadius: 8,
@@ -1573,20 +1573,21 @@ const baseStyles = StyleSheet.create({
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#1e293b',
   },
   switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    padding: 2,
   },
   switchLabel: {
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '600',
     color: '#64748b',
   },
   inputGroup: {

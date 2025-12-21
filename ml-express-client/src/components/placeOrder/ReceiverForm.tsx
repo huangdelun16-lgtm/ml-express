@@ -46,10 +46,10 @@ const ReceiverForm = memo<ReceiverFormProps>(({
   };
 
   const chooseAddressT = {
-    zh: '使用常用地址',
-    en: 'Use Saved Address',
-    my: 'လိပ်စာစာအုပ်မှရွေးရန်'
-  }[language] || '使用常用地址';
+    zh: '常用地址',
+    en: 'Saved Address',
+    my: 'လိပ်စာစာအုပ်'
+  }[language] || '常用地址';
 
   return (
     <FadeInView delay={200}>
