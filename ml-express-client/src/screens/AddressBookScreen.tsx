@@ -118,10 +118,21 @@ const baseStyles = StyleSheet.create({
   
   // 地图模态框样式
   mapModalContainer: { flex: 1, backgroundColor: 'white' },
-  mapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  mapCloseButton: { fontSize: 24, color: '#64748b' },
+  mapHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 16, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 40, // 增加顶部内边距避开刘海屏
+    paddingBottom: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1, 
+    borderBottomColor: '#e2e8f0',
+    zIndex: 10
+  },
+  mapCloseButton: { fontSize: 28, color: '#64748b', padding: 8 }, // 增大点击区域
   mapTitle: { fontSize: 18, fontWeight: 'bold' },
-  mapConfirmButton: { fontSize: 24, color: '#2563eb' },
+  mapConfirmButton: { fontSize: 28, color: '#2563eb', padding: 8 }, // 增大点击区域
   mapAddressInputContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   mapAddressInput: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 12, fontSize: 16 },
   suggestionsContainer: { position: 'absolute', top: 120, left: 16, right: 16, backgroundColor: 'white', borderRadius: 8, zIndex: 1000, ...theme.shadows.medium },
