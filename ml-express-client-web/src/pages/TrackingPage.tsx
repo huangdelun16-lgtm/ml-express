@@ -225,18 +225,6 @@ const TrackingPage: React.FC = () => {
 
   const t = translations[language as keyof typeof translations] || translations.zh;
 
-  const handleLanguageChange = (newLanguage: string) => {
-    setLanguage(newLanguage);
-    localStorage.setItem('ml-express-language', newLanguage);
-  };
-
-  const handleNavigation = (path: string) => {
-    setIsVisible(false);
-    setTimeout(() => {
-      navigate(path);
-    }, 300);
-  };
-
   const handleTracking = async () => {
     if (!trackingNumber.trim()) {
       alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
