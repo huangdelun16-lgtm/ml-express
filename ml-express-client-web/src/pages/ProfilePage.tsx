@@ -33,6 +33,7 @@ const ProfilePage: React.FC = () => {
     totalCOD: 0,
     unclearedCOD: 0,
     unclearedCount: 0,
+    settledCOD: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -41,6 +42,7 @@ const ProfilePage: React.FC = () => {
   });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
   const [codOrders, setCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
+  const [codModalTitle, setCodModalTitle] = useState('');
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const handlePrevMonth = () => {
@@ -227,7 +229,7 @@ const ProfilePage: React.FC = () => {
   }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
 
   // 查看代收款订单
-  const handleViewCODOrders = async () => {
+  const handleViewCODOrders = async (settled?: boolean) => {
     if (!currentUser || !isPartnerStore) return;
     
     try {
@@ -235,8 +237,17 @@ const ProfilePage: React.FC = () => {
       const userId = currentUser.id || storeInfo?.id;
       
       if (userId) {
+        // 设置模态框标题
+        if (settled === true) {
+          setCodModalTitle(language === 'zh' ? '本月已代收款订单' : language === 'en' ? 'Monthly Collected COD Orders' : 'လအလိုက် ငွေကောက်ခံပြီးသော အော်ဒါများ');
+        } else if (settled === false) {
+          setCodModalTitle(language === 'zh' ? '待结清订单' : language === 'en' ? 'Uncleared Orders' : 'ရှင်းလင်းရန် စောင့်ဆိုင်းနေသော အော်ဒါများ');
+        } else {
+          setCodModalTitle(language === 'zh' ? '代收款订单' : language === 'en' ? 'COD Orders' : 'ငွေကောက်ခံရန် အော်商များ');
+        }
+
         // 分页获取第一页
-        const { orders } = await packageService.getPartnerCODOrders(userId, storeName, selectedMonth);
+        const { orders } = await packageService.getPartnerCODOrders(userId, storeName, selectedMonth, settled);
         setCodOrders(orders);
         setShowCODOrdersModal(true);
       }
@@ -413,7 +424,7 @@ const ProfilePage: React.FC = () => {
       storeType: '店铺类型',
       storeCode: '店铺代码',
       codStats: '代收款统计',
-      totalCOD: '本月代收款',
+      totalCOD: '本月已代收款',
       unclearedCOD: '待结清金额',
       unclearedCount: '待结清订单数',
       lastSettledAt: '上次结清日期',
@@ -467,7 +478,7 @@ const ProfilePage: React.FC = () => {
       storeType: 'Store Type',
       storeCode: 'Store Code',
       codStats: 'COD Statistics',
-      totalCOD: 'Monthly COD',
+      totalCOD: 'Monthly Collected COD',
       unclearedCOD: 'Uncleared Amount',
       unclearedCount: 'Uncleared Orders',
       lastSettledAt: 'Last Settled Date',
@@ -1252,9 +1263,32 @@ const ProfilePage: React.FC = () => {
                   e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.1)';
                 }}
                 >
-                  <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.totalCOD}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.totalCOD}</div>
+                    {partnerCODStats.settledCOD > 0 && (
+                      <button 
+                        onClick={() => handleViewCODOrders(true)}
+                        style={{ 
+                          padding: '6px 16px', 
+                          borderRadius: '12px', 
+                          background: '#3b82f6', 
+                          border: 'none', 
+                          color: 'white', 
+                          fontSize: '0.85rem', 
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          boxShadow: '0 6px 15px rgba(59, 130, 246, 0.4)',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {t.view}
+                      </button>
+                    )}
+                  </div>
                   <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                    {partnerCODStats.totalCOD.toLocaleString()}
+                    {partnerCODStats.settledCOD.toLocaleString()}
                     <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
                   </div>
                   <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>📈</div>
@@ -1287,7 +1321,7 @@ const ProfilePage: React.FC = () => {
                     <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.unclearedCOD}</div>
                     {partnerCODStats.unclearedCount > 0 && (
                       <button 
-                        onClick={handleViewCODOrders}
+                        onClick={() => handleViewCODOrders(false)}
                         style={{ 
                           padding: '6px 16px', 
                           borderRadius: '12px', 
@@ -2876,7 +2910,7 @@ const ProfilePage: React.FC = () => {
               fontSize: '1.5rem',
               fontWeight: '600'
             }}>
-              {t.codOrders}
+              {codModalTitle || t.codOrders}
             </h2>
             
             <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>

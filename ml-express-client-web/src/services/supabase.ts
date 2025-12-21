@@ -400,18 +400,22 @@ export const packageService = {
       const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
       const unclearedCount = unclearedPackages.length;
       
+      const settledPackages = packages.filter(pkg => pkg.cod_settled);
+      const settledCOD = settledPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      
       // 计算最后结清日期
-      const settledPackages = packages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
+      const settledPackagesWithDate = settledPackages.filter(pkg => pkg.cod_settled_at);
       let lastSettledAt: string | null = null;
-      if (settledPackages.length > 0) {
-        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
-        lastSettledAt = settledPackages[0].cod_settled_at || null;
+      if (settledPackagesWithDate.length > 0) {
+        settledPackagesWithDate.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledPackagesWithDate[0].cod_settled_at || null;
       }
 
       return {
         totalCOD,
         unclearedCOD,
         unclearedCount,
+        settledCOD,
         lastSettledAt
       };
     } catch (error) {
@@ -420,17 +424,18 @@ export const packageService = {
         totalCOD: 0,
         unclearedCOD: 0,
         unclearedCount: 0,
+        settledCOD: 0,
         lastSettledAt: null
       };
     }
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, page: number = 1, pageSize: number = 20) {
+  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
-        .select('id, cod_amount, delivery_time', { count: 'exact' })
+        .select('id, cod_amount, delivery_time, cod_settled', { count: 'exact' })
         .eq('status', '已送达')
         .gt('cod_amount', 0);
 
@@ -440,6 +445,16 @@ export const packageService = {
       }
       
       q = q.or(conditions.join(','));
+      
+      // 如果指定了结算状态
+      if (settled !== undefined) {
+        if (settled) {
+          q = q.eq('cod_settled', true);
+        } else {
+          // 处理 cod_settled 为 false 或 null 的情况
+          q = q.or('cod_settled.eq.false,cod_settled.is.null');
+        }
+      }
       
       // 如果指定了月份，添加日期过滤
       if (month) {
