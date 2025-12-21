@@ -77,12 +77,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
   if (!showOrderForm) return null;
 
   const packageTypes = [
-    { value: t.ui.document, label: t.ui.document, icon: '📄' },
-    { value: t.ui.standardPackageDetail, label: t.ui.standardPackage, icon: '📦' },
-    { value: t.ui.overweightPackageDetail, label: t.ui.overweightPackage, icon: '⚖️' },
-    { value: t.ui.oversizedPackageDetail, label: t.ui.oversizedPackage, icon: '🐘' },
-    { value: t.ui.fragile, label: t.ui.fragile, icon: '🍷' },
-    { value: t.ui.foodDrinks, label: t.ui.foodDrinks, icon: '🍱' },
+    { value: t.ui.document, label: t.ui.document, icon: '📄', description: t.ui.packageTypeInfo.document },
+    { value: t.ui.standardPackageDetail, label: t.ui.standardPackage, icon: '📦', description: t.ui.packageTypeInfo.standard },
+    { value: t.ui.overweightPackageDetail, label: t.ui.overweightPackage, icon: '⚖️', description: t.ui.packageTypeInfo.overweight },
+    { value: t.ui.oversizedPackageDetail, label: t.ui.oversizedPackage, icon: '🐘', description: t.ui.packageTypeInfo.oversized },
+    { value: t.ui.fragile, label: t.ui.fragile, icon: '🍷', description: t.ui.packageTypeInfo.fragile },
+    { value: t.ui.foodDrinks, label: t.ui.foodDrinks, icon: '🍱', description: t.ui.packageTypeInfo.foodDrinks },
   ];
 
   const deliverySpeeds = [
@@ -471,6 +471,24 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* 显示包裹类型说明 */}
+            {selectedPackageType && (
+              <div style={{
+                marginTop: '-0.5rem',
+                marginBottom: '1rem',
+                padding: '0.8rem',
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                borderLeft: '4px solid #f59e0b',
+                color: 'white',
+                fontSize: '0.85rem',
+                lineHeight: '1.4'
+              }}>
+                <span style={{ marginRight: '5px' }}>💡</span>
+                {packageTypes.find(p => p.value === selectedPackageType)?.description}
+              </div>
+            )}
             
             {showWeightInput && (
               <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>

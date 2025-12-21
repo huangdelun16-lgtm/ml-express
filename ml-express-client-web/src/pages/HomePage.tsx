@@ -1139,7 +1139,16 @@ const HomePage: React.FC = () => {
         orderEmailSending: '正在发送订单确认邮件，请稍候...',
         orderEmailSent: '订单确认邮件已发送，请查收邮箱。',
         orderEmailSentDev: '开发模式：系统未实际发送邮件，请手动保存二维码。',
-        orderFollowup: '我们会在1小时内联系您取件。'
+        orderFollowup: '我们会在1小时内联系您取件。',
+        packageTypeInfo: {
+          title: '包裹类型说明',
+          standard: '适用于常规大小的包裹（45x60x15cm）和（5KG）以内。',
+          overweight: '适用于重量超过5公斤的包裹。重物品需要额外运费。',
+          oversized: '适用于尺寸超过标准（45x60x15cm）的大型包裹。',
+          fragile: '适用于易损坏物品，如玻璃、陶瓷、精密电子产品等。需加收特殊处理费。',
+          foodDrinks: '适用于熟食、饮料等。为了保证新鲜，建议选择加急配送。',
+          document: '适用于信件、护照、合同等纸质文件。'
+        }
       }
       },
     en: {
@@ -1274,7 +1283,16 @@ const HomePage: React.FC = () => {
         orderEmailSending: 'Sending the order confirmation email, please wait...',
         orderEmailSent: 'Order confirmation email sent. Please check your inbox.',
         orderEmailSentDev: 'Development mode: email not actually sent. Please save the QR code manually.',
-        orderFollowup: 'We will contact you within 1 hour to arrange pickup.'
+        orderFollowup: 'We will contact you within 1 hour to arrange pickup.',
+        packageTypeInfo: {
+          title: 'Package Type Description',
+          standard: 'Standard package within (45x60x15cm) and (5KG).',
+          overweight: 'Packages weighing over 5KG. Heavy items require extra fee.',
+          oversized: 'Large packages exceeding standard dimensions (45x60x15cm).',
+          fragile: 'Easily damaged items such as glass, ceramics, etc. Special handling fee applies.',
+          foodDrinks: 'Foods and drinks. For freshness, express delivery is recommended.',
+          document: 'Paper documents like letters, passports, contracts, etc.'
+        }
       }
     },
     my: {
@@ -1409,7 +1427,16 @@ const HomePage: React.FC = () => {
         orderEmailSending: 'အော်ဒါအတည်ပြုအီးမေးလ် ပို့နေပါသည်၊ ခဏစောင့်ပါ...',
         orderEmailSent: 'အော်ဒါအတည်ပြုအီးမေးလ်ပို့ပြီးပါပြီ။ အီးမေးလ်ကို စစ်ဆေးပါ။',
         orderEmailSentDev: 'ဖွံ့ဖြိုးတိုးတက်မှု မုဒ် - အီးမေးလ်ကို မပို့ရသေးပါ။ QR ကုဒ်ကို ကိုယ်တိုင် သိမ်းဆည်းပါ။',
-        orderFollowup: '၁ နာရီအတွင်း ကူရီယာမှ ပစ္စည်းယူဖို့ ဆက်သွယ်ပါမည်။'
+        orderFollowup: '၁ နာရီအတွင်း ကူရီယာမှ ပစ္စည်းယူဖို့ ဆက်သွယ်ပါမည်။',
+        packageTypeInfo: {
+          title: 'ထုပ်ပိုးအမျိုးအစား ရှင်းလင်းချက်',
+          standard: 'စံထုပ်ပိုး (45x60x15cm) နှင့် (5KG) အတွင်း။',
+          overweight: '၅ ကီလိုဂရမ်ထက် ပိုလေးသော ထုပ်ပိုးမှုများ။',
+          oversized: 'စံအရွယ်အစားထက် ကျော်လွန်သော ထုပ်ပိုးမှုများ။',
+          fragile: 'ပျက်စီးလွယ်သော ပစ္စည်းများ (ဥပမာ- ဖန်၊ ကြွေထည်)။',
+          foodDrinks: 'အစားအသောက်နှင့် ဖျော်ရည်များ။',
+          document: 'စာရွက်စာတမ်းများ (ဥပမာ- စာများ၊ နိုင်ငံကူးလက်မှတ်)။'
+        }
       }
     }
   };
