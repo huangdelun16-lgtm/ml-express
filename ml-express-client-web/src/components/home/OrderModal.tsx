@@ -78,10 +78,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
   const packageTypes = [
     { value: t.ui.document, label: t.ui.document, icon: '📄' },
-    { value: t.ui.smallPackage, label: t.ui.smallPackage, icon: '📦' },
-    { value: t.ui.mediumPackage, label: t.ui.mediumPackage, icon: '📦' },
-    { value: t.ui.largePackage, label: t.ui.largePackage, icon: '📦' },
-    { value: t.ui.oversizedPackage, label: t.ui.oversizedPackage, icon: '🐘' },
+    { value: t.ui.standardPackageDetail, label: t.ui.standardPackage, icon: '📦' },
+    { value: t.ui.overweightPackageDetail, label: t.ui.overweightPackage, icon: '⚖️' },
+    { value: t.ui.oversizedPackageDetail, label: t.ui.oversizedPackage, icon: '🐘' },
     { value: t.ui.fragile, label: t.ui.fragile, icon: '🍷' },
     { value: t.ui.foodDrinks, label: t.ui.foodDrinks, icon: '🍱' },
   ];
@@ -434,7 +433,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       onClick={() => {
                         setSelectedPackageType(type.value);
                         setShowPackageDropdown(false);
-                        if (type.value === t.ui.oversizedPackage) {
+                        const isOversized = type.value === t.ui.oversizedPackageDetail || type.value === '超规件（45x60x15cm）以上';
+                        const isOverweight = type.value === t.ui.overweightPackageDetail || type.value === '超重件（5KG）以上';
+                        if (isOversized || isOverweight) {
                           setShowWeightInput(true);
                         } else {
                           setShowWeightInput(false);

@@ -1100,11 +1100,14 @@ const HomePage: React.FC = () => {
         cancelPayment: '取消',
         packageType: '包裹类型',
         document: '文件',
-        standardPackage: '标准件（45x60x15cm）和（5KG）以内',
-        overweightPackage: '超重件（5KG）以上',
-        oversizedPackage: '超规件（45x60x15cm）以上',
+        standardPackage: '标准件',
+        overweightPackage: '超重件',
+        oversizedPackage: '超规件',
         fragile: '易碎品',
         foodDrinks: '食品和饮料',
+        standardPackageDetail: '标准件（45x60x15cm）和（5KG）以内',
+        overweightPackageDetail: '超重件（5KG）以上',
+        oversizedPackageDetail: '超规件（45x60x15cm）以上',
         onTimeDelivery: '准时达（订单后1小时送达）',
         urgentDelivery: '急送达（订单后30分钟送达）',
         scheduledDelivery: '定时达（客户要求的时间送达）',
@@ -1232,11 +1235,14 @@ const HomePage: React.FC = () => {
         cancelPayment: 'Cancel',
         packageType: 'Package Type',
         document: 'Document',
-        standardPackage: 'Standard Package (45x60x15cm) & (5KG)',
-        overweightPackage: 'Overweight Package (5KG+)',
-        oversizedPackage: 'Oversized Package (45x60x15cm+)',
+        standardPackage: 'Standard Package',
+        overweightPackage: 'Overweight',
+        oversizedPackage: 'Oversized',
         fragile: 'Fragile',
         foodDrinks: 'Foods & Drinks',
+        standardPackageDetail: 'Standard Package (45x60x15cm) & (5KG)',
+        overweightPackageDetail: 'Overweight Package (5KG+)',
+        oversizedPackageDetail: 'Oversized Package (45x60x15cm+)',
         onTimeDelivery: 'On-Time Delivery (1 hour after order)',
         urgentDelivery: 'Urgent Delivery (30 minutes after order)',
         scheduledDelivery: 'Scheduled Delivery (Customer requested time)',
@@ -1364,11 +1370,14 @@ const HomePage: React.FC = () => {
         cancelPayment: 'ပေးချေမှုကို ပယ်ဖျက်ပါ',
         packageType: 'ထုပ်ပိုးအမျိုးအစား',
         document: 'စာရွက်စာတမ်း',
-        standardPackage: 'စံထုပ်ပိုး (45x60x15cm) နှင့် (5KG) အတွင်း',
-        overweightPackage: 'အလေးချိန်များသော ထုပ်ပိုး (5KG) အထက်',
-        oversizedPackage: 'အရွယ်အစားကြီးသော ထုပ်ပိုး (45x60x15cm) အထက်',
+        standardPackage: 'စံထုပ်ပိုး',
+        overweightPackage: 'အလေးချိန်များသော ထုပ်ပိုး',
+        oversizedPackage: 'အရွယ်အစားကြီးသော ထုပ်ပိုး',
         fragile: 'ပျက်စီးလွယ်သော',
         foodDrinks: 'အစားအသောက်များ',
+        standardPackageDetail: 'စံထုပ်ပိုး (45x60x15cm) နှင့် (5KG) အတွင်း',
+        overweightPackageDetail: 'အလေးချိန်များသော ထုပ်ပိုး (5KG) အထက်',
+        oversizedPackageDetail: 'အရွယ်အစားကြီးသော ထုပ်ပိုး (45x60x15cm) အထက်',
         onTimeDelivery: 'အချိန်မှန်ပို့ဆောင်မှု（အမှာတင်ပြီး ၁ နာရီအတွင်း）',
         urgentDelivery: 'အလျင်အမြန်ပို့ဆောင်မှု（အမှာတင်ပြီး ၃၀ မိနစ်အတွင်း）',
         scheduledDelivery: 'အချိန်သတ်မှတ်ပို့ဆောင်မှု（ဖောက်သည်တောင်းဆိုသောအချိန်）',
@@ -1585,9 +1594,11 @@ const HomePage: React.FC = () => {
     }
     
     // 4. 包裹类型附加费
-    if (packageType === t.ui.oversizedPackage || packageType === '超规件') {
+    if (packageType === t.ui.oversizedPackageDetail || packageType === '超规件（45x60x15cm）以上') {
       // 超规件：按距离计算附加费
       totalPrice += distance * pricingSettings.oversizeSurcharge;
+    } else if (packageType === t.ui.overweightPackageDetail || packageType === '超重件（5KG）以上') {
+      // 超重件：已经按重量计算了附加费，这里可以加特定类型费（如有）
     } else if (packageType === t.ui.fragile || packageType === '易碎品') {
       // 易碎品：按距离计算附加费（MMK/公里）
       totalPrice += distance * pricingSettings.fragileSurcharge;
@@ -1756,7 +1767,10 @@ const HomePage: React.FC = () => {
     }
     
     // 根据包裹类型决定是否需要重量
-    const needWeight = orderInfo.packageType === '超重件' || orderInfo.packageType === '超规件';
+    const needWeight = orderInfo.packageType === t.ui.overweightPackageDetail || 
+                      orderInfo.packageType === t.ui.oversizedPackageDetail ||
+                      orderInfo.packageType === '超重件（5KG）以上' || 
+                      orderInfo.packageType === '超规件（45x60x15cm）以上';
     if (!orderInfo.packageType || (needWeight && !orderInfo.weight) || !orderInfo.deliverySpeed) {
       alert('请填写完整的包裹信息');
       return;
@@ -2607,10 +2621,10 @@ const HomePage: React.FC = () => {
                     // 创建包裹数据 - 使用数据库字段名
                     // 确保 weight 字段始终有值（数据库要求非空）
                     // 对于不需要重量的包裹类型，使用默认值 '1'
-                    const needWeight = orderInfo.packageType === t.ui.overweightPackage || 
-                                      orderInfo.packageType === t.ui.oversizedPackage ||
-                                      orderInfo.packageType === '超重件' || 
-                                      orderInfo.packageType === '超规件';
+                    const needWeight = orderInfo.packageType === t.ui.overweightPackageDetail || 
+                                      orderInfo.packageType === t.ui.oversizedPackageDetail ||
+                                      orderInfo.packageType === '超重件（5KG）以上' || 
+                                      orderInfo.packageType === '超规件（45x60x15cm）以上';
                     const packageWeight = needWeight && orderInfo.weight 
                       ? orderInfo.weight 
                       : (orderInfo.weight || '1'); // 默认重量为 1kg
