@@ -763,12 +763,20 @@ const ProfilePage: React.FC = () => {
                       ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
                       : (currentUser.user_type === 'vip' 
                         ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)'
-                        : 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'),
+                        : (currentUser.user_type === 'admin' 
+                          ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
+                          : (currentUser.user_type === 'courier' 
+                            ? 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)' 
+                            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'))),
                     boxShadow: isPartnerStore 
                       ? '0 2px 8px rgba(14, 165, 233, 0.3)' 
                       : (currentUser.user_type === 'vip'
                         ? '0 2px 8px rgba(251, 191, 36, 0.3)'
-                        : '0 2px 8px rgba(148, 163, 184, 0.3)'),
+                        : (currentUser.user_type === 'admin'
+                          ? '0 2px 8px rgba(249, 115, 22, 0.3)'
+                          : (currentUser.user_type === 'courier'
+                            ? '0 2px 8px rgba(168, 85, 247, 0.3)'
+                            : '0 2px 8px rgba(59, 130, 246, 0.3)'))),
                     color: 'white',
                     padding: '0.2rem 0.8rem',
                     borderRadius: '12px',
@@ -779,7 +787,9 @@ const ProfilePage: React.FC = () => {
                     {isPartnerStore ? 'Partner' : (
                       currentUser.user_type === 'vip' 
                         ? (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')
-                        : (language === 'zh' ? '普通会员' : language === 'en' ? 'Standard Member' : 'သာမန်အဖွဲ့ဝင်')
+                        : (currentUser.user_type === 'admin' 
+                          ? 'Admin' 
+                          : (currentUser.user_type === 'courier' ? 'Courier' : 'Member'))
                     )}
                   </div>
                 </div>

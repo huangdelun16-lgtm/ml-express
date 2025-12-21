@@ -802,15 +802,23 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={[
                 styles.userBadge,
                 userType === 'partner' && styles.partnerBadge,
-                userType === 'vip' && styles.vipBadge
+                userType === 'vip' && styles.vipBadge,
+                userType === 'admin' && styles.adminBadge,
+                userType === 'courier' && styles.courierBadge,
+                (!userType || userType === 'customer') && !isPartnerStore && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
                   userType === 'partner' && styles.partnerBadgeText,
-                  userType === 'vip' && styles.vipBadgeText
+                  userType === 'vip' && styles.vipBadgeText,
+                  userType === 'admin' && styles.adminBadgeText,
+                  userType === 'courier' && styles.courierBadgeText,
+                  (!userType || userType === 'customer') && !isPartnerStore && styles.memberBadgeText
                 ]}>
                   {userType === 'partner' ? 'Partner' : (
-                    userType === 'vip' ? (language === 'zh' ? 'VIP 会员' : 'VIP Member') : (language === 'zh' ? '普通会员' : 'Standard Member')
+                    userType === 'vip' ? (language === 'zh' ? 'VIP 会员' : 'VIP Member') : (
+                      userType === 'admin' ? 'Admin' : (userType === 'courier' ? 'Courier' : 'Member')
+                    )
                   )}
                 </Text>
               </View>
@@ -1774,6 +1782,33 @@ const styles = StyleSheet.create({
   },
   vipBadgeText: {
     color: '#92400e', // 深褐色文字
+    fontWeight: '800',
+  },
+  adminBadge: {
+    backgroundColor: '#f97316', // 橙色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  adminBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  courierBadge: {
+    backgroundColor: '#a855f7', // 紫色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  courierBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  memberBadge: {
+    backgroundColor: '#3b82f6', // 蓝色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  memberBadgeText: {
+    color: '#ffffff',
     fontWeight: '800',
   },
   contactInfoContainer: {
