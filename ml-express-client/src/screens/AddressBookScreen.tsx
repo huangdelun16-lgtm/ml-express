@@ -64,6 +64,36 @@ const baseStyles = StyleSheet.create({
   form: { marginBottom: 20 },
   inputLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
   input: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 16 },
+  labelButtonGroup: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16
+  },
+  labelButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 6
+  },
+  labelButtonActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb'
+  },
+  labelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b'
+  },
+  labelButtonTextActive: {
+    color: 'white'
+  },
   mapBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -171,7 +201,10 @@ export default function AddressBookScreen({ navigation, route }: any) {
       title: '常用地址',
       add: '添加新地址',
       edit: '编辑地址',
-      label: '地址标签 (如: 家, 公司)',
+      label: '地址标签',
+      home: '家',
+      office: '公司',
+      other: '其它',
       name: '联系人姓名',
       phone: '联系人电话',
       address: '详细地址',
@@ -190,7 +223,10 @@ export default function AddressBookScreen({ navigation, route }: any) {
       title: 'Address Book',
       add: 'Add New Address',
       edit: 'Edit Address',
-      label: 'Label (e.g. Home, Office)',
+      label: 'Label',
+      home: 'Home',
+      office: 'Office',
+      other: 'Other',
       name: 'Contact Name',
       phone: 'Phone Number',
       address: 'Detail Address',
@@ -209,7 +245,10 @@ export default function AddressBookScreen({ navigation, route }: any) {
       title: 'လိပ်စာစာအုပ်',
       add: 'လိပ်စာအသစ်ထည့်ရန်',
       edit: 'လိပ်စာပြင်ရန်',
-      label: 'လိပ်စာအမည် (ဥပမာ: အိမ်၊ ရုံး)',
+      label: 'လိပ်စာအမည်',
+      home: 'အိမ်',
+      office: 'ရုံး',
+      other: 'အခြား',
       name: 'အမည်',
       phone: 'ဖုန်းနံပါတ်',
       address: 'လိပ်စာအပြည့်အစုံ',
@@ -440,12 +479,33 @@ export default function AddressBookScreen({ navigation, route }: any) {
             </View>
             <ScrollView style={styles.form}>
               <Text style={styles.inputLabel}>{t.label}</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.label}
-                onChangeText={v => setFormData({ ...formData, label: v })}
-                placeholder="e.g. Home, Office"
-              />
+              <View style={styles.labelButtonGroup}>
+                {[
+                  { key: '家', icon: 'home', label: t.home },
+                  { key: '公司', icon: 'business', label: t.office },
+                  { key: '其它', icon: 'bookmark', label: t.other }
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.labelButton,
+                      formData.label === item.key && styles.labelButtonActive
+                    ]}
+                    onPress={() => setFormData({ ...formData, label: item.key })}
+                  >
+                    <Ionicons 
+                      name={item.icon as any} 
+                      size={18} 
+                      color={formData.label === item.key ? 'white' : '#64748b'} 
+                    />
+                    <Text style={[
+                      styles.labelButtonText,
+                      formData.label === item.key && styles.labelButtonTextActive
+                    ]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Text style={styles.inputLabel}>{t.name} *</Text>
               <TextInput
                 style={styles.input}
@@ -490,6 +550,30 @@ export default function AddressBookScreen({ navigation, route }: any) {
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
               <Text style={styles.saveBtnText}>{t.save}</Text>
             </TouchableOpacity>
+
+            {/* MapModal 放在这里以确保它能显示在当前 Modal 之上 */}
+            <MapModal
+              visible={showMapSelector}
+              language={language as any}
+              styles={styles}
+              currentT={currentT}
+              mapType="receiver"
+              selectedLocation={selectedLocation}
+              selectedPlace={selectedPlace}
+              mapAddressInput={mapAddressInput}
+              showSuggestions={showSuggestions}
+              autocompleteSuggestions={autocompleteSuggestions}
+              onClose={() => setShowMapSelector(false)}
+              onConfirm={handleConfirmMapLocation}
+              onAddressInputChange={handleMapAddressInputChange}
+              onMapAddressInputChange={setMapAddressInput}
+              onUseCurrentLocation={handleUseCurrentLocation}
+              onSelectSuggestion={handleSelectSuggestion}
+              onSetShowSuggestions={setShowSuggestions}
+              onLocationChange={setSelectedLocation}
+              onPlaceChange={setSelectedPlace}
+              markerTitle={t.selectOnMap}
+            />
           </View>
         </View>
       </Modal>
@@ -500,30 +584,8 @@ export default function AddressBookScreen({ navigation, route }: any) {
         type={toastType}
         onHide={() => setToastVisible(false)}
       />
-
-      <MapModal
-        visible={showMapSelector}
-        language={language as any}
-        styles={styles}
-        currentT={currentT}
-        mapType="receiver"
-        selectedLocation={selectedLocation}
-        selectedPlace={selectedPlace}
-        mapAddressInput={mapAddressInput}
-        showSuggestions={showSuggestions}
-        autocompleteSuggestions={autocompleteSuggestions}
-        onClose={() => setShowMapSelector(false)}
-        onConfirm={handleConfirmMapLocation}
-        onAddressInputChange={handleMapAddressInputChange}
-        onMapAddressInputChange={setMapAddressInput}
-        onUseCurrentLocation={handleUseCurrentLocation}
-        onSelectSuggestion={handleSelectSuggestion}
-        onSetShowSuggestions={setShowSuggestions}
-        onLocationChange={setSelectedLocation}
-        onPlaceChange={setSelectedPlace}
-        markerTitle={t.selectOnMap}
-      />
     </View>
   );
 }
+
 
