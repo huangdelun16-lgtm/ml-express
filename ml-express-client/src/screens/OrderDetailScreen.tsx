@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 import { packageService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -85,6 +87,42 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
+  const viewShotRef = React.useRef<any>(null);
+
+  // 保存二维码到相册
+  const handleSaveQRCode = async () => {
+    try {
+      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        hideLoading();
+        Alert.alert(
+          language === 'zh' ? '权限提示' : 'Permission Required',
+          language === 'zh' ? '需要相册权限才能保存二维码' : 'Photo library permission is required to save QR code'
+        );
+        return;
+      }
+
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+      });
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      hideLoading();
+      Alert.alert(
+        language === 'zh' ? '保存成功' : 'Saved!',
+        language === 'zh' ? '二维码已保存到您的相册' : 'QR code has been saved to your gallery'
+      );
+    } catch (error) {
+      hideLoading();
+      LoggerService.error('保存二维码失败:', error);
+      Alert.alert(
+        language === 'zh' ? '保存失败' : 'Save Failed',
+        language === 'zh' ? '无法保存图片' : 'Unable to save image'
+      );
+    }
+  };
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -895,49 +933,65 @@ export default function OrderDetailScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </LinearGradient>
 
-            <View style={styles.qrModalBody}>
-              <Text style={styles.qrOrderInfo}>📦 {t.orderNumber}</Text>
-              <Text style={styles.qrOrderId}>{order?.id}</Text>
+            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ backgroundColor: 'white' }}>
+              <View style={styles.qrModalBody}>
+                <Text style={styles.qrOrderInfo}>📦 {t.orderNumber}</Text>
+                <Text style={styles.qrOrderId}>{order?.id}</Text>
 
-              <View style={styles.qrCodeContainer}>
-                <View style={styles.qrCodeWrapper}>
-                  <QRCode
-                    value={order?.id || ''}
-                    size={220}
-                    color="#2E86AB"
-                    backgroundColor="white"
-                  />
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode
+                      value={order?.id || ''}
+                      size={220}
+                      color="#2E86AB"
+                      backgroundColor="white"
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.qrHint}>{t.saveQRHint}</Text>
+
+                {/* 订单状态和价格 */}
+                <View style={styles.qrInfoRow}>
+                  <View style={styles.qrInfoItem}>
+                    <Text style={styles.qrInfoLabel}>{t.status}:</Text>
+                    <Text style={[styles.qrInfoValue, { color: getStatusColor(order?.status || '') }]}>
+                      {order?.status}
+                    </Text>
+                  </View>
+                  <View style={styles.qrInfoItem}>
+                    <Text style={styles.qrInfoLabel}>{t.totalPrice}:</Text>
+                    <Text style={styles.qrInfoValue}>{order?.price} MMK</Text>
+                  </View>
                 </View>
               </View>
+            </ViewShot>
 
-              <Text style={styles.qrHint}>{t.saveQRHint}</Text>
-
-              {/* 订单状态和价格 */}
-              <View style={styles.qrInfoRow}>
-                <View style={styles.qrInfoItem}>
-                  <Text style={styles.qrInfoLabel}>{t.status}:</Text>
-                  <Text style={[styles.qrInfoValue, { color: getStatusColor(order?.status || '') }]}>
-                    {order?.status}
-                  </Text>
-                </View>
-                <View style={styles.qrInfoItem}>
-                  <Text style={styles.qrInfoLabel}>{t.totalPrice}:</Text>
-                  <Text style={styles.qrInfoValue}>{order?.price} MMK</Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.qrCloseButton}
-              onPress={() => setShowQRCodeModal(false)}
-            >
-              <LinearGradient
-                colors={['#64748b', '#475569']}
-                style={styles.qrCloseButtonGradient}
+            <View style={{ flexDirection: 'row', gap: 12, padding: 20, paddingTop: 0 }}>
+              <TouchableOpacity
+                style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
+                onPress={handleSaveQRCode}
               >
-                <Text style={styles.qrCloseButtonText}>{t.close}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  style={{ paddingVertical: 14, alignItems: 'center' }}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>💾 {language === 'zh' ? '保存图片' : language === 'en' ? 'Save Image' : 'သိမ်းဆည်းမည်'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
+                onPress={() => setShowQRCodeModal(false)}
+              >
+                <LinearGradient
+                  colors={['#64748b', '#475569']}
+                  style={{ paddingVertical: 14, alignItems: 'center' }}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>{t.close}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

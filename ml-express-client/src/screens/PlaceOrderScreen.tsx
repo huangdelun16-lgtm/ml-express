@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,10 +40,59 @@ import MapModal from '../components/placeOrder/MapModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
+import * as FileSystem from 'expo-file-system';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+
 export default function PlaceOrderScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const styles = useLanguageStyles(baseStyles);
+  
+  // QR码保存引用
+  const viewShotRef = useRef<any>(null);
+
+  // 保存二维码到相册
+  const handleSaveQRCode = async () => {
+    try {
+      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      
+      // 检查相册权限
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        hideLoading();
+        Alert.alert(
+          language === 'zh' ? '权限提示' : 'Permission Required',
+          language === 'zh' ? '需要相册权限才能保存二维码' : 'Photo library permission is required to save QR code'
+        );
+        return;
+      }
+
+      // 截取视图
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+      });
+
+      // 保存到本地文件（可选，captureRef 返回的已经是本地临时文件）
+      // 保存到相册
+      await MediaLibrary.saveToLibraryAsync(uri);
+      
+      hideLoading();
+      Alert.alert(
+        language === 'zh' ? '保存成功' : 'Saved!',
+        language === 'zh' ? '二维码已保存到您的相册' : 'QR code has been saved to your gallery'
+      );
+    } catch (error) {
+      hideLoading();
+      LoggerService.error('保存二维码失败:', error);
+      Alert.alert(
+        language === 'zh' ? '保存失败' : 'Save Failed',
+        language === 'zh' ? '无法保存图片，请稍后重试' : 'Unable to save image, please try again'
+      );
+    }
+  };
 
   useEffect(() => {
     analytics.trackPageView('PlaceOrderScreen');
@@ -1523,29 +1572,43 @@ export default function PlaceOrderScreen({ navigation }: any) {
               </TouchableOpacity>
             </LinearGradient>
 
-            <View style={styles.qrModalBody}>
-              <Text style={styles.qrInfoText}>📦 {language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}</Text>
-              <Text style={styles.qrOrderId}>{qrOrderId}</Text>
+            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ backgroundColor: 'white' }}>
+              <View style={styles.qrModalBody}>
+                <Text style={styles.qrInfoText}>📦 {language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}</Text>
+                <Text style={styles.qrOrderId}>{qrOrderId}</Text>
 
-              <View style={styles.qrCodeContainer}>
-                <View style={styles.qrCodeWrapper}>
-                  <QRCode
-                    value={qrOrderId}
-                    size={200}
-                    color="#2E86AB"
-                    backgroundColor="white"
-                  />
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode
+                      value={qrOrderId}
+                      size={200}
+                      color="#2E86AB"
+                      backgroundColor="white"
+                    />
+                  </View>
                 </View>
+
+                <Text style={styles.qrHint}>
+                  {language === 'zh' ? '请向骑手出示此二维码以供取件扫描' : language === 'en' ? 'Please show this QR code to the courier' : 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို ပြပေးပါ'}
+                </Text>
+
+                <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
               </View>
-
-              <Text style={styles.qrHint}>
-                {language === 'zh' ? '请向骑手出示此二维码以供取件扫描' : language === 'en' ? 'Please show this QR code to the courier' : 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို ပြပေးပါ'}
-              </Text>
-
-              <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
-            </View>
+            </ViewShot>
 
             <View style={styles.qrModalButtons}>
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={handleSaveQRCode}
+              >
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  style={styles.qrButtonGradient}
+                >
+                  <Text style={styles.qrButtonText}>💾 {language === 'zh' ? '保存二维码' : language === 'en' ? 'Save QR' : 'သိမ်းဆည်းမည်'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.qrButton}
                 onPress={() => {
@@ -1558,25 +1621,25 @@ export default function PlaceOrderScreen({ navigation }: any) {
                   colors={['#3b82f6', '#2563eb']}
                   style={styles.qrButtonGradient}
                 >
-                  <Text style={styles.qrButtonText}>{language === 'zh' ? '查看订单' : language === 'en' ? 'View Orders' : 'အော်ဒါကြည့်ရန်'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={() => {
-                  setShowQRCodeModal(false);
-                  resetForm();
-                }}
-              >
-                <LinearGradient
-                  colors={['#64748b', '#475569']}
-                  style={styles.qrButtonGradient}
-                >
-                  <Text style={styles.qrButtonText}>{language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'}</Text>
+                  <Text style={styles.qrButtonText}>📄 {language === 'zh' ? '查看订单' : language === 'en' ? 'View Orders' : 'အော်ဒါကြည့်ရန်'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={{
+                alignItems: 'center',
+                paddingVertical: 15,
+                borderTopWidth: 1,
+                borderTopColor: '#f1f5f9'
+              }}
+              onPress={() => {
+                setShowQRCodeModal(false);
+                resetForm();
+              }}
+            >
+              <Text style={{ color: '#64748b', fontWeight: 'bold' }}>{language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
