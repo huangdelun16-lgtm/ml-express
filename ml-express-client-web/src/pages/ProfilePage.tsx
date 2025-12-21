@@ -239,7 +239,7 @@ const ProfilePage: React.FC = () => {
       if (userId) {
         // 设置模态框标题
         if (settled === true) {
-          setCodModalTitle(language === 'zh' ? '本月已代收款订单' : language === 'en' ? 'Monthly Collected COD Orders' : 'လအလိုက် ငွေကောက်ခံပြီးသော အော်ဒါများ');
+          setCodModalTitle(language === 'zh' ? '本月已结清订单' : language === 'en' ? 'Monthly Settled Orders' : 'လအလိုက် ငွေရှင်းပြီးသော အော်ဒါများ');
         } else if (settled === false) {
           setCodModalTitle(language === 'zh' ? '待结清订单' : language === 'en' ? 'Uncleared Orders' : 'ရှင်းလင်းရန် စောင့်ဆိုင်းနေသော အော်ဒါများ');
         } else {
@@ -424,7 +424,7 @@ const ProfilePage: React.FC = () => {
       storeType: '店铺类型',
       storeCode: '店铺代码',
       codStats: '代收款统计',
-      totalCOD: '本月已代收款',
+      totalCOD: '本月已结清代收款',
       unclearedCOD: '待结清金额',
       unclearedCount: '待结清订单数',
       lastSettledAt: '上次结清日期',
@@ -478,7 +478,7 @@ const ProfilePage: React.FC = () => {
       storeType: 'Store Type',
       storeCode: 'Store Code',
       codStats: 'COD Statistics',
-      totalCOD: 'Monthly Collected COD',
+      totalCOD: 'Monthly Settled COD',
       unclearedCOD: 'Uncleared Amount',
       unclearedCount: 'Uncleared Orders',
       lastSettledAt: 'Last Settled Date',
@@ -532,7 +532,7 @@ const ProfilePage: React.FC = () => {
       storeType: 'ဆိုင်အမျိုးအစား',
       storeCode: 'ဆိုင်ကုဒ်',
       codStats: 'ငွေကောက်ခံမှုစာရင်း',
-      totalCOD: 'လတစ်လငွေကောက်ခံမှု',
+      totalCOD: 'လအလိုက် ငွေရှင်းပြီးသော ငွေကောက်ခံမှု',
       unclearedCOD: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောငွေ',
       unclearedCount: 'ရှင်းလင်းရန်စောင့်ဆိုင်းနေသောအော်ဒါ',
       lastSettledAt: 'နောက်ဆုံးရှင်းလင်းထားသောရက်စွဲ',
