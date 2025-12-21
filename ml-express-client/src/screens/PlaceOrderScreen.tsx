@@ -1264,6 +1264,30 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   }, [setPackageType, setShowWeightInput]);
 
+  // 处理地址簿选择
+  const openAddressBook = (type: 'sender' | 'receiver') => {
+    navigation.navigate('AddressBook', {
+      pickerMode: true,
+      onSelect: (item: any) => {
+        if (type === 'sender') {
+          handleFieldChange('senderName', item.contact_name);
+          handleFieldChange('senderPhone', item.contact_phone);
+          handleFieldChange('senderAddress', item.address_text);
+          if (item.latitude && item.longitude) {
+            setSenderCoordinates({ lat: item.latitude, lng: item.longitude });
+          }
+        } else {
+          handleFieldChange('receiverName', item.contact_name);
+          handleFieldChange('receiverPhone', item.contact_phone);
+          handleFieldChange('receiverAddress', item.address_text);
+          if (item.latitude && item.longitude) {
+            setReceiverCoordinates({ lat: item.latitude, lng: item.longitude });
+          }
+        }
+      }
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* 优化背景视觉效果 */}
@@ -1330,6 +1354,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
             onSenderAddressChange={(val) => handleFieldChange('senderAddress', val)}
             onUseMyInfoChange={setUseMyInfo}
             onOpenMap={() => openMapSelector('sender')}
+            onOpenAddressBook={() => openAddressBook('sender')}
             onBlur={handleFieldBlur}
           />
 
@@ -1348,6 +1373,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
             onReceiverPhoneChange={(val) => handleFieldChange('receiverPhone', val)}
             onReceiverAddressChange={(val) => handleFieldChange('receiverAddress', val)}
             onOpenMap={() => openMapSelector('receiver')}
+            onOpenAddressBook={() => openAddressBook('receiver')}
             onBlur={handleFieldBlur}
           />
 

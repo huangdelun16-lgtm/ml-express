@@ -19,6 +19,7 @@ interface SenderFormProps {
   onSenderAddressChange: (text: string) => void;
   onUseMyInfoChange: (value: boolean) => void;
   onOpenMap: () => void;
+  onOpenAddressBook: () => void;
   onBlur?: (field: string) => void;
 }
 
@@ -38,6 +39,7 @@ const SenderForm = memo<SenderFormProps>(({
   onSenderAddressChange,
   onUseMyInfoChange,
   onOpenMap,
+  onOpenAddressBook,
   onBlur,
 }) => {
   const handleAddressChange = (text: string) => {
@@ -47,6 +49,12 @@ const SenderForm = memo<SenderFormProps>(({
     onSenderAddressChange(addressLines.join('\n'));
   };
 
+  const chooseAddressT = {
+    zh: '使用常用地址',
+    en: 'Use Saved Address',
+    my: 'လိပ်စာစာအုပ်မှရွေးရန်'
+  }[language] || '使用常用地址';
+
   return (
     <FadeInView delay={100}>
       <View style={styles.section}>
@@ -55,14 +63,29 @@ const SenderForm = memo<SenderFormProps>(({
             <PackageIcon size={18} color="#1e293b" />
             <Text style={styles.sectionTitle}> {currentT.senderInfo}</Text>
           </View>
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
-            <Switch
-              value={useMyInfo}
-              onValueChange={onUseMyInfoChange}
-              trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-              thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
-            />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity 
+              onPress={onOpenAddressBook}
+              style={{
+                backgroundColor: '#eff6ff',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#bfdbfe'
+              }}
+            >
+              <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
+            </TouchableOpacity>
+            <View style={styles.switchContainer}>
+              <Text style={styles.switchLabel}>{currentT.useMyInfo}</Text>
+              <Switch
+                value={useMyInfo}
+                onValueChange={onUseMyInfoChange}
+                trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+                thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
+              />
+            </View>
           </View>
         </View>
 

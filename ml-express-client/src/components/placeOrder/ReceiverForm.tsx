@@ -17,6 +17,7 @@ interface ReceiverFormProps {
   onReceiverPhoneChange: (text: string) => void;
   onReceiverAddressChange: (text: string) => void;
   onOpenMap: () => void;
+  onOpenAddressBook: () => void;
   onBlur?: (field: string) => void;
 }
 
@@ -34,6 +35,7 @@ const ReceiverForm = memo<ReceiverFormProps>(({
   onReceiverPhoneChange,
   onReceiverAddressChange,
   onOpenMap,
+  onOpenAddressBook,
   onBlur,
 }) => {
   const handleAddressChange = (text: string) => {
@@ -43,12 +45,33 @@ const ReceiverForm = memo<ReceiverFormProps>(({
     onReceiverAddressChange(addressLines.join('\n'));
   };
 
+  const chooseAddressT = {
+    zh: '使用常用地址',
+    en: 'Use Saved Address',
+    my: 'လိပ်စာစာအုပ်မှရွေးရန်'
+  }[language] || '使用常用地址';
+
   return (
     <FadeInView delay={200}>
       <View style={styles.section}>
-        <View style={styles.sectionTitleContainer}>
-          <LocationIcon size={18} color="#1e293b" />
-          <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+          <View style={styles.sectionTitleContainer}>
+            <LocationIcon size={18} color="#1e293b" />
+            <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={onOpenAddressBook}
+            style={{
+              backgroundColor: '#eff6ff',
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: '#bfdbfe'
+            }}
+          >
+            <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.inputGroup}>
