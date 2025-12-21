@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Logo from '../Logo';
 
 interface OrderModalProps {
@@ -70,7 +70,27 @@ const OrderModal: React.FC<OrderModalProps> = ({
   calculatePriceEstimate,
   handleOrderSubmit
 }) => {
+  const [selectedPackageType, setSelectedPackageType] = useState('');
+  const [showPackageDropdown, setShowPackageDropdown] = useState(false);
+  const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+
   if (!showOrderForm) return null;
+
+  const packageTypes = [
+    { value: t.ui.document, label: t.ui.document, icon: '📄' },
+    { value: t.ui.smallPackage, label: t.ui.smallPackage, icon: '📦' },
+    { value: t.ui.mediumPackage, label: t.ui.mediumPackage, icon: '📦' },
+    { value: t.ui.largePackage, label: t.ui.largePackage, icon: '📦' },
+    { value: t.ui.oversizedPackage, label: t.ui.oversizedPackage, icon: '🐘' },
+    { value: t.ui.fragile, label: t.ui.fragile, icon: '🍷' },
+    { value: t.ui.foodDrinks, label: t.ui.foodDrinks, icon: '🍱' },
+  ];
+
+  const deliverySpeeds = [
+    { value: t.ui.onTimeDelivery, label: t.ui.onTimeDelivery, icon: '🕒' },
+    { value: t.ui.urgentDelivery, label: t.ui.urgentDelivery, icon: '⚡' },
+    { value: t.ui.scheduledDelivery, label: t.ui.scheduledDelivery, icon: '📅' },
+  ];
 
   return (
     <div style={{
@@ -359,61 +379,100 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.packageInfo}</h3>
-            <select
-              name="packageType"
-              required
-              style={{
-                width: '100%',
-                padding: 'var(--spacing-3) var(--spacing-4)',
-                border: '2px solid var(--color-border-dark)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: 'var(--spacing-2)',
-                fontSize: 'var(--font-size-base)',
-                lineHeight: 'var(--line-height-normal)',
-                textAlign: 'left',
-                transition: 'all var(--transition-base)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(5px)',
-                fontFamily: 'var(--font-family-base)',
-                cursor: 'pointer',
-                appearance: 'none',
-                color: 'var(--color-text-primary)',
-                fontWeight: 'var(--font-weight-medium)',
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right var(--spacing-3) center',
-                backgroundSize: '1em',
-                paddingRight: '2.5rem'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-border-dark)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === t.ui.oversizedPackage) {
-                  setShowWeightInput(true);
-                } else {
-                  setShowWeightInput(false);
-                }
-              }}
-            >
-              <option value="">{t.order.selectType}</option>
-              <option value={t.ui.document}>{t.ui.document}</option>
-              <option value={t.ui.smallPackage}>{t.ui.smallPackage}</option>
-              <option value={t.ui.mediumPackage}>{t.ui.mediumPackage}</option>
-              <option value={t.ui.largePackage}>{t.ui.largePackage}</option>
-              <option value={t.ui.oversizedPackage}>{t.ui.oversizedPackage}</option>
-              <option value={t.ui.fragile}>{t.ui.fragile}</option>
-              <option value={t.ui.foodDrinks}>{t.ui.foodDrinks}</option>
-            </select>
+            
+            {/* 自定义包裹类型下拉框 */}
+            <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
+              <input type="hidden" name="packageType" value={selectedPackageType} required />
+              <div
+                onClick={() => setShowPackageDropdown(!showPackageDropdown)}
+                style={{
+                  width: '100%',
+                  padding: 'var(--spacing-3) var(--spacing-4)',
+                  border: '2px solid var(--color-border-dark)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-base)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(5px)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: selectedPackageType ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  transition: 'all 0.3s'
+                }}
+              >
+                <span>
+                  {selectedPackageType 
+                    ? packageTypes.find(p => p.value === selectedPackageType)?.icon + ' ' + packageTypes.find(p => p.value === selectedPackageType)?.label
+                    : t.order.selectType}
+                </span>
+                <span style={{ 
+                  transform: showPackageDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s'
+                }}>▼</span>
+              </div>
+
+              {showPackageDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '105%',
+                  left: 0,
+                  right: 0,
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                  zIndex: 100,
+                  maxHeight: '250px',
+                  overflowY: 'auto',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  padding: '8px'
+                }}>
+                  {packageTypes.map((type) => (
+                    <div
+                      key={type.value}
+                      onClick={() => {
+                        setSelectedPackageType(type.value);
+                        setShowPackageDropdown(false);
+                        if (type.value === t.ui.oversizedPackage) {
+                          setShowWeightInput(true);
+                        } else {
+                          setShowWeightInput(false);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 15px',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        background: selectedPackageType === type.value ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        color: selectedPackageType === type.value ? '#2563eb' : '#4a5568',
+                        fontWeight: selectedPackageType === type.value ? '600' : '400',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        if (selectedPackageType !== type.value) {
+                          e.currentTarget.style.background = '#f8fafc';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (selectedPackageType !== type.value) {
+                          e.currentTarget.style.background = 'transparent';
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>{type.icon}</span>
+                      <span>{type.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             
             {showWeightInput && (
-              <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
                 <label style={{ color: 'white', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
                   {language === 'zh' ? '包裹重量 (kg)' : language === 'en' ? 'Weight (kg)' : 'အလေးချိန် (kg)'}
                 </label>
@@ -450,55 +509,91 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
             {/* 速度部分 */}
             <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.ui.speed || '速度'}</h3>
-            <select
-              name="deliverySpeed"
-              required
-              value={selectedDeliverySpeed}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSelectedDeliverySpeed(value);
-                // 如果选择了"定时达"，打开时间选择器
-                if (value === t.ui.scheduledDelivery) {
-                  setShowTimePickerModal(true);
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: 'var(--spacing-3) var(--spacing-4)',
-                border: '2px solid var(--color-border-dark)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: 'var(--spacing-2)',
-                fontSize: 'var(--font-size-base)',
-                lineHeight: 'var(--line-height-normal)',
-                textAlign: 'left',
-                transition: 'all var(--transition-base)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(5px)',
-                fontFamily: 'var(--font-family-base)',
-                cursor: 'pointer',
-                appearance: 'none',
-                color: 'var(--color-text-primary)',
-                fontWeight: 'var(--font-weight-medium)',
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right var(--spacing-3) center',
-                backgroundSize: '1em',
-                paddingRight: '2.5rem'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-border-dark)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <option value="">{t.ui.selectDeliverySpeed}</option>
-              <option value={t.ui.onTimeDelivery}>{t.ui.onTimeDelivery}</option>
-              <option value={t.ui.urgentDelivery}>{t.ui.urgentDelivery}</option>
-              <option value={t.ui.scheduledDelivery}>{t.ui.scheduledDelivery}</option>
-            </select>
+            
+            <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
+              <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} required />
+              <div
+                onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
+                style={{
+                  width: '100%',
+                  padding: 'var(--spacing-3) var(--spacing-4)',
+                  border: '2px solid var(--color-border-dark)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--font-size-base)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(5px)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: selectedDeliverySpeed ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  transition: 'all 0.3s'
+                }}
+              >
+                <span>
+                  {selectedDeliverySpeed 
+                    ? deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.icon + ' ' + deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.label
+                    : t.ui.selectDeliverySpeed}
+                </span>
+                <span style={{ 
+                  transform: showSpeedDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s'
+                }}>▼</span>
+              </div>
+
+              {showSpeedDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '105%',
+                  left: 0,
+                  right: 0,
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                  zIndex: 100,
+                  padding: '8px'
+                }}>
+                  {deliverySpeeds.map((speed) => (
+                    <div
+                      key={speed.value}
+                      onClick={() => {
+                        setSelectedDeliverySpeed(speed.value);
+                        setShowSpeedDropdown(false);
+                        if (speed.value === t.ui.scheduledDelivery) {
+                          setShowTimePickerModal(true);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 15px',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        background: selectedDeliverySpeed === speed.value ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        color: selectedDeliverySpeed === speed.value ? '#2563eb' : '#4a5568',
+                        fontWeight: selectedDeliverySpeed === speed.value ? '600' : '400',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        if (selectedDeliverySpeed !== speed.value) {
+                          e.currentTarget.style.background = '#f8fafc';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (selectedDeliverySpeed !== speed.value) {
+                          e.currentTarget.style.background = 'transparent';
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>{speed.icon}</span>
+                      <span>{speed.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* 代收款 (仅Partner或VIP可见) */}
             {((currentUser && currentUser.user_type === 'partner') || (currentUser && currentUser.user_type === 'vip')) && (

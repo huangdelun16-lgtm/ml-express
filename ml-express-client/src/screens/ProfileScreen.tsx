@@ -801,13 +801,17 @@ export default function ProfileScreen({ navigation }: any) {
             {!isGuest && (
               <View style={[
                 styles.userBadge,
-                userType === 'partner' && styles.partnerBadge
+                userType === 'partner' && styles.partnerBadge,
+                userType === 'vip' && styles.vipBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
-                  userType === 'partner' && styles.partnerBadgeText
+                  userType === 'partner' && styles.partnerBadgeText,
+                  userType === 'vip' && styles.vipBadgeText
                 ]}>
-                  {userType === 'partner' ? 'Partner' : '普通会员'}
+                  {userType === 'partner' ? 'Partner' : (
+                    userType === 'vip' ? (language === 'zh' ? 'VIP 会员' : 'VIP Member') : (language === 'zh' ? '普通会员' : 'Standard Member')
+                  )}
                 </Text>
               </View>
             )}
@@ -1755,11 +1759,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   partnerBadge: {
-    backgroundColor: '#fbbf24', // 金色背景
+    backgroundColor: '#3b82f6', // 蓝色背景
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
   partnerBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  vipBadge: {
+    backgroundColor: '#fbbf24', // 金色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  vipBadgeText: {
     color: '#92400e', // 深褐色文字
     fontWeight: '800',
   },
