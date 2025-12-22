@@ -1674,6 +1674,19 @@ const HomePage: React.FC = () => {
     setGeneratedOrderId('');
   };
 
+  // 计算两个点之间的球面距离（公里）
+  const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // 地球半径（公里）
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
   // 预估费用计算函数（类似客户端App）
   const calculatePriceEstimate = async () => {
     try {
@@ -1683,53 +1696,62 @@ const HomePage: React.FC = () => {
       
       const formData = new FormData(form);
       const orderInfo = {
-        senderName: formData.get('senderName') as string,
-        senderPhone: formData.get('senderPhone') as string,
-        senderAddress: formData.get('senderAddress') as string,
-        receiverName: formData.get('receiverName') as string,
-        receiverPhone: formData.get('receiverPhone') as string,
-        receiverAddress: formData.get('receiverAddress') as string,
         packageType: formData.get('packageType') as string,
         weight: formData.get('weight') as string,
         deliverySpeed: formData.get('deliverySpeed') as string,
-        description: formData.get('description') as string
       };
 
-      // 检查必填字段
-      if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
-        alert(language === 'zh' ? '请先填写寄件和收件地址' : 
-              language === 'en' ? 'Please fill in sender and receiver addresses first' : 
-              'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ဦးစွာ ဖြည့်စွက်ပါ');
-        return;
-      }
+      // 检查坐标信息（优先使用地图选择的精确坐标）
+      let distance = 0;
+      
+      if (selectedSenderLocation && selectedReceiverLocation) {
+        console.log('📍 使用精确坐标计算距离:', { sender: selectedSenderLocation, receiver: selectedReceiverLocation });
+        distance = calculateDistanceKm(
+          selectedSenderLocation.lat,
+          selectedSenderLocation.lng,
+          selectedReceiverLocation.lat,
+          selectedReceiverLocation.lng
+        );
+      } else {
+        // 如果没有坐标，尝试使用地址字符串计算（备用方案）
+        const senderAddressTextValue = formData.get('senderAddress') as string;
+        const receiverAddressTextValue = formData.get('receiverAddress') as string;
 
-      // 计算距离
-      const distance = await calculateDistance(
-        orderInfo.senderAddress,
-        orderInfo.receiverAddress
-      );
+        if (!senderAddressTextValue || !receiverAddressTextValue) {
+          alert(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' : 
+                language === 'en' ? 'Please select sender and receiver addresses (Map selection recommended for accurate pricing)' : 
+                'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ရွေးချယ်ပါ (တိကျသောစျေးနှုန်းအတွက် မြေပုံမှရွေးချယ်ရန် အကြံပြုပါသည်)');
+          return;
+        }
+
+        console.log('📝 无坐标，尝试使用地址文本计算距离...');
+        distance = await calculateDistance(senderAddressTextValue, receiverAddressTextValue);
+      }
       
       // 按照要求：6.1km = 7km（向上取整）
       const roundedDistance = Math.ceil(distance);
-      setCalculatedDistanceDetail(roundedDistance);
+      // 确保至少有 1km，防止 0 距离导致计费异常
+      const finalDistanceValue = Math.max(1, roundedDistance);
+      
+      setCalculatedDistanceDetail(finalDistanceValue);
 
       // 计算价格
-      const price = calculatePrice(
+      const priceValue = calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
-        roundedDistance
+        finalDistanceValue
       );
       
-      setCalculatedPriceDetail(price);
+      setCalculatedPriceDetail(priceValue);
       setIsCalculated(true);
       
       // 显示计算结果
       alert(language === 'zh' ? 
-        `计算完成！\n配送距离: ${roundedDistance}km\n总费用: ${price} MMK` :
+        `计算完成！\n配送距离: ${finalDistanceValue}km\n总费用: ${priceValue} MMK` :
         language === 'en' ? 
-        `Calculation Complete!\nDelivery Distance: ${roundedDistance}km\nTotal Cost: ${price} MMK` :
-        `တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ${roundedDistance}km\nစုစုပေါင်းကုန်ကျစရိတ်: ${price} MMK`
+        `Calculation Complete!\nDelivery Distance: ${finalDistanceValue}km\nTotal Cost: ${priceValue} MMK` :
+        `တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ${finalDistanceValue}km\nစုစုပေါင်းကုန်ကျစရိတ်: ${priceValue} MMK`
       );
       
     } catch (error) {
@@ -3929,6 +3951,9 @@ const HomePage: React.FC = () => {
                         setSelectedReceiverLocation(finalCoords);
                         console.log('✅ 收件地址坐标已保存:', finalCoords);
                       }
+                      
+                      // 更改地址后，重置计算状态
+                      setIsCalculated(false);
                     } else {
                       // 如果没有坐标，只添加地址
                       if (mapSelectionType === 'sender') {
