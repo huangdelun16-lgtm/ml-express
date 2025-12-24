@@ -13,6 +13,15 @@ const AdminDashboard: React.FC = () => {
   const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
 
+  // 获取工作区域
+  const getWorkRegion = () => {
+    if (currentUser.startsWith('YGN')) return 'YGN';
+    if (currentUser.startsWith('MDY')) return 'MDY';
+    if (currentUser.startsWith('POL')) return 'POL';
+    return '';
+  };
+  const workRegion = getWorkRegion();
+
   // 用户编辑模态框状态
 const [showUserEditModal, setShowUserEditModal] = useState(false);
   const { isMobile } = useResponsive();
@@ -317,11 +326,26 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
             }}
           >
             <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{currentUserName}</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px' }}>
-              {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
-              {currentUserRole === 'manager' && (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
-              {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
-              {currentUserRole === 'finance' && (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
+            <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+              {workRegion && (
+                <span style={{ 
+                  background: 'rgba(72, 187, 120, 0.2)', 
+                  color: '#48bb78', 
+                  padding: '2px 6px', 
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '0.7rem',
+                  border: '1px solid rgba(72, 187, 120, 0.3)'
+                }}>
+                  {workRegion}
+                </span>
+              )}
+              <span>
+                {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
+                {currentUserRole === 'manager' && (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
+                {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
+                {currentUserRole === 'finance' && (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
+              </span>
             </div>
             <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px' }}>
               {language === 'zh' ? '点击编辑个人信息' : language === 'en' ? 'Click to edit profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်နှိပ်ပါ'}
@@ -512,36 +536,6 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
             </h2>
             
             <form onSubmit={handleUpdateUserInfo}>
-              {/* 工作区域显示 */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'block', 
-                  color: 'rgba(255, 255, 255, 0.9)', 
-                  marginBottom: '8px',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  letterSpacing: '0.5px'
-                }}>
-                  {language === 'zh' ? '工作区域' : language === 'en' ? 'Work Region' : 'အလုပ်လုပ်သည့်နေရာ'}
-                </label>
-                <div style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  border: '2px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: '#48bb78', // 绿色显示
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold',
-                  letterSpacing: '1px'
-                }}>
-                  {currentUser.startsWith('YGN') ? '📍 YGN (Yangon)' : 
-                   currentUser.startsWith('MDY') ? '📍 MDY (Mandalay)' : 
-                   currentUser.startsWith('POL') ? '📍 POL (Pyin Oo Lwin)' :
-                   '📍 General'}
-                </div>
-              </div>
-
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ 
                   display: 'block', 
