@@ -989,9 +989,36 @@ const RealTimeTracking: React.FC = () => {
             <>
               {/* 待分配包裹 */}
               <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length})
-            </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ color: '#dc2626', margin: 0, fontSize: '1.1rem' }}>
+                    ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length})
+                  </h3>
+                  <button
+                    onClick={() => {
+                      loadPackages();
+                      loadCouriers();
+                      loadStores();
+                    }}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: '#2563eb',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                  >
+                    🔄 刷新
+                  </button>
+                </div>
 
           {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length === 0 ? (
             <div style={{
