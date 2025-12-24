@@ -1689,6 +1689,26 @@ export const adminAccountService = {
       console.error('更新账号信息异常:', err);
       return false;
     }
+  },
+
+  // 删除账号
+  async deleteAccount(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('admin_accounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('删除账号失败:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('删除账号异常:', err);
+      return false;
+    }
   }
 };
 
