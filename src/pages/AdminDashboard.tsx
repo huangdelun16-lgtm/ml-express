@@ -325,27 +325,27 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
             }}
           >
-            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{currentUserName}</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
               {workRegion && (
                 <span style={{ 
-                  background: 'rgba(72, 187, 120, 0.2)', 
-                  color: '#48bb78', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px',
-                  fontWeight: 'bold',
-                  fontSize: '0.7rem',
-                  border: '1px solid rgba(72, 187, 120, 0.3)'
+                  background: '#48bb78', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '6px',
+                  fontWeight: '900',
+                  fontSize: '0.75rem',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}>
                   {workRegion}
                 </span>
               )}
-              <span>
-                {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
-                {currentUserRole === 'manager' && (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
-                {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
-                {currentUserRole === 'finance' && (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
-              </span>
+              <span>{currentUserName}</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '3px' }}>
+              {currentUserRole === 'admin' && (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
+              {currentUserRole === 'manager' && (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
+              {currentUserRole === 'operator' && (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
+              {currentUserRole === 'finance' && (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
             </div>
             <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '2px' }}>
               {language === 'zh' ? '点击编辑个人信息' : language === 'en' ? 'Click to edit profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်နှိပ်ပါ'}
