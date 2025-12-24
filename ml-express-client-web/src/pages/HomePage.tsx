@@ -2461,7 +2461,7 @@ const HomePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000,
+          zIndex: 999999,
           backdropFilter: 'blur(5px)'
         }}>
           <div style={{
@@ -2901,7 +2901,7 @@ const HomePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 3000
+          zIndex: 999999
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
@@ -3263,7 +3263,7 @@ const HomePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 2000
+          zIndex: 999999
         }}>
           <div style={{
             background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
@@ -4331,7 +4331,7 @@ const HomePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-            zIndex: 3000,
+            zIndex: 999999, // 极大提升层级，确保覆盖导航栏
             animation: 'fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             padding: '1rem'
           }}
