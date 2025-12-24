@@ -1130,7 +1130,9 @@ const AccountManagement: React.FC = () => {
                       <td style={tableCellStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '1rem' }}>📍</span>
-                          <span>{REGIONS.find(r => r.id === account.region)?.name || account.region || '-'}</span>
+                          <span style={{ fontWeight: 'bold', color: '#48bb78' }}>
+                            {REGIONS.find(r => r.id === account.region)?.prefix || account.region || '-'}
+                          </span>
                         </div>
                       </td>
                       <td style={tableCellStyle}>
