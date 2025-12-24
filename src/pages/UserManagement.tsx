@@ -1547,10 +1547,9 @@ const UserManagement: React.FC = () => {
                       }}
                     />
                     <textarea
-                      placeholder="地址"
+                      placeholder="地址（可选）"
                       value={userForm.address}
                       onChange={(e) => setUserForm({...userForm, address: e.target.value})}
-                      required
                       style={{
                         width: '100%',
                         padding: '14px',
@@ -2037,7 +2036,7 @@ const UserManagement: React.FC = () => {
                       <input placeholder="姓名" value={courierForm.name} onChange={e => setCourierForm({...courierForm, name: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
                       <input placeholder="电话" value={courierForm.phone} onChange={e => setCourierForm({...courierForm, phone: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
                       <input placeholder="邮箱" value={courierForm.email} onChange={e => setCourierForm({...courierForm, email: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-                      <input placeholder="地址" value={courierForm.address} onChange={e => setCourierForm({...courierForm, address: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
+                      <input placeholder="地址（可选）" value={courierForm.address} onChange={e => setCourierForm({...courierForm, address: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
                       
                       <select value={courierForm.vehicle_type} onChange={e => setCourierForm({...courierForm, vehicle_type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
                          <option value="motorcycle">🏍️ 摩托车</option>
