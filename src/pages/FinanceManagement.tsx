@@ -95,7 +95,17 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  
+  // 获取当前用户角色和账号
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
+  const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const isFinance = currentUserRole === 'finance';
+  const isMDYFinance = isFinance && currentUser.startsWith('MDY');
+  const isYGNFinance = isFinance && currentUser.startsWith('YGN');
+  const isRegionalFinance = isMDYFinance || isYGNFinance;
+  const currentRegionPrefix = isMDYFinance ? 'MDY' : isYGNFinance ? 'YGN' : '';
+
+  const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'package_records' : 'overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [cashSettlementStatus, setCashSettlementStatus] = useState<'unsettled' | 'settled' | 'all'>('unsettled');
@@ -142,8 +152,12 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
   const deliveredPackages = useMemo(() => {
-    return packages.filter(pkg => pkg.status === '已送达');
-  }, [packages]);
+    let filtered = packages.filter(pkg => pkg.status === '已送达');
+    if (isRegionalFinance) {
+      filtered = filtered.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+    }
+    return filtered;
+  }, [packages, isRegionalFinance, currentRegionPrefix]);
 
   const deliveredPackagesSorted = useMemo(() => {
     return [...deliveredPackages].sort((a, b) => {
@@ -154,8 +168,12 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   }, [deliveredPackages]);
 
   const inProgressPackages = useMemo(() => {
-    return packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消');
-  }, [packages]);
+    let filtered = packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消');
+    if (isRegionalFinance) {
+      filtered = filtered.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+    }
+    return filtered;
+  }, [packages, isRegionalFinance, currentRegionPrefix]);
 
   const deliveredIncome = useMemo(() => {
     return deliveredPackages.reduce((sum, pkg) => {
@@ -480,7 +498,14 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const partnerCollectionStats = useMemo(() => {
     if (!deliveryStores.length) return [];
 
-    return deliveryStores.map(store => {
+    let filteredStores = [...deliveryStores];
+    if (isRegionalFinance) {
+      filteredStores = filteredStores.filter(s => 
+        s.store_code && s.store_code.startsWith(currentRegionPrefix)
+      );
+    }
+
+    return filteredStores.map(store => {
       // 查找该店铺的所有代收款订单
       const storePackages = packages.filter(pkg => 
         (pkg.delivery_store_id === store.id || pkg.sender_name === store.store_name) &&
@@ -1028,7 +1053,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
             flexWrap: 'wrap'
           }}
         >
-          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[]).map((key) => (
+          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[])
+            .filter(key => {
+              if (isRegionalFinance) {
+                // 财务账号过滤：隐藏总览、收支记录(主列表)、数据分析
+                return !['overview', 'records', 'analytics'].includes(key);
+              }
+              return true;
+            })
+            .map((key) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -1052,12 +1085,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               {key === 'partner_collection' && '🤝 合伙代收款'}
             </button>
           ))}
-          {activeTab === 'records' && (
+          {(activeTab === 'records' || (isRegionalFinance && activeTab === 'package_records')) && (
             <button
               onClick={() => {
                 resetForm();
                 setShowForm(true);
-                setActiveTab('records');
+                // 如果是财务账号，默认类别设为其他收入/支出
+                if (isRegionalFinance) {
+                  setFormData(prev => ({ ...prev, category: '其他收入' }));
+                }
               }}
               style={{
                 marginLeft: 'auto',
@@ -2941,25 +2977,27 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               </select>
               
               {/* 生成工资按钮 */}
-              <button
-                onClick={generateMonthlySalaries}
-                disabled={loading}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: loading ? 'rgba(102, 126, 234, 0.5)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                🔄 生成本月工资
-              </button>
+              {!isRegionalFinance && (
+                <button
+                  onClick={generateMonthlySalaries}
+                  disabled={loading}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: loading ? 'rgba(102, 126, 234, 0.5)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  🔄 生成本月工资
+                </button>
+              )}
               
-              {selectedSalaries.length > 0 && (
+              {selectedSalaries.length > 0 && !isRegionalFinance && (
                 <>
                   <button
                     onClick={async () => {
@@ -3133,7 +3171,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
               marginBottom: '24px'
             }}>
               {(() => {
-                const monthFilteredSalaries = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                let monthFilteredSalaries = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                
+                // 领区过滤
+                if (isRegionalFinance) {
+                  monthFilteredSalaries = monthFilteredSalaries.filter(s => 
+                    s.courier_id && s.courier_id.startsWith(currentRegionPrefix)
+                  );
+                }
+
                 return (
                   <>
                     <div style={{
@@ -3239,7 +3285,15 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 <tbody>
                   {(() => {
                     // 先按月份过滤，再按状态过滤
-                    const monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                    let monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
+                    
+                    // 领区过滤
+                    if (isRegionalFinance) {
+                      monthFiltered = monthFiltered.filter(s => 
+                        s.courier_id && s.courier_id.startsWith(currentRegionPrefix)
+                      );
+                    }
+
                     const filtered = monthFiltered.filter(s => salaryFilterStatus === 'all' || s.status === salaryFilterStatus);
                     
                     if (filtered.length === 0) {
@@ -3338,101 +3392,105 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                               详情
                             </button>
                             
-                            {salary.status === 'pending' && (
-                              <button
-                                onClick={async () => {
-                                  if (!window.confirm('确认审核通过？')) return;
-                                  
-                                  setLoading(true);
-                                  try {
-                                    const success = await courierSalaryService.updateSalary(salary.id!, {
-                                      status: 'approved',
-                                      approved_by: localStorage.getItem('admin_name') || 'System',
-                                      approved_at: new Date().toISOString()
-                                    });
-                                    
-                                    if (success) {
-                                      window.alert('审核成功！');
-                                      await loadRecords();
-                                    } else {
-                                      window.alert('审核失败！');
-                                    }
-                                  } catch (error) {
-                                    console.error('审核失败:', error);
-                                    window.alert('审核失败！');
-                                  } finally {
-                                    setLoading(false);
-                                  }
-                                }}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: 'rgba(34, 197, 94, 0.2)',
-                                  color: '#22c55e',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600'
-                                }}
-                              >
-                                审核
-                              </button>
-                            )}
-                            
-                            {salary.status === 'approved' && (
-                              <button
-                                onClick={() => {
-                                  setSelectedSalaries([salary.id!]);
-                                  setShowPaymentModal(true);
-                                }}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: 'rgba(245, 87, 108, 0.2)',
-                                  color: '#f5576c',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600'
-                                }}
-                              >
-                                发放
-                              </button>
-                            )}
-
-                            <button
-                              onClick={async () => {
-                                if (!window.confirm(`确定要删除骑手 ${salary.courier_id} 的工资记录吗？\n此操作不可恢复！`)) return;
+                            {!isRegionalFinance && (
+                              <>
+                                {salary.status === 'pending' && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!window.confirm('确认审核通过？')) return;
+                                      
+                                      setLoading(true);
+                                      try {
+                                        const success = await courierSalaryService.updateSalary(salary.id!, {
+                                          status: 'approved',
+                                          approved_by: localStorage.getItem('admin_name') || 'System',
+                                          approved_at: new Date().toISOString()
+                                        });
+                                        
+                                        if (success) {
+                                          window.alert('审核成功！');
+                                          await loadRecords();
+                                        } else {
+                                          window.alert('审核失败！');
+                                        }
+                                      } catch (error) {
+                                        console.error('审核失败:', error);
+                                        window.alert('审核失败！');
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      background: 'rgba(34, 197, 94, 0.2)',
+                                      color: '#22c55e',
+                                      cursor: 'pointer',
+                                      fontSize: '0.8rem',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    审核
+                                  </button>
+                                )}
                                 
-                                setLoading(true);
-                                try {
-                                  const success = await courierSalaryService.deleteSalary(salary.id!);
-                                  if (success) {
-                                    window.alert('删除成功！');
-                                    await loadRecords();
-                                  } else {
-                                    window.alert('删除失败！');
-                                  }
-                                } catch (error) {
-                                  console.error('删除工资记录失败:', error);
-                                  window.alert('删除失败！');
-                                } finally {
-                                  setLoading(false);
-                                }
-                              }}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: 'rgba(239, 68, 68, 0.2)',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                fontWeight: '600'
-                              }}
-                            >
-                              删除
-                            </button>
+                                {salary.status === 'approved' && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSalaries([salary.id!]);
+                                      setShowPaymentModal(true);
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      background: 'rgba(245, 87, 108, 0.2)',
+                                      color: '#f5576c',
+                                      cursor: 'pointer',
+                                      fontSize: '0.8rem',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    发放
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={async () => {
+                                    if (!window.confirm(`确定要删除骑手 ${salary.courier_id} 的工资记录吗？\n此操作不可恢复！`)) return;
+                                    
+                                    setLoading(true);
+                                    try {
+                                      const success = await courierSalaryService.deleteSalary(salary.id!);
+                                      if (success) {
+                                        window.alert('删除成功！');
+                                        await loadRecords();
+                                      } else {
+                                        window.alert('删除失败！');
+                                      }
+                                    } catch (error) {
+                                      console.error('删除工资记录失败:', error);
+                                      window.alert('删除失败！');
+                                    } finally {
+                                      setLoading(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.2)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600'
+                                  }}
+                                >
+                                  删除
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -4151,7 +4209,12 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   
                   // 日期筛选：检查送达时间是否包含选定日期
                   const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
-                  return deliveryDate.includes(cashCollectionDate);
+                  if (!deliveryDate.includes(cashCollectionDate)) return false;
+
+                  // 领区过滤
+                  if (isRegionalFinance && !pkg.id.startsWith(currentRegionPrefix)) return false;
+                  
+                  return true;
                 });
                 
                 let totalDeliveryFee = 0;
@@ -4271,26 +4334,34 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                 courierCashMap[courier].total += price;
               });
 
-              if (couriers.length === 0) {
-                return (
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.12)',
-                    borderRadius: '16px',
-                    padding: '60px 20px',
-                    textAlign: 'center',
-                    border: '1px solid rgba(255, 255, 255, 0.18)'
-                  }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚚</div>
-                    <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
-                      暂无快递员数据
-                    </div>
-                  </div>
-                );
-              }
+                // 过滤快递员列表（如果为领区财务，仅显示所属领区的骑手）
+                let displayCouriers = [...couriers];
+                if (isRegionalFinance) {
+                  displayCouriers = displayCouriers.filter(c => 
+                    c.employee_id && c.employee_id.startsWith(currentRegionPrefix)
+                  );
+                }
 
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {couriers.map(courier => {
+                if (displayCouriers.length === 0) {
+                  return (
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.12)',
+                      borderRadius: '16px',
+                      padding: '60px 20px',
+                      textAlign: 'center',
+                      border: '1px solid rgba(255, 255, 255, 0.18)'
+                    }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚚</div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
+                        暂无快递员数据
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {displayCouriers.map(courier => {
                     const courierName = courier.name || '未知';
                     const employeeId = courier.employee_id || '无';
                     const cashData = courierCashMap[courierName] || { packages: [], total: 0 };
@@ -5056,7 +5127,7 @@ const [activeTab, setActiveTab] = useState<TabKey>('overview');
                   </div>
                 )}
 
-                {store.unclearedAmount > 0 && (
+                {store.unclearedAmount > 0 && !isRegionalFinance && (
                   <button
                     onClick={() => handleSettlePartner(store.id, store.store_name)}
                     style={{
