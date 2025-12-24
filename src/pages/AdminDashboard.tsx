@@ -512,6 +512,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
             </h2>
             
             <form onSubmit={handleUpdateUserInfo}>
+              {/* 工作区域显示 */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ 
                   display: 'block', 
@@ -521,36 +522,48 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                   fontWeight: '600',
                   letterSpacing: '0.5px'
                 }}>
-                  {language === 'zh' ? '用户名' : language === 'en' ? 'Username' : 'အသုံးပြုသူအမည်'}
+                  {language === 'zh' ? '工作区域' : language === 'en' ? 'Work Region' : 'အလုပ်လုပ်သည့်နေရာ'}
                 </label>
-                <input
-                  type="text"
-                  value={userEditFormData.username}
-                  onChange={(e) => setUserEditFormData({
-                    ...userEditFormData,
-                    username: e.target.value
-                  })}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#4299e1';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  }}
-                  required
-                />
+                <div style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: '#48bb78', // 绿色显示
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  letterSpacing: '1px'
+                }}>
+                  {currentUser.startsWith('YGN') ? '📍 YGN (Yangon)' : 
+                   currentUser.startsWith('MDY') ? '📍 MDY (Mandalay)' : 
+                   currentUser.startsWith('POL') ? '📍 POL (Pyin Oo Lwin)' :
+                   '📍 General'}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  color: 'rgba(255, 255, 255, 0.9)', 
+                  marginBottom: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px'
+                }}>
+                  {language === 'zh' ? '账号 (不可修改)' : language === 'en' ? 'Username (Read-only)' : 'အသုံးပြုသူအမည်'}
+                </label>
+                <div style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '1rem',
+                }}>
+                  {currentUser}
+                </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
