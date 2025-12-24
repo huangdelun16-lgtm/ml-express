@@ -278,6 +278,26 @@ const AccountManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async (account: AdminAccount) => {
+    if (!account.id) return;
+    
+    const confirm = await showConfirmDialog(`确定要永久删除账号 "${account.employee_name} (@${account.username})" 吗？此操作不可恢复！`);
+    if (!confirm) return;
+
+    try {
+      const success = await adminAccountService.deleteAccount(account.id);
+      if (success) {
+        showNotification('账号已成功删除', 'success');
+        loadAccounts();
+      } else {
+        showNotification('删除失败，请稍后重试', 'error');
+      }
+    } catch (error) {
+      console.error('删除账号异常:', error);
+      showNotification('删除账号出错', 'error');
+    }
+  };
+
   const handleStatusChange = async (id: string, newStatus: 'active' | 'inactive' | 'suspended') => {
     const success = await adminAccountService.updateAccountStatus(id, newStatus);
     if (success) {
@@ -1131,7 +1151,25 @@ const AccountManagement: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '1rem' }}>📍</span>
                           <span style={{ fontWeight: 'bold', color: '#48bb78' }}>
-                            {REGIONS.find(r => r.id === account.region)?.prefix || account.region || '-'}
+                            {(() => {
+                              // 1. 优先尝试从 region 字段映射
+                              const region = REGIONS.find(r => r.id === account.region);
+                              if (region) return region.prefix;
+                              
+                              // 2. 如果字段为空，从员工编号中提取前缀 (MDY/YGN/POL)
+                              if (account.employee_id) {
+                                const prefix = account.employee_id.split('-')[0];
+                                if (['MDY', 'YGN', 'POL', 'NPW', 'TGI', 'LSO', 'MUSE'].includes(prefix)) {
+                                  return prefix;
+                                }
+                                // 兼容 YGNML001 这种非横杠格式
+                                if (account.employee_id.startsWith('YGN')) return 'YGN';
+                                if (account.employee_id.startsWith('MDY')) return 'MDY';
+                                if (account.employee_id.startsWith('POL')) return 'POL';
+                              }
+                              
+                              return account.region || '-';
+                            })()}
                           </span>
                         </div>
                       </td>
@@ -1225,6 +1263,13 @@ const AccountManagement: React.FC = () => {
                             style={actionButtonStyle('#48bb78')}
                           >
                             ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAccount(account)}
+                            title="删除账号"
+                            style={actionButtonStyle('#f56565')}
+                          >
+                            🗑️
                           </button>
                         </div>
                       </td>
