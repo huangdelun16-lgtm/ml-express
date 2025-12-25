@@ -955,6 +955,52 @@ const AccountManagement: React.FC = () => {
                     }}
                   />
                 </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+                    入职日期 *
+                  </label>
+                  <input
+                    type="date"
+                    name="hire_date"
+                    value={formData.hire_date}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      background: 'rgba(15, 32, 60, 0.55)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
+                    基本工资 (MMK)
+                  </label>
+                  <input
+                    type="number"
+                    name="salary"
+                    value={formData.salary}
+                    onChange={handleInputChange}
+                    placeholder="例如: 300000"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      background: 'rgba(15, 32, 60, 0.55)',
+                      color: 'white',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               </div>
 
               <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>

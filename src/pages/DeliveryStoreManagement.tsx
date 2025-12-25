@@ -912,15 +912,21 @@ const DeliveryStoreManagement: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label style={labelStyle}>店铺代码 *</label>
+                <label style={labelStyle}>店铺代码 * (自动生成)</label>
                 <input
                   type="text"
                   name="store_code"
                   value={formData.store_code}
-                  onChange={handleInputChange}
-                  placeholder="例: MDL001"
-                  style={inputStyle}
-                  required
+                  readOnly
+                  style={{
+                    ...inputStyle,
+                    background: 'rgba(72, 187, 120, 0.1)',
+                    border: '1px solid rgba(72, 187, 120, 0.4)',
+                    color: '#48bb78',
+                    fontWeight: 'bold',
+                    cursor: 'not-allowed'
+                  }}
+                  placeholder="填写店铺名称后自动生成"
                 />
               </div>
               <div>
