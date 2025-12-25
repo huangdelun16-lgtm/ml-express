@@ -542,7 +542,26 @@ const DeliveryStoreManagement: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // 自动生成店铺代码逻辑
+    if (!isEditing && (name === 'store_name' || name === 'region')) {
+      setFormData(prev => {
+        const newData = { ...prev, [name]: value };
+        // 如果区域和店铺名称都有了（或者正在输入名称），自动生成代码
+        if (newData.region && newData.store_name) {
+          const regionObj = REGIONS.find(r => r.id === newData.region);
+          const prefix = regionObj ? regionObj.prefix : 'MDY';
+          
+          // 获取该区域现有的店铺数量
+          const regionStores = allStores.filter(s => s.region === newData.region || (s.store_code && s.store_code.startsWith(prefix)));
+          const nextNumber = (regionStores.length + 1).toString().padStart(3, '0');
+          newData.store_code = `${prefix}${nextNumber}`;
+        }
+        return newData;
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleFacilityChange = (facility: string) => {
