@@ -9,7 +9,19 @@ import { useResponsive } from '../hooks/useResponsive';
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
+  
+  // 获取当前用户角色和区域信息
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
+  const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
+  
+  // 判断是否为区域管理员/员工 (非超管且属于特定区域)
+  const isMDYUser = currentUserRole !== 'admin' && (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || currentUser.startsWith('MDY') || currentUser.startsWith('POL'));
+  const isYGNUser = currentUserRole !== 'admin' && (currentUserRegion === 'yangon' || currentUser.startsWith('YGN'));
+  const isRegionalUser = isMDYUser || isYGNUser;
+  const currentRegionPrefix = isMDYUser ? 'MDY' : isYGNUser ? 'YGN' : '';
+
+  const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -111,12 +123,19 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
 
   // 计算包裹统计信息
   const getPackageStatistics = () => {
-    const total = packages.length;
-    const pending = packages.filter(p => p.status === '待取件').length;
-    const pickedUp = packages.filter(p => p.status === '已取件').length;
-    const delivering = packages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
-    const delivered = packages.filter(p => p.status === '已送达').length;
-    const cancelled = packages.filter(p => p.status === '已取消').length;
+    let displayPackages = [...packages];
+    
+    // 统计也需要根据领区过滤
+    if (isRegionalUser) {
+      displayPackages = displayPackages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+    }
+
+    const total = displayPackages.length;
+    const pending = displayPackages.filter(p => p.status === '待取件').length;
+    const pickedUp = displayPackages.filter(p => p.status === '已取件').length;
+    const delivering = displayPackages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
+    const delivered = displayPackages.filter(p => p.status === '已送达').length;
+    const cancelled = displayPackages.filter(p => p.status === '已取消').length;
 
     return {
       total,
@@ -131,6 +150,11 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   // 按日期和状态过滤包裹（返回所有过滤后的包裹）
   const getFilteredPackages = () => {
     let filteredPackages = [...packages];
+    
+    // 领区过滤逻辑：非超管账号只能看到所属领区的订单
+    if (isRegionalUser) {
+      filteredPackages = filteredPackages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+    }
     
     // 按状态过滤
     if (selectedStatus) {
@@ -486,8 +510,21 @@ const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', margin: 0, textShadow: '1px 1px 2px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '12px' }}>
             {language === 'zh' ? '同城订单管理' : language === 'en' ? 'City Order Management' : 'မြို့တွင်းအော်ဒါစီမံခန့်ခွဲမှု'}
+            {isRegionalUser && (
+              <span style={{ 
+                background: '#48bb78', 
+                color: 'white', 
+                padding: '4px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}>
+                📍 {currentRegionPrefix}
+              </span>
+            )}
           </h1>
           <p style={{ margin: '5px 0 0 0', opacity: 0.8, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
               {language === 'zh' ? '管理缅甸同城快递包裹' : 'Manage local express packages in Myanmar'}
