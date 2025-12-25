@@ -18,6 +18,7 @@ interface AdminToken {
     username: string;
     role: string;
     name: string;
+    region?: string;
   };
 }
 
@@ -147,10 +148,10 @@ function parseToken(token: string): { username: string; role: string } | null {
  * 保存 Token（通过服务器设置 httpOnly Cookie）
  * ⚠️ 注意：不再使用 localStorage，改为服务器设置 httpOnly Cookie
  */
-export async function saveToken(username: string, role: string, name: string): Promise<string> {
+export async function saveToken(username: string, role: string, name: string, region?: string): Promise<string> {
   // Token 现在由服务器通过 httpOnly Cookie 设置
   // 客户端只保存非敏感的用户信息（用于显示）
-  const userInfo = { username, role, name };
+  const userInfo = { username, role, name, region };
   
   // 只保存非敏感的用户信息到 sessionStorage 和 localStorage（页面关闭后清除 sessionStorage，但保留 localStorage 以兼容）
   // 敏感数据（Token）由服务器通过 httpOnly Cookie 管理
@@ -158,10 +159,13 @@ export async function saveToken(username: string, role: string, name: string): P
     sessionStorage.setItem('currentUser', username);
     sessionStorage.setItem('currentUserName', name);
     sessionStorage.setItem('currentUserRole', role);
+    if (region) sessionStorage.setItem('currentUserRegion', region);
+    
     // 同时保存到 localStorage 以保持兼容性（特别是 Windows 浏览器）
     localStorage.setItem('currentUser', username);
     localStorage.setItem('currentUserName', name);
     localStorage.setItem('currentUserRole', role);
+    if (region) localStorage.setItem('currentUserRegion', region);
   } catch (error) {
     // sessionStorage 可能不可用（某些隐私模式）
     logger.warn('无法保存用户信息到存储:', error);
@@ -227,7 +231,7 @@ export async function clearToken(): Promise<void> {
  */
 export async function verifyToken(requiredRoles: string[] = []): Promise<{
   valid: boolean;
-  user?: { username: string; role: string; name: string };
+  user?: { username: string; role: string; name: string; region?: string };
   error?: string;
 }> {
   try {
@@ -273,18 +277,20 @@ export async function isAuthenticated(): Promise<boolean> {
  * 获取当前用户信息
  * 从 sessionStorage 读取（非敏感信息）
  */
-export function getCurrentUser(): { username: string; role: string; name: string } | null {
+export function getCurrentUser(): { username: string; role: string; name: string; region?: string } | null {
   try {
     const username = sessionStorage.getItem('currentUser');
     const role = sessionStorage.getItem('currentUserRole');
     const name = sessionStorage.getItem('currentUserName');
+    const region = sessionStorage.getItem('currentUserRegion') || undefined;
     
     if (!username || !role) return null;
     
     return {
       username,
       role,
-      name: name || ''
+      name: name || '',
+      region
     };
   } catch {
     return null;

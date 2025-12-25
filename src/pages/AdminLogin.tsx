@@ -19,7 +19,7 @@ const AdminLogin: React.FC = () => {
       
       if (account) {
         // 登录成功，生成并保存 Token
-        await saveToken(account.username, account.role, account.employee_name);
+        await saveToken(account.username, account.role, account.employee_name, account.region);
         
         // 记录登录日志
         await auditLogService.log({

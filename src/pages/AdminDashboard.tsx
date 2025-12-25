@@ -12,12 +12,13 @@ const AdminDashboard: React.FC = () => {
   const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
   const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
 
   // 获取工作区域
   const getWorkRegion = () => {
-    if (currentUser.startsWith('YGN')) return 'YGN';
-    if (currentUser.startsWith('MDY')) return 'MDY';
-    if (currentUser.startsWith('POL')) return 'POL';
+    if (currentUserRegion === 'yangon' || currentUser.startsWith('YGN')) return 'YGN';
+    if (currentUserRegion === 'mandalay' || currentUser.startsWith('MDY')) return 'MDY';
+    if (currentUserRegion === 'maymyo' || currentUser.startsWith('POL')) return 'POL';
     return '';
   };
   const workRegion = getWorkRegion();

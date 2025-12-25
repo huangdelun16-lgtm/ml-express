@@ -99,9 +99,12 @@ const FinanceManagement: React.FC = () => {
   // 获取当前用户角色和账号
   const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
+  
   const isFinance = currentUserRole === 'finance';
-  const isMDYFinance = isFinance && currentUser.startsWith('MDY');
-  const isYGNFinance = isFinance && currentUser.startsWith('YGN');
+  const isMDYFinance = isFinance && (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || currentUser.startsWith('MDY') || currentUser.startsWith('POL'));
+  const isYGNFinance = isFinance && (currentUserRegion === 'yangon' || currentUser.startsWith('YGN'));
+  
   const isRegionalFinance = isMDYFinance || isYGNFinance;
   const currentRegionPrefix = isMDYFinance ? 'MDY' : isYGNFinance ? 'YGN' : '';
 
