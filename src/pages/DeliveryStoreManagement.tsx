@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
+import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 
 const REGIONS = [
@@ -85,6 +86,7 @@ class ErrorBoundary extends React.Component<
 
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
@@ -738,14 +740,16 @@ const DeliveryStoreManagement: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '24px',
-          color: 'white'
+          color: 'white',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          gap: '15px'
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>合伙店铺</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>合伙店铺</h1>
           <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>管理合伙店铺位置和信息</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
           <button
             onClick={() => navigate('/admin/dashboard')}
             style={{
@@ -754,7 +758,8 @@ const DeliveryStoreManagement: React.FC = () => {
               border: '1px solid rgba(255,255,255,0.3)',
               padding: '10px 18px',
               borderRadius: '10px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              flex: isMobile ? 1 : 'none'
             }}
           >
             ← 返回仪表板
@@ -782,7 +787,8 @@ const DeliveryStoreManagement: React.FC = () => {
               padding: '10px 24px',
               borderRadius: '10px',
               cursor: 'pointer',
-              boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)'
+              boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)',
+              flex: isMobile ? 1 : 'none'
             }}
           >
             {showForm ? (isEditing ? '取消编辑' : '取消') : '+ 新增合伙店铺'}
@@ -1138,14 +1144,14 @@ const DeliveryStoreManagement: React.FC = () => {
       )}
 
       {/* 合伙店铺列表和地图 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
         {/* 合伙店铺列表 */}
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
             borderRadius: '16px',
-            padding: '24px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            padding: isMobile ? '16px' : '24px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
             color: 'white'
           }}
         >
