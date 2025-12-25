@@ -15,11 +15,17 @@ const CityPackages: React.FC = () => {
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
-  // 判断是否为区域管理员/员工 (非超管且属于特定区域)
-  const isMDYUser = currentUserRole !== 'admin' && (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || currentUser.startsWith('MDY') || currentUser.startsWith('POL'));
-  const isYGNUser = currentUserRole !== 'admin' && (currentUserRegion === 'yangon' || currentUser.startsWith('YGN'));
-  const isRegionalUser = isMDYUser || isYGNUser;
-  const currentRegionPrefix = isMDYUser ? 'MDY' : isYGNUser ? 'YGN' : '';
+  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  const getDetectedRegion = () => {
+    if (currentUserRegion === 'yangon' || currentUser.toUpperCase().startsWith('YGN')) return 'YGN';
+    if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
+        currentUser.toUpperCase().startsWith('MDY') || currentUser.toUpperCase().startsWith('POL')) return 'MDY';
+    return '';
+  };
+
+  const currentRegionPrefix = getDetectedRegion();
+  // 只有当角色不是最高超级管理员（通常账号名为 admin）且检测到明确领区时，才开启过滤
+  const isRegionalUser = currentUser !== 'admin' && currentRegionPrefix !== '';
 
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
@@ -2066,20 +2072,20 @@ const CityPackages: React.FC = () => {
               maxHeight: 'calc(90vh - 140px)',
               overflow: 'auto'
             }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                {/* 左侧：预设日期范围 */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.5fr', gap: '32px' }}>
+                {/* 左侧：快速选择 */}
                 <div>
                   <h3 style={{
                     color: 'white',
                     fontSize: '1.1rem',
                     fontWeight: 600,
-                    marginBottom: '16px',
+                    marginBottom: '20px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}>
                     <span style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       width: '32px',
                       height: '32px',
                       borderRadius: '8px',
@@ -2091,7 +2097,7 @@ const CityPackages: React.FC = () => {
                     {language === 'zh' ? '快速选择' : language === 'en' ? 'Quick Select' : 'အမြန်ရွေး'}
                   </h3>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {/* 全部日期 */}
                     <button
                       onClick={() => {
@@ -2102,43 +2108,20 @@ const CityPackages: React.FC = () => {
                         background: selectedDate === null ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255, 255, 255, 0.08)',
                         color: 'white',
                         border: selectedDate === null ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.15)',
-                        padding: '14px 20px',
-                        borderRadius: '12px',
+                        padding: '16px 24px',
+                        borderRadius: '14px',
                         cursor: 'pointer',
                         fontSize: '1rem',
                         fontWeight: selectedDate === null ? '600' : '500',
                         transition: 'all 0.3s ease',
-                        textAlign: 'left',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        boxShadow: selectedDate === null ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedDate !== null) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedDate !== null) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                        }
+                        boxShadow: selectedDate === null ? '0 8px 20px rgba(16, 185, 129, 0.3)' : 'none'
                       }}
                     >
-                      <span>
-                        🗓️ {language === 'zh' ? '全部日期' : language === 'en' ? 'All Dates' : 'ရက်စွဲအားလုံး'}
-                      </span>
-                      <span style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: '600'
-                      }}>
-                        {packages.length}
-                      </span>
+                      <span>📦 {language === 'zh' ? '全部订单' : language === 'en' ? 'All Orders' : 'အမှာစာအားလုံး'}</span>
+                      <span style={{ opacity: 0.7 }}>{packages.length}</span>
                     </button>
 
                     {/* 今天 */}
@@ -2151,46 +2134,23 @@ const CityPackages: React.FC = () => {
                         background: selectedDate === new Date().toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.08)',
                         color: 'white',
                         border: selectedDate === new Date().toLocaleDateString('zh-CN') ? '2px solid #3b82f6' : '2px solid rgba(255, 255, 255, 0.15)',
-                        padding: '14px 20px',
-                        borderRadius: '12px',
+                        padding: '16px 24px',
+                        borderRadius: '14px',
                         cursor: 'pointer',
                         fontSize: '1rem',
                         fontWeight: selectedDate === new Date().toLocaleDateString('zh-CN') ? '600' : '500',
                         transition: 'all 0.3s ease',
-                        textAlign: 'left',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        boxShadow: selectedDate === new Date().toLocaleDateString('zh-CN') ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedDate !== new Date().toLocaleDateString('zh-CN')) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedDate !== new Date().toLocaleDateString('zh-CN')) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                        }
+                        boxShadow: selectedDate === new Date().toLocaleDateString('zh-CN') ? '0 8px 20px rgba(59, 130, 246, 0.3)' : 'none'
                       }}
                     >
-                      <span>
-                        ☀️ {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}
-                      </span>
-                      <span style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: '600'
-                      }}>
+                      <span>☀️ {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}</span>
+                      <span style={{ opacity: 0.7 }}>
                         {packages.filter(pkg => {
                           const dateStr = pkg.created_at || pkg.create_time;
-                          if (!dateStr) return false;
-                          const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
-                          return pkgDate === new Date().toLocaleDateString('zh-CN');
+                          return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date().toLocaleDateString('zh-CN');
                         }).length}
                       </span>
                     </button>
@@ -2205,192 +2165,48 @@ const CityPackages: React.FC = () => {
                         background: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'rgba(255, 255, 255, 0.08)',
                         color: 'white',
                         border: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '2px solid #8b5cf6' : '2px solid rgba(255, 255, 255, 0.15)',
-                        padding: '14px 20px',
-                        borderRadius: '12px',
+                        padding: '16px 24px',
+                        borderRadius: '14px',
                         cursor: 'pointer',
                         fontSize: '1rem',
                         fontWeight: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '600' : '500',
                         transition: 'all 0.3s ease',
-                        textAlign: 'left',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        boxShadow: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '0 4px 12px rgba(139, 92, 246, 0.3)' : 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedDate !== new Date(Date.now() - 86400000).toLocaleDateString('zh-CN')) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedDate !== new Date(Date.now() - 86400000).toLocaleDateString('zh-CN')) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                        }
+                        boxShadow: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '0 8px 20px rgba(139, 92, 246, 0.3)' : 'none'
                       }}
                     >
-                      <span>
-                        🌙 {language === 'zh' ? '昨天' : language === 'en' ? 'Yesterday' : 'မနေ့က'}
-                      </span>
-                      <span style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: '600'
-                      }}>
+                      <span>🌙 {language === 'zh' ? '昨天' : language === 'en' ? 'Yesterday' : 'မနေ့က'}</span>
+                      <span style={{ opacity: 0.7 }}>
                         {packages.filter(pkg => {
                           const dateStr = pkg.created_at || pkg.create_time;
-                          if (!dateStr) return false;
-                          const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
-                          return pkgDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
-                        }).length}
-                      </span>
-                    </button>
-
-                    {/* 最近7天 */}
-                    <button
-                      onClick={() => {
-                        // 这里可以实现最近7天的逻辑
-                        setSelectedDate('last7days');
-                      }}
-                      style={{
-                        background: selectedDate === 'last7days' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(255, 255, 255, 0.08)',
-                        color: 'white',
-                        border: selectedDate === 'last7days' ? '2px solid #f59e0b' : '2px solid rgba(255, 255, 255, 0.15)',
-                        padding: '14px 20px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '1rem',
-                        fontWeight: selectedDate === 'last7days' ? '600' : '500',
-                        transition: 'all 0.3s ease',
-                        textAlign: 'left',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        boxShadow: selectedDate === 'last7days' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedDate !== 'last7days') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedDate !== 'last7days') {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                        }
-                      }}
-                    >
-                      <span>
-                        📊 {language === 'zh' ? '最近7天' : language === 'en' ? 'Last 7 Days' : 'ပြီးခဲ့သော ၇ ရက်'}
-                      </span>
-                      <span style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: '600'
-                      }}>
-                        {packages.filter(pkg => {
-                          const dateStr = pkg.created_at || pkg.create_time;
-                          if (!dateStr) return false;
-                          const pkgDate = new Date(dateStr);
-                          const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
-                          return pkgDate >= sevenDaysAgo;
+                          return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
                         }).length}
                       </span>
                     </button>
                   </div>
 
-                  {/* 状态筛选 */}
-                  <h3 style={{
-                    color: 'white',
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    marginTop: '24px',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
+                  <div style={{
+                    marginTop: '32px',
+                    padding: '20px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
                   }}>
-                    <span style={{
-                      background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '16px'
-                    }}>🎯</span>
-                    {language === 'zh' ? '按状态筛选' : language === 'en' ? 'Filter by Status' : 'အခြေအနေအလိုက်'}
-                  </h3>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {[
-                      { status: null, label: language === 'zh' ? '全部状态' : language === 'en' ? 'All Status' : 'အားလုံး', icon: '📦', color: '#64748b' },
-                      { status: '待取件', label: language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်', icon: '📮', color: '#f59e0b' },
-                      { status: '已取件', label: language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး', icon: '📬', color: '#3b82f6' },
-                      { status: '配送中', label: language === 'zh' ? '配送中' : language === 'en' ? 'In Transit' : 'ပို့ဆောင်နေသည်', icon: '🚚', color: '#8b5cf6' },
-                      { status: '已送达', label: language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး', icon: '✅', color: '#10b981' }
-                    ].map(({ status, label, icon, color }) => (
-                      <button
-                        key={status || 'all'}
-                        onClick={() => setSelectedStatus(status)}
-                        style={{
-                          background: selectedStatus === status ? `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` : 'rgba(255, 255, 255, 0.06)',
-                          color: 'white',
-                          border: selectedStatus === status ? `2px solid ${color}` : '2px solid rgba(255, 255, 255, 0.1)',
-                          padding: '10px 16px',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.95rem',
-                          fontWeight: selectedStatus === status ? '600' : '500',
-                          transition: 'all 0.3s ease',
-                          textAlign: 'left',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          boxShadow: selectedStatus === status ? `0 4px 12px ${color}40` : 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedStatus !== status) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                            e.currentTarget.style.transform = 'translateX(4px)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedStatus !== status) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                            e.currentTarget.style.transform = 'translateX(0)';
-                          }
-                        }}
-                      >
-                        <span>{icon} {label}</span>
-                        <span style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.8rem',
-                          fontWeight: '600'
-                        }}>
-                          {status ? packages.filter(pkg => pkg.status === status).length : packages.length}
-                        </span>
-                      </button>
-                    ))}
+                    <p style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem', margin: 0, lineHeight: '1.6' }}>
+                      💡 {language === 'zh' ? '小提示：主页面已经提供了“状态筛选”，您可以直接在主页点击状态图标进行快速切换。' : 'Tip: Status filters are available on the main page for quick access.'}
+                    </p>
                   </div>
                 </div>
 
-                {/* 右侧：所有日期列表 */}
+                {/* 右侧：历史日期列表 */}
                 <div>
                   <h3 style={{
                     color: 'white',
                     fontSize: '1.1rem',
                     fontWeight: 600,
-                    marginBottom: '16px',
+                    marginBottom: '20px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
@@ -2404,21 +2220,22 @@ const CityPackages: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: '16px'
-                    }}>📋</span>
-                    {language === 'zh' ? '历史日期' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
+                    }}>📅</span>
+                    {language === 'zh' ? '历史日期查询' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
                   </h3>
 
                   <div style={{
-                    maxHeight: '450px',
+                    maxHeight: '400px',
                     overflowY: 'auto',
-                    paddingRight: '8px'
+                    paddingRight: '12px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '12px'
                   }}>
-                    {getAvailableDates().map((date, index) => {
+                    {getAvailableDates().map((date) => {
                       const datePackages = packages.filter(pkg => {
                         const dateStr = pkg.created_at || pkg.create_time;
-                        if (!dateStr) return false;
-                        const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
-                        return pkgDate === date;
+                        return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === date;
                       });
                       
                       const isSelected = selectedDate === date;
@@ -2434,42 +2251,17 @@ const CityPackages: React.FC = () => {
                             padding: '12px 16px',
                             borderRadius: '12px',
                             cursor: 'pointer',
-                            fontSize: '0.95rem',
-                            width: '100%',
-                            marginBottom: '8px',
                             transition: 'all 0.3s ease',
                             textAlign: 'left',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
                             boxShadow: isSelected ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
                           }}
-                          onMouseEnter={(e) => {
-                            if (!isSelected) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                              e.currentTarget.style.transform = 'translateX(4px)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSelected) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                              e.currentTarget.style.transform = 'translateX(0)';
-                            }
-                          }}
                         >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span style={{ fontWeight: '600' }}>
-                              📅 {formatDateDisplay(date)}
-                            </span>
-                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', opacity: 0.8 }}>
-                              <span>📦 {datePackages.length}</span>
-                              <span>✅ {datePackages.filter(p => p.status === '已送达').length}</span>
-                              <span>🚚 {datePackages.filter(p => p.status === '配送中').length}</span>
-                            </div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '4px' }}>
+                            {formatDateDisplay(date)}
                           </div>
-                          {isSelected && (
-                            <span style={{ fontSize: '1.2rem' }}>✓</span>
-                          )}
+                          <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>
+                            {datePackages.length} {language === 'zh' ? '个订单' : 'Orders'}
+                          </div>
                         </button>
                       );
                     })}
