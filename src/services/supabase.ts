@@ -162,6 +162,7 @@ export interface DeliveryStore {
   facilities: string[];
   notes?: string;
   password?: string; // 合伙店铺登录密码
+  region?: string; // 店铺所属区域
   created_by?: string;
   created_at?: string;
   updated_at?: string;

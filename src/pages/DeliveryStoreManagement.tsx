@@ -4,6 +4,16 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@re
 import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import QRCode from 'qrcode';
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -304,7 +314,8 @@ const DeliveryStoreManagement: React.FC = () => {
     capacity: 1000, // 保留默认值，但不在表单中显示
     facilities: [] as string[],
     notes: '',
-    password: '' // 合伙店铺登录密码
+    password: '', // 合伙店铺登录密码
+    region: 'mandalay'
   });
 
   // 生成店长收件码二维码
@@ -404,7 +415,8 @@ const DeliveryStoreManagement: React.FC = () => {
       capacity: store.capacity,
       facilities: store.facilities || [],
       notes: store.notes || '',
-      password: store.password || ''
+      password: store.password || '',
+      region: store.region || 'mandalay'
     });
     setShowForm(true);
   };
@@ -558,7 +570,7 @@ const DeliveryStoreManagement: React.FC = () => {
     setSuccessMessage(null);
 
     // 验证必填项
-    if (!formData.store_name || !formData.store_code || !formData.address || !formData.latitude || !formData.longitude || !formData.password) {
+    if (!formData.store_name || !formData.store_code || !formData.address || !formData.latitude || !formData.longitude || !formData.password || !formData.region) {
       setErrorMessage('请填写所有必填项');
       return;
     }
@@ -675,7 +687,8 @@ const DeliveryStoreManagement: React.FC = () => {
       capacity: 1000,
       facilities: [],
       notes: '',
-      password: ''
+      password: '',
+      region: 'mandalay'
     });
   };
 
@@ -816,18 +829,47 @@ const DeliveryStoreManagement: React.FC = () => {
 
       {/* 新增表单 */}
       {showForm && (
-        <div
-          style={{
-            background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '14px',
-            padding: '20px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            marginBottom: '20px'
-          }}
-        >
-          <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '1.3rem' }}>
-            {isEditing ? '编辑合伙店铺' : '新增合伙店铺'}
-          </h2>
+        <div style={{
+          background: 'rgba(15, 32, 60, 0.5)',
+          borderRadius: '20px',
+          padding: isMobile ? '24px' : '32px',
+          marginBottom: '32px',
+          border: '1px solid rgba(255,255,255,0.15)',
+          boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(20px)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', color: 'white' }}>
+              <span style={{ fontSize: '1.8rem' }}>📝</span> {isEditing ? '编辑合伙店铺' : '新增合伙店铺'}
+            </h2>
+            {/* 区域选择下拉框 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>工作区域：</label>
+              <select
+                name="region"
+                value={formData.region}
+                onChange={handleInputChange}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'rgba(66, 153, 225, 0.2)',
+                  color: '#63b3ed',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {REGIONS.map(r => (
+                  <option key={r.id} value={r.id} style={{ color: '#000' }}>
+                    {r.name} ({r.prefix})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               <div>
@@ -1138,7 +1180,22 @@ const DeliveryStoreManagement: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
+                      {store.region && (
+                        <span style={{ 
+                          background: 'rgba(72, 187, 120, 0.2)', 
+                          color: '#48bb78', 
+                          padding: '2px 6px', 
+                          borderRadius: '4px',
+                          fontWeight: 'bold',
+                          fontSize: '0.7rem',
+                          border: '1px solid rgba(72, 187, 120, 0.3)'
+                        }}>
+                          {REGIONS.find(r => r.id === store.region)?.prefix || store.region}
+                        </span>
+                      )}
+                    </div>
                     <span
                       style={{
                         padding: '4px 8px',
