@@ -1,11 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, Text, Platform } from 'react-native';
+import { ActivityIndicator, View, Text, Platform, Alert, TouchableOpacity, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as SplashScreen from 'expo-splash-screen';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './contexts/AppContext';
+import { notificationService } from './services/notificationService';
+import { errorService } from './services/errorService';
+import { locationService } from './services/locationService';
+
+// 保持启动页可见
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// 初始化全局错误拦截
+errorService.initGlobalErrorHandler();
 
 // 引入所有页面
 import LoginScreen from './screens/LoginScreen';
@@ -30,6 +41,7 @@ const Tab = createBottomTabNavigator();
 // 管理员/经理底部导航
 function AdminTabs() {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   
   return (
     <Tab.Navigator
@@ -37,24 +49,25 @@ function AdminTabs() {
         headerShown: false,
         tabBarActiveTintColor: '#2c5282',
         tabBarInactiveTintColor: '#999',
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 85 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          height: Platform.OS === 'ios' ? 85 + insets.bottom : (75 + Math.max(insets.bottom, 10)),
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 5 : Math.max(insets.bottom, 12),
           paddingTop: 8,
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
           backgroundColor: '#fff',
-          elevation: 8,
+          elevation: 20, // 显著提高层级，防止系统条穿透
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
           marginTop: 2,
-          marginBottom: 0,
+          marginBottom: Platform.OS === 'android' ? 8 : 0, // 增加安卓文字底部间距，远离系统按键
         },
         tabBarIconStyle: {
           marginTop: 4,
@@ -124,6 +137,7 @@ function AdminTabs() {
 // 快递员底部导航
 function CourierTabs() {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   
   return (
     <Tab.Navigator
@@ -131,24 +145,25 @@ function CourierTabs() {
         headerShown: false,
         tabBarActiveTintColor: '#2c5282',
         tabBarInactiveTintColor: '#999',
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 85 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          height: Platform.OS === 'ios' ? 85 + insets.bottom : (75 + Math.max(insets.bottom, 10)),
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 5 : Math.max(insets.bottom, 12),
           paddingTop: 8,
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
           backgroundColor: '#fff',
-          elevation: 8,
+          elevation: 20,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
           marginTop: 2,
-          marginBottom: 0,
+          marginBottom: Platform.OS === 'android' ? 8 : 0,
         },
         tabBarIconStyle: {
           marginTop: 4,
@@ -237,32 +252,116 @@ function MainTabs() {
 }
 
 export default function App() {
+  const [appIsReady, setAppIsReady] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        // 关键修复：添加 5 秒超时保护
+        const safetyTimer = setTimeout(() => {
+          setAppIsReady(true);
+          SplashScreen.hideAsync().catch(() => {});
+        }, 5000);
+
+        // 初始化通知服务
+        const initNotifications = async () => {
+          try {
+            const token = await notificationService.registerForPushNotificationsAsync();
+            if (token) {
+              await notificationService.savePushTokenToSupabase(token);
+            }
+          } catch (e) {
+            console.warn('Notification init error:', e);
+          }
+        };
+
+        await initNotifications();
+        notificationService.initNotificationListeners();
+
+        // 检查并启动后台位置追踪
+        const checkTracking = async () => {
+          try {
+            const courierId = await AsyncStorage.getItem('currentCourierId');
+            if (courierId) {
+              await locationService.startBackgroundTracking();
+            }
+          } catch (e) {
+            console.warn('Tracking init error:', e);
+          }
+        };
+        await checkTracking();
+
+        clearTimeout(safetyTimer);
+      } catch (e) {
+        console.warn('App preparation error:', e);
+      } finally {
+        setAppIsReady(true);
+        SplashScreen.hideAsync().catch(() => {});
+      }
+    }
+
+    prepare();
+  }, []);
+
+  if (!appIsReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <LoadingFallback />
+      </View>
+    );
+  }
+
   return (
-    <AppProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Login"
-          screenOptions={{
-            headerShown: false,
-          }}
+    <SafeAreaProvider>
+      <AppProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName="Login"
+            screenOptions={{
+              headerShown: false,
+            }}
+          >
+            {/* 员工登录页面 */}
+            <Stack.Screen name="Login" component={LoginScreen} />
+            
+            {/* 管理系统（需要登录验证） */}
+            <Stack.Screen name="Main" component={MainTabs} />
+            
+            {/* 其他页面 */}
+            <Stack.Screen name="PackageDetail" component={PackageDetailScreen} />
+            <Stack.Screen name="DeliveryHistory" component={DeliveryHistoryScreen} />
+            <Stack.Screen name="PackageManagement" component={PackageManagementScreen} />
+          <Stack.Screen name="CourierManagement" component={CourierManagementScreen} />
+          <Stack.Screen name="FinanceManagement" component={FinanceManagementScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
+          <Stack.Screen name="PerformanceAnalytics" component={PerformanceAnalyticsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AppProvider>
+  </SafeAreaProvider>
+  );
+}
+
+function LoadingFallback() {
+  const [showRetry, setShowRetry] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowRetry(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <View style={{ alignItems: 'center', marginTop: 20 }}>
+      {showRetry && (
+        <TouchableOpacity 
+          style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 }}
+          onPress={() => Platform.OS === 'android' ? Alert.alert('提示', '如果长时间无法进入，请检查网络或重启应用') : null}
         >
-          {/* 员工登录页面 */}
-          <Stack.Screen name="Login" component={LoginScreen} />
-          
-          {/* 管理系统（需要登录验证） */}
-          <Stack.Screen name="Main" component={MainTabs} />
-          
-          {/* 其他页面 */}
-          <Stack.Screen name="PackageDetail" component={PackageDetailScreen} />
-          <Stack.Screen name="DeliveryHistory" component={DeliveryHistoryScreen} />
-          <Stack.Screen name="PackageManagement" component={PackageManagementScreen} />
-        <Stack.Screen name="CourierManagement" component={CourierManagementScreen} />
-        <Stack.Screen name="FinanceManagement" component={FinanceManagementScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
-        <Stack.Screen name="PerformanceAnalytics" component={PerformanceAnalyticsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  </AppProvider>
+          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>初始化时间较长...</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }

@@ -7,7 +7,12 @@ import {
   StyleSheet,
   RefreshControl,
   Dimensions,
+  Platform,
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
@@ -39,11 +44,9 @@ export default function MyStatisticsScreen({ navigation }: any) {
       const userName = await AsyncStorage.getItem('currentUserName') || '';
       setCurrentUserName(userName);
       
-      // 获取快递员的包裹数据
       const packages = await packageService.getAllPackages();
       const myPackages = packages.filter(pkg => pkg.courier === userName);
       
-      // 计算统计数据
       const today = new Date().toLocaleDateString('zh-CN');
       const todayPackages = myPackages.filter(pkg => {
         const createDate = new Date(pkg.create_time).toLocaleDateString('zh-CN');
@@ -68,7 +71,7 @@ export default function MyStatisticsScreen({ navigation }: any) {
           delivered: myPackages.filter(p => p.status === '已送达').length,
           totalPackages: myPackages.length,
         },
-        avgDeliveryTime: 25, // 模拟平均配送时间（分钟）
+        avgDeliveryTime: 25,
         rating: 4.8,
         efficiency: 92,
       };
@@ -89,176 +92,142 @@ export default function MyStatisticsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['#0f172a', '#1e3a8a', '#334155']}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* 装饰圆形 */}
+      <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
+      <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
+
       {/* 头部 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
+          <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>📊 {language === 'zh' ? '我的统计' : 'My Statistics'}</Text>
+        <Text style={styles.headerTitle}>{language === 'zh' ? '我的统计' : 'My Statistics'}</Text>
         <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
-          <Text style={styles.refreshIcon}>🔄</Text>
+          <Ionicons name="refresh" size={22} color="white" />
         </TouchableOpacity>
       </View>
 
       <ScrollView 
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+        }
       >
         {/* 用户信息卡片 */}
-        <View style={styles.userCard}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.userAvatarText}>{currentUserName.charAt(0)}</Text>
+        <View style={styles.userGlassCard}>
+          <View style={styles.userAvatarContainer}>
+            <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.userAvatar}>
+              <Text style={styles.userAvatarText}>{currentUserName.charAt(0)}</Text>
+            </LinearGradient>
+            <View style={styles.onlineBadge} />
           </View>
           <Text style={styles.userName}>{currentUserName}</Text>
-          <Text style={styles.userRole}>{language === 'zh' ? '快递员' : 'Courier'}</Text>
+          <Text style={styles.userRole}>{language === 'zh' ? '官方认证骑手' : 'Certified Courier'}</Text>
           
-          {/* 详细分析按钮 */}
           <TouchableOpacity 
+            activeOpacity={0.8}
             style={styles.analyticsButton}
             onPress={() => navigation.navigate('PerformanceAnalytics')}
           >
-            <Text style={styles.analyticsButtonText}>
-              📈 {language === 'zh' ? '详细业绩分析' : 'Detailed Analytics'}
-            </Text>
+            <LinearGradient colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']} style={styles.analyticsGradient}>
+              <Ionicons name="analytics" size={18} color="#60a5fa" style={{marginRight: 8}} />
+              <Text style={styles.analyticsButtonText}>
+                {language === 'zh' ? '查看详细业绩分析' : 'Detailed Analytics'}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* 今日统计 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>📅 {language === 'zh' ? '今日数据' : "Today's Data"}</Text>
+        {/* 今日数据网格 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📅 {language === 'zh' ? '今日实时数据' : "Today's Live Data"}</Text>
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: '#27ae60' }]}>
-              <Text style={styles.statNumber}>{statistics.today.delivered}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '已完成' : 'Completed'}</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: '#9b59b6' }]}>
-              <Text style={styles.statNumber}>{statistics.today.delivering}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'In Transit'}</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: '#3498db' }]}>
-              <Text style={styles.statNumber}>{statistics.today.picked}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked Up'}</Text>
-            </View>
+            <LinearGradient colors={['rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.05)']} style={styles.statCard}>
+              <Text style={[styles.statNumber, {color: '#10b981'}]}>{statistics.today.delivered}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '已完成' : 'Delivered'}</Text>
+            </LinearGradient>
+            <LinearGradient colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCard}>
+              <Text style={[styles.statNumber, {color: '#a78bfa'}]}>{statistics.today.delivering}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Active'}</Text>
+            </LinearGradient>
+            <LinearGradient colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.05)']} style={styles.statCard}>
+              <Text style={[styles.statNumber, {color: '#60a5fa'}]}>{statistics.today.picked}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked'}</Text>
+            </LinearGradient>
           </View>
         </View>
 
-        {/* 累计统计 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>📊 {language === 'zh' ? '累计数据' : 'Total Data'}</Text>
-          
-          <View style={styles.totalStatsCard}>
+        {/* 累计数据 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📊 {language === 'zh' ? '历史累计数据' : 'Overall Performance'}</Text>
+          <View style={styles.totalStatsGlassCard}>
             <View style={styles.totalStatItem}>
               <Text style={styles.totalStatNumber}>{statistics.total.delivered}</Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '总完成数' : 'Total Completed'}</Text>
+              <Text style={styles.totalStatLabel}>{language === 'zh' ? '累计完成' : 'Completed'}</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={styles.glassDivider} />
             <View style={styles.totalStatItem}>
               <Text style={styles.totalStatNumber}>{statistics.total.totalPackages}</Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '总接单数' : 'Total Orders'}</Text>
+              <Text style={styles.totalStatLabel}>{language === 'zh' ? '接单总数' : 'Total Orders'}</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={styles.glassDivider} />
             <View style={styles.totalStatItem}>
-              <Text style={styles.totalStatNumber}>
+              <Text style={[styles.totalStatNumber, {color: '#10b981'}]}>
                 {statistics.total.totalPackages > 0 
                   ? Math.round((statistics.total.delivered / statistics.total.totalPackages) * 100) 
                   : 0}%
               </Text>
-              <Text style={styles.totalStatLabel}>{language === 'zh' ? '完成率' : 'Completion Rate'}</Text>
+              <Text style={styles.totalStatLabel}>{language === 'zh' ? '综合完成率' : 'Success Rate'}</Text>
             </View>
           </View>
         </View>
 
         {/* 绩效指标 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>🎯 {language === 'zh' ? '绩效指标' : 'Performance Metrics'}</Text>
-          
-          <View style={styles.performanceCard}>
-            <View style={styles.performanceItem}>
-              <View style={styles.performanceHeader}>
-                <Text style={styles.performanceLabel}>⭐ {language === 'zh' ? '服务评分' : 'Service Rating'}</Text>
-                <Text style={styles.performanceValue}>{statistics.rating.toFixed(1)}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎯 {language === 'zh' ? '核心绩效指标' : 'Performance Indicators'}</Text>
+          <View style={styles.performanceGlassCard}>
+            {[
+              { label: language === 'zh' ? '服务评分' : 'Service Rating', value: statistics.rating.toFixed(1), icon: 'star', color: '#fbbf24', percent: (statistics.rating / 5) * 100 },
+              { label: language === 'zh' ? '工作效率' : 'Work Efficiency', value: `${statistics.efficiency}%`, icon: 'flash', color: '#10b981', percent: statistics.efficiency },
+              { label: language === 'zh' ? '平均配送耗时' : 'Avg Time', value: `${statistics.avgDeliveryTime}min`, icon: 'time', color: '#60a5fa', percent: Math.max(0, 100 - (statistics.avgDeliveryTime / 60) * 100) },
+            ].map((item, index) => (
+              <View key={index} style={styles.performanceItem}>
+                <View style={styles.performanceHeader}>
+                  <View style={styles.performanceLabelGroup}>
+                    <Ionicons name={item.icon as any} size={16} color={item.color} />
+                    <Text style={styles.performanceLabelText}>{item.label}</Text>
+                  </View>
+                  <Text style={[styles.performanceValue, { color: item.color }]}>{item.value}</Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <LinearGradient
+                    colors={[item.color, item.color + 'aa']}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={[styles.progressFill, { width: `${item.percent}%` }]}
+                  />
+                </View>
               </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { 
-                  width: `${(statistics.rating / 5) * 100}%`,
-                  backgroundColor: '#f39c12'
-                }]} />
-              </View>
-            </View>
-
-            <View style={styles.performanceItem}>
-              <View style={styles.performanceHeader}>
-                <Text style={styles.performanceLabel}>⚡ {language === 'zh' ? '工作效率' : 'Work Efficiency'}</Text>
-                <Text style={styles.performanceValue}>{statistics.efficiency}%</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { 
-                  width: `${statistics.efficiency}%`,
-                  backgroundColor: statistics.efficiency >= 90 ? '#27ae60' : '#f39c12'
-                }]} />
-              </View>
-            </View>
-
-            <View style={styles.performanceItem}>
-              <View style={styles.performanceHeader}>
-                <Text style={styles.performanceLabel}>⏰ {language === 'zh' ? '平均配送时间' : 'Avg Delivery Time'}</Text>
-                <Text style={styles.performanceValue}>{statistics.avgDeliveryTime}{language === 'zh' ? '分钟' : 'min'}</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { 
-                  width: `${Math.max(0, 100 - (statistics.avgDeliveryTime / 60) * 100)}%`,
-                  backgroundColor: '#3498db'
-                }]} />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* 时间分析 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>📈 趋势分析</Text>
-          
-          <View style={styles.trendCard}>
-            <View style={styles.trendItem}>
-              <View style={styles.trendIcon}>
-                <Text style={styles.trendIconText}>📅</Text>
-              </View>
-              <View style={styles.trendContent}>
-                <Text style={styles.trendLabel}>本周完成</Text>
-                <Text style={styles.trendValue}>{statistics.week.delivered} 单</Text>
-                <Text style={styles.trendSubtext}>
-                  共 {statistics.week.total} 单任务
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.trendDivider} />
-
-            <View style={styles.trendItem}>
-              <View style={styles.trendIcon}>
-                <Text style={styles.trendIconText}>📆</Text>
-              </View>
-              <View style={styles.trendContent}>
-                <Text style={styles.trendLabel}>本月完成</Text>
-                <Text style={styles.trendValue}>{statistics.month.delivered} 单</Text>
-                <Text style={styles.trendSubtext}>
-                  共 {statistics.month.total} 单任务
-                </Text>
-              </View>
-            </View>
+            ))}
           </View>
         </View>
 
         {/* 成就徽章 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>🏅 成就徽章</Text>
-          
+        <View style={[styles.section, { marginBottom: 40 }]}>
+          <Text style={styles.sectionTitle}>🏅 {language === 'zh' ? '成就徽章' : 'Achievements'}</Text>
           <View style={styles.achievementsGrid}>
             {[
-              { icon: '🥇', title: '配送达人', desc: '完成100单配送', unlocked: statistics.total.delivered >= 100 },
-              { icon: '⚡', title: '闪电侠', desc: '平均配送时间<20分钟', unlocked: statistics.avgDeliveryTime < 20 },
-              { icon: '⭐', title: '五星好评', desc: '评分≥4.8分', unlocked: statistics.rating >= 4.8 },
-              { icon: '🎯', title: '完美主义', desc: '完成率≥95%', unlocked: statistics.efficiency >= 95 },
+              { icon: '🥇', title: '配送达人', desc: '100单配送', unlocked: statistics.total.delivered >= 100 },
+              { icon: '⚡', title: '闪电侠', desc: '准时高效', unlocked: statistics.avgDeliveryTime < 30 },
+              { icon: '⭐', title: '五星好评', desc: '零投诉', unlocked: statistics.rating >= 4.8 },
+              { icon: '🎯', title: '零失误', desc: '100%完成率', unlocked: statistics.efficiency >= 95 },
             ].map((achievement, index) => (
               <View 
                 key={index}
@@ -267,12 +236,15 @@ export default function MyStatisticsScreen({ navigation }: any) {
                   !achievement.unlocked && styles.achievementLocked
                 ]}
               >
-                <Text style={styles.achievementIcon}>{achievement.icon}</Text>
+                <View style={styles.achievementIconBg}>
+                  <Text style={styles.achievementIcon}>{achievement.icon}</Text>
+                </View>
                 <Text style={styles.achievementTitle}>{achievement.title}</Text>
                 <Text style={styles.achievementDesc}>{achievement.desc}</Text>
                 {achievement.unlocked && (
-                  <View style={styles.unlockedBadge}>
-                    <Text style={styles.unlockedText}>✓ 已解锁</Text>
+                  <View style={styles.unlockedTag}>
+                    <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                    <Text style={styles.unlockedText}>已达成</Text>
                   </View>
                 )}
               </View>
@@ -287,13 +259,18 @@ export default function MyStatisticsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: '#0f172a',
+  },
+  circle: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   header: {
-    backgroundColor: '#2c5282',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -301,94 +278,112 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '300',
-  },
   headerTitle: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
   },
   refreshButton: {
     width: 44,
     height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  refreshIcon: {
-    fontSize: 20,
-  },
   content: {
     flex: 1,
+    paddingHorizontal: 20,
   },
-  userCard: {
-    backgroundColor: '#fff',
-    margin: 16,
+  userGlassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 28,
     padding: 24,
-    borderRadius: 16,
     alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  userAvatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
   },
   userAvatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#2c5282',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   userAvatarText: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#fff',
   },
+  onlineBadge: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#10b981',
+    borderWidth: 2,
+    borderColor: '#1e3a8a',
+  },
   userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
     marginBottom: 4,
   },
   userRole: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    marginBottom: 20,
   },
   analyticsButton: {
-    backgroundColor: '#3b82f6',
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  analyticsGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   analyticsButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '700',
   },
-  statsSection: {
-    padding: 16,
-    paddingTop: 0,
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontSize: 16,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.6)',
     marginBottom: 16,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -396,143 +391,92 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 24,
+    fontWeight: '900',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '700',
     textAlign: 'center',
   },
-  totalStatsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+  totalStatsGlassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
+    padding: 24,
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   totalStatItem: {
     flex: 1,
     alignItems: 'center',
   },
   totalStatNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#fff',
     marginBottom: 4,
   },
   totalStatLabel: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '700',
     textAlign: 'center',
   },
-  statDivider: {
+  glassDivider: {
     width: 1,
-    backgroundColor: '#e5e7eb',
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  performanceCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+  performanceGlassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     gap: 20,
   },
   performanceItem: {
-    gap: 8,
+    gap: 10,
   },
   performanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  performanceLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
+  performanceLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  performanceLabelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
   },
   performanceValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontSize: 16,
+    fontWeight: '800',
   },
-  progressBar: {
-    height: 10,
-    backgroundColor: '#f0f4f8',
-    borderRadius: 5,
+  progressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 5,
-  },
-  trendCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  trendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  trendIcon: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#f0f4f8',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  trendIconText: {
-    fontSize: 24,
-  },
-  trendContent: {
-    flex: 1,
-  },
-  trendLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  trendValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 2,
-  },
-  trendSubtext: {
-    fontSize: 12,
-    color: '#999',
-  },
-  trendDivider: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 16,
+    borderRadius: 4,
   },
   achievementsGrid: {
     flexDirection: 'row',
@@ -540,46 +484,55 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   achievementCard: {
-    width: (width - 48) / 2,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    width: (width - 52) / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   achievementLocked: {
-    opacity: 0.4,
+    opacity: 0.3,
   },
-  achievementIcon: {
-    fontSize: 40,
+  achievementIconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
+  achievementIcon: {
+    fontSize: 28,
+  },
   achievementTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 4,
     textAlign: 'center',
   },
   achievementDesc: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  unlockedBadge: {
-    backgroundColor: '#d4edda',
-    paddingHorizontal: 10,
+  unlockedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   unlockedText: {
-    fontSize: 11,
-    color: '#27ae60',
-    fontWeight: '600',
+    fontSize: 10,
+    color: '#10b981',
+    fontWeight: '800',
   },
 });

@@ -118,6 +118,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 包裹信息
   const [packageType, setPackageType] = useState('文件');
   const [weight, setWeight] = useState('');
+  const [codAmount, setCodAmount] = useState('');
   const [description, setDescription] = useState('');
   const [showWeightInput, setShowWeightInput] = useState(false);
   
@@ -279,6 +280,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       packageType: '包裹类型',
       weight: '重量（kg）',
       description: '物品描述（选填）',
+      codAmount: '代收款 (COD)',
       deliveryOptions: '配送选项',
       deliverySpeed: '配送速度',
       speedStandard: '准时达（1小时内）',
@@ -315,6 +317,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         phone: '请输入电话号码',
         address: '请输入详细地址',
         weight: '请输入重量',
+        codAmount: '请输入代收款金额',
         description: '如：衣服、食品等',
         scheduledTime: '如：今天18:00',
       },
@@ -344,6 +347,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
         oversizedDescription: '适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。',
         understood: '我知道了',
       },
+      timePicker: {
+        title: '选择送达时间',
+        subtitle: '请选择您期望的送达日期和时间',
+        workingHours: '营业时间: 09:00 - 18:00',
+        selectDate: '选择日期',
+        selectTime: '选择时间',
+        confirm: '确定',
+        cancel: '取消',
+        today: '今天',
+        tomorrow: '明天',
+      },
     },
     en: {
       title: 'Place Order',
@@ -363,6 +377,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       packageType: 'Package Type',
       weight: 'Weight (kg)',
       description: 'Description (Optional)',
+      codAmount: 'COD Amount',
       deliveryOptions: 'Delivery Options',
       deliverySpeed: 'Delivery Speed',
       speedStandard: 'Standard (within 1 hour)',
@@ -399,6 +414,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         phone: 'Enter phone number',
         address: 'Enter detailed address',
         weight: 'Enter weight',
+        codAmount: 'Enter COD amount',
         description: 'e.g.: Clothes, Food, etc.',
         scheduledTime: 'e.g.: Today 18:00',
       },
@@ -428,6 +444,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
         oversizedDescription: 'Suitable for large packages exceeding standard dimensions. Large items require additional shipping fees. Please contact in advance to confirm transportability.',
         understood: 'I Understand',
       },
+      timePicker: {
+        title: 'Select Delivery Time',
+        subtitle: 'Please select your preferred delivery date and time',
+        workingHours: 'Working Hours: 09:00 - 18:00',
+        selectDate: 'Select Date',
+        selectTime: 'Select Time',
+        confirm: 'Confirm',
+        cancel: 'Cancel',
+        today: 'Today',
+        tomorrow: 'Tomorrow',
+      },
     },
     my: {
       title: 'အမှာစာတင်',
@@ -447,6 +474,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       packageType: 'ပါဆယ်အမျိုးအစား',
       weight: 'အလေးချိန် (kg)',
       description: 'ပစ္စည်းဖော်ပြချက် (ရွေးချယ်)',
+      codAmount: '代收款 (COD)',
       deliveryOptions: 'ပို့ဆောင်ရေးရွေးချယ်မှု',
       deliverySpeed: 'ပို့ဆောင်မြန်နှုန်း',
       speedStandard: 'စံချိန် (၁နာရီအတွင်း)',
@@ -483,6 +511,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         phone: 'ဖုန်းနံပါတ်ထည့်ပါ',
         address: 'အသေးစိတ်လိပ်စာထည့်ပါ',
         weight: 'အလေးချိန်ထည့်ပါ',
+        codAmount: '代收款 (COD) ပမာဏထည့်ပါ',
         description: 'ဥပမာ: အဝတ်အစား, အစားအစာ',
         scheduledTime: 'ဥပမာ: ယနေ့ ၁၈:၀၀',
       },
@@ -511,6 +540,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
         overweightDescription: '၅ကီလိုဂရမ်ထက်ပိုလေးသောပါဆယ်များအတွက်သင့်လျော်သည်။ လေးသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ထုပ်ပိုးမှုခိုင်မာစွာပြုလုပ်ပါ။',
         oversizedDescription: 'စံချိန်ထက်ကြီးသောအရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ကြီးမားသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ပို့ဆောင်နိုင်မနိုင်ကို ကြိုတင်ဆက်သွယ်ပါ။',
         understood: 'နားလည်ပါပြီ',
+      },
+      timePicker: {
+        title: 'ပို့ဆောင်မည့်အချိန်ရွေးပါ',
+        subtitle: 'သင်အလိုရှိသော ပို့ဆောင်မည့်ရက်နှင့် အချိန်ကို ရွေးချယ်ပါ',
+        workingHours: 'ရုံးဖွင့်ချိန်: 09:00 - 18:00',
+        selectDate: 'ရက်စွဲရွေးပါ',
+        selectTime: 'အချိန်ရွေးပါ',
+        confirm: 'အတည်ပြုသည်',
+        cancel: 'ပယ်ဖျက်သည်',
+        today: 'ယနေ့',
+        tomorrow: 'မနက်ဖြန်',
       },
     },
   };
@@ -1213,6 +1253,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
+        cod_amount: currentUser?.user_type === 'partner' ? parseFloat(codAmount || '0') : 0,
         description: description || '',
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
@@ -1281,6 +1322,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
     setReceiverPhone('');
     setReceiverAddress('');
     setWeight('');
+    setCodAmount('');
     setDescription('');
     setDeliverySpeed('准时达');
     setScheduledTime('');
@@ -1445,6 +1487,32 @@ export default function PlaceOrderScreen({ navigation }: any) {
             }}
           />
 
+          {/* 代收款 (仅限 Partner 账号) */}
+          {currentUser?.user_type === 'partner' && (
+            <FadeInView delay={320}>
+              <View style={styles.section}>
+                <View style={styles.sectionTitleContainer}>
+                  <MoneyIcon size={18} color="#1e293b" />
+                  <Text style={styles.sectionTitle}> {currentT.codAmount}</Text>
+                </View>
+                <View style={[styles.inputGroup, { marginTop: 15 }]}>
+                  <Text style={styles.label}>{currentT.codAmount} *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={codAmount}
+                    onChangeText={setCodAmount}
+                    placeholder={currentT.placeholders.codAmount}
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+                    💡 {language === 'zh' ? '该金额将由骑手在取件时代收' : language === 'en' ? 'This amount will be collected by the courier upon pickup' : 'ဤပမာဏကို ကူရီယာမှ ပစ္စည်းယူစဉ် ကောက်ခံမည်ဖြစ်သည်'}
+                  </Text>
+                </View>
+              </View>
+            </FadeInView>
+          )}
+
           {/* 配送选项 */}
           <DeliveryOptions
             language={language as any}
@@ -1530,8 +1598,10 @@ export default function PlaceOrderScreen({ navigation }: any) {
             <Text style={styles.modalTitle}>{currentT.packageTypeInfo.title}</Text>
             <ScrollView style={{ maxHeight: 300 }}>
               <Text style={styles.modalText}>
-                {/* 这里的 getPackageTypeDescription 可能需要从外部获取或者移动到 helper */}
-                {selectedPackageTypeInfo}
+                {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' ? currentT.packageTypeDetails.standard :
+                 selectedPackageTypeInfo === '超重件（5KG）以上' ? currentT.packageTypeDetails.overweight :
+                 selectedPackageTypeInfo === '超规件（45x60x15cm）以上' ? currentT.packageTypeDetails.oversized :
+                 selectedPackageTypeInfo}
               </Text>
             </ScrollView>
             <TouchableOpacity
@@ -1540,6 +1610,109 @@ export default function PlaceOrderScreen({ navigation }: any) {
             >
               <Text style={styles.modalCloseButtonText}>{currentT.packageTypeInfo.understood}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 时间选择器模态框 */}
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.timePickerOverlay}>
+          <View style={styles.timePickerContent}>
+            <LinearGradient
+              colors={['#2c5282', '#2d3748']}
+              style={styles.timePickerHeader}
+            >
+              <View style={styles.timePickerHeaderContent}>
+                <Text style={styles.timePickerTitle}>{currentT.timePicker.title}</Text>
+                <Text style={styles.timePickerSubtitle}>{currentT.timePicker.subtitle}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowTimePicker(false)}
+                style={styles.timePickerCloseButton}
+              >
+                <Text style={styles.timePickerCloseText}>✕</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={styles.timePickerBody}>
+              <View style={styles.quickSelectSection}>
+                <Text style={styles.quickSelectTitle}>{currentT.timePicker.selectDate}</Text>
+                <View style={styles.quickSelectGrid}>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickSelectButton,
+                      selectedDate === 'Today' && { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }
+                    ]}
+                    onPress={() => setSelectedDate('Today')}
+                  >
+                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Today' && { color: '#3b82f6' }]}>
+                      {currentT.timePicker.today}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickSelectButton,
+                      selectedDate === 'Tomorrow' && { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }
+                    ]}
+                    onPress={() => setSelectedDate('Tomorrow')}
+                  >
+                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Tomorrow' && { color: '#3b82f6' }]}>
+                      {currentT.timePicker.tomorrow}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.customTimeSection}>
+                <Text style={styles.customTimeTitle}>{currentT.timePicker.selectTime}</Text>
+                <View style={styles.dateTimeRow}>
+                  <View style={styles.dateTimeInput}>
+                    <Text style={styles.dateTimeLabel}>{currentT.timePicker.workingHours}</Text>
+                    <TextInput
+                      style={styles.dateTimeTextInput}
+                      value={selectedTime}
+                      onChangeText={setSelectedTime}
+                      placeholder="例如: 14:30"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.timePickerButtons}>
+              <TouchableOpacity
+                style={styles.timePickerCancelButton}
+                onPress={() => setShowTimePicker(false)}
+              >
+                <Text style={styles.timePickerCancelText}>{currentT.timePicker.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.timePickerConfirmButton}
+                onPress={() => {
+                  if (selectedDate && selectedTime) {
+                    const timeStr = `${selectedDate === 'Today' ? currentT.timePicker.today : currentT.timePicker.tomorrow} ${selectedTime}`;
+                    setScheduledTime(timeStr);
+                    setShowTimePicker(false);
+                  } else {
+                    Alert.alert('提示', '请选择日期并输入时间');
+                  }
+                }}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.timePickerConfirmGradient}
+                >
+                  <Text style={styles.timePickerConfirmText}>{currentT.timePicker.confirm}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

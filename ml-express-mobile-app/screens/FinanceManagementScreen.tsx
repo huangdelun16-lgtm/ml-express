@@ -1167,14 +1167,19 @@ const styles = StyleSheet.create({
   recordCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 4,
+  },
+  recordCardSelected: {
+    borderWidth: 2,
+    borderColor: '#2c5282',
+    backgroundColor: '#f8fafc',
   },
   typeIcon: {
     width: 50,
@@ -1182,13 +1187,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    margin: 16,
   },
   typeEmoji: {
     fontSize: 24,
   },
   recordInfo: {
     flex: 1,
+    padding: 16,
+    paddingLeft: 0,
   },
   recordHeader: {
     flexDirection: 'row',
@@ -1225,11 +1232,6 @@ const styles = StyleSheet.create({
   statusTagText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   emptyContainer: {
     padding: 60,
@@ -1532,23 +1534,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  recordCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  recordCardSelected: {
-    borderWidth: 2,
-    borderColor: '#2c5282',
-    backgroundColor: '#f8fafc',
-  },
   checkboxContainer: {
     paddingLeft: 16,
     justifyContent: 'center',
@@ -1574,58 +1559,6 @@ const styles = StyleSheet.create({
   colorIndicator: {
     width: 4,
   },
-  typeIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 16,
-  },
-  typeEmoji: {
-    fontSize: 24,
-  },
-  recordInfo: {
-    flex: 1,
-    padding: 16,
-    paddingLeft: 0,
-  },
-  recordHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  category: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  recordDate: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 4,
-  },
-  notes: {
-    fontSize: 13,
-    color: '#666',
-    fontStyle: 'italic',
-    marginBottom: 6,
-  },
-  statusTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  statusTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
   quickDeleteButton: {
     width: 40,
     height: 40,
@@ -1637,14 +1570,6 @@ const styles = StyleSheet.create({
   },
   quickDeleteIcon: {
     fontSize: 16,
-  },
-  emptyContainer: {
-    padding: 60,
-    alignItems: 'center',
-  },
-  emptyEmoji: {
-    fontSize: 80,
-    marginBottom: 16,
   },
   // 分析页面样式
   analyticsCard: {

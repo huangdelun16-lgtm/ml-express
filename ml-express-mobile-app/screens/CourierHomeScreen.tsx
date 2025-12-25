@@ -7,10 +7,16 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { packageService, Package } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+
+const { width } = Dimensions.get('window');
 
 export default function CourierHomeScreen({ navigation }: any) {
   const { language } = useApp();
@@ -57,93 +63,76 @@ export default function CourierHomeScreen({ navigation }: any) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '待取件': return '#f39c12';
-      case '已取件': return '#3498db';
-      case '配送中': return '#9b59b6';
-      default: return '#95a5a6';
+      case '待取件': return '#f59e0b';
+      case '已取件': return '#3b82f6';
+      case '配送中': return '#8b5cf6';
+      default: return '#64748b';
     }
   };
 
   const getNextStatus = (currentStatus: string) => {
     switch (currentStatus) {
-      case '待取件': return '已取件';
-      case '已取件': return '配送中';
-      case '配送中': return '已送达';
+      case '待取件': return language === 'zh' ? '去取件' : 'Pickup';
+      case '已取件': return language === 'zh' ? '去配送' : 'Deliver';
+      case '配送中': return language === 'zh' ? '签收' : 'Complete';
       default: return '';
     }
   };
 
   const renderPackageItem = ({ item }: { item: Package }) => (
     <TouchableOpacity
-      style={styles.card}
+      activeOpacity={0.9}
+      style={styles.packageCardWrapper}
       onPress={() => navigation.navigate('PackageDetail', { package: item })}
     >
-      {/* 状态横条 */}
-      <View style={[styles.statusBar, { backgroundColor: getStatusColor(item.status) }]} />
-      
-      <View style={styles.cardContent}>
-        {/* 头部：编号和状态 */}
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.05)']}
+        style={styles.packageGlassCard}
+      >
         <View style={styles.cardHeader}>
-          <Text style={styles.packageId}>{item.id}</Text>
+          <View style={styles.idBadge}>
+            <Text style={styles.packageId}>{item.id}</Text>
+          </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
             <Text style={styles.statusText}>{item.status}</Text>
           </View>
         </View>
         
-        {/* 收件人信息 */}
-        <View style={styles.receiverInfo}>
-          <Text style={styles.receiverName}>📍 {item.receiver_name}</Text>
-          <Text style={styles.receiverPhone}>📞 {item.receiver_phone}</Text>
-          <Text style={styles.address} numberOfLines={2}>{item.receiver_address}</Text>
+        <View style={styles.receiverContainer}>
+          <View style={styles.infoRow}>
+            <Ionicons name="location" size={18} color="#60a5fa" />
+            <Text style={styles.receiverName}>{item.receiver_name}</Text>
+          </View>
+          <Text style={styles.addressText} numberOfLines={2}>{item.receiver_address}</Text>
         </View>
 
-        {/* 包裹信息 */}
-        <View style={styles.packageInfo}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>{language === 'zh' ? '类型' : 'Type'}</Text>
-            <Text style={styles.infoValue}>{item.package_type}</Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.tagGroup}>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{item.package_type}</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{item.weight}kg</Text>
+            </View>
           </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>{language === 'zh' ? '重量' : 'Weight'}</Text>
-            <Text style={styles.infoValue}>{item.weight}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>{language === 'zh' ? '价格' : 'Price'}</Text>
-            <Text style={styles.infoValue}>{item.price}</Text>
-          </View>
-        </View>
-
-        {/* 快捷操作按钮 */}
-        <View style={styles.quickActions}>
+          
           <TouchableOpacity 
-            style={styles.quickButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              navigation.navigate('PackageDetail', { package: item, action: 'call' });
-            }}
-          >
-            <Text style={styles.quickButtonText}>📞</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.quickButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              navigation.navigate('PackageDetail', { package: item, action: 'navigate' });
-            }}
-          >
-            <Text style={styles.quickButtonText}>🗺️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.nextStatusButton, { backgroundColor: getStatusColor(getNextStatus(item.status)) }]}
+            style={styles.actionButton}
             onPress={(e) => {
               e.stopPropagation();
               navigation.navigate('PackageDetail', { package: item, action: 'updateStatus' });
             }}
           >
-            <Text style={styles.nextStatusText}>{getNextStatus(item.status)}</Text>
+            <LinearGradient
+              colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
+              style={styles.actionGradient}
+            >
+              <Text style={styles.actionText}>{getNextStatus(item.status)}</Text>
+              <Ionicons name="chevron-forward" size={16} color="white" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
@@ -154,56 +143,78 @@ export default function CourierHomeScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['#0f172a', '#1e3a8a', '#334155']}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
+      <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
+
       {/* 头部 */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>👋 {language === 'zh' ? '你好' : 'Hello'}</Text>
+          <Text style={styles.greeting}>👋 {language === 'zh' ? '你好' : 'Hello'},</Text>
           <Text style={styles.userName}>{currentUserName}</Text>
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{packages.length}</Text>
-          <Text style={styles.badgeLabel}>{language === 'zh' ? '待完成' : 'Pending'}</Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.notificationButton}
+          onPress={() => navigation.navigate('MyTasks')}
+        >
+          <View style={styles.badgeContainer}>
+            <Text style={styles.badgeText}>{packages.length}</Text>
+          </View>
+          <Ionicons name="notifications-outline" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
-      {/* 统计卡片 */}
+      {/* 快捷统计 */}
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
-          <Text style={styles.statNumber}>{todoCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '待取件' : 'Pending Pickup'}</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: '#3498db' }]}>
-          <Text style={styles.statNumber}>{pickedCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked Up'}</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: '#9b59b6' }]}>
-          <Text style={styles.statNumber}>{deliveringCount}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Delivering'}</Text>
-        </View>
+        <LinearGradient colors={['rgba(245, 158, 11, 0.2)', 'rgba(245, 158, 11, 0.05)']} style={styles.statCard}>
+          <Text style={[styles.statNumber, {color: '#fbbf24'}]}>{todoCount}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '待取件' : 'Todo'}</Text>
+        </LinearGradient>
+        <LinearGradient colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.05)']} style={styles.statCard}>
+          <Text style={[styles.statNumber, {color: '#60a5fa'}]}>{pickedCount}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked'}</Text>
+        </LinearGradient>
+        <LinearGradient colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCard}>
+          <Text style={[styles.statNumber, {color: '#a78bfa'}]}>{deliveringCount}</Text>
+          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Active'}</Text>
+        </LinearGradient>
       </View>
 
       {/* 任务列表 */}
       <View style={styles.listContainer}>
-        <Text style={styles.listTitle}>📦 {language === 'zh' ? '我的任务' : 'My Tasks'}</Text>
+        <View style={styles.listHeader}>
+          <Text style={styles.listTitle}>📦 {language === 'zh' ? '当前任务' : 'Current Tasks'}</Text>
+          <TouchableOpacity onPress={onRefresh}>
+            <Ionicons name="refresh" size={20} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
+        </View>
+
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2c5282" />
+            <ActivityIndicator size="large" color="#3b82f6" />
           </View>
         ) : packages.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyEmoji}>🎉</Text>
-            <Text style={styles.emptyText}>{language === 'zh' ? '太棒了！' : 'Great!'}</Text>
-            <Text style={styles.emptySubtext}>{language === 'zh' ? '暂无待配送的包裹' : 'No packages to deliver'}</Text>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="checkmark-done-circle-outline" size={80} color="rgba(255,255,255,0.1)" />
+            </View>
+            <Text style={styles.emptyText}>{language === 'zh' ? '全部完成！' : 'All Clear!'}</Text>
+            <Text style={styles.emptySubtext}>{language === 'zh' ? '当前没有待配送的包裹' : 'No pending deliveries'}</Text>
           </View>
         ) : (
           <FlatList
             data={packages}
             renderItem={renderPackageItem}
             keyExtractor={item => item.id}
+            showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
             }
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
       </View>
@@ -214,186 +225,204 @@ export default function CourierHomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7fafc',
+    backgroundColor: '#0f172a',
+  },
+  circle: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   header: {
-    backgroundColor: '#2c5282',
-    padding: 20,
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 24,
     paddingBottom: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   greeting: {
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 16,
+    fontWeight: '600',
   },
   userName: {
     color: '#fff',
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginTop: 4,
   },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+  notificationButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 1,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#0f172a',
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  badgeLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    marginTop: 2,
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '800',
   },
   statsRow: {
     flexDirection: 'row',
-    padding: 16,
+    paddingHorizontal: 24,
     gap: 12,
+    marginBottom: 32,
   },
   statCard: {
     flex: 1,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   statNumber: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 4,
   },
   statLabel: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: 12,
-    marginTop: 4,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   listContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   listTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#2c3e50',
+    fontWeight: '800',
+    color: '#fff',
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+  packageCardWrapper: {
     marginBottom: 16,
-    overflow: 'hidden',
+  },
+  packageGlassCard: {
+    borderRadius: 28,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statusBar: {
-    height: 4,
-  },
-  cardContent: {
-    padding: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    elevation: 8,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  idBadge: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   packageId: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   statusText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '800',
   },
-  receiverInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 12,
+  receiverContainer: {
+    marginBottom: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   receiverName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
   },
-  receiverPhone: {
+  addressText: {
     fontSize: 14,
-    color: '#3182ce',
-    marginBottom: 4,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    lineHeight: 20,
+    marginLeft: 26,
   },
-  address: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-  },
-  packageInfo: {
+  cardFooter: {
     flexDirection: 'row',
-    marginBottom: 12,
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
-  infoItem: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: '#999',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  quickActions: {
+  tagGroup: {
     flexDirection: 'row',
     gap: 8,
   },
-  quickButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#3182ce',
+  tag: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tagText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  actionButton: {
     borderRadius: 12,
-    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  actionGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 4,
   },
-  quickButtonText: {
-    fontSize: 20,
-  },
-  nextStatusButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nextStatusText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  actionText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '800',
   },
   loadingContainer: {
     flex: 1,
@@ -404,20 +433,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    paddingTop: 60,
   },
-  emptyEmoji: {
-    fontSize: 80,
-    marginBottom: 16,
+  emptyIconContainer: {
+    marginBottom: 24,
   },
   emptyText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
     marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '600',
   },
 });

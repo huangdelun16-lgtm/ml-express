@@ -166,7 +166,7 @@ Certificate fingerprints:
 在浏览器中测试（可选）：
 
 ```
-https://maps.googleapis.com/maps/api/place/autocomplete/json?input=test&key=AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE
+https://maps.googleapis.com/maps/api/place/autocomplete/json?input=test&key=AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI
 ```
 
 如果返回 JSON 数据（不是错误），说明配置成功。

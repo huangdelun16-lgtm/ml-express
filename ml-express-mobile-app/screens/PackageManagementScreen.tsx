@@ -484,6 +484,70 @@ export default function PackageManagementScreen({ navigation }: any) {
   );
 };
 
+  // 生成送件扫码
+  const generateDeliveryQRCode = (packageId: string) => {
+    return `DELIVERY_${packageId}_${Date.now()}`;
+  };
+
+  // 上传照片功能
+  const uploadDeliveryPhoto = async () => {
+    if (!selectedPackage) return;
+    
+    setUploadingPhoto(true);
+    try {
+      // 请求相机权限
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('需要相机权限', '需要相机权限才能拍照');
+        return;
+      }
+
+      // 获取当前位置
+      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+      if (locationStatus !== 'granted') {
+        Alert.alert('需要位置权限', '需要位置权限才能记录送达位置');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      
+      // 拍照
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        const photoUri = result.assets[0].uri;
+        
+        // 这里可以上传照片到服务器或保存到本地
+        // 同时记录位置信息
+        const deliveryData = {
+          packageId: selectedPackage.id,
+          photoUri: photoUri,
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: new Date().toISOString(),
+        };
+
+        console.log('送达照片和位置信息:', deliveryData);
+        
+        Alert.alert(
+          '✅ 上传成功！',
+          '送达照片和位置信息已记录\n骑手可获得KM积分',
+          [{ text: '确定' }]
+        );
+      }
+    } catch (error) {
+      console.error('上传照片失败:', error);
+      Alert.alert('上传失败', '请重试');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* 头部 */}
@@ -957,37 +1021,37 @@ export default function PackageManagementScreen({ navigation }: any) {
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '包裹编号' : 'Package ID'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.id}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.id}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '收件人' : 'Receiver'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.receiver_name}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.receiver_name}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '收件人电话' : 'Receiver Phone'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.receiver_phone}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.receiver_phone}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '收件地址' : 'Delivery Address'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.receiver_address}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.receiver_address}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '快递员' : 'Courier'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.courier}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.courier}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '状态' : 'Status'}:
                     </Text>
-                    <Text style={[styles.infoValue, { color: getStatusColor(selectedPackage.status) }]}>
+                    <Text style={[styles.infoValueRight, { color: getStatusColor(selectedPackage.status) }]}>
                       {selectedPackage.status}
                     </Text>
                   </View>
@@ -1002,25 +1066,19 @@ export default function PackageManagementScreen({ navigation }: any) {
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '包裹类型' : 'Package Type'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.package_type}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.package_type}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '重量' : 'Weight'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.weight} kg</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.weight} kg</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '描述' : 'Description'}:
                     </Text>
-                    <Text style={styles.infoValue}>{selectedPackage.description}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>
-                      {language === 'zh' ? '预估费用' : 'Estimated Cost'}:
-                    </Text>
-                    <Text style={styles.infoValue}>${selectedPackage.estimated_cost}</Text>
+                    <Text style={styles.infoValueRight}>{selectedPackage.description}</Text>
                   </View>
                 </View>
 
@@ -1033,15 +1091,15 @@ export default function PackageManagementScreen({ navigation }: any) {
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '创建时间' : 'Created Time'}:
                     </Text>
-                    <Text style={styles.infoValue}>
-                      {new Date(selectedPackage.created_at).toLocaleString()}
+                    <Text style={styles.infoValueRight}>
+                      {new Date(selectedPackage.created_at || Date.now()).toLocaleString()}
                     </Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '取件时间' : 'Pickup Time'}:
                     </Text>
-                    <Text style={styles.infoValue}>
+                    <Text style={styles.infoValueRight}>
                       {selectedPackage.pickup_time ? 
                         new Date(selectedPackage.pickup_time).toLocaleString() : 
                         (language === 'zh' ? '未取件' : 'Not Picked Up')
@@ -1052,7 +1110,7 @@ export default function PackageManagementScreen({ navigation }: any) {
                     <Text style={styles.infoLabel}>
                       {language === 'zh' ? '送达时间' : 'Delivery Time'}:
                     </Text>
-                    <Text style={styles.infoValue}>
+                    <Text style={styles.infoValueRight}>
                       {selectedPackage.delivery_time ? 
                         new Date(selectedPackage.delivery_time).toLocaleString() : 
                         (language === 'zh' ? '未送达' : 'Not Delivered')
@@ -1313,70 +1371,6 @@ export default function PackageManagementScreen({ navigation }: any) {
   );
 }
 
-// 生成送件扫码
-const generateDeliveryQRCode = (packageId: string) => {
-  return `DELIVERY_${packageId}_${Date.now()}`;
-};
-
-// 上传照片功能
-const uploadDeliveryPhoto = async () => {
-  if (!selectedPackage) return;
-  
-  setUploadingPhoto(true);
-  try {
-    // 请求相机权限
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('需要相机权限', '需要相机权限才能拍照');
-      return;
-    }
-
-    // 获取当前位置
-    const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-    if (locationStatus !== 'granted') {
-      Alert.alert('需要位置权限', '需要位置权限才能记录送达位置');
-      return;
-    }
-
-    const location = await Location.getCurrentPositionAsync({});
-    
-    // 拍照
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    });
-
-    if (!result.canceled) {
-      const photoUri = result.assets[0].uri;
-      
-      // 这里可以上传照片到服务器或保存到本地
-      // 同时记录位置信息
-      const deliveryData = {
-        packageId: selectedPackage.id,
-        photoUri: photoUri,
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        timestamp: new Date().toISOString(),
-      };
-
-      console.log('送达照片和位置信息:', deliveryData);
-      
-      Alert.alert(
-        '✅ 上传成功！',
-        '送达照片和位置信息已记录\n骑手可获得KM积分',
-        [{ text: '确定' }]
-      );
-    }
-  } catch (error) {
-    console.error('上传照片失败:', error);
-    Alert.alert('上传失败', '请重试');
-  } finally {
-    setUploadingPhoto(false);
-  }
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1418,7 +1412,6 @@ const styles = StyleSheet.create({
   mapViewIcon: {
     fontSize: 20,
   },
-  // 统计仪表板样式
   statsContainer: {
     backgroundColor: '#fff',
     padding: 16,
@@ -1439,7 +1432,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statCard: {
-    width: '23%', // 确保4个卡片每行显示
+    width: '23%',
     minWidth: 75,
     padding: 8,
     borderRadius: 12,
@@ -1769,7 +1762,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
-  // 优化后的模态框样式
   centeredModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1812,13 +1804,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  modalContent: {
+  packageDetailModal: {
+    width: '95%',
+    maxHeight: '85%',
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    maxHeight: '70%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1847,6 +1843,225 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#fff',
     fontWeight: 'bold',
+  },
+  packageDetailContent: {
+    padding: 20,
+  },
+  packageInfoSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c5282',
+    marginBottom: 16,
+  },
+  infoValueRight: {
+    fontSize: 14,
+    color: '#2c3e50',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 12,
+  },
+  functionSection: {
+    marginBottom: 20,
+  },
+  functionButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  functionButtonIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  functionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c5282',
+    marginBottom: 4,
+  },
+  functionButtonDesc: {
+    fontSize: 12,
+    color: '#666',
+  },
+  codeModal: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  codeContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  codeLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  qrCodeContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  codeDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  qrCodeActions: {
+    marginTop: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  qrCodeButton: {
+    backgroundColor: '#2c5282',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  qrCodeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  scanWindowContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  scanFrame: {
+    width: 200,
+    height: 200,
+    borderWidth: 2,
+    borderColor: '#27ae60',
+    borderRadius: 12,
+    position: 'relative',
+    marginBottom: 16,
+  },
+  scanFrameCorner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#27ae60',
+    borderWidth: 3,
+  },
+  scanFrameCornerTopRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+  },
+  scanFrameCornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+  },
+  scanFrameCornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+  },
+  scanInstruction: {
+    fontSize: 14,
+    color: '#27ae60',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  deliveryQRContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  deliveryQRTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#27ae60',
+    marginBottom: 12,
+  },
+  deliveryQRDescription: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 18,
+  },
+  photoModal: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  photoContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  photoInstruction: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  photoInfoContainer: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    width: '100%',
+  },
+  photoInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c5282',
+    marginBottom: 8,
+  },
+  photoInfoText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  photoButton: {
+    backgroundColor: '#2c5282',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  photoButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  photoButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  photoNote: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
   packageInfo: {
     backgroundColor: '#f8f9fa',
@@ -1889,15 +2104,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     flex: 1,
   },
-  noOptionsContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  noOptionsText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
   updatingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1909,7 +2115,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2c5282',
   },
-  // 智能分配样式
+  noOptionsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noOptionsText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
   routeCard: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
@@ -1987,321 +2201,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-  },
-  // 包裹详情模态框样式
-  packageDetailModal: {
-    width: '95%',
-    maxHeight: '85%',
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  packageDetailContent: {
-    padding: 20,
-  },
-  packageInfoSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2c5282',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#2c3e50',
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 12,
-  },
-  functionSection: {
-    marginBottom: 20,
-  },
-  functionButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  functionButtonIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  functionButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 4,
-  },
-  functionButtonDesc: {
-    fontSize: 12,
-    color: '#666',
-  },
-  // 取件码和送件扫码模态框样式
-  codeModal: {
-    width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  codeContent: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  codeLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  codeValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 16,
-    letterSpacing: 4,
-  },
-  codeDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  qrCodeContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  // 上传照片模态框样式
-  photoModal: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  photoContent: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  photoInstruction: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  photoButton: {
-    backgroundColor: '#2c5282',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  photoButtonIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  photoButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  // 条形码样式
-  barcodeContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  barcodeWrapper: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#2c5282',
-    borderStyle: 'dashed',
-  },
-  barcodeLines: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    height: 50,
-  },
-  barcodeLine: {
-    backgroundColor: '#2c5282',
-    marginHorizontal: 1,
-    borderRadius: 1,
-  },
-  barcodeText: {
-    fontSize: 12,
-    color: '#2c5282',
-    fontWeight: '500',
-  },
-  deliveryBarcodeContainer: {
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  deliveryBarcodeWrapper: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#27ae60',
-    borderStyle: 'dashed',
-  },
-  deliveryBarcodeLines: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    height: 40,
-  },
-  deliveryBarcodeLine: {
-    backgroundColor: '#27ae60',
-    marginHorizontal: 1,
-    borderRadius: 1,
-  },
-  deliveryBarcodeText: {
-    fontSize: 10,
-    color: '#27ae60',
-    fontWeight: '500',
-  },
-  qrCodeButton: {
-    backgroundColor: '#2c5282',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  qrCodeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // 扫码窗口样式
-  scanWindowContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  scanFrame: {
-    width: 200,
-    height: 200,
-    borderWidth: 2,
-    borderColor: '#27ae60',
-    borderRadius: 12,
-    position: 'relative',
-    marginBottom: 16,
-  },
-  scanFrameCorner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: '#27ae60',
-    borderWidth: 3,
-  },
-  scanFrameCornerTopRight: {
-    top: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: 0,
-  },
-  scanFrameCornerBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderTopWidth: 0,
-    borderRightWidth: 0,
-  },
-  scanFrameCornerBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-  },
-  scanInstruction: {
-    fontSize: 14,
-    color: '#27ae60',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  deliveryQRContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  deliveryQRTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#27ae60',
-    marginBottom: 12,
-  },
-  deliveryQRDescription: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 18,
-  },
-  // 照片上传样式
-  photoInfoContainer: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    width: '100%',
-  },
-  photoInfoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 8,
-  },
-  photoInfoText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  photoNote: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 18,
-    fontStyle: 'italic',
   },
 });

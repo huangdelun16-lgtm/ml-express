@@ -11,9 +11,16 @@ import {
   ScrollView,
   Modal,
   Image,
-  Linking
+  Linking,
+  Dimensions,
+  Platform,
+  StatusBar,
 } from 'react-native';
-import { packageService, deliveryStoreService } from '../services/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { packageService, deliveryStoreService, supabase } from '../services/supabase';
+import { cacheService } from '../services/cacheService';
+import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
@@ -41,6 +48,8 @@ interface Package {
   store_fee?: number | string;
   payment_method?: string;
 }
+
+const { width, height } = Dimensions.get('window');
 
 const MyTasksScreen: React.FC = () => {
   const { language } = useApp();
@@ -82,7 +91,6 @@ const MyTasksScreen: React.FC = () => {
       
       try {
         if (pkg.delivery_time) {
-          // 如果有送达时间，按送达时间分组
           const deliveryDate = new Date(pkg.delivery_time);
           if (!isNaN(deliveryDate.getTime())) {
             dateKey = deliveryDate.toLocaleDateString('zh-CN', {
@@ -92,7 +100,6 @@ const MyTasksScreen: React.FC = () => {
             });
           }
         } else if (pkg.pickup_time) {
-          // 如果有取件时间，按取件时间分组
           const pickupDate = new Date(pkg.pickup_time);
           if (!isNaN(pickupDate.getTime())) {
             dateKey = pickupDate.toLocaleDateString('zh-CN', {
@@ -102,7 +109,6 @@ const MyTasksScreen: React.FC = () => {
             });
           }
         } else if (pkg.created_at) {
-          // 否则按创建时间分组
           const createDate = new Date(pkg.created_at);
           if (!isNaN(createDate.getTime())) {
             dateKey = createDate.toLocaleDateString('zh-CN', {
@@ -113,7 +119,6 @@ const MyTasksScreen: React.FC = () => {
           }
         }
         
-        // 如果日期解析失败，使用默认日期
         if (!dateKey) {
           dateKey = '未知日期';
         }
@@ -124,7 +129,6 @@ const MyTasksScreen: React.FC = () => {
         grouped[dateKey].push(pkg);
       } catch (error) {
         console.error('日期解析错误:', error, pkg);
-        // 使用默认分组
         const defaultKey = '未知日期';
         if (!grouped[defaultKey]) {
           grouped[defaultKey] = [];
@@ -133,11 +137,9 @@ const MyTasksScreen: React.FC = () => {
       }
     });
     
-    // 按日期排序（最新的在前）
     const sortedKeys = Object.keys(grouped).sort((a, b) => {
       if (a === '未知日期') return 1;
       if (b === '未知日期') return -1;
-      
       try {
         const dateA = new Date(a.replace(/\//g, '-'));
         const dateB = new Date(b.replace(/\//g, '-'));
@@ -174,33 +176,44 @@ const MyTasksScreen: React.FC = () => {
   const loadMyPackages = async () => {
     try {
       setLoading(true);
-      const allPackages = await packageService.getAllPackages();
-      
-      // 获取当前骑手信息
       const userName = await AsyncStorage.getItem('currentUserName') || '';
-      console.log('📱 MyTasks - 当前用户:', userName);
+      const netInfo = await NetInfo.fetch();
       
-      // 过滤出分配给当前骑手的包裹（包括已送达的包裹）
+      let allPackages: any[] = [];
+      
+      if (netInfo.isConnected) {
+        try {
+          allPackages = await packageService.getAllPackages();
+          if (allPackages && allPackages.length > 0) {
+            await cacheService.savePackages(allPackages);
+          }
+        } catch (err) {
+          console.warn('网络请求失败，尝试使用缓存:', err);
+          const cached = await cacheService.getCachedPackages();
+          if (cached) allPackages = cached;
+        }
+      } else {
+        console.log('📶 离线模式，使用缓存数据');
+        const cached = await cacheService.getCachedPackages();
+        if (cached) {
+          allPackages = cached;
+        } else {
+          Alert.alert(
+            language === 'zh' ? '离线状态' : 'Offline Mode',
+            language === 'zh' ? '当前无网络连接且无本地缓存数据' : 'No network connection and no cached data'
+          );
+        }
+      }
+      
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === userName && 
         (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
       );
       
-      console.log('📱 MyTasks - 所有包裹:', allPackages.length);
-      console.log('📱 MyTasks - 我的包裹:', myPackages.length);
-      console.log('📱 MyTasks - 包裹详情:', myPackages);
-      
-      // 调试：显示所有快递员姓名
-      const allCouriers = [...new Set(allPackages.map(pkg => pkg.courier).filter(Boolean))];
-      console.log('📱 MyTasks - 所有快递员:', allCouriers);
-      
       setPackages(myPackages);
-      
-      // 按日期分组包裹
       const grouped = groupPackagesByDate(myPackages);
       setGroupedPackages(grouped);
       
-      // 更新可用日期列表
       const dates = Object.keys(grouped).sort((a, b) => {
         if (a === '未知日期') return 1;
         if (b === '未知日期') return -1;
@@ -215,7 +228,10 @@ const MyTasksScreen: React.FC = () => {
       setAvailableDates(dates);
     } catch (error) {
       console.error('加载我的任务失败:', error);
-      Alert.alert('加载失败', '无法加载任务列表，请重试');
+      Alert.alert(
+        language === 'zh' ? '加载失败' : 'Load Failed',
+        language === 'zh' ? '无法加载任务列表，请重试' : 'Unable to load task list, please try again'
+      );
     } finally {
       setLoading(false);
     }
@@ -229,33 +245,23 @@ const MyTasksScreen: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '已取件':
-        return '#27ae60';
+      case '已取件': return '#27ae60';
       case '配送中':
-      case '配送进行中':
-        return '#f39c12';
-      case '已送达':
-        return '#3498db';
-      case '已取消':
-        return '#e74c3c';
-      default:
-        return '#95a5a6';
+      case '配送进行中': return '#f39c12';
+      case '已送达': return '#3498db';
+      case '已取消': return '#e74c3c';
+      default: return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case '已取件':
-        return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
+      case '已取件': return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
       case '配送中':
-      case '配送进行中':
-        return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
-      case '已送达':
-        return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
-      case '已取消':
-        return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
-      default:
-        return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
+      case '配送进行中': return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
+      case '已送达': return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
+      case '已取消': return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
+      default: return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
     }
   };
 
@@ -264,7 +270,6 @@ const MyTasksScreen: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  // 新增功能处理函数
   const handleCall = () => {
     if (selectedPackage) {
       Linking.openURL(`tel:${selectedPackage.receiver_phone}`);
@@ -282,55 +287,28 @@ const MyTasksScreen: React.FC = () => {
     setShowAddressModal(true);
   };
 
-  // 确认收款功能
   const handleConfirmPayment = async () => {
     if (!selectedPackage) return;
     
     Alert.alert(
       language === 'zh' ? '确认收款' : language === 'en' ? 'Confirm Payment' : 'ငွေကောက်ခံမှုအတည်ပြုရန်',
-      `${language === 'zh' ? '确认已收到' : language === 'en' ? 'Confirm received' : 'လက်ခံရရှိပြီးဖြစ်ကြောင်း အတည်ပြုရန်'} ${selectedPackage.price} ${language === 'zh' ? '吗？' : language === 'en' ? '?' : '?'}`,
+      `${language === 'zh' ? '确认已收到' : language === 'en' ? 'Confirm received' : 'လက်ခံရရှိပြီးဖြစ်ကြောင်း အတည်ပြုရန်'} ${selectedPackage.estimated_cost} ${language === 'zh' ? '吗？' : language === 'en' ? '?' : '?'}`,
       [
-        {
-          text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်',
-          style: 'cancel'
-        },
+        { text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်', style: 'cancel' },
         {
           text: language === 'zh' ? '确认' : language === 'en' ? 'Confirm' : 'အတည်ပြု',
           onPress: async () => {
             try {
-              // 更新订单状态：从"待收款"改为"待取件"
-              const success = await packageService.updatePackageStatus(
-                selectedPackage.id,
-                '待取件',
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                undefined
-              );
-              
+              const success = await packageService.updatePackageStatus(selectedPackage.id, '待取件');
               if (success) {
                 Alert.alert(
                   language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
-                  language === 'zh' ? '收款确认成功！订单状态已更新为"待取件"。' : language === 'en' ? 'Payment confirmed! Order status updated to "Pending Pickup".' : 'ငွေကောက်ခံမှု အတည်ပြုပြီးပါပြီ! အော်ဒါအခြေအနေ "ယူရန်စောင့်ဆိုင်း" သို့ အပ်ဒိတ်လုပ်ပြီးပါပြီ။',
-                  [{ text: 'OK', onPress: () => {
-                    setShowDetailModal(false);
-                    loadMyPackages(); // 重新加载包裹列表
-                  }}]
-                );
-              } else {
-                Alert.alert(
-                  language === 'zh' ? '失败' : language === 'en' ? 'Failed' : 'မအောင်မြင်ပါ',
-                  language === 'zh' ? '更新失败，请重试。' : language === 'en' ? 'Update failed, please try again.' : 'အပ်ဒိတ်လုပ်ခြင်း မအောင်မြင်ပါ၊ ထပ်မံကြိုးစားပါ။'
+                  language === 'zh' ? '收款确认成功！' : 'Payment confirmed!',
+                  [{ text: 'OK', onPress: () => { setShowDetailModal(false); loadMyPackages(); }}]
                 );
               }
             } catch (error) {
-              console.error('确认收款失败:', error);
-              Alert.alert(
-                language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား',
-                language === 'zh' ? '操作失败，请检查网络连接。' : language === 'en' ? 'Operation failed, please check your network connection.' : 'လုပ်ဆောင်ချက် မအောင်မြင်ပါ၊ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပါ။'
-              );
+              Alert.alert('错误', '操作失败');
             }
           }
         }
@@ -359,1022 +337,416 @@ const MyTasksScreen: React.FC = () => {
         setShowCameraModal(false);
       }
     } catch (error) {
-      console.error('相机错误:', error);
       Alert.alert('错误', '无法打开相机');
     }
   };
 
-  const handleUploadPhoto = async () => {
-    if (!capturedPhoto) {
-      Alert.alert('提示', '请先拍照');
-      return;
-    }
+  const handleManualPickup = async () => {
+    if (!selectedPackage) return;
+    
+    Alert.alert(
+      language === 'zh' ? '确认取件' : language === 'en' ? 'Confirm Pickup' : 'ကောက်ယူမှုကိုအတည်ပြုပါ',
+      language === 'zh' ? '确定已收到此包裹吗？' : language === 'en' ? 'Are you sure you have received this package?' : 'ဤအထုပ်ကိုလက်ခံရရှိသည်မှာသေချာပါသလား?',
+      [
+        { text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်', style: 'cancel' },
+        {
+          text: language === 'zh' ? '确认' : language === 'en' ? 'Confirm' : 'အတည်ပြု',
+          onPress: async () => {
+            try {
+              const success = await packageService.updatePackageStatus(
+                selectedPackage.id,
+                '已取件',
+                new Date().toLocaleString('zh-CN'),
+                undefined,
+                currentCourierName
+              );
 
+              if (success) {
+                Alert.alert(
+                  language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
+                  language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ'
+                );
+                setShowCameraModal(false);
+                setShowDetailModal(false);
+                loadMyPackages();
+              }
+            } catch (error) {
+              Alert.alert('错误', '操作失败');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!capturedPhoto || !selectedPackage) return;
     try {
       setUploadingPhoto(true);
-
-      const locationPermission = await Location.requestForegroundPermissionsAsync();
-      if (locationPermission.status !== 'granted') {
-        Alert.alert('权限不足', '需要位置权限才能记录配送位置');
-        return;
-      }
-
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
+      
+      const success = await packageService.updatePackageStatus(
+        selectedPackage.id,
+        '已送达',
+        undefined,
+        new Date().toISOString(),
+        currentCourierName
+      );
 
-      const mediaPermission = await MediaLibrary.requestPermissionsAsync();
-      if (mediaPermission.status === 'granted') {
-        await MediaLibrary.saveToLibraryAsync(capturedPhoto);
+      if (success) {
+        Alert.alert('配送完成！', '包裹已成功送达', [{
+          text: '确定',
+          onPress: async () => {
+            setShowPhotoModal(false);
+            setCapturedPhoto(null);
+            await loadMyPackages();
+          }
+        }]);
       }
-
-      const deliveryProof = {
-        packageId: selectedPackage?.id,
-        photoUri: capturedPhoto,
-        latitude,
-        longitude,
-        timestamp: new Date().toISOString(),
-        courier: currentCourierName,
-      };
-
-      console.log('配送证明记录:', deliveryProof);
-
-      // 上传照片成功后，自动更新包裹状态为"已送达"
-      if (selectedPackage) {
-        const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
-        
-        const success = await packageService.updatePackageStatus(
-          selectedPackage.id,
-          '已送达',
-          undefined, // pickupTime
-          new Date().toISOString(), // deliveryTime
-          userName
-        );
-
-        if (success) {
-          Alert.alert(
-            '配送完成！',
-            `包裹已成功送达\n\n📦 包裹编号：${selectedPackage.id}\n📸 配送照片已保存\n📍 位置：${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n包裹状态已更新为"已送达"`,
-            [
-              {
-                text: '确定',
-                onPress: async () => {
-                  setShowPhotoModal(false);
-                  setCapturedPhoto(null);
-                  // 刷新任务列表
-                  await loadMyPackages();
-                }
-              }
-            ]
-          );
-        } else {
-          Alert.alert(
-            '照片上传成功',
-            `配送证明已记录\n位置: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}\n时间: ${new Date().toLocaleString('zh-CN')}\n\n但包裹状态更新失败，请手动更新`,
-            [
-              {
-                text: '确定',
-                onPress: () => {
-                  setShowPhotoModal(false);
-                  setCapturedPhoto(null);
-                }
-              }
-            ]
-          );
-        }
-      }
-
     } catch (error) {
-      console.error('上传照片失败:', error);
-      Alert.alert('上传失败', '网络错误，请重试');
+      Alert.alert('上传失败', '请检查网络连接');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  // 扫码功能处理函数
   const handleScanCode = async (data: string) => {
-    // 如果已经扫描过一次，直接返回，避免重复扫描
-    if (scannedOnce.current) {
-      return;
-    }
-    
-    // 标记已经扫描过一次
+    if (scannedOnce.current) return;
     scannedOnce.current = true;
-    
     setScannedData(data);
     setScanning(false);
     setShowScanModal(false);
     
-    // 检查是否是店长收件码
     if (data.startsWith('STORE_')) {
-      // 解析店长收件码
-      const storeInfo = data.replace('STORE_', '');
-      const [storeId, timestamp] = storeInfo.split('_');
-      
+      const storeId = data.replace('STORE_', '').split('_')[0];
       try {
-        // 查询店铺详细信息
         const storeDetails = await deliveryStoreService.getStoreById(storeId);
         const storeName = storeDetails ? storeDetails.store_name : `店铺${storeId}`;
         
-        Alert.alert(
-          '✅ 已送达',
-          `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n🏪 送达店铺：${storeName}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
-          [
-            {
-              text: '确定',
-              onPress: async () => {
-                try {
-                  // 更新包裹状态为"已送达"，并记录店铺信息
-                  if (selectedPackage) {
-                    const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
-                    
-                    // 构造店铺信息
-                    const storeReceiveInfo = {
-                      storeId: storeId,
-                      storeName: storeName,
-                      receiveCode: data
-                    };
-                    
-                    const success = await packageService.updatePackageStatus(
-                      selectedPackage.id, 
-                      '已送达',
-                      undefined, // pickupTime
-                      new Date().toISOString(), // deliveryTime
-                      userName,
-                      storeReceiveInfo
-                    );
-                    
-                    if (success) {
-                      // 刷新任务列表
-                      await loadMyPackages();
-                      console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId, '店铺名称:', storeName);
-                    } else {
-                      Alert.alert('错误', '更新包裹状态失败，请重试');
-                    }
-                  }
-                } catch (error) {
-                  console.error('更新包裹状态失败:', error);
-                  Alert.alert('错误', '更新包裹状态失败，请重试');
-                }
-              }
-            }
-          ]
-        );
-      } catch (error) {
-        console.error('查询店铺信息失败:', error);
-        Alert.alert(
-          '✅ 已送达',
-          `包裹已成功送达至店铺！\n\n📦 包裹ID：${selectedPackage?.id}\n🏪 送达店铺：店铺${storeId}\n⏰ 送达时间：${new Date().toLocaleString('zh-CN')}\n\n配送任务已完成！`,
-          [
-            {
-              text: '确定',
-              onPress: async () => {
-                try {
-                  // 更新包裹状态为"已送达"，并记录店铺信息
-                  if (selectedPackage) {
-                    const userName = await AsyncStorage.getItem('currentUserName') || '未知骑手';
-                    
-                    // 构造店铺信息（使用默认名称）
-                    const storeReceiveInfo = {
-                      storeId: storeId,
-                      storeName: `店铺${storeId}`,
-                      receiveCode: data
-                    };
-                    
-                    const success = await packageService.updatePackageStatus(
-                      selectedPackage.id, 
-                      '已送达',
-                      undefined, // pickupTime
-                      new Date().toISOString(), // deliveryTime
-                      userName,
-                      storeReceiveInfo
-                    );
-                    
-                    if (success) {
-                      // 刷新任务列表
-                      await loadMyPackages();
-                      console.log('包裹状态已更新为已送达:', selectedPackage.id, '店铺ID:', storeId);
-                    } else {
-                      Alert.alert('错误', '更新包裹状态失败，请重试');
-                    }
-                  }
-                } catch (error) {
-                  console.error('更新包裹状态失败:', error);
-                  Alert.alert('错误', '更新包裹状态失败，请重试');
-                }
-              }
-            }
-          ]
-        );
-      }
-    } else {
-      // 处理其他类型的扫码结果
-      Alert.alert(
-        '扫码成功',
-        `扫描结果: ${data}`,
-        [
-          {
-            text: '确定',
-            onPress: () => {
-              console.log('扫码结果:', data);
+        Alert.alert('✅ 已送达', `包裹已送达至：${storeName}`, [{
+          text: '确定',
+          onPress: async () => {
+            if (selectedPackage) {
+              const success = await packageService.updatePackageStatus(
+                selectedPackage.id, '已送达', undefined, new Date().toISOString(), currentCourierName,
+                undefined, { storeId, storeName, receiveCode: data }
+              );
+              if (success) await loadMyPackages();
             }
           }
-        ]
-      );
+        }]);
+      } catch (error) {
+        Alert.alert('错误', '更新失败');
+      }
+    } else {
+      Alert.alert('扫码成功', `扫描结果: ${data}`);
     }
   };
 
-  const handleStartScan = () => {
-    setScanning(true);
-    setScannedData(null);
-    scannedOnce.current = false; // 重置扫描状态，允许新的扫描
-  };
-
-  const handleStopScan = () => {
-    setScanning(false);
-    setShowScanModal(false);
-    scannedOnce.current = false; // 重置扫描状态，为下次扫描做准备
-  };
-
-  const renderPackageItem = ({ item }: { item: Package }) => (
-    <TouchableOpacity
-      style={styles.packageCard}
-      onPress={() => handlePackagePress(item)}
-    >
-      <View style={styles.packageHeader}>
-        <Text style={styles.packageId}>{item.id}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.packageInfo}>
-        <Text style={styles.infoLabel}>收件人：</Text>
-        <Text style={styles.infoValue}>{item.receiver_name}</Text>
-      </View>
-      
-      <View style={styles.packageInfo}>
-        <Text style={styles.infoLabel}>收件地址：</Text>
-        <Text style={styles.infoValue}>{item.receiver_address}</Text>
-      </View>
-      
-      <View style={styles.packageInfo}>
-        <Text style={styles.infoLabel}>包裹类型：</Text>
-        <Text style={styles.infoValue}>{item.package_type}</Text>
-      </View>
-      
-      <View style={styles.packageInfo}>
-        <Text style={styles.infoLabel}>重量：</Text>
-        <Text style={styles.infoValue}>{item.weight}kg</Text>
-      </View>
-      
-      <View style={styles.packageInfo}>
-        <Text style={styles.infoLabel}>预估费用：</Text>
-        <Text style={styles.infoValue}>¥{item.estimated_cost}</Text>
-      </View>
-      
-      {item.pickup_time && (
-        <View style={styles.packageInfo}>
-          <Text style={styles.infoLabel}>取件时间：</Text>
-          <Text style={styles.infoValue}>{item.pickup_time}</Text>
-        </View>
-      )}
-      
-      {item.delivery_time && (
-        <View style={styles.packageInfo}>
-          <Text style={styles.infoLabel}>送达时间：</Text>
-          <Text style={styles.infoValue}>{item.delivery_time}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-
   const renderDetailModal = () => {
     if (!selectedPackage) return null;
-
     return (
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {language === 'zh' ? '包裹详情' : language === 'en' ? 'Package Details' : 'ပက်ကေ့ဂျ်အသေးစိတ်'}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowDetailModal(false)}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>
-                {language === 'zh' ? '包裹信息' : language === 'en' ? 'Package Info' : 'ပက်ကေ့ဂျ်အချက်အလက်'}
-              </Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '包裹编号：' : language === 'en' ? 'Package ID: ' : 'ပက်ကေ့ဂျ်နံပါတ်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.id}</Text>
+      <Modal visible={showDetailModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.glassModal}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>{language === 'zh' ? '任务详情' : 'Task Details'}</Text>
+                <Text style={styles.modalSubtitle}>{selectedPackage.id}</Text>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '包裹类型：' : language === 'en' ? 'Package Type: ' : 'ပက်ကေ့ဂျ်အမျိုးအစား: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.package_type}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '重量：' : language === 'en' ? 'Weight: ' : 'အလေးချိန်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.weight}kg</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '描述：' : language === 'en' ? 'Description: ' : 'ဖော်ပြချက်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.description}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '预估费用：' : language === 'en' ? 'Estimated Cost: ' : 'ခန့်မှန်းကုန်ကျစရိတ်: '}
-                </Text>
-                <Text style={styles.detailValue}>¥{selectedPackage.estimated_cost}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '支付方式：' : language === 'en' ? 'Payment Method: ' : 'ပေးချေမှုနည်းလမ်း: '}
-                </Text>
-                <View style={styles.paymentMethodDisplay}>
-                  {selectedPackage.payment_method === 'cash' && (
-                    <Text style={[styles.detailValue, { color: '#f59e0b', fontWeight: 'bold' }]}>
-                      💵 {language === 'zh' ? '现金支付' : language === 'en' ? 'Cash Payment' : 'ငွေသားပေးချေမှု'}
-                    </Text>
-                  )}
-                  {(!selectedPackage.payment_method || selectedPackage.payment_method === 'qr') && (
-                    <Text style={[styles.detailValue, { color: '#3b82f6', fontWeight: 'bold' }]}>
-                      📱 {language === 'zh' ? '二维码支付（已支付）' : language === 'en' ? 'QR Payment (Paid)' : 'QR ပေးချေမှု (ပေးချေပြီး)'}
-                    </Text>
-                  )}
+              <TouchableOpacity onPress={() => setShowDetailModal(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.glassInfoCard}>
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoSectionTitle}>📦 {language === 'zh' ? '包裹信息' : 'Package'}</Text>
+                  <View style={styles.infoLine}>
+                    <Text style={styles.infoLineLabel}>{language === 'zh' ? '类型' : 'Type'}</Text>
+                    <Text style={styles.infoLineValue}>{selectedPackage.package_type}</Text>
+                  </View>
+                  <View style={styles.infoLine}>
+                    <Text style={styles.infoLineLabel}>{language === 'zh' ? '重量' : 'Weight'}</Text>
+                    <Text style={styles.infoLineValue}>{selectedPackage.weight}kg</Text>
+                  </View>
+                </View>
+                <View style={styles.glassDivider} />
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoSectionTitle}>👥 {language === 'zh' ? '联系人' : 'Contacts'}</Text>
+                  <View style={styles.contactCard}>
+                    <Text style={styles.contactRole}>{language === 'zh' ? '收件人' : 'Receiver'}</Text>
+                    <Text style={styles.contactName}>{selectedPackage.receiver_name}</Text>
+                    <Text style={styles.contactPhone}>{selectedPackage.receiver_phone}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-            
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>
-                {language === 'zh' ? '寄件人信息' : language === 'en' ? 'Sender Info' : 'ပေးပို့သူအချက်အလက်'}
-              </Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '姓名：' : language === 'en' ? 'Name: ' : 'အမည်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.sender_name}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '电话：' : language === 'en' ? 'Phone: ' : 'ဖုန်း: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.sender_phone}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>
-                {language === 'zh' ? '收件人信息' : language === 'en' ? 'Receiver Info' : 'လက်ခံသူအချက်အလက်'}
-              </Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '姓名：' : language === 'en' ? 'Name: ' : 'အမည်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.receiver_name}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '电话：' : language === 'en' ? 'Phone: ' : 'ဖုန်း: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.receiver_phone}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '地址：' : language === 'en' ? 'Address: ' : 'လိပ်စာ: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.receiver_address}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>
-                {language === 'zh' ? '配送信息' : language === 'en' ? 'Delivery Info' : 'ပို့ဆောင်မှုအချက်အလက်'}
-              </Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '状态：' : language === 'en' ? 'Status: ' : 'အခြေအနေ: '}
-                </Text>
-                <Text style={[styles.detailValue, { color: getStatusColor(selectedPackage.status) }]}>
-                  {getStatusText(selectedPackage.status)}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '负责骑手：' : language === 'en' ? 'Courier: ' : 'မောင်းသူ: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.courier}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {language === 'zh' ? '创建时间：' : language === 'en' ? 'Created At: ' : 'ဖန်တီးသည့်အချိန်: '}
-                </Text>
-                <Text style={styles.detailValue}>{selectedPackage.created_at}</Text>
-              </View>
-              {selectedPackage.pickup_time && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>
-                    {language === 'zh' ? '取件时间：' : language === 'en' ? 'Pickup Time: ' : 'ယူသည့်အချိန်: '}
-                  </Text>
-                  <Text style={styles.detailValue}>{selectedPackage.pickup_time}</Text>
-                </View>
-              )}
-              {selectedPackage.delivery_time && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>
-                    {language === 'zh' ? '送达时间：' : language === 'en' ? 'Delivery Time: ' : 'ပို့ဆောင်သည့်အချိန်: '}
-                  </Text>
-                  <Text style={styles.detailValue}>{selectedPackage.delivery_time}</Text>
-                </View>
-              )}
-            </View>
-            
-            {/* 确认收款按钮（仅当状态为"待收款"时显示） */}
-            {(selectedPackage.status === '待收款' && selectedPackage.payment_method === 'cash') && (
-              <View style={styles.confirmPaymentContainer}>
-                <TouchableOpacity 
-                  style={styles.confirmPaymentButton}
-                  onPress={handleConfirmPayment}
-                >
-                  <Text style={styles.confirmPaymentButtonText}>
-                    💵 {language === 'zh' ? '确认收款' : language === 'en' ? 'Confirm Payment' : 'ငွေကောက်ခံမှုအတည်ပြုရန်'}
-                  </Text>
+              <View style={styles.modalActionsGrid}>
+                <TouchableOpacity style={styles.gridActionBtn} onPress={handleShowAddress}>
+                  <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']} style={styles.gridBtnGradient}>
+                    <Ionicons name="location" size={26} color="#3b82f6" />
+                    <Text style={styles.gridBtnText}>{language === 'zh' ? '查看地址' : 'Address'}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.gridActionBtn} onPress={() => setShowCameraModal(true)}>
+                  <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']} style={styles.gridBtnGradient}>
+                    <Ionicons name="camera" size={26} color="#10b981" />
+                    <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照/扫码' : 'Proof'}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
-            )}
-            
-            {/* 新增功能按钮 */}
-            <View style={styles.newActionsContainer}>
-              <TouchableOpacity style={styles.newActionButton} onPress={handleShowAddress}>
-                <Text style={styles.newActionButtonText}>
-                  📍 {language === 'zh' ? '送货地址' : language === 'en' ? 'Address' : 'လိပ်စာ'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.newActionButton} onPress={() => setShowCameraModal(true)}>
-                <Text style={styles.newActionButtonText}>
-                  📷 {language === 'zh' ? '摄像机' : language === 'en' ? 'Camera' : 'ကင်မရာ'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.newActionButton} onPress={() => setShowPhotoModal(true)}>
-                <Text style={styles.newActionButtonText}>
-                  📸 {language === 'zh' ? '上传照片' : language === 'en' ? 'Upload Photo' : 'ဓာတ်ပုံတင်'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </Modal>
     );
   };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
-        <Text style={styles.loadingText}>加载中...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={['#0f172a', '#1e3a8a', '#334155']} style={StyleSheet.absoluteFill} />
+      
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {language === 'zh' ? '我的任务' : language === 'en' ? 'My Tasks' : 'ကျွန်ုပ်၏တာဝန်'}
-            {'  •  '}
-            <Text style={styles.headerSubtitle}>
-              {language === 'zh' ? '当前骑手：' : language === 'en' ? 'Current Rider: ' : 'လက်ရှိမောင်းသူ: '}
-              {currentCourierName || (language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'ခေါင်းစဉ်...')}
-            </Text>
-          </Text>
+        <View>
+          <Text style={styles.headerTitle}>{language === 'zh' ? '我的任务' : 'My Tasks'}</Text>
+          <Text style={styles.headerSubtitle}>{currentCourierName || 'Rider'}</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dateButtonText}>
-              📅 {language === 'zh' ? '日期' : language === 'en' ? 'Date' : 'နေ့စွဲ'}
-            </Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowDatePicker(true)}>
+            <Ionicons name="calendar-outline" size={22} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={onRefresh}
-            disabled={refreshing}
-          >
-            <Text style={styles.refreshButtonText}>
-              {refreshing ? '🔄' : '🔄'} {language === 'zh' ? '刷新' : language === 'en' ? 'Refresh' : 'ပြန်လည်ဖွင့်'}
-            </Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={onRefresh}>
+            <Ionicons name={refreshing ? "sync" : "refresh-outline"} size={22} color="white" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {packages.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyTitle}>
-            {language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိ'}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {language === 'zh' ? '您当前没有分配的包裹任务' : language === 'en' ? 'You have no assigned packages' : 'သင့်အား ပက်ကေ့ဂျ်များ မှာထားခြင်းမရှိပါ'}
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {/* 显示选中的日期过滤 */}
-          {selectedDate && (
-            <View style={styles.filterInfo}>
-              <Text style={styles.filterText}>
-                {language === 'zh' ? '显示日期：' : language === 'en' ? 'Date: ' : 'နေ့စွဲ: '}
-                {selectedDate} ({groupedPackages[selectedDate]?.length || 0} 
-                {language === 'zh' ? ' 个包裹' : language === 'en' ? ' packages' : ' ပက်ကေ့ဂျ်'})
-              </Text>
-              <TouchableOpacity 
-                style={styles.clearFilterButton}
-                onPress={() => setSelectedDate(null)}
-              >
-                <Text style={styles.clearFilterText}>
-                  {language === 'zh' ? '清除过滤' : language === 'en' ? 'Clear' : 'ရှင်းလင်း'}
-                </Text>
-              </TouchableOpacity>
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}>
+        {selectedDate && (
+          <View style={styles.activeFilter}>
+            <Text style={styles.filterText}>📅 {selectedDate}</Text>
+            <TouchableOpacity onPress={() => setSelectedDate(null)}><Ionicons name="close-circle" size={20} color="#fff" /></TouchableOpacity>
+          </View>
+        )}
+        
+        {packages.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyIcon}>📦</Text>
+            <Text style={styles.emptyTitle}>{language === 'zh' ? '暂无任务' : 'No Tasks'}</Text>
+          </View>
+        ) : (
+          (selectedDate ? [selectedDate] : Object.keys(groupedPackages)).map(date => (
+            <View key={date} style={styles.dateGroup}>
+              <Text style={styles.dateGroupTitle}>{date}</Text>
+              {groupedPackages[date]?.map(item => (
+                <TouchableOpacity key={item.id} style={styles.packageCard} onPress={() => handlePackagePress(item)} activeOpacity={0.8}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardId}>{item.id}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                      <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardRow}><Ionicons name="person" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue}>{item.receiver_name}</Text></View>
+                    <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>
+                  </View>
+                  <View style={styles.cardFooter}>
+                    <View style={styles.tag}><Text style={styles.tagText}>{item.package_type}</Text></View>
+                    <View style={styles.tag}><Text style={styles.tagText}>{item.weight}kg</Text></View>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-          
-          {(selectedDate ? [selectedDate] : Object.keys(groupedPackages)).map((dateKey) => {
-            if (!groupedPackages[dateKey]) return null;
-            
-            return (
-              <View key={dateKey} style={styles.dateSection}>
-                <View style={styles.dateHeader}>
-                  <Text style={styles.dateTitle}>{dateKey}</Text>
-                  <Text style={styles.dateSubtitle}>
-                    {groupedPackages[dateKey].length} 
-                    {language === 'zh' ? ' 个包裹' : language === 'en' ? ' packages' : ' ပက်ကေ့ဂျ်'}
-                  </Text>
-                </View>
-                
-                {groupedPackages[dateKey].map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.packageCard}
-                    onPress={() => handlePackagePress(item)}
-                  >
-                    <View style={styles.packageHeader}>
-                      <Text style={styles.packageId}>{item.id}</Text>
-                      <View style={styles.badgeContainer}>
-                        {/* 支付方式标识 */}
-                        {item.payment_method === 'cash' && (
-                          <View style={[styles.paymentBadge, { backgroundColor: '#f59e0b' }]}>
-                            <Text style={styles.paymentBadgeText}>
-                              {language === 'zh' ? '💵 现金' : language === 'en' ? '💵 Cash' : '💵 ငွေသား'}
-                            </Text>
-                          </View>
-                        )}
-                        {item.payment_method === 'qr' && (
-                          <View style={[styles.paymentBadge, { backgroundColor: '#3b82f6' }]}>
-                            <Text style={styles.paymentBadgeText}>
-                              {language === 'zh' ? '📱 已支付' : language === 'en' ? '📱 Paid' : '📱 ပေးချေပြီး'}
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {/* 代收款标识 - 仅合伙店铺下单且需要代收款时显示 */}
-                        {item.delivery_store_id && parseFloat(item.store_fee?.toString() || '0') > 0 && (
-                          <View style={[
-                            styles.paymentBadge, 
-                            { 
-                              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                              borderWidth: 1,
-                              borderColor: 'rgba(239, 68, 68, 0.3)'
-                            }
-                          ]}>
-                            <Text style={[styles.paymentBadgeText, { color: '#ef4444' }]}>
-                              {language === 'zh' ? '代收款' : language === 'en' ? 'COD' : 'ငွေကောက်ခံ'}: {(() => {
-                                const value = parseFloat(item.store_fee?.toString() || '0');
-                                return value % 1 === 0 ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
-                              })()}
-                            </Text>
-                          </View>
-                        )}
-                        
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-                        </View>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>
-                        {language === 'zh' ? '收件人：' : language === 'en' ? 'Receiver: ' : 'လက်ခံသူ: '}
-                      </Text>
-                      <Text style={styles.infoValue}>{item.receiver_name}</Text>
-                    </View>
-                    
-                    <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>
-                        {language === 'zh' ? '收件地址：' : language === 'en' ? 'Address: ' : 'လိပ်စာ: '}
-                      </Text>
-                      <Text style={styles.infoValue}>{item.receiver_address}</Text>
-                    </View>
-                    
-                    <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>
-                        {language === 'zh' ? '包裹类型：' : language === 'en' ? 'Type: ' : 'အမျိုးအစား: '}
-                      </Text>
-                      <Text style={styles.infoValue}>{item.package_type}</Text>
-                    </View>
-                    
-                    <View style={styles.packageInfo}>
-                      <Text style={styles.infoLabel}>
-                        {language === 'zh' ? '重量：' : language === 'en' ? 'Weight: ' : 'အလေးချိန်: '}
-                      </Text>
-                      <Text style={styles.infoValue}>{item.weight}kg</Text>
-                    </View>
-                    
-                    {item.delivery_time && (
-                      <View style={styles.packageInfo}>
-                        <Text style={styles.infoLabel}>
-                          {language === 'zh' ? '送达时间：' : language === 'en' ? 'Delivered: ' : 'ပို့ဆောင်ပြီး: '}
-                        </Text>
-                        <Text style={styles.infoValue}>
-                          {new Date(item.delivery_time).toLocaleString('zh-CN')}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+          ))
+        )}
+      </ScrollView>
 
-      {showDetailModal && renderDetailModal()}
-      
-      {/* 日期选择器模态框 */}
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
+      {renderDetailModal()}
+
+      {/* 地址模态框 */}
+      <Modal visible={showAddressModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.glassModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                📅 {language === 'zh' ? '选择日期' : language === 'en' ? 'Select Date' : 'နေ့စွဲရွေးချယ်'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
+              <Text style={styles.modalTitle}>📍 {language === 'zh' ? '送货地址' : 'Address'}</Text>
+              <TouchableOpacity onPress={() => setShowAddressModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
-            
-            <ScrollView style={styles.dateList}>
-              <TouchableOpacity
-                style={[
-                  styles.dateItem,
-                  !selectedDate && styles.selectedDateItem
-                ]}
-                onPress={() => {
-                  setSelectedDate(null);
-                  setShowDatePicker(false);
-                }}
-              >
-                <Text style={[
-                  styles.dateItemText,
-                  !selectedDate && styles.selectedDateItemText
-                ]}>
-                  {language === 'zh' ? '全部日期' : language === 'en' ? 'All Dates' : 'အားလုံးနေ့စွဲများ'}
-                </Text>
-                <Text style={[
-                  styles.dateItemCount,
-                  !selectedDate && styles.selectedDateItemCount
-                ]}>
-                  {packages.length} {language === 'zh' ? '个包裹' : language === 'en' ? 'packages' : 'ပက်ကေ့ဂျ်'}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.dateItem}
-                onPress={() => {
-                  const today = new Date().toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                  });
-                  setSelectedDate(today);
-                  setShowDatePicker(false);
-                }}
-              >
-                <Text style={styles.dateItemText}>
-                  {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.modalBody}>
+              <View style={styles.glassInfoCard}>
+                <Text style={styles.infoLineLabel}>{language === 'zh' ? '收件人' : 'Receiver'}</Text>
+                <Text style={styles.infoLineValue}>{selectedPackage?.receiver_name}</Text>
+                <View style={styles.glassDivider} />
+                <Text style={styles.infoLineLabel}>{language === 'zh' ? '详细地址' : 'Address'}</Text>
+                <Text style={styles.infoLineValue}>{selectedPackage?.receiver_address}</Text>
+              </View>
+              <View style={styles.modalActionsGrid}>
+                <TouchableOpacity style={styles.gridActionBtn} onPress={handleCall}><LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}><Text style={styles.gridBtnText}>📞 {language === 'zh' ? '拨打电话' : 'Call'}</Text></LinearGradient></TouchableOpacity>
+                <TouchableOpacity style={styles.gridActionBtn} onPress={handleNavigate}><LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}><Text style={styles.gridBtnText}>🗺️ {language === 'zh' ? '导航前往' : 'Map'}</Text></LinearGradient></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
-              {availableDates.map((date) => (
-                <TouchableOpacity
-                  key={date}
-                  style={[
-                    styles.dateItem,
-                    selectedDate === date && styles.selectedDateItem
-                  ]}
-                  onPress={() => {
-                    setSelectedDate(date);
-                    setShowDatePicker(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.dateItemText,
-                    selectedDate === date && styles.selectedDateItemText
-                  ]}>
-                    {date}
-                  </Text>
-                  <Text style={[
-                    styles.dateItemCount,
-                    selectedDate === date && styles.selectedDateItemCount
-                  ]}>
-                    {groupedPackages[date]?.length || 0} {language === 'zh' ? '个包裹' : language === 'en' ? 'packages' : 'ပက်ကေ့ဂျ်'}
-                  </Text>
+      {/* 扫码选择模态框 */}
+      <Modal visible={showCameraModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.glassModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📷 {language === 'zh' ? '选择操作' : 'Operation'}</Text>
+              <TouchableOpacity onPress={() => setShowCameraModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
+            </View>
+            <View style={[styles.modalBody, { flexDirection: 'row', gap: 16, flexWrap: 'wrap' }]}>
+              {selectedPackage?.status === '待取件' ? (
+                <>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
+                    <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
+                      <Ionicons name="qr-code" size={32} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码取件' : 'Scan'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={handleManualPickup}>
+                    <LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}>
+                      <Ionicons name="hand-right" size={32} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '手动取件' : 'Manual'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={handleOpenCamera}>
+                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}>
+                      <Ionicons name="camera" size={32} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照送达' : 'Photo'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
+                    <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
+                      <Ionicons name="qr-code" size={32} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码送达' : 'Scan'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 日期选择模态框 */}
+      <Modal visible={showDatePicker} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.glassModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📅 {language === 'zh' ? '选择日期' : 'Select Date'}</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <TouchableOpacity style={[styles.dateItem, !selectedDate && styles.dateItemSelected]} onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}>
+                <Text style={styles.dateItemText}>{language === 'zh' ? '全部任务' : 'All'}</Text>
+                {!selectedDate && <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />}
+              </TouchableOpacity>
+              {availableDates.map(d => (
+                <TouchableOpacity key={d} style={[styles.dateItem, selectedDate === d && styles.dateItemSelected]} onPress={() => { setSelectedDate(d); setShowDatePicker(false); }}>
+                  <Text style={styles.dateItemText}>{d}</Text>
+                  {selectedDate === d && <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
       </Modal>
-      
-      {/* 送货地址模态框 */}
-      <Modal
-        visible={showAddressModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddressModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                📍 {language === 'zh' ? '送货地址' : language === 'en' ? 'Delivery Address' : 'ပို့ဆောင်မည့်လိပ်စာ'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowAddressModal(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
+
+      {/* 扫码相机 */}
+      <Modal visible={showScanModal} transparent animationType="slide">
+        <View style={styles.scanOverlay}>
+          <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+          <View style={styles.scanFrameContainer}>
+            <View style={styles.scanFrame}>
+              <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
+              <View style={[styles.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
+              <View style={[styles.corner, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 }]} />
+              <View style={[styles.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
             </View>
-            
-            <View style={styles.addressContent}>
-              <Text style={styles.addressLabel}>
-                {language === 'zh' ? '收件人：' : language === 'en' ? 'Receiver: ' : 'လက်ခံသူ: '}
-              </Text>
-              <Text style={styles.addressValue}>{selectedPackage?.receiver_name}</Text>
-              
-              <Text style={styles.addressLabel}>
-                {language === 'zh' ? '联系电话：' : language === 'en' ? 'Contact Phone: ' : 'ဆက်သွယ်ရန်ဖုန်း: '}
-              </Text>
-              <Text style={styles.addressValue}>{selectedPackage?.receiver_phone}</Text>
-              
-              <Text style={styles.addressLabel}>
-                {language === 'zh' ? '详细地址：' : language === 'en' ? 'Detailed Address: ' : 'အသေးစိတ်လိပ်စာ: '}
-              </Text>
-              <Text style={styles.addressDetail}>{selectedPackage?.receiver_address}</Text>
-              
-              <View style={styles.addressActions}>
-                <TouchableOpacity style={styles.addressActionButton} onPress={handleCall}>
-                  <Text style={styles.addressActionText}>
-                    📞 {language === 'zh' ? '拨打电话' : language === 'en' ? 'Call' : 'ဖုန်းခေါ်'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.addressActionButton} onPress={handleNavigate}>
-                  <Text style={styles.addressActionText}>
-                    🗺️ {language === 'zh' ? '导航前往' : language === 'en' ? 'Navigate' : 'လမ်းညွှန်'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <Text style={styles.scanHint}>{language === 'zh' ? '对准二维码/条形码' : 'Align code'}</Text>
           </View>
+          <TouchableOpacity onPress={() => setShowScanModal(false)} style={styles.scanCloseBtn}><Ionicons name="close" size={32} color="white" /></TouchableOpacity>
         </View>
       </Modal>
 
-      {/* 摄像机模态框 */}
-      <Modal
-        visible={showCameraModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowCameraModal(false)}
-      >
+      {/* 照片预览 */}
+      <Modal visible={showPhotoModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                📷 {language === 'zh' ? '拍照功能' : language === 'en' ? 'Camera' : 'ဓာတ်ပုံရိုက်'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowCameraModal(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.cameraContent}>
-              <Text style={styles.cameraInstruction}>
-                {language === 'zh' ? '选择功能：拍照或扫码' : language === 'en' ? 'Select Function: Take Photo or Scan Code' : 'လုပ်ဆောင်ချက်ရွေးချယ်ပါ: ဓာတ်ပုံရိုက်ရန် သို့မဟုတ် ကုဒ်စကင်'}
-              </Text>
-              
-              <View style={styles.cameraOptions}>
-                <TouchableOpacity style={styles.cameraButton} onPress={handleOpenCamera}>
-                  <Text style={styles.cameraButtonText}>
-                    📷 {language === 'zh' ? '拍照' : language === 'en' ? 'Take Photo' : 'ဓာတ်ပုံရိုက်'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.cameraButton} onPress={() => {
-                  setShowCameraModal(false);
-                  setShowScanModal(true);
-                }}>
-                  <Text style={styles.cameraButtonText}>
-                    📱 {language === 'zh' ? '扫码' : language === 'en' ? 'Scan Code' : 'ကုဒ်စကင်'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 扫码模态框 */}
-      <Modal
-        visible={showScanModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={handleStopScan}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.scanModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                📱 {language === 'zh' ? '扫码功能' : language === 'en' ? 'Scan Code' : 'ကုဒ်စကင်'}
-              </Text>
-              <TouchableOpacity
-                onPress={handleStopScan}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.scanContent}>
-              {scanning ? (
-                <View style={styles.scanCameraContainer}>
-                  <CameraView
-                    style={styles.scanCamera}
-                    facing="back"
-                    onBarcodeScanned={({ data }) => handleScanCode(data)}
-                    barcodeScannerSettings={{
-                      barcodeTypes: ['qr', 'pdf417', 'aztec', 'ean13', 'ean8', 'upc_e', 'code128', 'code39', 'codabar'],
-                    }}
-                  />
-                  <View style={styles.scanOverlay}>
-                    <View style={styles.scanFrame}>
-                      <View style={[styles.scanCorner, styles.scanCornerTopLeft]} />
-                      <View style={[styles.scanCorner, styles.scanCornerTopRight]} />
-                      <View style={[styles.scanCorner, styles.scanCornerBottomLeft]} />
-                      <View style={[styles.scanCorner, styles.scanCornerBottomRight]} />
-                    </View>
-                    <Text style={styles.scanInstruction}>
-                      {language === 'zh' ? '将二维码/条形码对准扫描框' : language === 'en' ? 'Align QR code/barcode with the scan frame' : 'QR ကုဒ်/ဘားကုဒ်ကို စကင်ဘောင်၌ ညှိပါ'}
-                    </Text>
-                  </View>
+          <View style={[styles.glassModal, { backgroundColor: '#fff', maxWidth: 450 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: '#f1f5f9' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="image" size={24} color="#3b82f6" />
                 </View>
-              ) : (
-                <View style={styles.scanStartContent}>
-                  <Text style={styles.scanInstruction}>
-                    {language === 'zh' ? '点击开始扫码，扫描包裹二维码或条形码' : language === 'en' ? 'Tap to start scanning, scan package QR code or barcode' : 'စကင်စတင်ရန် နှိပ်ပါ၊ ပက်ကေ့ဂျ် QR ကုဒ် သို့မဟုတ် ဘားကုဒ်ကို စကင်ပါ'}
-                  </Text>
-                  
-                  <TouchableOpacity style={styles.scanStartButton} onPress={handleStartScan}>
-                    <Text style={styles.scanStartButtonText}>
-                      📱 {language === 'zh' ? '开始扫码' : language === 'en' ? 'Start Scanning' : 'စကင်စတင်ရန်'}
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  {scannedData && (
-                    <View style={styles.scanResult}>
-                      <Text style={styles.scanResultLabel}>
-                        {language === 'zh' ? '扫描结果：' : language === 'en' ? 'Scan Result: ' : 'စကင်ရလဒ်: '}
-                      </Text>
-                      <Text style={styles.scanResultText}>{scannedData}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 上传照片模态框 */}
-      <Modal
-        visible={showPhotoModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPhotoModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                📸 {language === 'zh' ? '上传照片' : language === 'en' ? 'Upload Photo' : 'ဓာတ်ပုံတင်'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowPhotoModal(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Text style={[styles.modalTitle, { color: '#1e293b' }]}>
+                  {language === 'zh' ? '上传配送证明' : 'Upload Proof'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPhotoModal(false)} style={[styles.closeBtn, { backgroundColor: '#f1f5f9' }]}>
+                <Ionicons name="close" size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.photoContent}>
-              {capturedPhoto ? (
-                <>
+            <View style={styles.modalBody}>
+              <View style={styles.photoPreviewWrapper}>
+                {capturedPhoto ? (
                   <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
-                  <Text style={styles.photoInstruction}>
-                    {language === 'zh' ? '确认上传此照片作为配送证明？' : language === 'en' ? 'Confirm upload this photo as delivery proof?' : 'ဤဓာတ်ပုံကို ပို့ဆောင်မှုအတည်ပြုချက်အဖြစ် တင်ရန် အတည်ပြုပါမည်လား?'}
-                  </Text>
-                  
-                  <View style={styles.photoActions}>
-                    <TouchableOpacity 
-                      style={styles.photoActionButton} 
-                      onPress={() => setCapturedPhoto(null)}
-                    >
-                      <Text style={styles.photoActionText}>
-                        {language === 'zh' ? '重新拍照' : language === 'en' ? 'Retake Photo' : 'ဓာတ်ပုံပြန်ရိုက်'}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={[styles.photoActionButton, styles.uploadButton]} 
-                      onPress={handleUploadPhoto}
-                      disabled={uploadingPhoto}
-                    >
-                      {uploadingPhoto ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text style={styles.uploadButtonText}>
-                          {language === 'zh' ? '确认上传' : language === 'en' ? 'Confirm Upload' : 'တင်ရန် အတည်ပြု'}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
+                ) : (
+                  <View style={[styles.photoPreview, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' }]}>
+                    <ActivityIndicator color="#3b82f6" />
                   </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.photoInstruction}>
-                    {language === 'zh' ? '请先拍照，然后上传作为配送证明' : language === 'en' ? 'Please take a photo first, then upload as delivery proof' : 'ကျေးဇူးပြု၍ ဓာတ်ပုံရိုက်ပြီး ပို့ဆောင်မှုအတည်ပြုချက်အဖြစ် တင်ပါ'}
+                )}
+                <View style={styles.photoBadge}>
+                  <Text style={styles.photoBadgeText}>
+                    {language === 'zh' ? '待上传证明' : 'Proof to Upload'}
                   </Text>
-                  
-                  <TouchableOpacity 
-                    style={styles.cameraButton} 
-                    onPress={() => {
-                      setShowPhotoModal(false);
-                      setShowCameraModal(true);
-                    }}
+                </View>
+              </View>
+              
+              <View style={styles.photoActionRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPhotoModal(false);
+                    setCapturedPhoto(null);
+                  }}
+                  style={styles.retakeButtonFixed}
+                >
+                  <Ionicons name="refresh" size={18} color="#64748b" />
+                  <Text style={styles.retakeButtonTextFixed}>
+                    {language === 'zh' ? '重新拍摄' : 'Retake'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleUploadPhoto}
+                  style={[styles.uploadButtonFixed, uploadingPhoto && styles.disabledBtn]}
+                  disabled={uploadingPhoto}
+                >
+                  <LinearGradient
+                    colors={uploadingPhoto ? ['#9ca3af', '#6b7280'] : ['#10b981', '#059669']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.uploadButtonGradientFixed}
                   >
-                    <Text style={styles.cameraButtonText}>
-                      📷 {language === 'zh' ? '去拍照' : language === 'en' ? 'Take Photo' : 'ဓာတ်ပုံရိုက်ရန်'}
+                    {uploadingPhoto ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.uploadButtonTextFixed}>
+                      {uploadingPhoto 
+                        ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
+                        : (language === 'zh' ? '确认送达' : 'Confirm')}
                     </Text>
-                  </TouchableOpacity>
-                </>
-              )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -1384,567 +756,137 @@ const MyTasksScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    backgroundColor: '#2c5282',
-    padding: 20,
-    paddingTop: 50,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+  container: { flex: 1, backgroundColor: '#0f172a' },
+  header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20, paddingBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  headerSubtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '700' },
+  headerRight: { flexDirection: 'row', gap: 12 },
+  headerBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  scroll: { flex: 1, paddingHorizontal: 20 },
+  activeFilter: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(59, 130, 246, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignSelf: 'flex-start', marginBottom: 16 },
+  filterText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 100 },
+  emptyIcon: { fontSize: 60, marginBottom: 16 },
+  emptyTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 18, fontWeight: '700' },
+  dateGroup: { marginBottom: 24 },
+  dateGroupTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '800', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
+  packageCard: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardId: { color: '#fff', fontSize: 14, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  cardBody: { gap: 6, marginBottom: 12 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardValue: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', flex: 1 },
+  cardFooter: { flexDirection: 'row', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  tag: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  tagText: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  glassModal: { width: '100%', backgroundColor: 'rgba(30, 41, 59, 0.98)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+  modalHeader: { padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  modalSubtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
+  modalBody: { padding: 24 },
+  glassInfoCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  infoSectionTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '800', marginBottom: 16, textTransform: 'uppercase' },
+  infoLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  infoLineLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
+  infoLineValue: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 16 },
+  contactCard: { gap: 4 },
+  contactRole: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800' },
+  contactName: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  contactPhone: { color: '#3b82f6', fontSize: 14, fontWeight: '700' },
+  modalActionsGrid: { flexDirection: 'row', gap: 12 },
+  gridActionBtn: { flex: 1, height: 90, borderRadius: 20, overflow: 'hidden' },
+  gridBtnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12 },
+  gridBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 8 },
+  dateItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.02)' },
+  dateItemSelected: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
+  dateItemText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  scanOverlay: { flex: 1, backgroundColor: '#000' },
+  scanFrameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scanFrame: { width: 250, height: 250, position: 'relative' },
+  corner: { position: 'absolute', width: 40, height: 40, borderColor: '#3b82f6' },
+  scanHint: { color: '#fff', marginTop: 40, fontSize: 14, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
+  scanCloseBtn: { position: 'absolute', top: 60, right: 30 },
+  photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
+  photoPreviewWrapper: {
+    width: '100%',
+    aspectRatio: 4/3,
+    borderRadius: 24,
+    marginBottom: 24,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#e2e8f0',
+    position: 'relative',
   },
-  dateButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  refreshButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  filterInfo: {
-    backgroundColor: '#e3f2fd',
-    padding: 12,
-    margin: 16,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  filterText: {
-    color: '#1976d2',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  clearFilterButton: {
-    backgroundColor: '#ff5722',
+  photoBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-  },
-  clearFilterText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dateList: {
-    maxHeight: 400,
-  },
-  dateItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedDateItem: {
-    backgroundColor: '#e3f2fd',
-  },
-  dateItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  selectedDateItemText: {
-    color: '#1976d2',
-    fontWeight: '600',
-  },
-  dateItemCount: {
-    fontSize: 14,
-    color: '#666',
-  },
-  selectedDateItemCount: {
-    color: '#1976d2',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    flexWrap: 'nowrap',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  listContainer: {
-    padding: 16,
-  },
-  packageCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  packageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  paymentBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 12,
   },
-  paymentBadgeText: {
+  photoBadgeText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  paymentMethodDisplay: {
-    flex: 1,
-  },
-  confirmPaymentContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  confirmPaymentButton: {
-    backgroundColor: '#f59e0b',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  confirmPaymentButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  packageId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c5282',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
     fontSize: 12,
-    color: 'white',
     fontWeight: 'bold',
   },
-  packageInfo: {
+  photoActionRow: {
     flexDirection: 'row',
-    marginBottom: 6,
+    gap: 16,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    width: 80,
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#333',
+  retakeButtonFixed: {
     flex: 1,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#f1f5f9',
+    height: 56,
     borderRadius: 16,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c5282',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: '#666',
-  },
-  modalBody: {
-    padding: 20,
-  },
-  detailSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c5282',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  detailRow: {
+    justifyContent: 'center',
     flexDirection: 'row',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666',
-    width: 100,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  // 新增功能按钮样式
-  newActionsContainer: {
-    flexDirection: 'row',
-    padding: 16,
     gap: 8,
-  },
-  newActionButton: {
-    flex: 1,
-    backgroundColor: '#27ae60',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  newActionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // 地址模态框样式
-  addressContent: {
-    padding: 20,
-  },
-  addressLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  addressValue: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  addressDetail: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-    lineHeight: 24,
-  },
-  addressActions: {
-    flexDirection: 'row',
-    marginTop: 20,
-    gap: 12,
-  },
-  addressActionButton: {
-    flex: 1,
-    backgroundColor: '#3182ce',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addressActionText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // 相机模态框样式
-  cameraContent: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  cameraInstruction: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 24,
-  },
-  cameraButton: {
-    backgroundColor: '#27ae60',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  cameraButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // 照片模态框样式
-  photoContent: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  photoPreview: {
-    width: 200,
-    height: 150,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  photoInstruction: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 24,
-  },
-  photoActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  photoActionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e2e8f0',
   },
-  photoActionText: {
-    fontSize: 14,
-    color: '#666',
+  retakeButtonTextFixed: {
+    color: '#64748b',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  uploadButton: {
-    backgroundColor: '#27ae60',
-    borderColor: '#27ae60',
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // 扫码相关样式
-  cameraOptions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  scanModalContent: {
-    backgroundColor: '#fff',
+  uploadButtonFixed: {
+    flex: 2,
+    height: 56,
     borderRadius: 16,
-    width: '95%',
-    height: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
     elevation: 8,
   },
-  scanContent: {
-    flex: 1,
-    padding: 20,
-  },
-  scanCameraContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  scanCamera: {
-    flex: 1,
-    borderRadius: 12,
-  },
-  scanOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanFrame: {
-    width: 250,
-    height: 250,
-    position: 'relative',
-  },
-  scanCorner: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderColor: '#27ae60',
-    borderWidth: 3,
-  },
-  scanCornerTopLeft: {
-    top: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-  },
-  scanCornerTopRight: {
-    top: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: 0,
-  },
-  scanCornerBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderRightWidth: 0,
-    borderTopWidth: 0,
-  },
-  scanCornerBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-  },
-  scanStartContent: {
+  uploadButtonGradientFixed: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
-  scanStartButton: {
-    backgroundColor: '#27ae60',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
-  },
-  scanStartButtonText: {
+  uploadButtonTextFixed: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  scanResult: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    width: '100%',
+  infoSection: {
+    marginBottom: 20,
   },
-  scanResultLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  scanResultText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  // 日期分组相关样式
-  scrollContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  dateSection: {
-    marginBottom: 24,
-  },
-  dateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  dateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c5282',
-  },
-  dateSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    backgroundColor: '#f0f4f8',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  disabledBtn: {
+    opacity: 0.5,
   },
 });
 

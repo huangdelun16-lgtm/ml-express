@@ -17,15 +17,16 @@ const CityPackages: React.FC = () => {
   
   // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
   const getDetectedRegion = () => {
-    if (currentUserRegion === 'yangon' || currentUser.toUpperCase().startsWith('YGN')) return 'YGN';
+    const userUpper = currentUser.toUpperCase();
+    if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
     if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
-        currentUser.toUpperCase().startsWith('MDY') || currentUser.toUpperCase().startsWith('POL')) return 'MDY';
+        userUpper.startsWith('MDY') || userUpper.startsWith('POL')) return 'MDY';
     return '';
   };
 
   const currentRegionPrefix = getDetectedRegion();
-  // 只有当角色不是最高超级管理员（通常账号名为 admin）且检测到明确领区时，才开启过滤
-  const isRegionalUser = currentUser !== 'admin' && currentRegionPrefix !== '';
+  // 只要不是唯一的超级总管账号 "admin"，且检测到了领区前缀，就强制开启领区过滤
+  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
 
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
@@ -153,14 +154,15 @@ const CityPackages: React.FC = () => {
     };
   };
 
-  // 按日期和状态过滤包裹（返回所有过滤后的包裹）
+  // 获取当前账号可见的基础包裹列表（已应用领区过滤）
+  const getBaseRegionalPackages = () => {
+    if (!isRegionalUser) return packages;
+    return packages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+  };
+
+  // 按日期和状态过滤包裹（返回最终显示用的过滤列表）
   const getFilteredPackages = () => {
-    let filteredPackages = [...packages];
-    
-    // 领区过滤逻辑：非超管账号只能看到所属领区的订单
-    if (isRegionalUser) {
-      filteredPackages = filteredPackages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
-    }
+    let filteredPackages = getBaseRegionalPackages();
     
     // 按状态过滤
     if (selectedStatus) {
@@ -222,7 +224,8 @@ const CityPackages: React.FC = () => {
   // 获取可用日期列表
   const getAvailableDates = () => {
     const dates = new Set<string>();
-    packages.forEach(pkg => {
+    const visiblePackages = getBaseRegionalPackages();
+    visiblePackages.forEach(pkg => {
       const dateStr = pkg.created_at || pkg.create_time;
       if (dateStr) {
         const date = new Date(dateStr).toLocaleDateString('zh-CN');
@@ -432,8 +435,9 @@ const CityPackages: React.FC = () => {
 
     try {
       setSearchLoading(true);
-      // 在当前包裹列表中搜索
-      const foundPackage = packages.find(pkg => 
+      // 在当前【可见】包裹列表中搜索
+      const visiblePackages = getBaseRegionalPackages();
+      const foundPackage = visiblePackages.find(pkg => 
         pkg.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pkg.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pkg.receiver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -447,7 +451,9 @@ const CityPackages: React.FC = () => {
         setShowDetailModal(true);
         setSelectedPackage(foundPackage);
       } else {
-        alert('未找到相关包裹，请检查单号是否正确');
+        alert(isRegionalUser 
+          ? `在本领区 (${currentRegionPrefix}) 未找到相关包裹` 
+          : '未找到相关包裹，请检查单号是否正确');
       }
     } catch (error) {
       console.error('查询包裹失败:', error);
@@ -2121,7 +2127,7 @@ const CityPackages: React.FC = () => {
                       }}
                     >
                       <span>📦 {language === 'zh' ? '全部订单' : language === 'en' ? 'All Orders' : 'အမှာစာအားလုံး'}</span>
-                      <span style={{ opacity: 0.7 }}>{packages.length}</span>
+                      <span style={{ opacity: 0.7 }}>{getBaseRegionalPackages().length}</span>
                     </button>
 
                     {/* 今天 */}
@@ -2148,7 +2154,7 @@ const CityPackages: React.FC = () => {
                     >
                       <span>☀️ {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}</span>
                       <span style={{ opacity: 0.7 }}>
-                        {packages.filter(pkg => {
+                        {getBaseRegionalPackages().filter(pkg => {
                           const dateStr = pkg.created_at || pkg.create_time;
                           return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date().toLocaleDateString('zh-CN');
                         }).length}
@@ -2179,7 +2185,7 @@ const CityPackages: React.FC = () => {
                     >
                       <span>🌙 {language === 'zh' ? '昨天' : language === 'en' ? 'Yesterday' : 'မနေ့က'}</span>
                       <span style={{ opacity: 0.7 }}>
-                        {packages.filter(pkg => {
+                        {getBaseRegionalPackages().filter(pkg => {
                           const dateStr = pkg.created_at || pkg.create_time;
                           return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
                         }).length}
@@ -2202,38 +2208,69 @@ const CityPackages: React.FC = () => {
 
                 {/* 右侧：历史日期列表 */}
                 <div>
-                  <h3 style={{
-                    color: 'white',
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span style={{
-                      background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{
+                      color: 'white',
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      margin: 0,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '16px'
-                    }}>📅</span>
-                    {language === 'zh' ? '历史日期查询' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
-                  </h3>
+                      gap: '8px'
+                    }}>
+                      <span style={{
+                        background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '16px'
+                      }}>📅</span>
+                      {language === 'zh' ? '历史日期查询' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
+                    </h3>
+                    
+                    {/* 日期搜索微调 */}
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="text"
+                        placeholder={language === 'zh' ? '搜索日期...' : 'Search...'}
+                        onChange={(e) => {
+                          const term = e.target.value;
+                          const elements = document.querySelectorAll('[data-date-btn]');
+                          elements.forEach((el: any) => {
+                            if (el.getAttribute('data-date-btn').includes(term)) {
+                              el.style.display = 'flex';
+                            } else {
+                              el.style.display = 'none';
+                            }
+                          });
+                        }}
+                        style={{
+                          background: 'rgba(0,0,0,0.2)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          color: 'white',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          width: '120px'
+                        }}
+                      />
+                    </div>
+                  </div>
 
                   <div style={{
                     maxHeight: '400px',
                     overflowY: 'auto',
                     paddingRight: '12px',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                     gap: '12px'
                   }}>
                     {getAvailableDates().map((date) => {
-                      const datePackages = packages.filter(pkg => {
+                      const datePackages = getBaseRegionalPackages().filter(pkg => {
                         const dateStr = pkg.created_at || pkg.create_time;
                         return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === date;
                       });
@@ -2243,6 +2280,7 @@ const CityPackages: React.FC = () => {
                       return (
                         <button
                           key={date}
+                          data-date-btn={date}
                           onClick={() => setSelectedDate(date)}
                           style={{
                             background: isSelected ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' : 'rgba(255, 255, 255, 0.06)',
@@ -2251,16 +2289,25 @@ const CityPackages: React.FC = () => {
                             padding: '12px 16px',
                             borderRadius: '12px',
                             cursor: 'pointer',
-                            transition: 'all 0.3s ease',
+                            transition: 'all 0.2s ease',
                             textAlign: 'left',
+                            display: 'flex',
+                            flexDirection: 'column',
                             boxShadow: isSelected ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
                           }}
                         >
                           <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '4px' }}>
                             {formatDateDisplay(date)}
                           </div>
-                          <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>
-                            {datePackages.length} {language === 'zh' ? '个订单' : 'Orders'}
+                          <div style={{ 
+                            fontSize: '0.75rem', 
+                            color: isSelected ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            width: '100%'
+                          }}>
+                            <span>📦 {datePackages.length} {language === 'zh' ? '单' : 'Orders'}</span>
+                            {isSelected && <span>✓</span>}
                           </div>
                         </button>
                       );

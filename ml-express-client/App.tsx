@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, Platform, View, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -82,17 +82,20 @@ export default function App() {
         // 保持启动屏幕可见
         await SplashScreen.preventAutoHideAsync();
         
-        // 关键修复：添加 3 秒超时保护
-        // 如果初始化卡住，3秒后强制进入应用，避免白屏被拒
+        // 关键修复：添加 5 秒超时保护
+        // 如果初始化卡住，5秒后强制进入应用，避免白屏被拒
         const safetyTimer = setTimeout(() => {
           setIsLoggedIn((prevState) => {
             if (prevState === null) {
               console.warn('⚠️ 初始化超时，强制进入首页');
+              saveErrorToStorage('init_timeout', new Error('App initialization timed out after 5s'), false);
               return false; // 超时默认为未登录
             }
             return prevState;
           });
-        }, 3000);
+          // 确保 appIsReady 也被设置
+          setAppIsReady(true);
+        }, 5000);
 
         // 正常执行初始化
         await initializeApp();
@@ -228,7 +231,11 @@ export default function App() {
 
   if (!appIsReady || isLoggedIn === null) {
     return (
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView} />
+      <View style={{ flex: 1, backgroundColor: '#2E86AB', justifyContent: 'center', alignItems: 'center' }} onLayout={onLayoutRootView}>
+        {/* 即使在初始化阶段也显示背景色，避免纯白屏 */}
+        {/* 如果 10 秒还没准备好，显示一个重试按钮 */}
+        <LoadingFallback />
+      </View>
     );
   }
 
@@ -362,6 +369,30 @@ export default function App() {
           </LoadingProvider>
         </AppProvider>
       </ErrorBoundary>
+    </View>
+  );
+}
+
+// 简单的初始化加载界面
+function LoadingFallback() {
+  const [showRetry, setShowRetry] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowRetry(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <ActivityIndicator size="large" color="#ffffff" />
+      {showRetry && (
+        <TouchableOpacity 
+          style={{ marginTop: 20, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8 }}
+          onPress={() => Platform.OS === 'ios' ? Alert.alert('提示', '请尝试重启应用') : null}
+        >
+          <Text style={{ color: '#ffffff' }}>加载时间过长，请检查网络</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

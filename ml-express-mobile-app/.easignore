@@ -1,0 +1,23 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.DS_Store
+.env*
+! .env.example
+*.md
+*.sql
+*.bat
+*.sh
+*.ps1
+build/
+build.zip
+android/
+ios/
+

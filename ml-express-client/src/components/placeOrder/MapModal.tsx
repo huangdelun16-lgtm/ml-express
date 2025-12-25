@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import LoggerService from './../../services/LoggerService';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { errorService } from '../../services/ErrorService';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
@@ -194,7 +194,7 @@ const MapModal = memo<MapModalProps>(({
         </View>
 
         <MapView
-          provider={PROVIDER_GOOGLE}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           style={styles.map}
           initialRegion={mapRegion}
           region={mapRegion}

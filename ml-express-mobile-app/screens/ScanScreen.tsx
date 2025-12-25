@@ -130,7 +130,7 @@ export default function ScanScreen({ navigation }: any) {
     },
   };
 
-  const t = translations[language] || translations.zh;
+  const t = translations[language as keyof typeof translations] || translations.zh;
 
   // 应用语言样式（缅语字体缩小2号）- 必须在所有使用styles之前
   const styles = useLanguageStyles(baseStyles);

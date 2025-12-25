@@ -7,11 +7,16 @@ import {
   ScrollView,
   Alert,
   Linking,
+  Dimensions,
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+
+const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
   const { language } = useApp();
@@ -163,228 +168,328 @@ export default function ProfileScreen({ navigation }: any) {
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      {/* 用户信息卡片 */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {currentUserName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <Text style={styles.userName}>{currentUserName}</Text>
-        <Text style={styles.userRole}>{getRoleName(currentUserRole)}</Text>
-        <Text style={styles.userId}>{language === 'zh' ? '账号' : language === 'my' ? 'အကောင့်' : 'Account'}: {currentUser}</Text>
-      </View>
+    <View style={styles.container}>
+      {/* 渐变背景 */}
+      <LinearGradient
+        colors={['#0f172a', '#1e3a8a', '#334155']}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* 装饰性圆圈 */}
+      <View style={[styles.circle, { top: -100, right: -100, backgroundColor: 'rgba(59, 130, 246, 0.15)' }]} />
+      <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
 
-      {/* 统计卡片 */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.todayDelivered}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '今日完成' : language === 'my' ? 'ယနေ့ပြီးမြောက်' : 'Today'}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.inProgress}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : language === 'my' ? 'ပို့ဆောင်နေဆဲ' : 'In Progress'}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.totalDelivered}</Text>
-          <Text style={styles.statLabel}>{language === 'zh' ? '累计完成' : language === 'my' ? 'စုစုပေါင်းပြီးမြောက်' : 'Total'}</Text>
-        </View>
-      </View>
-
-      {/* 功能菜单 */}
-      <View style={styles.menuContainer}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={() => {
-              if ((item as any).action) {
-                (item as any).action();
-              } else if (item.screen) {
-                navigation.navigate(item.screen);
-              } else {
-                Alert.alert(
-                  language === 'zh' ? '提示' : language === 'my' ? 'အကြောင်းကြားချက်' : 'Notice', 
-                  language === 'zh' ? '功能开发中，敬请期待！' : language === 'my' ? 'လုပ်ဆောင်ချက်များဖွံ့ဖြိုးတိုးတက်နေဆဲ၊ စောင့်ဆိုင်းပါ!' : 'Feature under development, stay tuned!'
-                );
-              }
-            }}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 用户信息卡片 */}
+        <View style={styles.profileCard}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.05)']}
+            style={styles.glassCard}
           >
-            <View style={styles.menuIcon}>
-              <Text style={styles.menuIconText}>{item.icon}</Text>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {currentUserName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{currentUserName}</Text>
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleBadgeText}>{getRoleName(currentUserRole)}</Text>
+                </View>
+                <Text style={styles.userId}>{language === 'zh' ? '账号' : language === 'my' ? 'အကောင့်' : 'ID'}: {currentUser}</Text>
+              </View>
             </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+          </LinearGradient>
+        </View>
+
+        {/* 统计卡片 */}
+        <View style={styles.statsContainer}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.03)']}
+            style={styles.statsGlassCard}
+          >
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.todayDelivered}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '今日完成' : language === 'my' ? 'ယနေ့ပြီးမြောက်' : 'Today'}</Text>
             </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.inProgress}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : language === 'my' ? 'ပို့ဆောင်နေဆဲ' : 'Active'}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{stats.totalDelivered}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '累计完成' : language === 'my' ? 'စုစုပေါင်းပြီးမြောက်' : 'Total'}</Text>
+            </View>
+          </LinearGradient>
+        </View>
 
-      {/* 退出登录按钮 */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>{language === 'zh' ? '退出登录' : language === 'my' ? 'အကောင့်မှထွက်ရန်' : 'Logout'}</Text>
-      </TouchableOpacity>
+        {/* 功能菜单 */}
+        <View style={styles.menuContainer}>
+          <Text style={styles.sectionTitle}>{language === 'zh' ? '快捷功能' : language === 'my' ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick Actions'}</Text>
+          <View style={styles.menuList}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.menuItem,
+                  index === menuItems.length - 1 && { borderBottomWidth: 0 }
+                ]}
+                onPress={() => {
+                  if ((item as any).action) {
+                    (item as any).action();
+                  } else if (item.screen) {
+                    navigation.navigate(item.screen);
+                  } else {
+                    Alert.alert(
+                      language === 'zh' ? '提示' : language === 'my' ? 'အကြောင်းကြားချက်' : 'Notice', 
+                      language === 'zh' ? '功能开发中，敬请期待！' : language === 'my' ? 'လုပ်ဆောင်ချက်များဖွံ့ဖြိုးတိုးတက်နေဆဲ၊ စောင့်ဆိုင်းပါ!' : 'Feature coming soon!'
+                    );
+                  }
+                }}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Text style={styles.menuIconText}>{item.icon}</Text>
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
-      {/* 版本信息 */}
-      <Text style={styles.version}>
-        Market Link Express v1.0.0
-      </Text>
-      <Text style={styles.copyright}>
-        © 2025 Market Link Express
-      </Text>
-    </ScrollView>
+        {/* 退出登录按钮 */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LinearGradient
+            colors={['#ef4444', '#b91c1c']}
+            style={styles.logoutGradient}
+          >
+            <Ionicons name="log-out-outline" size={20} color="white" style={{marginRight: 8}} />
+            <Text style={styles.logoutText}>{language === 'zh' ? '退出登录' : language === 'my' ? 'အကောင့်မှထွက်ရန်' : 'Logout'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* 版本信息 */}
+        <View style={styles.footer}>
+          <Text style={styles.version}>Market Link Staff v1.1.2</Text>
+          <Text style={styles.copyright}>© 2025 Market Link Express</Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7fafc',
+    backgroundColor: '#0f172a',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  circle: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   profileCard: {
-    backgroundColor: '#2c5282',
     paddingTop: 60,
-    paddingBottom: 30,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  glassCard: {
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#C0C0C0',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   avatarText: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#2c5282',
+    color: '#fff',
+  },
+  userInfo: {
+    marginLeft: 18,
   },
   userName: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
   },
-  userRole: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    marginBottom: 8,
+  roleBadge: {
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  roleBadgeText: {
+    color: '#92400e',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   userId: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
+    fontWeight: '600',
   },
   statsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+  statsGlassCard: {
+    flexDirection: 'row',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  statItem: {
+    alignItems: 'center',
   },
   statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2c5282',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   menuContainer: {
-    marginTop: 8,
-    marginHorizontal: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 16,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  menuList: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  menuIcon: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+  menuIconContainer: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   menuIconText: {
-    fontSize: 24,
+    fontSize: 20,
   },
   menuContent: {
     flex: 1,
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
+    fontWeight: '700',
+    color: '#fff',
     marginBottom: 2,
   },
   menuSubtitle: {
     fontSize: 12,
-    color: '#999',
-  },
-  menuArrow: {
-    fontSize: 24,
-    color: '#ccc',
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontWeight: '500',
   },
   logoutButton: {
-    margin: 16,
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  logoutGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e74c3c',
+    justifyContent: 'center',
+    paddingVertical: 16,
   },
   logoutText: {
-    color: '#e74c3c',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+  },
+  footer: {
+    marginTop: 32,
+    alignItems: 'center',
   },
   version: {
-    textAlign: 'center',
-    color: '#999',
+    color: 'rgba(255, 255, 255, 0.4)',
     fontSize: 12,
-    marginTop: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   copyright: {
-    textAlign: 'center',
-    color: '#ccc',
+    color: 'rgba(255, 255, 255, 0.2)',
     fontSize: 11,
-    marginTop: 4,
-    marginBottom: 30,
+    fontWeight: '500',
   },
 });

@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -19,19 +19,17 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
-          "maps",
-          "comgooglemaps",
           "maps"
         ],
         "NSLocationWhenInUseUsageDescription": "需要获取您的位置来显示配送路线和导航",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "需要获取您的位置来提供实时配送服务",
+        "NSCameraUsageDescription": "需要访问您的相机以扫描包裹二维码和中转码。",
         "UIBackgroundModes": [
-          "location",
           "location"
         ]
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+        "googleMapsApiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
       }
     },
     "android": {
@@ -40,61 +38,44 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 12,
+      "versionCode": 26,
       "permissions": [
+        "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "ACCESS_BACKGROUND_LOCATION"
       ],
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "enableProguardInReleaseBuilds": true,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE"
+          "apiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
         }
-      }
+      },
+      "enableProguardInReleaseBuilds": false
     },
-    
     "extra": {
       "eas": {
         "projectId": "9831d961-9124-46ed-8581-bf406616439f"
-      }
+      },
+      "supabaseUrl": "https://uopkyuluxnrewvlmutam.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY",
+      "netlifyUrl": "https://admin-market-link-express.netlify.app"
     },
-    "owner": "amt349",
-    "privacy": "public",
-    "privacyPolicy": "https://market-link-express.com/privacy-policy",
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "需要访问相机以扫描包裹二维码和中转码，用于快速识别包裹信息。",
-          "microphonePermission": false
+          "cameraPermission": "需要访问相机以扫描包裹二维码和中转码。"
         }
       ],
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "需要获取您的位置来提供实时配送服务和显示配送路线。",
-          "locationAlwaysPermission": "需要获取您的位置来提供实时配送服务。",
-          "locationWhenInUsePermission": "需要获取您的位置来显示配送路线和导航。"
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      [
-        "expo-media-library",
-        {
-          "savePhotosPermission": "需要访问相册以保存包裹配送照片，用于记录配送凭证。",
-          "isAccessMediaLocationEnabled": true
-        }
-      ]
-    ],
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/9831d961-9124-46ed-8581-bf406616439f"
-    }
+      "expo-media-library",
+      "expo-notifications"
+    ]
   }
 }

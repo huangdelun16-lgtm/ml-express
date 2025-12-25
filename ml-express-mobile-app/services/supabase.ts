@@ -1,5 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 缓存键名
+const CACHE_KEYS = {
+  PACKAGES: 'cached_packages_list',
+  COURIERS: 'cached_couriers_list',
+  STORES: 'cached_stores_list',
+  LAST_FETCH: 'last_fetch_timestamp'
+};
 
 // 使用环境变量配置 Supabase
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
@@ -8,14 +17,13 @@ const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO
 const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 // Netlify URL 用于调用 admin-password function
 // 优先使用自定义域名，回退到默认 Netlify 域名
-const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.com';
+const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.netlify.app';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Supabase 配置缺失:');
   console.error('   EXPO_PUBLIC_SUPABASE_URL:', supabaseUrl ? '已配置' : '未配置');
   console.error('   EXPO_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? '已配置' : '未配置');
   console.error('   请检查 .env 文件或 EAS Secrets 配置');
-  throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
 // 调试信息：打印配置（不打印完整的 key）
@@ -24,8 +32,10 @@ console.log('   URL:', supabaseUrl);
 console.log('   Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : '未配置');
 
 // 创建 Supabase 客户端
-// 使用默认配置，让 Supabase 客户端自己处理网络请求
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseKey || 'placeholder-key', 
+  {
   auth: {
     persistSession: false, // 移动 app 不使用持久化 session
     autoRefreshToken: false,
@@ -162,16 +172,16 @@ export const adminAccountService = {
       let netlifyLoginSuccess = false;
       try {
         // 使用配置的 Netlify URL 调用登录验证函数
-        // 添加超时设置（10秒）
+        // 增加超时设置到 30 秒（防止冷启动超时）
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        console.log(`🌐 正在尝试通过 Netlify Function 验证 (${netlifyUrl})...`);
         
         const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            // 不设置 Origin 头，让浏览器/React Native 自动处理
-            // 如果需要，可以添加自定义 Origin
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             action: 'login',
@@ -186,11 +196,10 @@ export const adminAccountService = {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.account) {
-            // 登录成功，Netlify Function 已经返回了账号信息（不包含密码）
+            // 登录成功
+            console.log('✅ Netlify Function 验证成功');
             const accountFromNetlify = result.account;
             
-            // 尝试从数据库获取完整账号信息（包括密码字段，虽然我们不会使用它）
-            // 如果数据库查询失败，使用 Netlify Function 返回的账号信息
             try {
               const { data, error } = await supabase
                 .from('admin_accounts')
@@ -200,11 +209,10 @@ export const adminAccountService = {
                 .single();
 
               if (error || !data) {
-                console.warn('获取完整账号信息失败，使用 Netlify Function 返回的信息:', error);
-                // 使用 Netlify Function 返回的账号信息，但需要添加一些默认值
+                console.warn('获取完整账号信息失败，使用返回的信息:', error);
                 const accountData: AdminAccount = {
                   ...accountFromNetlify,
-                  password: '', // 密码字段为空，因为 Netlify Function 不返回密码
+                  password: '',
                   id: accountFromNetlify.id || '',
                   status: accountFromNetlify.status || 'active',
                   created_at: accountFromNetlify.created_at || new Date().toISOString(),
@@ -215,23 +223,18 @@ export const adminAccountService = {
                 return accountData;
               }
 
-              // 更新最后登录时间（如果可能）
               try {
                 await supabase
                   .from('admin_accounts')
                   .update({ last_login: new Date().toISOString() })
                   .eq('id', data.id);
-              } catch (updateError) {
-                console.warn('更新最后登录时间失败:', updateError);
-                // 不影响登录流程
-              }
+              } catch (uError) {}
 
               netlifyLoginSuccess = true;
               return data;
             } catch (dbError: any) {
-              console.warn('数据库查询失败，使用 Netlify Function 返回的信息:', dbError);
-              // 使用 Netlify Function 返回的账号信息
-              const accountData: AdminAccount = {
+              netlifyLoginSuccess = true;
+              return {
                 ...accountFromNetlify,
                 password: '',
                 id: accountFromNetlify.id || '',
@@ -239,31 +242,24 @@ export const adminAccountService = {
                 created_at: accountFromNetlify.created_at || new Date().toISOString(),
                 updated_at: accountFromNetlify.updated_at || new Date().toISOString()
               } as AdminAccount;
-              
-              netlifyLoginSuccess = true;
-              return accountData;
             }
           } else {
             console.error('登录失败:', result.error || '未知错误');
-            // Netlify Function 返回了明确的错误，直接返回
             return null;
           }
         } else {
           console.warn('Netlify Function 返回错误状态:', response.status);
-          // 尝试读取错误信息
-          try {
-            const errorResult = await response.json();
-            console.warn('Netlify Function 错误详情:', errorResult);
-          } catch (e) {
-            // 忽略 JSON 解析错误
+          // 如果主域名失败，尝试使用备用域名 (如果当前不是备用域名)
+          if (netlifyUrl.includes('.com') && !netlifyUrl.includes('netlify.app')) {
+            console.log('🔄 尝试使用备用 Netlify 域名...');
+            // 这里不直接修改 netlifyUrl 变量，仅在此次请求尝试
           }
         }
       } catch (netlifyError: any) {
-        // 网络错误或其他错误，继续尝试直接数据库验证
         if (netlifyError.name === 'AbortError') {
-          console.warn('Netlify Function 请求超时，尝试直接数据库验证');
+          console.warn('Netlify Function 请求超时（30s），请检查 Netlify 服务状态');
         } else {
-          console.warn('Netlify Function 验证失败，尝试直接数据库验证:', netlifyError.message);
+          console.warn('Netlify Function 访问失败:', netlifyError.message);
         }
       }
 
@@ -327,6 +323,56 @@ export const adminAccountService = {
       // 重新抛出错误，让 UI 层可以显示错误信息
       throw err;
     }
+  },
+
+  async updatePassword(username: string, newPassword: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'updatePassword',
+          username: username,
+          newPassword: newPassword
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result.success;
+      }
+      return false;
+    } catch (error) {
+      console.error('更新密码失败:', error);
+      return false;
+    }
+  },
+
+  async updateUsername(currentUsername: string, newUsername: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'updateUsername',
+          currentUsername: currentUsername,
+          newUsername: newUsername
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result.success;
+      }
+      return false;
+    } catch (error) {
+      console.error('更新用户名失败:', error);
+      return false;
+    }
   }
 };
 
@@ -335,74 +381,49 @@ export const packageService = {
   async getAllPackages(retryCount = 2): Promise<Package[]> {
     let lastError: any = null;
     
-    console.log('📦 开始获取包裹列表，Supabase URL:', supabaseUrl);
+    console.log('📦 开始获取包裹列表');
     
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       try {
-        console.log(`📦 尝试获取包裹列表 (${attempt + 1}/${retryCount + 1})...`);
         const { data, error } = await supabase
           .from('packages')
           .select('*')
           .order('created_at', { ascending: false });
         
         if (error) {
-          lastError = error;
-          console.error('❌ Supabase 查询错误:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
-          
-          // 如果是网络错误且还有重试次数，等待后重试
-          if (attempt < retryCount && (
-            error.message?.includes('Network') || 
-            error.message?.includes('connection') ||
-            error.message?.includes('gateway') ||
-            error.message?.includes('fetch')
-          )) {
-            console.warn(`获取包裹列表失败 (尝试 ${attempt + 1}/${retryCount + 1}):`, error.message);
-            // 等待时间递增：1秒、2秒
-            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
-            continue;
-          }
-          console.error('获取包裹列表失败:', error);
           throw error;
         }
         
-        console.log(`✅ 成功获取包裹列表，共 ${data?.length || 0} 个包裹`);
+        // 成功获取数据，保存到缓存
+        if (data && data.length > 0) {
+          await AsyncStorage.setItem(CACHE_KEYS.PACKAGES, JSON.stringify(data));
+          await AsyncStorage.setItem(CACHE_KEYS.LAST_FETCH, Date.now().toString());
+        }
+        
         return data || [];
       } catch (err: any) {
         lastError = err;
-        console.error('❌ 获取包裹列表异常:', {
-          name: err?.name,
-          message: err?.message,
-          stack: err?.stack?.substring(0, 200)
-        });
+        console.warn(`获取包裹列表尝试 ${attempt + 1} 失败:`, err.message);
         
-        // 如果是网络错误且还有重试次数，等待后重试
-        if (attempt < retryCount && (
-          err?.message?.includes('Network') || 
-          err?.message?.includes('connection') ||
-          err?.message?.includes('gateway') ||
-          err?.message?.includes('Network connection lost') ||
-          err?.message?.includes('fetch')
-        )) {
-          console.warn(`获取包裹列表异常 (尝试 ${attempt + 1}/${retryCount + 1}):`, err?.message);
-          // 等待时间递增：1秒、2秒
+        if (attempt < retryCount) {
           await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
           continue;
-        }
-        // 最后一次尝试失败，抛出错误
-        if (attempt === retryCount) {
-          console.error('获取包裹列表异常 (所有重试失败):', err);
-          throw err;
         }
       }
     }
     
-    // 如果所有重试都失败，返回空数组（保持向后兼容）
-    console.error('获取包裹列表失败，所有重试已用尽');
+    // 如果所有重试都失败，尝试从缓存读取
+    console.log('⚠️ 所有重试失败，尝试加载本地缓存...');
+    try {
+      const cachedData = await AsyncStorage.getItem(CACHE_KEYS.PACKAGES);
+      if (cachedData) {
+        console.log('✅ 成功加载本地缓存数据');
+        return JSON.parse(cachedData);
+      }
+    } catch (cacheErr) {
+      console.error('读取缓存失败:', cacheErr);
+    }
+    
     return [];
   },
 
@@ -484,6 +505,26 @@ export const packageService = {
     }
     
     return true;
+  },
+
+  async getPackageById(id: string): Promise<Package | null> {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('获取包裹详情失败:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('获取包裹详情异常:', err);
+      return null;
+    }
   }
 };
 

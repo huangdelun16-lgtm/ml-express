@@ -36,7 +36,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
   const [isGuest, setIsGuest] = useState(false);
-  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
+  const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
     total: 0,
     pending: 0,
@@ -96,6 +96,8 @@ export default function ProfileScreen({ navigation }: any) {
     smsNotifications: false,   // 短信通知
   });
 
+  const isPartnerStore = userType === 'partner';
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
@@ -135,7 +137,6 @@ export default function ProfileScreen({ navigation }: any) {
       updateSuccess: '资料更新成功',
       updateFailed: '资料更新失败',
       pleaseLogin: '请先登录',
-      comingSoon: '功能开发中，敬请期待',
       // 关于我们相关翻译
       aboutApp: '关于应用',
       appDescription: 'MARKET LINK EXPRESS 是一款专业的快递配送服务平台，为用户提供快速、安全、可靠的包裹配送服务。',
@@ -389,7 +390,7 @@ export default function ProfileScreen({ navigation }: any) {
       setIsGuest(false);
 
       // 检测用户类型
-      const detectedUserType = user.user_type === 'partner' ? 'partner' : 'customer';
+      const detectedUserType = user.user_type || 'customer';
       setUserType(detectedUserType);
 
       // 加载订单统计
@@ -980,9 +981,7 @@ export default function ProfileScreen({ navigation }: any) {
         {[
           { label: t.myProfile, icon: '👤', action: 'profile', color: '#3b82f6' },
           { label: t.addressManagement, icon: '📍', action: 'address', color: '#f59e0b' },
-          { label: t.myCoupons, icon: '🎟️', action: 'coupons', color: '#ec4899' },
-          { label: t.helpCenter, icon: '❓', action: 'help', color: '#10b981' },
-          { label: '通知测试', icon: '🔔', action: 'notificationTest', color: '#8b5cf6' },
+          { label: '通知中心', icon: '🔔', action: 'notifications', color: '#8b5cf6' },
         ].map((action, index) => (
           <TouchableOpacity
             key={index}

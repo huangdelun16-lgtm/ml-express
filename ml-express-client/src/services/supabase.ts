@@ -8,11 +8,17 @@ import { retry } from '../utils/retry';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
+// 关键：不要在顶层 throw 错误，这会导致整个 JS Bundle 崩溃，从而出现白屏
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY 环境变量必须配置！');
+  LoggerService.error('Supabase 环境变量未配置！请检查 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// 即使没有环境变量也创建客户端（它会报错但不会导致 Bundle 级崩溃）
+// 或者可以使用一个占位符 URL 以防止 createClient 崩溃
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseKey || 'placeholder-key'
+);
 
 // 用户接口（与Web端users表对应）
 export interface User {

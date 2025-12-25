@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
-import { Camera, BarCodeScannedEvent } from 'expo-camera';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { packageService, Package } from '../services/supabase';
 
 interface ScannerScreenProps {
@@ -10,33 +10,30 @@ interface ScannerScreenProps {
 }
 
 export default function ScannerScreen({ visible, onClose, onPackageFound }: ScannerScreenProps) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualInput, setManualInput] = useState('');
 
   useEffect(() => {
-    const getCameraPermissions = async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    };
-
+    if (visible && (!permission || !permission.granted)) {
+      requestPermission();
+    }
     if (visible) {
-      getCameraPermissions();
       setScanned(false);
       setManualInput('');
     }
-  }, [visible]);
+  }, [visible, permission]);
 
-  const handleBarCodeScanned = async ({ type, data }: BarCodeScannedEvent) => {
+  const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
     if (scanned || loading) return;
     
     setScanned(true);
     setLoading(true);
     
     try {
-      await searchPackage(data);
+      await searchPackage(result.data);
     } catch (error) {
       console.error('扫码处理失败:', error);
       Alert.alert('错误', '扫码处理失败，请重试');
@@ -116,7 +113,7 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
 
   if (!visible) return null;
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <Modal visible={visible} animationType="slide">
         <View style={styles.container}>
@@ -126,12 +123,15 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <Modal visible={visible} animationType="slide">
         <View style={styles.container}>
           <Text style={styles.message}>需要摄像头权限才能扫描二维码</Text>
-          <TouchableOpacity style={styles.button} onPress={onClose}>
+          <TouchableOpacity style={styles.button} onPress={requestPermission}>
+            <Text style={styles.buttonText}>授予权限</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, { marginTop: 10, backgroundColor: '#666' }]} onPress={onClose}>
             <Text style={styles.buttonText}>关闭</Text>
           </TouchableOpacity>
         </View>
@@ -158,11 +158,11 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
 
         {/* 摄像头视图 */}
         <View style={styles.cameraContainer}>
-          <Camera
+          <CameraView
             style={styles.camera}
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barCodeScannerSettings={{
-              barCodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'],
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'],
             }}
           >
             <View style={styles.overlay}>
@@ -181,7 +181,7 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
               </View>
               <View style={styles.unfocusedContainer}></View>
             </View>
-          </Camera>
+          </CameraView>
         </View>
 
         {/* 底部信息 */}
@@ -410,7 +410,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // 优化后的手动输入模态框样式
   centeredModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -429,19 +428,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 15,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '85%',
-    maxWidth: 400,
   },
   modalHeader: {
     flexDirection: 'row',

@@ -73,19 +73,7 @@ export interface LanguageTexts {
   packageNumber: string;
   query: string;
   trackingResult: string;
-  packageStatus: string;
-  receiver: string;
-  courier: string;
-  createTime: string;
-  pickupTime: string;
-  deliveryTime: string;
-  
-  // 状态
-  pending: string;
   picked: string;
-  delivering: string;
-  delivered: string;
-  cancelled: string;
   
   // 管理系统
   dashboard: string;
@@ -249,19 +237,7 @@ export const translations: { [key: string]: LanguageTexts } = {
     packageNumber: '包裹编号',
     query: '查询',
     trackingResult: '追踪结果',
-    packageStatus: '包裹状态',
-    receiver: '收件人',
-    courier: '快递员',
-    createTime: '创建时间',
-    pickupTime: '取件时间',
-    deliveryTime: '送达时间',
-    
-    // 状态
-    pending: '待取件',
     picked: '已取件',
-    delivering: '配送中',
-    delivered: '已送达',
-    cancelled: '已取消',
     
     // 管理系统
     dashboard: '仪表板',
@@ -284,7 +260,7 @@ export const translations: { [key: string]: LanguageTexts } = {
     getLocationFailed: '获取位置失败',
     getLocationErrorMessage: '请检查您的GPS和网络连接，并确保已授予位置权限。',
     locationSuccess: '位置获取成功！',
-    locationSuccessMessage: '纬度: {latitude}\n经度: {longitude}\n精度: {accuracy}米',
+    locationSuccessMessage: '纬度: {latitude}\n精度: {accuracy}米',
     pleaseSelectLocation: '请先选择一个位置',
     scan: '扫码',
     profile: '我的',
@@ -424,19 +400,7 @@ export const translations: { [key: string]: LanguageTexts } = {
     packageNumber: 'Package Number',
     query: 'Query',
     trackingResult: 'Tracking Result',
-    packageStatus: 'Package Status',
-    receiver: 'Receiver',
-    courier: 'Courier',
-    createTime: 'Created',
-    pickupTime: 'Picked Up',
-    deliveryTime: 'Delivered',
-    
-    // 状态
-    pending: 'Pending Pickup',
     picked: 'Picked Up',
-    delivering: 'In Transit',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
     
     // 管理系统
     dashboard: 'Dashboard',
@@ -599,19 +563,7 @@ export const translations: { [key: string]: LanguageTexts } = {
     packageNumber: 'ပက်ကေ့ဂျ်နံပါတ်',
     query: 'မေးမြန်းမည်',
     trackingResult: 'ခြေရာခံရလဒ်',
-    packageStatus: 'ပက်ကေ့ဂျ်အခြေအနေ',
-    receiver: 'လက်ခံသူ',
-    courier: 'စာပို့သမား',
-    createTime: 'ဖန်တီးချိန်',
-    pickupTime: 'ယူချိန်',
-    deliveryTime: 'ပေးပို့ချိန်',
-    
-    // 状态
-    pending: 'ယူရန်စောင့်ဆိုင်းနေသည်',
     picked: 'ယူပြီးပါပြီ',
-    delivering: 'ပေးပို့နေသည်',
-    delivered: 'ပေးပို့ပြီးပါပြီ',
-    cancelled: 'ပယ်ဖျက်ပြီးပါပြီ',
     
     // 管理系统
     dashboard: 'ဒက်ရှ်ဘုတ်',
