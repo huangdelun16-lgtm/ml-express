@@ -47,7 +47,7 @@
       },
       "config": {
         "usesNonExemptEncryption": false,
-        "googleMapsApiKey": "AIzaSyC2B8GX1alcSLs9F0Oi1CuQvYOphaBn1ps"
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
       },
       "associatedDomains": [
         "applinks:mlexpress.com",
@@ -70,7 +70,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyC2B8GX1alcSLs9F0Oi1CuQvYOphaBn1ps"
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
         }
       }
     },
