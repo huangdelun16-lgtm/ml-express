@@ -243,6 +243,16 @@ const AccountManagement: React.FC = () => {
     setShowViewModal(true);
   };
 
+  const handleEditAccount = (account: AdminAccount) => {
+    setEditingAccount(account);
+    setEditFormData({
+      username: account.username,
+      password: '', // 不显示原密码
+      employee_name: account.employee_name
+    });
+    setShowEditModal(true);
+  };
+
   const handleEditPermissions = (account: AdminAccount) => {
     setEditingAccount(account);
     setPermissionsPermissionsFormData(account.permissions || []);
