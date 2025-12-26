@@ -141,7 +141,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       description: language === 'zh' ? 'GPS位置监控和路线跟踪' : language === 'en' ? 'GPS location monitoring and route tracking' : 'GPS တည်နေရာစောင့်ကြည့်ခြင်းနှင့်လမ်းကြောင်းခြေရာခံခြင်း',
       color: '#2c5282',
       icon: '📍',
-      roles: ['admin', 'manager', 'operator'] // 管理员、经理和操作员可访问
+      roles: ['admin', 'manager', 'operator', 'finance'] // 管理员、经理、操作员和财务可访问
     },
     {
       title: language === 'zh' ? '系统设置' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု',
@@ -155,7 +155,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       description: language === 'zh' ? '骑手异常操作监控和警报管理' : language === 'en' ? 'Courier anomaly monitoring and alert management' : 'ကောင်ရီယာကိစ္စပုံမှန်မဟုတ်သောစောင့်ကြည့်မှုနှင့်သတိပေးချက်စီမံခန့်ခွဲမှု',
       color: '#dc2626',
       icon: '🚨',
-      roles: ['admin', 'manager'] // 管理员和经理可访问
+      roles: ['admin', 'manager', 'finance'] // 管理员、经理和财务可访问
     },
     {
       title: language === 'zh' ? '广告管理' : language === 'en' ? 'Ad Management' : 'ကြော်ငြာစီမံခန့်ခွဲမှု',
