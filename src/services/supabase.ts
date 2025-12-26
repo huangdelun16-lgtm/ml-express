@@ -1028,8 +1028,9 @@ export const systemSettingsService = {
   },
 
   // 获取计费规则（管理端专用格式）
-  async getPricingSettings(): Promise<Record<string, any>> {
+  async getPricingSettings(region?: string): Promise<Record<string, any>> {
     try {
+      const prefix = region ? `pricing.${region}.` : 'pricing.';
       const { data, error } = await supabase
         .from('system_settings')
         .select('settings_key, settings_value')
@@ -1050,17 +1051,41 @@ export const systemSettingsService = {
         courier_km_rate: 500
       };
 
-      data?.forEach((item: any) => {
-        const key = item.settings_key.replace('pricing.', '');
-        let value = item.settings_value;
-        if (typeof value === 'string') {
-          try {
-            value = JSON.parse(value);
-          } catch {
-            value = parseFloat(value) || 0;
-          }
+      // 如果提供了 region，先尝试寻找该区域的配置，如果没有则使用全局配置
+      if (region) {
+        const regionPrefix = `pricing.${region}.`;
+        const regionSettings = data?.filter(item => item.settings_key.startsWith(regionPrefix));
+        
+        if (regionSettings && regionSettings.length > 0) {
+          regionSettings.forEach((item: any) => {
+            const key = item.settings_key.replace(regionPrefix, '');
+            let value = item.settings_value;
+            if (typeof value === 'string') {
+              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+            }
+            settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+          });
+          return settings;
         }
-        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+      }
+
+      // 如果没有指定区域或该区域没有特殊配置，使用默认的 pricing. 前缀配置
+      data?.forEach((item: any) => {
+        if (!item.settings_key.includes('.mandalay.') && 
+            !item.settings_key.includes('.yangon.') && 
+            !item.settings_key.includes('.maymyo.') &&
+            !item.settings_key.includes('.naypyidaw.') &&
+            !item.settings_key.includes('.taunggyi.') &&
+            !item.settings_key.includes('.lashio.') &&
+            !item.settings_key.includes('.muse.')) {
+          
+          const key = item.settings_key.replace('pricing.', '');
+          let value = item.settings_value;
+          if (typeof value === 'string') {
+            try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+          }
+          settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        }
       });
 
       return settings;

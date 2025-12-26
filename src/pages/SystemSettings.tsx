@@ -324,9 +324,20 @@ const categories: Array<{ id: SettingCategory; name: string; description: string
   { id: 'security', name: '安全与合规', description: '后台安全策略与访问控制', icon: '🛡️' }
 ];
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
-const [activeTab, setActiveTab] = useState<SettingCategory>('general');
+  const [activeTab, setActiveTab] = useState<SettingCategory>('general');
+  const [selectedRegion, setSelectedRegion] = useState<string>('mandalay');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
 
   const [loading, setLoading] = useState(true);
@@ -360,7 +371,33 @@ const [activeTab, setActiveTab] = useState<SettingCategory>('general');
     const metadata: Record<string, { updated_at?: string | null; updated_by?: string | null }> = {};
 
     incoming.forEach(setting => {
-      const def = definitionMap[setting.settings_key];
+      let def = definitionMap[setting.settings_key];
+      let settingsKey = setting.settings_key;
+
+      // 特殊处理计费规则的领区化 Key
+      if (setting.settings_key.startsWith('pricing.')) {
+        // 如果是类似 pricing.mandalay.base_fee 这种
+        const parts = setting.settings_key.split('.');
+        if (parts.length === 3) {
+          const region = parts[1];
+          const actualKey = `pricing.${parts[2]}`;
+          if (region === selectedRegion) {
+            def = definitionMap[actualKey];
+            settingsKey = actualKey; // 使用不带区域的 key 作为内部状态的 key
+          } else {
+            return; // 忽略非当前选中区域的设置
+          }
+        } else {
+          // 原始的 pricing.base_fee，作为所有领区的默认回退值
+          // 只有当 mergedValues 中还没有设置值时才应用
+          if (mergedValues[setting.settings_key] === definitionMap[setting.settings_key]?.defaultValue) {
+            def = definitionMap[setting.settings_key];
+          } else {
+            return;
+          }
+        }
+      }
+
       if (!def) return;
 
       let rawValue = setting.settings_value;
@@ -369,20 +406,20 @@ const [activeTab, setActiveTab] = useState<SettingCategory>('general');
         rawValue = (rawValue as any).value;
       }
 
-      if (def.key === 'security.ip_whitelist' && Array.isArray(rawValue)) {
-        mergedValues[def.key] = (rawValue as string[]).join('\n');
+      if (settingsKey === 'security.ip_whitelist' && Array.isArray(rawValue)) {
+        mergedValues[settingsKey] = (rawValue as string[]).join('\n');
       } else if (def.type === 'switch') {
-        mergedValues[def.key] = Boolean(rawValue);
+        mergedValues[settingsKey] = Boolean(rawValue);
       } else if (def.type === 'number') {
         const numericValue = typeof rawValue === 'number' ? rawValue : Number(rawValue);
-        mergedValues[def.key] = Number.isFinite(numericValue) ? numericValue : Number(def.defaultValue);
+        mergedValues[settingsKey] = Number.isFinite(numericValue) ? numericValue : Number(def.defaultValue);
       } else if ((def.type === 'text' || def.type === 'select') && rawValue !== undefined && rawValue !== null) {
-        mergedValues[def.key] = String(rawValue);
+        mergedValues[settingsKey] = String(rawValue);
       } else if (def.type === 'textarea' && rawValue !== undefined && rawValue !== null) {
-        mergedValues[def.key] = String(rawValue);
+        mergedValues[settingsKey] = String(rawValue);
       }
 
-      metadata[def.key] = {
+      metadata[settingsKey] = {
         updated_at: setting.updated_at,
         updated_by: setting.updated_by
       };
@@ -391,7 +428,7 @@ const [activeTab, setActiveTab] = useState<SettingCategory>('general');
     setSettingsValues(mergedValues);
     setSettingsMetadata(metadata);
     setHasChanges(false);
-  }, [defaultValues, definitionMap]);
+  }, [defaultValues, definitionMap, selectedRegion]);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -464,9 +501,15 @@ const [activeTab, setActiveTab] = useState<SettingCategory>('general');
         parsedValue = text.length === 0 ? [] : text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       }
 
+      // 如果是计费规则，保存带区域前缀的 key
+      let settingsKey = def.key;
+      if (def.category === 'pricing') {
+        settingsKey = `pricing.${selectedRegion}.${def.key.replace('pricing.', '')}`;
+      }
+
       payload.push({
         category: def.category,
-        settings_key: def.key,
+        settings_key: settingsKey,
         settings_value: parsedValue,
         description: def.description,
         updated_by: 'admin-dashboard'
@@ -823,13 +866,54 @@ const [activeTab, setActiveTab] = useState<SettingCategory>('general');
             overflowY: 'auto'
           }}
         >
-          <div style={{ marginBottom: '18px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600 }}>
-              {categories.find(category => category.id === activeTab)?.name || '系统设置'}
-            </h2>
-            <p style={{ margin: '6px 0 0 0', opacity: 0.78 }}>
-              {categories.find(category => category.id === activeTab)?.description}
-            </p>
+          <div style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600 }}>
+                {categories.find(category => category.id === activeTab)?.name || '系统设置'}
+              </h2>
+              <p style={{ margin: '6px 0 0 0', opacity: 0.78 }}>
+                {categories.find(category => category.id === activeTab)?.description}
+              </p>
+            </div>
+
+            {/* 计费规则专属：领区选择器 */}
+            {activeTab === 'pricing' && (
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.05)', 
+                padding: '10px 16px', 
+                borderRadius: '12px', 
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>当前领区：</label>
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => {
+                    setSelectedRegion(e.target.value);
+                    setHasChanges(false); // 切换领区时重置未保存状态，触发重新加载该领区数据
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'rgba(66, 153, 225, 0.2)',
+                    color: '#63b3ed',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  {REGIONS.map(r => (
+                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
+                      {r.name} ({r.prefix})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {loading ? (
