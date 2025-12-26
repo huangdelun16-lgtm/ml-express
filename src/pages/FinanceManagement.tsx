@@ -130,7 +130,7 @@ const FinanceManagement: React.FC = () => {
   
   const isRegionalFinance = isMDYFinance || isYGNFinance;
 
-  const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'package_records' : 'overview');
+  const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'records' : 'overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [cashSettlementStatus, setCashSettlementStatus] = useState<'unsettled' | 'settled' | 'all'>('unsettled');
@@ -798,6 +798,12 @@ const FinanceManagement: React.FC = () => {
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
+      // 🔒 权限逻辑优化：让MDY账号和YGN账号只能看到他们添加过的记录
+      if (currentUser.toLowerCase() !== 'admin') {
+        // 如果是地区账号，只显示自己创建的记录
+        if (record.created_by !== currentUser) return false;
+      }
+
       const matchesSearch =
         record.order_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         record.courier_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -824,7 +830,7 @@ const FinanceManagement: React.FC = () => {
 
       return matchesSearch && matchesStatus && matchesType && withinDateRange;
     });
-  }, [records, searchTerm, filterStatus, filterType, dateRange]);
+  }, [records, searchTerm, filterStatus, filterType, dateRange, currentUser]);
 
   const resetForm = () => {
     setFormData({ 
@@ -855,7 +861,8 @@ const FinanceManagement: React.FC = () => {
       payment_method: formData.payment_method,
       reference: formData.reference || undefined,
       record_date: formData.record_date,
-      notes: formData.notes || undefined
+      notes: formData.notes || undefined,
+      created_by: editingRecord ? editingRecord.created_by : currentUser // 保存当前用户名作为创建者
     };
 
     try {
@@ -1125,8 +1132,8 @@ const FinanceManagement: React.FC = () => {
           {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[])
             .filter(key => {
               if (isRegionalFinance) {
-                // 财务账号过滤：隐藏总览、收支记录(主列表)、数据分析
-                return !['overview', 'records', 'analytics'].includes(key);
+                // 财务账号过滤：隐藏总览、数据分析，保留收支记录供其管理自己添加的数据
+                return !['overview', 'analytics'].includes(key);
               }
               return true;
             })
@@ -1154,15 +1161,13 @@ const FinanceManagement: React.FC = () => {
               {key === 'partner_collection' && '🤝 合伙代收款'}
             </button>
           ))}
-          {(activeTab === 'records' || (isRegionalFinance && activeTab === 'package_records')) && (
+          {(activeTab === 'records' || activeTab === 'package_records') && (
             <button
               onClick={() => {
                 resetForm();
                 setShowForm(true);
-                // 如果是财务账号，默认类别设为其他收入/支出
-                if (isRegionalFinance) {
-                  setFormData(prev => ({ ...prev, category: '其他收入' }));
-                }
+                // 默认类别设为其他收入/支出
+                setFormData(prev => ({ ...prev, category: '其他收入' }));
               }}
               style={{
                 marginLeft: 'auto',
@@ -1173,10 +1178,12 @@ const FinanceManagement: React.FC = () => {
                 color: '#05223b',
                 fontWeight: 700,
                 cursor: 'pointer',
-                boxShadow: '0 12px 25px rgba(79, 172, 254, 0.35)'
+                boxShadow: '0 12px 25px rgba(79, 172, 254, 0.35)',
+                position: 'relative',
+                zIndex: 5
               }}
             >
-              + 添加记录
+              + 添加收支记录
             </button>
           )}
         </div>
@@ -1300,7 +1307,8 @@ const FinanceManagement: React.FC = () => {
                   background: 'rgba(8, 27, 48, 0.72)',
                   borderRadius: '16px',
                   border: '1px solid rgba(255, 255, 255, 0.2)',
-                  position: 'relative'
+                  position: 'relative',
+                  zIndex: 10
                 }}
               >
                 <button
@@ -1617,8 +1625,16 @@ const FinanceManagement: React.FC = () => {
                     </tr>
                   ) : filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={12} style={{ textAlign: 'center', padding: '24px' }}>
-                        暂无财务记录
+                      <td colSpan={12} style={{ textAlign: 'center', padding: '48px 24px' }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '16px', opacity: 0.5 }}>📝</div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
+                          暂无收支记录
+                        </div>
+                        {currentUser.toLowerCase() !== 'admin' && (
+                          <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.9rem', marginTop: '8px' }}>
+                            (您目前仅被授权查看由您本人创建的财务记录)
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (
