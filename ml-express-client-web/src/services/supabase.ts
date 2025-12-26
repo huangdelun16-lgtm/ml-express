@@ -710,7 +710,7 @@ export const systemSettingsService = {
           if (regionSettings.length > 0) {
             regionSettings.forEach((item: any) => {
               const key = item.settings_key.replace(regionPrefix, '');
-              const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+              const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
               let value = item.settings_value;
               if (typeof value === 'string') {
                 try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
@@ -725,7 +725,7 @@ export const systemSettingsService = {
         data.forEach((item: any) => {
           if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
             const key = item.settings_key.replace('pricing.', '');
-            const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+            const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
             let value = item.settings_value;
             if (typeof value === 'string') {
               try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }

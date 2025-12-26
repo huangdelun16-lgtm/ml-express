@@ -866,48 +866,67 @@ const SystemSettings: React.FC = () => {
             overflowY: 'auto'
           }}
         >
-          <div style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600 }}>
-                {categories.find(category => category.id === activeTab)?.name || '系统设置'}
-              </h2>
-              <p style={{ margin: '6px 0 0 0', opacity: 0.78 }}>
-                {categories.find(category => category.id === activeTab)?.description}
-              </p>
+          <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <div style={{ 
+                width: '50px', 
+                height: '50px', 
+                borderRadius: '15px', 
+                background: 'rgba(255,255,255,0.1)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                fontSize: '1.8rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}>
+                {categories.find(category => category.id === activeTab)?.icon}
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>
+                  {categories.find(category => category.id === activeTab)?.name || '系统设置'}
+                </h2>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.7, fontSize: '0.95rem' }}>
+                  {categories.find(category => category.id === activeTab)?.description}
+                </p>
+              </div>
             </div>
 
             {/* 计费规则专属：领区选择器 */}
             {activeTab === 'pricing' && (
               <div style={{ 
-                background: 'rgba(255, 255, 255, 0.05)', 
-                padding: '10px 16px', 
-                borderRadius: '12px', 
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'linear-gradient(135deg, rgba(49, 130, 206, 0.2) 0%, rgba(44, 82, 130, 0.3) 100%)', 
+                padding: '12px 20px', 
+                borderRadius: '16px', 
+                border: '1px solid rgba(144, 205, 244, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px'
+                gap: '12px',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
               }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)' }}>当前领区：</label>
+                <label style={{ fontSize: '0.95rem', fontWeight: 700, color: '#90cdf4', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📍</span> {language === 'zh' ? '当前配置领区' : 'Region'}:
+                </label>
                 <select
                   value={selectedRegion}
                   onChange={(e) => {
                     setSelectedRegion(e.target.value);
-                    setHasChanges(false); // 切换领区时重置未保存状态，触发重新加载该领区数据
+                    setHasChanges(false); 
                   }}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'rgba(66, 153, 225, 0.2)',
-                    color: '#63b3ed',
-                    fontSize: '0.95rem',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(15, 32, 60, 0.8)',
+                    color: 'white',
+                    fontSize: '1rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    outline: 'none'
+                    outline: 'none',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                   }}
                 >
                   {REGIONS.map(r => (
-                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
+                    <option key={r.id} value={r.id} style={{ color: '#000', fontWeight: 'normal' }}>
                       {r.name} ({r.prefix})
                     </option>
                   ))}
@@ -930,35 +949,68 @@ const SystemSettings: React.FC = () => {
                   <div
                     key={def.key}
                     style={{
-                      background: 'rgba(15, 32, 60, 0.6)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: '16px',
-                      padding: '18px',
+                      background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.7) 0%, rgba(15, 32, 60, 0.5) 100%)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '20px',
+                      padding: '24px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '10px'
+                      gap: '12px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                      transition: 'transform 0.3s ease, border-color 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(144, 205, 244, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>{def.label}</h3>
-                        <p style={{ margin: '4px 0 0 0', opacity: 0.75, fontSize: '0.9rem', lineHeight: 1.5 }}>{def.description}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px' }}>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#ebf8ff' }}>{def.label}</h3>
+                        <p style={{ margin: '6px 0 0 0', opacity: 0.7, fontSize: '0.9rem', lineHeight: 1.6, color: '#a0aec0' }}>{def.description}</p>
                       </div>
                       {def.suffix && def.type !== 'switch' && (
-                        <span style={{ opacity: 0.65, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{def.suffix}</span>
+                        <div style={{ 
+                          background: 'rgba(255,255,255,0.1)', 
+                          padding: '4px 10px', 
+                          borderRadius: '8px', 
+                          fontSize: '0.8rem', 
+                          color: '#90cdf4',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap' 
+                        }}>
+                          {def.suffix}
+                        </div>
                       )}
                     </div>
 
-                    {renderInput(def)}
+                    <div style={{ marginTop: '8px' }}>
+                      {renderInput(def)}
+                    </div>
 
                     {(def.helpText || metadata) && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ 
+                        marginTop: '12px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid rgba(255,255,255,0.05)',
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        flexWrap: 'wrap', 
+                        gap: '8px' 
+                      }}>
                         {def.helpText && (
-                          <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>{def.helpText}</span>
+                          <span style={{ color: '#ecc94b', fontSize: '0.85rem', fontWeight: 500 }}>
+                            💡 {def.helpText}
+                          </span>
                         )}
                         {metadata && (metadata.updated_at || metadata.updated_by) && (
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>
-                            最近更新：{formatTimestamp(metadata.updated_at)}
+                          <span style={{ opacity: 0.5, fontSize: '0.75rem', color: '#cbd5e0' }}>
+                            ⏱️ {language === 'zh' ? '最近更新' : 'Updated'}: {formatTimestamp(metadata.updated_at)}
                             {metadata.updated_by ? ` · ${metadata.updated_by}` : ''}
                           </span>
                         )}
