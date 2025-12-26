@@ -1897,34 +1897,36 @@ const UserManagement: React.FC = () => {
       {/* 快递员管理 */}
       {activeTab === 'courier_management' && (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '15px',
-          padding: isMobile ? '12px' : '20px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 25px rgba(26, 54, 93, 0.3)',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(25px)',
+          borderRadius: '24px',
+          padding: isMobile ? '16px' : '32px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
           position: 'relative',
           zIndex: 1
         }}>
-          {/* 内部标签页 */}
+          {/* 内部标签页 - 高级视觉版 */}
           <div style={{
             display: 'flex',
-            gap: '10px',
-            marginBottom: '20px',
+            gap: '12px',
+            marginBottom: '32px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            paddingBottom: '15px'
+            paddingBottom: '20px'
           }}>
             <button
               onClick={() => setCourierSubTab('list')}
               style={{
-                background: courierSubTab === 'list' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                background: courierSubTab === 'list' ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.05)',
                 color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '12px 24px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                transition: 'all 0.3s ease',
+                boxShadow: courierSubTab === 'list' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               }}
             >
               📋 快递员列表
@@ -1933,14 +1935,16 @@ const UserManagement: React.FC = () => {
               <button
                 onClick={() => setCourierSubTab('create')}
                 style={{
-                  background: courierSubTab === 'create' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                  background: courierSubTab === 'create' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(255, 255, 255, 0.05)',
                   color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '12px 24px',
+                  borderRadius: '12px',
                   cursor: 'pointer',
                   fontWeight: 'bold',
-                  fontSize: '1rem'
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: courierSubTab === 'create' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
                 }}
               >
                 ✏️ 编辑快递员信息
@@ -1950,100 +1954,275 @@ const UserManagement: React.FC = () => {
 
           {courierSubTab === 'list' && (
             <div>
-              {/* 统计卡片 */}
+              {/* 统计卡片 - 视觉升级 */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
-                gap: '15px',
-                marginBottom: '20px'
+                gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                gap: '20px',
+                marginBottom: '32px'
               }}>
-                 <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(52, 152, 219, 0.3)' }}>
-                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0', fontSize: '1.5rem' }}>{couriers.length}</h3>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>总数</p>
-                 </div>
-                 <div style={{ background: 'rgba(39, 174, 96, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(39, 174, 96, 0.3)' }}>
-                    <h3 style={{ color: '#27ae60', margin: '0 0 5px 0', fontSize: '1.5rem' }}>{couriers.filter(c => c.status === 'active').length}</h3>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>活跃</p>
-                 </div>
-                 <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(230, 126, 34, 0.3)' }}>
-                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0', fontSize: '1.5rem' }}>{couriers.reduce((s, c) => s + c.total_deliveries, 0)}</h3>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>总配送</p>
-                 </div>
-                 <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(155, 89, 182, 0.3)' }}>
-                    <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0', fontSize: '1.5rem' }}>{(couriers.reduce((s, c) => s + c.rating, 0) / couriers.length || 0).toFixed(1)}</h3>
-                    <p style={{ color: 'white', margin: 0, fontSize: '0.9rem' }}>评分</p>
-                 </div>
+                 {[
+                   { label: '总数', value: couriers.length, color: '#3b82f6', icon: '👥' },
+                   { label: '活跃', value: couriers.filter(c => c.status === 'active').length, color: '#10b981', icon: '🟢' },
+                   { label: '总配送', value: couriers.reduce((s, c) => s + c.total_deliveries, 0), color: '#f59e0b', icon: '📦' },
+                   { label: '平均评分', value: (couriers.reduce((s, c) => s + c.rating, 0) / couriers.length || 0).toFixed(1), color: '#8b5cf6', icon: '⭐' }
+                 ].map((stat, i) => (
+                   <div key={i} style={{ 
+                     background: 'rgba(15, 32, 60, 0.4)', 
+                     padding: '24px 16px', 
+                     borderRadius: '20px', 
+                     textAlign: 'center', 
+                     border: `1px solid ${stat.color}33`,
+                     boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                     transition: 'transform 0.3s ease'
+                   }}>
+                      <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>{stat.icon}</div>
+                      <h3 style={{ color: stat.color, margin: '0 0 4px 0', fontSize: '1.8rem', fontWeight: 800 }}>{stat.value}</h3>
+                      <p style={{ color: 'rgba(255, 255, 255, 0.6)', margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{stat.label}</p>
+                   </div>
+                 ))}
               </div>
 
-              {/* 筛选 */}
-              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px' }}>
-                <input 
-                  type="text" 
-                  placeholder="🔍 搜索快递员..." 
-                  value={courierSearchTerm}
-                  onChange={(e) => setCourierSearchTerm(e.target.value)}
-                  style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', flex: '1 1 200px', fontSize: '1rem' }}
-                />
+              {/* 筛选 - 视觉升级 */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '16px', 
+                marginBottom: '24px', 
+                flexWrap: 'wrap', 
+                alignItems: 'center', 
+                background: 'rgba(0, 0, 0, 0.2)', 
+                padding: '20px', 
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>🔍</span>
+                  <input 
+                    type="text" 
+                    placeholder="搜索姓名、电话、工号..." 
+                    value={courierSearchTerm}
+                    onChange={(e) => setCourierSearchTerm(e.target.value)}
+                    style={{ 
+                      padding: '14px 14px 14px 40px', 
+                      borderRadius: '12px', 
+                      border: '1px solid rgba(255,255,255,0.2)', 
+                      background: 'rgba(15, 32, 60, 0.5)', 
+                      color: 'white', 
+                      width: '100%',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      transition: 'all 0.3s'
+                    }}
+                  />
+                </div>
                 <select 
                   value={courierStatusFilter}
                   onChange={(e) => setCourierStatusFilter(e.target.value)}
-                  style={{ padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', fontSize: '1rem', cursor: 'pointer' }}
+                  style={{ 
+                    padding: '14px 20px', 
+                    borderRadius: '12px', 
+                    background: 'rgba(15, 32, 60, 0.5)', 
+                    color: 'white', 
+                    border: '1px solid rgba(255,255,255,0.2)', 
+                    fontSize: '1rem', 
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
                 >
-                  <option value="all">📊 所有状态</option>
-                  <option value="active">✅ 活跃</option>
-                  <option value="inactive">💤 非活跃</option>
-                  <option value="busy">📦 忙碌</option>
+                  <option value="all" style={{ color: '#000' }}>📊 所有状态</option>
+                  <option value="active" style={{ color: '#000' }}>✅ 活跃</option>
+                  <option value="inactive" style={{ color: '#000' }}>💤 非活跃</option>
+                  <option value="busy" style={{ color: '#000' }}>📦 忙碌</option>
                 </select>
                 <select 
                   value={vehicleFilter}
                   onChange={(e) => setVehicleFilter(e.target.value)}
-                  style={{ padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', fontSize: '1rem', cursor: 'pointer' }}
+                  style={{ 
+                    padding: '14px 20px', 
+                    borderRadius: '12px', 
+                    background: 'rgba(15, 32, 60, 0.5)', 
+                    color: 'white', 
+                    border: '1px solid rgba(255,255,255,0.2)', 
+                    fontSize: '1rem', 
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
                 >
-                  <option value="all">🚗 所有车辆</option>
-                  <option value="motorcycle">🏍️ 摩托车</option>
-                  <option value="car">🚗 汽车</option>
-                  <option value="bicycle">🚲 自行车</option>
-                  <option value="truck">🚚 卡车</option>
-                  <option value="tricycle">🛺 三轮车</option>
-                  <option value="small_truck">🚛 小卡车</option>
+                  <option value="all" style={{ color: '#000' }}>🚗 所有车辆</option>
+                  <option value="motorcycle" style={{ color: '#000' }}>🏍️ 摩托车</option>
+                  <option value="car" style={{ color: '#000' }}>🚗 汽车</option>
+                  <option value="bicycle" style={{ color: '#000' }}>🚲 自行车</option>
+                  <option value="truck" style={{ color: '#000' }}>🚚 卡车</option>
+                  <option value="tricycle" style={{ color: '#000' }}>🛺 三轮车</option>
+                  <option value="small_truck" style={{ color: '#000' }}>🚛 小卡车</option>
                 </select>
               </div>
 
-              {/* 列表 */}
+              {/* 列表 - 现代悬浮卡片设计 */}
               {courierLoading ? (
-                <div style={{ color: 'white', textAlign: 'center', padding: '40px' }}>加载中...</div>
+                <div style={{ color: 'white', textAlign: 'center', padding: '60px' }}>加载中...</div>
               ) : filteredCouriers.length === 0 ? (
-                <div style={{ color: 'white', textAlign: 'center', padding: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>没有找到快递员</div>
+                <div style={{ 
+                  color: 'white', 
+                  textAlign: 'center', 
+                  padding: '80px 20px', 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: '20px',
+                  border: '1px dashed rgba(255,255,255,0.1)'
+                }}>没有找到匹配的快递员</div>
               ) : (
-                <div style={{ display: 'grid', gap: '15px' }}>
+                <div style={{ display: 'grid', gap: '20px' }}>
                   {filteredCouriers.map(courier => (
-                    <div key={courier.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' }}>
-                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '15px', alignItems: 'center' }}>
-                          <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1' }}>
-                             <h3 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.2rem' }}>{getVehicleIcon(courier.vehicle_type)} {courier.name}</h3>
-                             <p style={{ margin: '5px 0', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>{courier.phone}</p>
-                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{courier.email}</p>
-                          </div>
-                          <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1' }}>
-                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>🏠 {courier.address}</p>
-                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>🌍 区域: {REGIONS.find(r => r.id === courier.region)?.name || courier.region || '-'}</p>
-                             <p style={{ margin: '0 0 5px 0', color: '#48bb78', fontWeight: 'bold' }}>🆔 编号: {courier.employee_id || '-'}</p>
-                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>📅 {courier.join_date}</p>
-                          </div>
-                          <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1' }}>
-                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>📦 配送: {courier.total_deliveries}</p>
-                             <p style={{ margin: '0 0 5px 0', color: 'rgba(255,255,255,0.8)' }}>⭐ 评分: {courier.rating}</p>
-                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>🕐 {courier.last_active}</p>
-                          </div>
-                          <div style={{ gridColumn: isMobile ? '1 / -1' : 'span 1', textAlign: isMobile ? 'left' : 'right' }}>
-                             <div style={{ display: 'inline-block', background: getCourierStatusColor(courier.status), color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '10px' }}>
-                                {courier.status === 'active' ? '活跃' : courier.status === 'inactive' ? '非活跃' : '忙碌'}
+                    <div 
+                      key={courier.id} 
+                      style={{ 
+                        background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)', 
+                        padding: '28px', 
+                        borderRadius: '24px', 
+                        border: '1px solid rgba(255, 255, 255, 0.15)', 
+                        backdropFilter: 'blur(15px)',
+                        boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-6px) scale(1.01)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                        e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
+                      }}
+                    >
+                       {/* 背景光晕装饰 */}
+                       <div style={{
+                         position: 'absolute',
+                         top: '-20px',
+                         right: '-20px',
+                         width: '100px',
+                         height: '100px',
+                         background: 'rgba(59, 130, 246, 0.1)',
+                         borderRadius: '50%',
+                         filter: 'blur(30px)',
+                         pointerEvents: 'none'
+                       }}></div>
+
+                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1.5fr 1fr 1fr', gap: '32px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                          {/* 个人信息栏 */}
+                          <div>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                               <div style={{ 
+                                 width: '60px', 
+                                 height: '60px', 
+                                 borderRadius: '18px', 
+                                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.4) 100%)', 
+                                 display: 'flex', 
+                                 alignItems: 'center', 
+                                 justifyContent: 'center',
+                                 fontSize: '2rem',
+                                 border: '1px solid rgba(59, 130, 246, 0.3)',
+                                 boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                               }}>
+                                 {getVehicleIcon(courier.vehicle_type)}
+                               </div>
+                               <div>
+                                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.5px' }}>{courier.name}</h3>
+                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                   <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 700, fontFamily: 'monospace', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                                     #{courier.employee_id || '-'}
+                                   </span>
+                                   <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{courier.position || '骑手'}</span>
+                                 </div>
+                               </div>
                              </div>
-                             <div style={{ display: 'flex', gap: '8px', justifyContent: isMobile ? 'flex-start' : 'flex-end', flexWrap: 'wrap' }}>
-                                <button onClick={() => handleEditCourier(courier)} style={{ background: '#3498db', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>编辑</button>
-                                <button onClick={() => handleCourierStatusChange(courier.id, courier.status === 'active' ? 'inactive' : 'active')} style={{ background: courier.status === 'active' ? '#f39c12' : '#27ae60', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>{courier.status === 'active' ? '停用' : '启用'}</button>
-                                <button onClick={() => handleDeleteCourier(courier.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>删除</button>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                               <div style={{ color: 'white', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                 <span style={{ background: 'rgba(255,255,255,0.1)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>📞</span> 
+                                 <span style={{ fontWeight: 600 }}>{courier.phone}</span>
+                               </div>
+                               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                 <span style={{ background: 'rgba(255,255,255,0.05)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>📧</span> 
+                                 <span>{courier.email || '未设置邮箱'}</span>
+                               </div>
                              </div>
+                          </div>
+                          
+                          {/* 区域与地址 */}
+                          <div style={{ paddingLeft: isMobile ? 0 : '20px', borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                               <span style={{ color: '#60a5fa', fontSize: '1.1rem' }}>📍</span>
+                               <span style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 700 }}>
+                                 {REGIONS.find(r => r.id === courier.region)?.name || courier.region || '-'}
+                               </span>
+                             </div>
+                             <p style={{ margin: '0 0 16px 0', color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                               {courier.address || '暂无详细地址'}
+                             </p>
+                             <div style={{ display: 'flex', gap: '10px' }}>
+                               <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                 📅 入职: {courier.join_date}
+                               </span>
+                             </div>
+                          </div>
+
+                          {/* 业务数据 */}
+                          <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                               <div>
+                                 <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>配送成就</p>
+                                 <p style={{ margin: 0, color: '#f59e0b', fontSize: '1.8rem', fontWeight: 900 }}>{courier.total_deliveries}</p>
+                               </div>
+                               <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                 <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>星级评价</p>
+                                 <p style={{ margin: 0, color: '#fbbf24', fontSize: '1.4rem', fontWeight: 900 }}>⭐ {courier.rating}</p>
+                               </div>
+                             </div>
+                          </div>
+
+                          {/* 状态与操作 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: isMobile ? 'flex-start' : 'flex-end' }}>
+                             <div style={{ 
+                               background: courier.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
+                               color: courier.status === 'active' ? '#10b981' : '#f87171', 
+                               padding: '8px 20px', 
+                               borderRadius: '14px', 
+                               fontSize: '0.9rem', 
+                               fontWeight: 800,
+                               border: `1px solid ${courier.status === 'active' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                               display: 'flex',
+                               alignItems: 'center',
+                               gap: '8px'
+                             }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 10px currentColor' }}></span>
+                                {courier.status === 'active' ? '在线中' : courier.status === 'inactive' ? '休假中' : '忙碌中'}
+                             </div>
+                             <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                  onClick={() => handleEditCourier(courier)} 
+                                  title="编辑业务信息"
+                                  style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                >✏️</button>
+                                <button 
+                                  onClick={() => handleCourierStatusChange(courier.id, courier.status === 'active' ? 'inactive' : 'active')} 
+                                  title={courier.status === 'active' ? '停用账号' : '启用账号'}
+                                  style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                >{courier.status === 'active' ? '💤' : '⚡'}</button>
+                                <button 
+                                  onClick={() => handleDeleteCourier(courier.id)} 
+                                  title="永久删除"
+                                  style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                >🗑️</button>
+                             </div>
+                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 600 }}>最后活跃: {courier.last_active}</p>
                           </div>
                        </div>
                     </div>
@@ -2055,48 +2234,157 @@ const UserManagement: React.FC = () => {
 
           {courierSubTab === 'create' && (
              <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-                <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px' }}>{editingCourier ? '编辑快递员' : '添加快递员'}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
+                  <div style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '16px', 
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '1.5rem'
+                  }}>
+                    ✏️
+                  </div>
+                  <h2 style={{ color: 'white', margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>编辑快递员业务信息</h2>
+                </div>
+
                 <form onSubmit={editingCourier ? handleUpdateCourier : handleCreateCourier}>
-                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '20px', marginBottom: '30px' }}>
-                      <input placeholder="姓名" value={courierForm.name} onChange={e => setCourierForm({...courierForm, name: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-                      <input placeholder="电话" value={courierForm.phone} onChange={e => setCourierForm({...courierForm, phone: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-                      <input placeholder="邮箱" value={courierForm.email} onChange={e => setCourierForm({...courierForm, email: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-                      <input placeholder="地址（可选）" value={courierForm.address} onChange={e => setCourierForm({...courierForm, address: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
+                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px', marginBottom: '32px' }}>
                       
-                      <select value={courierForm.vehicle_type} onChange={e => setCourierForm({...courierForm, vehicle_type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
-                         <option value="motorcycle">🏍️ 摩托车</option>
-                         <option value="car">🚗 汽车</option>
-                         <option value="bicycle">🚲 自行车</option>
-                         <option value="truck">🚚 卡车</option>
-                         <option value="tricycle">🛺 三轮车</option>
-                         <option value="small_truck">🚛 小卡车</option>
-                      </select>
-                      
-                      <input placeholder="驾驶证号" value={courierForm.license_number} onChange={e => setCourierForm({...courierForm, license_number: e.target.value})} required style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white' }} />
-                      
-                      <select value={courierForm.region} onChange={e => handleCourierFormChange('region', e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
-                         {REGIONS.map(r => (
-                           <option key={r.id} value={r.id}>{r.name} ({r.prefix})</option>
-                         ))}
-                      </select>
+                      {/* 只读的核心信息（由账号系统决定） */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', gridColumn: '1 / -1' }}>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#90cdf4', fontWeight: 700 }}>以下信息由账号系统决定，无法在此修改：</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>姓名</label>
+                            <p style={{ margin: 0, color: 'white', fontWeight: 600 }}>{courierForm.name}</p>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>电话</label>
+                            <p style={{ margin: 0, color: 'white', fontWeight: 600 }}>{courierForm.phone}</p>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>员工编号</label>
+                            <p style={{ margin: 0, color: '#48bb78', fontWeight: 800, fontFamily: 'monospace' }}>{courierForm.employee_id}</p>
+                          </div>
+                        </div>
+                      </div>
 
-                      <input placeholder="员工编号（自动生成）" value={courierForm.employee_id} readOnly style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(72, 187, 120, 0.5)', background: 'rgba(72, 187, 120, 0.1)', color: '#48bb78', fontWeight: 'bold' }} />
-
-                      <select value={courierForm.status} onChange={e => setCourierForm({...courierForm, status: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(7, 23, 53, 0.65)', color: 'white' }}>
-                         <option value="active">✅ 活跃</option>
-                         <option value="inactive">💤 非活跃</option>
-                         <option value="busy">📦 忙碌</option>
-                      </select>
-
+                      {/* 可编辑的业务信息 */}
                       <div style={{ gridColumn: '1 / -1' }}>
-                         <textarea placeholder="备注" value={courierForm.notes} onChange={e => setCourierForm({...courierForm, notes: e.target.value})} rows={3} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: 'white', resize: 'vertical' }} />
+                        <label style={{ display: 'block', color: 'white', marginBottom: '12px', fontSize: '1.1rem', fontWeight: 700 }}>📦 业务属性配置</label>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', paddingLeft: '4px' }}>配送车辆类型</label>
+                        <select 
+                          value={courierForm.vehicle_type} 
+                          onChange={e => setCourierForm({...courierForm, vehicle_type: e.target.value})} 
+                          style={{ 
+                            padding: '14px', 
+                            borderRadius: '12px', 
+                            border: '1px solid rgba(255,255,255,0.2)', 
+                            background: 'rgba(15, 32, 60, 0.6)', 
+                            color: 'white',
+                            fontSize: '1rem',
+                            outline: 'none'
+                          }}
+                        >
+                           <option value="motorcycle">🏍️ 摩托车</option>
+                           <option value="car">🚗 汽车</option>
+                           <option value="bicycle">🚲 自行车</option>
+                           <option value="truck">🚚 卡车</option>
+                           <option value="tricycle">🛺 三轮车</option>
+                           <option value="small_truck">🚛 小卡车</option>
+                        </select>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', paddingLeft: '4px' }}>驾驶证/营业执照号</label>
+                        <input 
+                          placeholder="请输入证件号码" 
+                          value={courierForm.license_number} 
+                          onChange={e => setCourierForm({...courierForm, license_number: e.target.value})} 
+                          required 
+                          style={{ 
+                            padding: '14px', 
+                            borderRadius: '12px', 
+                            border: '1px solid rgba(255,255,255,0.2)', 
+                            background: 'rgba(15, 32, 60, 0.6)', 
+                            color: 'white',
+                            fontSize: '1rem',
+                            outline: 'none'
+                          }} 
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', paddingLeft: '4px' }}>业务备注</label>
+                        <textarea 
+                          placeholder="例如：熟悉曼德勒北区路线、持有特种车辆驾驶证..." 
+                          value={courierForm.notes} 
+                          onChange={e => setCourierForm({...courierForm, notes: e.target.value})} 
+                          rows={4} 
+                          style={{ 
+                            width: '100%', 
+                            padding: '14px', 
+                            borderRadius: '12px', 
+                            border: '1px solid rgba(255,255,255,0.2)', 
+                            background: 'rgba(15, 32, 60, 0.6)', 
+                            color: 'white', 
+                            resize: 'vertical',
+                            fontSize: '1rem',
+                            outline: 'none',
+                            lineHeight: 1.6
+                          }} 
+                        />
                       </div>
                    </div>
-                   <div style={{ textAlign: 'center', display: 'flex', gap: '15px', justifyContent: 'center' }}>
-                      <button type="submit" style={{ background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)' }}>
-                         {editingCourier ? '更新快递员' : '添加快递员'}
+
+                   <div style={{ textAlign: 'center', display: 'flex', gap: '16px', justifyContent: 'center' }}>
+                      <button 
+                        type="submit" 
+                        style={{ 
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                          color: 'white', 
+                          border: 'none', 
+                          padding: '14px 40px', 
+                          borderRadius: '12px', 
+                          cursor: 'pointer', 
+                          fontWeight: 'bold', 
+                          fontSize: '1.1rem', 
+                          boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+                          transition: 'all 0.3s ease' 
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.filter = 'brightness(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.filter = 'brightness(1)';
+                        }}
+                      >
+                         ✅ 保存业务信息
                       </button>
-                      <button type="button" onClick={() => { setEditingCourier(null); setCourierSubTab('list'); }} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '12px 30px', borderRadius: '10px', cursor: 'pointer', fontSize: '1.1rem' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => { setEditingCourier(null); setCourierSubTab('list'); }} 
+                        style={{ 
+                          background: 'rgba(255,255,255,0.1)', 
+                          color: 'white', 
+                          border: '1px solid rgba(255,255,255,0.2)', 
+                          padding: '14px 40px', 
+                          borderRadius: '12px', 
+                          cursor: 'pointer', 
+                          fontSize: '1.1rem',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                      >
                          取消
                       </button>
                    </div>
