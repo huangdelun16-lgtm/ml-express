@@ -70,7 +70,11 @@ export default function DeliveryAlerts() {
   const { language } = useLanguage();
   
   // 多语言翻译
-  const t = {
+  interface TranslationKeys {
+    title: string; subtitle: string; backToDashboard: string; criticalAlerts: string; resolvedToday: string; pendingAlerts: string; totalAlerts: string; newAlert: string; rider: string; alertId: string; alertType: string; severity: string; courier: string; status: string; action: string; actions: string; resolve: string; dismiss: string; detail: string; resolved: string; dismissed: string; pending: string; low: string; medium: string; high: string; critical: string; all: string; filterByStatus: string; filterBySeverity: string; loading: string; cancel: string; refresh: string;
+  }
+
+  const translations: Record<'zh' | 'en' | 'my', TranslationKeys> = {
     zh: {
       title: '配送警报管理',
       subtitle: '监控和管理骑手异常操作警报',
@@ -103,6 +107,7 @@ export default function DeliveryAlerts() {
       filterBySeverity: '严重程度',
       loading: '加载中...',
       cancel: '取消',
+      refresh: '刷新',
     },
     en: {
       title: 'Delivery Alert Management',
@@ -136,6 +141,7 @@ export default function DeliveryAlerts() {
       filterBySeverity: 'Severity',
       loading: 'Loading...',
       cancel: 'Cancel',
+      refresh: 'Refresh',
     },
     my: {
       title: 'ပို့ဆောင်ရေးသတိပေးချက်စီမံခန့်ခွဲမှု',
@@ -171,40 +177,9 @@ export default function DeliveryAlerts() {
       cancel: 'ပယ်ဖျက်ရန်',
       refresh: 'ဒေတာ အသစ်လုပ်ရန်',
     }
-  }[language as 'zh' | 'en' | 'my'] || {
-    title: '配送警报管理',
-    subtitle: '监控和管理骑手异常操作警报',
-    backToDashboard: '返回仪表板',
-    criticalAlerts: '紧急警报',
-    resolvedToday: '今日已处理',
-    pendingAlerts: '待处理警报',
-    totalAlerts: '总警报',
-    newAlert: '新警报',
-    rider: '骑手',
-    alertId: '警报ID',
-    alertType: '警报类型',
-    severity: '严重程度',
-    courier: '骑手姓名',
-    status: '处理状态',
-    action: '操作',
-    actions: '操作',
-    resolve: '处理',
-    dismiss: '忽略',
-    detail: '详情',
-    resolved: '已处理',
-    dismissed: '已忽略',
-    pending: '待处理',
-    low: '低',
-    medium: '中',
-    high: '高',
-    critical: '紧急',
-    all: '全部',
-    filterByStatus: '处理状态',
-    filterBySeverity: '严重程度',
-    loading: '加载中...',
-    cancel: '取消',
-    refresh: '刷新',
   };
+
+  const t: TranslationKeys = translations[language as 'zh' | 'en' | 'my'] || translations.zh;
 
   // 获取当前用户角色和区域信息
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
