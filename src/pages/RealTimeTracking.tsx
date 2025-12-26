@@ -19,6 +19,24 @@ const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  
+  // 获取当前用户角色和区域信息
+  const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
+  
+  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  const getDetectedRegion = () => {
+    const userUpper = currentUser.toUpperCase();
+    if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
+    if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
+        userUpper.startsWith('MDY') || userUpper.startsWith('POL')) return 'MDY';
+    return '';
+  };
+
+  const currentRegionPrefix = getDetectedRegion();
+  // 只要不是唯一的超级总管账号 "admin"，且检测到了领区前缀，就强制开启领区锁定
+  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+
   const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
@@ -26,8 +44,15 @@ const RealTimeTracking: React.FC = () => {
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   type CityKey = 'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse';
-  const [selectedCity, setSelectedCity] = useState<CityKey>('mandalay'); // 默认曼德勒（总部）
-  const [mapCenter, setMapCenter] = useState<Coordinates>({ lat: 21.9588, lng: 96.0891 }); // 曼德勒中心（总部）
+  
+  // 初始化城市和坐标逻辑
+  const initialCity: CityKey = currentRegionPrefix === 'YGN' ? 'yangon' : 'mandalay';
+  const initialCenter = currentRegionPrefix === 'YGN' 
+    ? { lat: 16.8661, lng: 96.1951 } 
+    : { lat: 21.9588, lng: 96.0891 };
+
+  const [selectedCity, setSelectedCity] = useState<CityKey>(initialCity); 
+  const [mapCenter, setMapCenter] = useState<Coordinates>(initialCenter); 
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
@@ -165,7 +190,13 @@ const RealTimeTracking: React.FC = () => {
     try {
       setLoadingStores(true);
       const data = await deliveryStoreService.getAllStores();
-      setStores(data);
+      
+      // 领区过滤
+      if (isRegionalUser) {
+        setStores(data.filter(s => s.store_code && s.store_code.startsWith(currentRegionPrefix)));
+      } else {
+        setStores(data);
+      }
     } catch (error) {
       errorHandler.handleErrorSilent(error, '加载快递店数据');
       setStores([]);
@@ -183,7 +214,12 @@ const RealTimeTracking: React.FC = () => {
       const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
       
       // 显示所有活跃包裹（待分配 + 已分配）
-      const activePackages = [...pendingPackages, ...assignedPackages];
+      let activePackages = [...pendingPackages, ...assignedPackages];
+      
+      // 领区过滤
+      if (isRegionalUser) {
+        activePackages = activePackages.filter(p => p.id.startsWith(currentRegionPrefix));
+      }
       
       setPackages(activePackages);
       
@@ -245,10 +281,18 @@ const RealTimeTracking: React.FC = () => {
         }
       });
 
-      // 4. 合并数据
-      const enrichedCouriers: CourierWithLocation[] = couriersData.map(courier => {
-        // 查找对应的位置信息
-        const location = locationsData?.find(loc => loc.courier_id === courier.id);
+      // 4. 合并数据并根据权限过滤
+      const enrichedCouriers: CourierWithLocation[] = couriersData
+        .filter(courier => {
+          // 如果是领区用户，只显示该领区的快递员
+          if (isRegionalUser) {
+            return courier.employee_id && courier.employee_id.startsWith(currentRegionPrefix);
+          }
+          return true;
+        })
+        .map(courier => {
+          // 查找对应的位置信息
+          const location = locationsData?.find(loc => loc.courier_id === courier.id);
         
         // 计算当前包裹数
         const currentPackages = packageCounts[courier.name] || 0;
@@ -393,6 +437,9 @@ const RealTimeTracking: React.FC = () => {
 
   // 切换城市
   const handleCityChange = (cityKey: string) => {
+    // 如果是领区用户，禁止切换城市（锁死）
+    if (isRegionalUser) return;
+
     const validCityKey = cityKey as CityKey;
     if (validCityKey in myanmarCities) {
       setSelectedCity(validCityKey);
@@ -403,6 +450,11 @@ const RealTimeTracking: React.FC = () => {
   
   // 根据城市过滤包裹
   const filterPackagesByCity = (pkgList: Package[]) => {
+    // 如果是领区用户，强制按领区前缀过滤（锁死）
+    if (isRegionalUser) {
+      return pkgList.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
+    }
+
     // 城市前缀映射（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
       'mandalay': 'MDY',      // 曼德勒（总部）
@@ -507,18 +559,20 @@ const RealTimeTracking: React.FC = () => {
             alignItems: 'center',
             gap: '0.5rem',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            cursor: 'pointer',
+            cursor: isRegionalUser ? 'default' : 'pointer',
             transition: 'all 0.2s'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
+            if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1.05)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
+            if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1)';
           }}
           >
             <span>📍</span>
-            <span>{myanmarCities[selectedCity].name}</span>
+            <span>
+              {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}
+            </span>
           </div>
           <div style={{ 
             background: '#10b981', 
@@ -600,41 +654,43 @@ const RealTimeTracking: React.FC = () => {
             position: 'relative'
           }}>
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
-              {/* 城市选择器 */}
-              <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                zIndex: 1000,
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '8px',
-                padding: '8px',
-                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                backdropFilter: 'blur(10px)'
-              }}>
-                <select
-                  value={selectedCity}
-                  onChange={(e) => handleCityChange(e.target.value)}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '2px solid #e5e7eb',
-                    background: 'white',
-                    color: '#1f2937',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    minWidth: '150px',
-                    outline: 'none'
-                  }}
-                >
-                  {Object.entries(myanmarCities).map(([key, city]) => (
-                    <option key={key} value={key}>
-                      📍 {city.name} ({city.nameEn})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 城市选择器 - 仅非领区限制用户（如 admin）显示 */}
+              {!isRegionalUser && (
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  zIndex: 1000,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => handleCityChange(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '2px solid #e5e7eb',
+                      background: 'white',
+                      color: '#1f2937',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      minWidth: '150px',
+                      outline: 'none'
+                    }}
+                  >
+                    {Object.entries(myanmarCities).map(([key, city]) => (
+                      <option key={key} value={key}>
+                        📍 {city.name} ({city.nameEn})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {!isMapLoaded ? (
                 <div style={{
