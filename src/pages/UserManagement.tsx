@@ -453,17 +453,53 @@ const UserManagement: React.FC = () => {
   const loadCouriers = async () => {
     try {
       setCourierLoading(true);
-      const { data, error } = await supabase
-        .from('couriers')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 1. 获取所有账号系统中的账号
+      const accounts = await adminAccountService.getAllAccounts();
       
-      if (error) {
-        console.error('获取快递员列表失败:', error);
-        setCouriers([]);
-      } else {
-        setCouriers(data || []);
+      // 2. 过滤出职位为 "骑手" 或 "骑手队长" 的账号
+      const riderAccounts = accounts.filter(acc => 
+        acc.position === '骑手' || acc.position === '骑手队长'
+      );
+
+      // 3. 获取快递员表中的实时数据（如总配送量、评分等）
+      const { data: realTimeData, error: rtError } = await supabase
+        .from('couriers')
+        .select('*');
+
+      if (rtError) {
+        console.warn('获取快递员实时数据失败:', rtError);
       }
+
+      // 4. 以账号系统为准，合并实时数据
+      const combinedCouriers: Courier[] = riderAccounts.map(acc => {
+        // 通过手机号或员工编号匹配
+        const rtInfo = realTimeData?.find(c => c.phone === acc.phone || c.employee_id === acc.employee_id);
+        
+        return {
+          id: acc.id || '',
+          name: acc.employee_name,
+          phone: acc.phone,
+          email: acc.email,
+          address: acc.address || '',
+          vehicle_type: rtInfo?.vehicle_type || (acc.position === '骑手队长' ? 'car' : 'motorcycle'),
+          license_number: rtInfo?.license_number || '',
+          status: acc.status,
+          join_date: acc.hire_date || (acc.created_at ? new Date(acc.created_at).toLocaleDateString('zh-CN') : '未知'),
+          last_active: rtInfo?.last_active || '从未上线',
+          total_deliveries: rtInfo?.total_deliveries || 0,
+          rating: rtInfo?.rating || 5.0,
+          notes: acc.notes || '',
+          employee_id: acc.employee_id,
+          department: acc.department,
+          position: acc.position,
+          role: acc.role,
+          region: acc.region,
+          created_at: acc.created_at,
+          updated_at: acc.updated_at
+        };
+      });
+
+      setCouriers(combinedCouriers);
     } catch (error) {
       console.error('加载快递员数据失败:', error);
       setCouriers([]);
@@ -652,84 +688,89 @@ const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!editingCourier) return;
 
-    const updatedCourier = { ...editingCourier, ...courierForm };
+    // 以账号系统为准进行更新
+    const updateData: any = {
+      employee_name: courierForm.name,
+      phone: courierForm.phone,
+      email: courierForm.email,
+      address: courierForm.address,
+      notes: courierForm.notes,
+      status: courierForm.status,
+      position: courierForm.position,
+      role: courierForm.role,
+      region: courierForm.region
+    };
 
     try {
-      const { error } = await supabase
+      // 1. 更新账号表 (admin_accounts)
+      const success = await adminAccountService.updateAccount(editingCourier.id, updateData);
+      
+      if (!success) throw new Error('更新账号系统失败');
+
+      // 2. 同步更新快递员表 (couriers) - 用于保存车辆和驾驶证等特殊信息
+      await supabase
         .from('couriers')
-        .update(updatedCourier)
+        .update({
+          name: courierForm.name,
+          phone: courierForm.phone,
+          vehicle_type: courierForm.vehicle_type,
+          license_number: courierForm.license_number,
+          status: courierForm.status,
+          address: courierForm.address
+        })
         .eq('id', editingCourier.id);
       
-      if (error) throw error;
-      
-      setCouriers(couriers.map(c => c.id === editingCourier.id ? updatedCourier : c));
+      window.alert('信息更新成功！');
+      await loadCouriers();
       setEditingCourier(null);
-      setCourierForm({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        vehicle_type: 'motorcycle',
-        license_number: '',
-        status: 'active',
-        notes: '',
-        employee_id: '',
-        department: '',
-        position: '',
-        role: 'operator',
-        region: 'yangon'
-      });
       setCourierSubTab('list');
     } catch (error) {
       console.error('更新快递员异常:', error);
-      alert('更新失败');
+      alert('更新失败，请重试');
     }
   };
 
   const handleDeleteCourier = async (courierId: string) => {
-    if (!window.confirm('确定要删除这个快递员吗？')) return;
-    
-    const courierToDelete = couriers.find(c => c.id === courierId);
+    if (!window.confirm('确定要删除这个快递员吗？这将同时删除其登录账号！')) return;
     
     try {
-      const { error } = await supabase
+      // 1. 从账号系统删除 (admin_accounts)
+      const success = await adminAccountService.deleteAccount(courierId);
+      
+      if (!success) {
+        // 如果删除失败，可能是因为该 ID 在 admin_accounts 中不存在，尝试直接从 couriers 删除
+        console.warn('账号系统删除失败，尝试直接从快递员表删除');
+      }
+
+      // 2. 从快递员表删除 (couriers)
+      await supabase
         .from('couriers')
         .delete()
         .eq('id', courierId);
       
-      if (error) throw error;
-      
-      setCouriers(couriers.filter(c => c.id !== courierId));
-      
-      const currentUser = localStorage.getItem('currentUser') || 'unknown';
-      const currentUserName = localStorage.getItem('currentUserName') || '未知用户';
-      
-      await auditLogService.log({
-        user_id: currentUser,
-        user_name: currentUserName,
-        action_type: 'delete',
-        module: 'couriers',
-        target_id: courierId,
-        target_name: `快递员 ${courierToDelete?.name || courierId}`,
-        action_description: `删除快递员，姓名：${courierToDelete?.name || '未知'}`,
-        old_value: JSON.stringify(courierToDelete)
-      });
+      window.alert('删除成功');
+      await loadCouriers();
     } catch (error) {
       console.error('删除快递员异常:', error);
-      setCouriers(couriers.filter(c => c.id !== courierId));
+      alert('删除失败');
     }
   };
 
   const handleCourierStatusChange = async (courierId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
+      // 1. 同步更新账号表状态
+      await adminAccountService.updateAccountStatus(courierId, newStatus as any);
+
+      // 2. 同步更新快递员表状态
+      await supabase
         .from('couriers')
-        .update({ status: newStatus })
+        .update({ 
+          status: newStatus,
+          last_active: new Date().toLocaleString('zh-CN')
+        })
         .eq('id', courierId);
       
-      if (error) throw error;
-      
-      setCouriers(couriers.map(c => c.id === courierId ? { ...c, status: newStatus } : c));
+      await loadCouriers();
     } catch (error) {
       console.error('更新状态异常:', error);
     }
@@ -1888,39 +1929,23 @@ const UserManagement: React.FC = () => {
             >
               📋 快递员列表
             </button>
-            <button
-              onClick={() => setCourierSubTab('create')}
-              style={{
-                background: courierSubTab === 'create' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}
-            >
-              ➕ {editingCourier ? '编辑快递员' : '添加快递员'}
-            </button>
-            <button
-              onClick={handleImportFromAccounts}
-              disabled={importing}
-              style={{
-                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                cursor: importing ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem',
-                marginLeft: 'auto',
-                opacity: importing ? 0.7 : 1
-              }}
-            >
-              {importing ? '⏳ 导入中...' : '📥 从账号导入'}
-            </button>
+            {editingCourier && (
+              <button
+                onClick={() => setCourierSubTab('create')}
+                style={{
+                  background: courierSubTab === 'create' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}
+              >
+                ✏️ 编辑快递员信息
+              </button>
+            )}
           </div>
 
           {courierSubTab === 'list' && (
