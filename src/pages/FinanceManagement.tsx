@@ -524,7 +524,8 @@ const FinanceManagement: React.FC = () => {
     if (!deliveryStores.length) return [];
 
     let filteredStores = [...deliveryStores];
-    if (isRegionalFinance) {
+    // 🌍 领区可见性：如果检测到是领区账号，则只显示该领区的店铺
+    if (isRegionalUser) {
       filteredStores = filteredStores.filter(s => 
         s.store_code && s.store_code.startsWith(currentRegionPrefix)
       );
@@ -563,7 +564,7 @@ const FinanceManagement: React.FC = () => {
         lastSettledAt
       };
     }).sort((a, b) => b.unclearedAmount - a.unclearedAmount);
-  }, [deliveryStores, packages]);
+  }, [deliveryStores, packages, isRegionalUser, currentRegionPrefix]);
 
   // 结清合伙店铺代收款
   const handleSettlePartner = async (storeId: string, storeName: string) => {
@@ -1131,8 +1132,8 @@ const FinanceManagement: React.FC = () => {
         >
           {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[])
             .filter(key => {
-              if (isRegionalFinance) {
-                // 财务账号过滤：隐藏总览、数据分析，保留收支记录供其管理自己添加的数据
+              if (isRegionalUser) {
+                // 🌍 领区账号过滤：隐藏总览、数据分析，保留收支、收款等业务模块
                 return !['overview', 'analytics'].includes(key);
               }
               return true;
@@ -5267,26 +5268,42 @@ const FinanceManagement: React.FC = () => {
                   </div>
                 )}
 
-                {store.unclearedAmount > 0 && !isRegionalFinance && (
+                {store.unclearedAmount > 0 && (
                   <button
-                    onClick={() => handleSettlePartner(store.id, store.store_name)}
+                    onClick={() => !isRegionalUser && handleSettlePartner(store.id, store.store_name)}
+                    disabled={isRegionalUser}
                     style={{
                       width: '100%',
                       padding: '12px',
                       borderRadius: '12px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-                      color: 'white',
+                      background: isRegionalUser 
+                        ? 'rgba(255, 255, 255, 0.1)' 
+                        : 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                      color: isRegionalUser ? 'rgba(255, 255, 255, 0.4)' : 'white',
                       fontWeight: 'bold',
-                      cursor: 'pointer',
+                      cursor: isRegionalUser ? 'not-allowed' : 'pointer',
                       marginTop: 'auto',
-                      boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
-                      transition: 'transform 0.2s'
+                      boxShadow: isRegionalUser ? 'none' : '0 4px 15px rgba(239, 68, 68, 0.4)',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseOver={(e) => {
+                      if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1.02)';
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1)';
+                    }}
                   >
-                    确认结清 ({store.unclearedAmount.toLocaleString()} MMK)
+                    <span>确认结清 ({store.unclearedAmount.toLocaleString()} MMK)</span>
+                    {isRegionalUser && (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.8 }}>
+                        🔒 仅限总公司管理员操作
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
