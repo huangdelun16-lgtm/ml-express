@@ -1368,7 +1368,7 @@ const FinanceManagement: React.FC = () => {
                 }
               }}
             >
-              {loading ? `🔄 ${t.loadingData}` : `🔄 ${t.refreshData}`}
+              {loading ? '🔄 ' + t.loadingData : '🔄 ' + t.refreshData}
             </button>
             <button
               onClick={() => navigate('/admin/dashboard')}

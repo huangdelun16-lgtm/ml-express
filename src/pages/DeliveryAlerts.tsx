@@ -964,7 +964,7 @@ export default function DeliveryAlerts() {
                 fontWeight: 500
               }}
             >
-              {loading ? t.loading : `🔄 ${language === 'my' ? 'ဒေတာ အသစ်လုပ်ရန်' : '刷新'}`}
+              {loading ? t.loading : (language === 'my' ? '🔄 ဒေတာ အသစ်လုပ်ရန်' : '🔄 刷新')}
             </button>
           </div>
         </div>
