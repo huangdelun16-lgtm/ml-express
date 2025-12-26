@@ -27,6 +27,8 @@ const AccountManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [permissionsFormData, setPermissionsPermissionsFormData] = useState<string[]>([]);
   const [viewingAccount, setViewingAccount] = useState<AdminAccount | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCvUploadModal, setShowCvUploadModal] = useState(false);
@@ -241,14 +243,50 @@ const AccountManagement: React.FC = () => {
     setShowViewModal(true);
   };
 
-  const handleEditAccount = (account: AdminAccount) => {
+  const handleEditPermissions = (account: AdminAccount) => {
     setEditingAccount(account);
-    setEditFormData({
-      username: account.username,
-      password: '', // 不显示原密码
-      employee_name: account.employee_name
-    });
-    setShowEditModal(true);
+    setPermissionsPermissionsFormData(account.permissions || []);
+    setShowPermissionsModal(true);
+  };
+
+  const handleUpdatePermissions = async () => {
+    if (!editingAccount || !editingAccount.id) return;
+
+    try {
+      const success = await adminAccountService.updateAccount(editingAccount.id, {
+        permissions: permissionsFormData
+      });
+
+      if (success) {
+        showNotification('权限更新成功！', 'success');
+        setShowPermissionsModal(false);
+        loadAccounts();
+      } else {
+        showNotification('权限更新失败', 'error');
+      }
+    } catch (error) {
+      console.error('更新权限异常:', error);
+      showNotification('操作出错', 'error');
+    }
+  };
+
+  const AVAILABLE_PERMISSIONS = [
+    { id: 'city_packages', name: '同城订单', icon: '📦' },
+    { id: 'users', name: '用户管理', icon: '👥' },
+    { id: 'partner_stores', name: '合伙店铺', icon: '🏪' },
+    { id: 'finance', name: '财务管理', icon: '💰' },
+    { id: 'tracking', name: '实时跟踪', icon: '📍' },
+    { id: 'settings', name: '系统设置', icon: '⚙️' },
+    { id: 'delivery_alerts', name: '配送警报', icon: '🚨' },
+    { id: 'banners', name: '广告管理', icon: '🖼️' },
+  ];
+
+  const togglePermission = (permId: string) => {
+    setPermissionsPermissionsFormData(prev => 
+      prev.includes(permId) 
+        ? prev.filter(id => id !== permId) 
+        : [...prev, permId]
+    );
   };
 
   const handleUpdateAccount = async (e: React.FormEvent) => {
@@ -1311,6 +1349,13 @@ const AccountManagement: React.FC = () => {
                             ✏️
                           </button>
                           <button
+                            onClick={() => handleEditPermissions(account)}
+                            title="管理权限"
+                            style={actionButtonStyle('#9f7aea')}
+                          >
+                            🔑
+                          </button>
+                          <button
                             onClick={() => handleDeleteAccount(account)}
                             title="删除账号"
                             style={actionButtonStyle('#f56565')}
@@ -2130,7 +2175,7 @@ const AccountManagement: React.FC = () => {
         </div>
       )}
 
-      <style>{`
+        <style>{`
         @keyframes slideInRight {
           from {
             transform: translateX(100%);
@@ -2155,7 +2200,129 @@ const AccountManagement: React.FC = () => {
           100% { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
+
+        {/* 权限管理模态框 */}
+        {showPermissionsModal && editingAccount && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              borderRadius: '24px',
+              padding: '32px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: 'white',
+              width: '90%',
+              maxWidth: '600px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔑</div>
+                <h2 style={{ margin: '0 0 8px 0', fontSize: '1.5rem' }}>管理账号权限</h2>
+                <p style={{ margin: 0, opacity: 0.6 }}>
+                  为 <span style={{ color: '#63b3ed', fontWeight: 'bold' }}>{editingAccount.employee_name}</span> 配置专属功能访问权限
+                </p>
+              </div>
+
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                gap: '12px',
+                marginBottom: '32px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                padding: '4px'
+              }}>
+                {AVAILABLE_PERMISSIONS.map(perm => (
+                  <div 
+                    key={perm.id}
+                    onClick={() => togglePermission(perm.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '16px',
+                      background: permissionsFormData.includes(perm.id) 
+                        ? 'rgba(66, 153, 225, 0.15)' 
+                        : 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: '16px',
+                      border: `1px solid ${permissionsFormData.includes(perm.id) ? '#4299e1' : 'rgba(255,255,255,0.08)'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
+                    <div style={{ fontSize: '1.5rem' }}>{perm.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{perm.name}</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>{perm.id}</div>
+                    </div>
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '6px',
+                      border: '2px solid rgba(255,255,255,0.2)',
+                      background: permissionsFormData.includes(perm.id) ? '#4299e1' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      color: 'white'
+                    }}>
+                      {permissionsFormData.includes(perm.id) && '✓'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleUpdatePermissions}
+                  style={{
+                    background: 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 40px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    boxShadow: '0 10px 20px rgba(49, 130, 206, 0.3)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  保存权限设置
+                </button>
+                <button
+                  onClick={() => setShowPermissionsModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    padding: '12px 32px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem'
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
   );
 };
 

@@ -136,6 +136,7 @@ export interface AdminAccount {
   notes?: string;
   region?: string; // 员工所属区域
   cv_images?: string[]; // 新增CV图片字段
+  permissions?: string[]; // 账号特有权限列表
   created_by?: string;
   last_login?: string;
   created_at?: string;
@@ -1577,7 +1578,7 @@ export const adminAccountService = {
     try {
       const { data, error } = await supabase
         .from('admin_accounts')
-        .select('id, username, employee_name, employee_id, phone, email, department, position, salary, role, status, hire_date, last_login, created_at')
+        .select('id, username, employee_name, employee_id, phone, email, department, position, salary, role, status, hire_date, last_login, created_at, region, permissions')
         .order('created_at', { ascending: false });
 
       if (error) {

@@ -13,6 +13,8 @@ const AdminDashboard: React.FC = () => {
   const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
+  const currentUserPermissionsStr = sessionStorage.getItem('currentUserPermissions') || localStorage.getItem('currentUserPermissions') || '[]';
+  const currentUserPermissions = JSON.parse(currentUserPermissionsStr);
 
   // 获取工作区域
   const getWorkRegion = () => {
@@ -109,6 +111,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
   // 所有卡片数据及其权限配置
   const allCardData = [
     {
+      id: 'city_packages',
       title: language === 'zh' ? '同城订单' : language === 'en' ? 'City Orders' : 'မြို့တွင်းအော်ဒါများ',
       description: language === 'zh' ? '同城快递包裹管理' : language === 'en' ? 'Local express package management' : 'မြို့တွင်းပက်ကေ့ဂျ်စီမံခန့်ခွဲမှု',
       color: '#2c5282',
@@ -116,13 +119,15 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager', 'operator', 'finance'] // 所有角色都可访问
     },
     {
+      id: 'users',
       title: language === 'zh' ? '用户管理' : language === 'en' ? 'User Management' : 'အသုံးပြုသူစီမံခန့်ခွဲမှု',
-      description: language === 'zh' ? '客户信息和行为分析' : language === 'en' ? 'Customer info and behavior analysis' : 'ဖောက်သည်အချက်အလက်နှင့်အပြုအမူခွဲခြမ်းစိတ်ဖြာမှု',
+      description: language === 'zh' ? '客户信息和行为分析' : language === 'en' ? 'Customer info and behavior analysis' : 'ဖောက်သည်အချက်အလက်และအပြုအမူခွဲခြမ်းစိတ်ဖြาမှု',
       color: '#3182ce',
       icon: '👥',
       roles: ['admin', 'manager'] // 仅管理员和经理可访问
     },
     {
+      id: 'partner_stores',
       title: language === 'zh' ? '合伙店铺' : language === 'en' ? 'Partner Stores' : 'လုပ်ဖော်ကိုင်ဖက်ဆိုင်များ',
       description: language === 'zh' ? '管理合伙店铺位置和信息' : language === 'en' ? 'Manage partner store locations and information' : 'လုပ်ဖော်ကိုင်ဖက်ဆိုင်တည်နေရာနှင့်အချက်အလက်များစီမံခန့်ခွဲမှု',
       color: '#38a169',
@@ -130,6 +135,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager'] // 管理员和经理可访问
     },
     {
+      id: 'finance',
       title: language === 'zh' ? '财务管理' : language === 'en' ? 'Finance Management' : 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု',
       description: language === 'zh' ? '收入统计和佣金管理' : language === 'en' ? 'Income statistics and commission management' : 'ဝင်ငွေစာရင်းအင်းနှင့်ကော်မရှင်စီမံခန့်ခွဲမှု',
       color: '#3182ce',
@@ -137,6 +143,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager', 'finance'] // 管理员、经理和财务可访问
     },
     {
+      id: 'tracking',
       title: language === 'zh' ? '实时跟踪' : language === 'en' ? 'Real-time Tracking' : 'အချိန်နှင့်တစ်ပြေးညီခြေရာခံမှု',
       description: language === 'zh' ? 'GPS位置监控和路线跟踪' : language === 'en' ? 'GPS location monitoring and route tracking' : 'GPS တည်နေရာစောင့်ကြည့်ခြင်းနှင့်လမ်းကြောင်းခြေရာခံခြင်း',
       color: '#2c5282',
@@ -144,6 +151,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager', 'operator', 'finance'] // 管理员、经理、操作员和财务可访问
     },
     {
+      id: 'settings',
       title: language === 'zh' ? '系统设置' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု',
       description: language === 'zh' ? '价格规则和系统配置' : language === 'en' ? 'Price rules and system configuration' : 'စျေးနှုန်းစည်းမျဉ်းများနှင့်စနစ်စီမံဖွဲ့စည်းမှု',
       color: '#3182ce',
@@ -151,6 +159,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin'] // 仅管理员可访问
     },
     {
+      id: 'delivery_alerts',
       title: language === 'zh' ? '配送警报' : language === 'en' ? 'Delivery Alerts' : 'ပို့ဆောင်ရေးသတိပေးချက်များ',
       description: language === 'zh' ? '骑手异常操作监控和警报管理' : language === 'en' ? 'Courier anomaly monitoring and alert management' : 'ကောင်ရီယာကိစ္စပုံမှန်မဟုတ်သောစောင့်ကြည့်မှုနှင့်သတိပေးချက်စီမံခန့်ခွဲမှု',
       color: '#dc2626',
@@ -158,16 +167,24 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       roles: ['admin', 'manager', 'finance'] // 管理员、经理和财务可访问
     },
     {
+      id: 'banners',
       title: language === 'zh' ? '广告管理' : language === 'en' ? 'Ad Management' : 'ကြော်ငြာစီမံခန့်ခွဲမှု',
-      description: language === 'zh' ? '管理移动端首页轮播广告内容' : language === 'en' ? 'Manage mobile app home carousel content' : 'မိုဘိုင်းအက်ပ်ပင်မစာမျက်နှာကြော်ငြာများစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '管理移动端首页轮播广告内容' : language === 'en' ? 'Manage mobile app home carousel content' : 'မိုဘိုင်းအက်ပ်ပင်မစာမျက်နှาကြော်ငြာများစီမံခန့်ခွဲမှု',
       color: '#805ad5',
       icon: '🖼️',
       roles: ['admin', 'manager'] // 管理员和经理可访问
     },
   ];
 
-  // 根据当前用户角色筛选可访问的卡片
-  const cardData = allCardData.filter(card => card.roles.includes(currentUserRole));
+  // 根据当前用户角色或特有权限筛选可访问的卡片
+  const cardData = allCardData.filter(card => {
+    // 如果用户拥有特有权限列表，且包含该卡片的 ID
+    if (currentUserPermissions && Array.isArray(currentUserPermissions) && currentUserPermissions.length > 0) {
+      if (currentUserPermissions.includes(card.id)) return true;
+    }
+    // 否则回退到角色基础权限
+    return card.roles.includes(currentUserRole);
+  });
 
   const handleCardClick = (title: string) => {
     // 根据卡片标题（支持中英缅文）导航到对应页面
