@@ -580,7 +580,35 @@ const FinanceManagement: React.FC = () => {
       setPackages(packageData);
       setCourierSalaries(salaryData);
       setAdminAccounts(accountsData);
-      setCouriers(couriersData.data || []);
+      
+      // 🔄 同步逻辑：以账号系统为准，过滤并合并快递员数据
+      // 只有职位为 "骑手" 或 "骑手队长" 的账号才会出现在财务收款列表中
+      const riderAccounts = accountsData.filter(acc => 
+        acc.position === '骑手' || acc.position === '骑手队长'
+      );
+      
+      const realTimeData = couriersData.data || [];
+      const combinedCouriers = riderAccounts.map(acc => {
+        // 通过手机号或员工编号匹配快递员实时数据（如配送量、评分等）
+        const rtInfo = realTimeData.find(c => c.phone === acc.phone || c.employee_id === acc.employee_id);
+        
+        return {
+          ...rtInfo,
+          id: acc.id || rtInfo?.id || '',
+          name: acc.employee_name,
+          phone: acc.phone,
+          employee_id: acc.employee_id,
+          region: acc.region,
+          status: acc.status,
+          vehicle_type: rtInfo?.vehicle_type || (acc.position === '骑手队长' ? 'car' : 'motorcycle'),
+          total_deliveries: rtInfo?.total_deliveries || 0,
+          rating: rtInfo?.rating || 5.0,
+          last_active: rtInfo?.last_active || '从未上线',
+          join_date: acc.hire_date || (acc.created_at ? new Date(acc.created_at).toLocaleDateString('zh-CN') : '未知')
+        };
+      });
+
+      setCouriers(combinedCouriers);
       setDeliveryStores(storesData);
     } catch (error) {
       console.error('加载财务数据失败:', error);
@@ -4373,86 +4401,141 @@ const FinanceManagement: React.FC = () => {
                       <div
                         key={courier.id}
                         style={{
-                          background: 'rgba(255, 255, 255, 0.12)',
-                          borderRadius: '16px',
-                          padding: isMobile ? '16px' : '20px',
-                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                          borderRadius: '20px',
+                          padding: isMobile ? '20px' : '24px',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           flexWrap: 'wrap',
-                          gap: '12px'
+                          gap: '16px',
+                          backdropFilter: 'blur(10px)',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                          transition: 'transform 0.3s ease'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                       >
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                            <h4 style={{ margin: 0, color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                              🚚 {courierName}
-                            </h4>
-                            {employeeId !== '无' && (
-                              <span style={{
-                                background: 'rgba(219, 234, 254, 0.2)',
-                                color: '#dbeafe',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '500'
-                              }}>
-                                工号: {employeeId}
-                              </span>
-                            )}
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                            <div style={{ 
+                              width: '50px', 
+                              height: '50px', 
+                              borderRadius: '14px', 
+                              background: 'rgba(59, 130, 246, 0.25)', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              fontSize: '1.8rem',
+                              border: '1px solid rgba(59, 130, 246, 0.3)'
+                            }}>
+                              {courier.vehicle_type === 'car' ? '🚗' : '🏍️'}
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 800 }}>
+                                {courierName}
+                              </h4>
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '4px', alignItems: 'center' }}>
+                                <span style={{
+                                  background: 'rgba(72, 187, 120, 0.15)',
+                                  color: '#4ade80',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  fontFamily: 'monospace'
+                                }}>
+                                  #{employeeId}
+                                </span>
+                                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 600 }}>
+                                  {(() => {
+                                    const r = REGIONS.find(reg => reg.id === courier.region || reg.prefix === courier.region);
+                                    return r ? r.prefix : (courier.region || '-');
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
-                            {cashData.packages.length > 0 ? (
-                              <>现金收款: {cashData.total.toLocaleString()} MMK ({cashData.packages.length} 个包裹)</>
-                            ) : (
-                              <>暂无现金收款记录</>
-                            )}
+                          
+                          <div style={{ 
+                            background: 'rgba(0,0,0,0.2)', 
+                            padding: '12px 16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            display: 'inline-block'
+                          }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>当日待收现金</div>
+                            <div style={{ color: cashData.total > 0 ? '#fbbf24' : 'rgba(255,255,255,0.4)', fontSize: '1.2rem', fontWeight: 800 }}>
+                              {cashData.total.toLocaleString()} MMK
+                              <span style={{ fontSize: '0.85rem', fontWeight: 500, marginLeft: '8px', opacity: 0.7 }}>
+                                ({cashData.packages.length} 个包裹)
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedCourier(courierName);
-                            setShowCashDetailModal(true);
-                            setCashDetailDateFilter('all');
-                            setCashDetailStartDate('');
-                            setCashDetailEndDate('');
-                            setSelectedCashPackages(new Set());
-                            setClearedCashPackages(new Set());
-                          }}
-                          style={{
-                            background: cashData.packages.length > 0 
-                              ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                              : 'rgba(255, 255, 255, 0.1)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '10px',
-                            fontSize: '0.9rem',
-                            fontWeight: '600',
-                            cursor: cashData.packages.length > 0 ? 'pointer' : 'not-allowed',
-                            opacity: cashData.packages.length > 0 ? 1 : 0.5,
-                            transition: 'all 0.3s ease',
-                            boxShadow: cashData.packages.length > 0 
-                              ? '0 4px 12px rgba(59, 130, 246, 0.3)'
-                              : 'none'
-                          }}
-                          disabled={cashData.packages.length === 0}
-                          onMouseOver={(e) => {
-                            if (cashData.packages.length > 0) {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (cashData.packages.length > 0) {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                            }
-                          }}
-                        >
-                          详情
-                        </button>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: isMobile ? 'flex-start' : 'flex-end' }}>
+                          <div style={{ 
+                            background: courier.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
+                            color: courier.status === 'active' ? '#10b981' : '#f87171', 
+                            padding: '6px 16px', 
+                            borderRadius: '10px', 
+                            fontSize: '0.85rem', 
+                            fontWeight: 800,
+                            border: `1px solid ${courier.status === 'active' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 8px currentColor' }}></span>
+                            {courier.status === 'active' ? '在线' : '离线'}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedCourier(courierName);
+                              setShowCashDetailModal(true);
+                              setCashDetailDateFilter('all');
+                              setCashDetailStartDate('');
+                              setCashDetailEndDate('');
+                              setSelectedCashPackages(new Set());
+                              setClearedCashPackages(new Set());
+                            }}
+                            style={{
+                              background: cashData.packages.length > 0 
+                                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                : 'rgba(255, 255, 255, 0.1)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '12px 32px',
+                              borderRadius: '12px',
+                              fontSize: '1rem',
+                              fontWeight: 'bold',
+                              cursor: cashData.packages.length > 0 ? 'pointer' : 'not-allowed',
+                              opacity: cashData.packages.length > 0 ? 1 : 0.5,
+                              transition: 'all 0.3s ease',
+                              boxShadow: cashData.packages.length > 0 
+                                ? '0 8px 20px rgba(59, 130, 246, 0.35)'
+                                : 'none'
+                            }}
+                            disabled={cashData.packages.length === 0}
+                            onMouseOver={(e) => {
+                              if (cashData.packages.length > 0) {
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                                e.currentTarget.style.filter = 'brightness(1.1)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (cashData.packages.length > 0) {
+                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.filter = 'brightness(1)';
+                              }
+                            }}
+                          >
+                            详情
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -5173,4 +5256,5 @@ const FinanceManagement: React.FC = () => {
 };
 
 export default FinanceManagement;
+
 
