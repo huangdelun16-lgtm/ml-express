@@ -66,6 +66,23 @@ interface AdminAuditLog {
 
 export default function DeliveryAlerts() {
   const navigate = useNavigate();
+  
+  // 获取当前用户角色和区域信息
+  const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
+  
+  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  const getDetectedRegion = () => {
+    const userUpper = currentUser.toUpperCase();
+    if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
+    if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
+        userUpper.startsWith('MDY') || userUpper.startsWith('POL')) return 'MDY';
+    return '';
+  };
+
+  const currentRegionPrefix = getDetectedRegion();
+  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+
   const [alerts, setAlerts] = useState<DeliveryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all'); // all, pending, resolved
@@ -678,8 +695,21 @@ export default function DeliveryAlerts() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c' }}>
+                <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   🚨 配送警报管理
+                  {isRegionalUser && (
+                    <span style={{ 
+                      background: '#48bb78', 
+                      color: 'white', 
+                      padding: '4px 12px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                    }}>
+                      📍 {currentRegionPrefix}
+                    </span>
+                  )}
                 </h1>
                 <p style={{ margin: '8px 0 0 0', color: '#718096', fontSize: '1rem' }}>
                   监控和管理骑手异常操作警报

@@ -112,11 +112,23 @@ const FinanceManagement: React.FC = () => {
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
   const isFinance = currentUserRole === 'finance';
-  const isMDYFinance = isFinance && (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || currentUser.startsWith('MDY') || currentUser.startsWith('POL'));
-  const isYGNFinance = isFinance && (currentUserRegion === 'yangon' || currentUser.startsWith('YGN'));
+  
+  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  const getDetectedRegion = () => {
+    const userUpper = currentUser.toUpperCase();
+    if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
+    if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
+        userUpper.startsWith('MDY') || userUpper.startsWith('POL')) return 'MDY';
+    return '';
+  };
+
+  const currentRegionPrefix = getDetectedRegion();
+  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+  
+  const isMDYFinance = isFinance && currentRegionPrefix === 'MDY';
+  const isYGNFinance = isFinance && currentRegionPrefix === 'YGN';
   
   const isRegionalFinance = isMDYFinance || isYGNFinance;
-  const currentRegionPrefix = isMDYFinance ? 'MDY' : isYGNFinance ? 'YGN' : '';
 
   const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'package_records' : 'overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
@@ -1019,10 +1031,26 @@ const FinanceManagement: React.FC = () => {
                 fontSize: '2.4rem',
                 margin: 0,
                 letterSpacing: '1px',
-                textShadow: '0 8px 20px rgba(3, 27, 78, 0.55)'
+                textShadow: '0 8px 20px rgba(3, 27, 78, 0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
               }}
             >
               💰 财务管理
+              {isRegionalUser && (
+                <span style={{ 
+                  background: '#48bb78', 
+                  color: 'white', 
+                  padding: '4px 12px', 
+                  borderRadius: '8px', 
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                }}>
+                  📍 {currentRegionPrefix}
+                </span>
+              )}
             </h1>
             <p style={{ margin: '8px 0 0 0', color: 'rgba(255, 255, 255, 0.75)' }}>
               管理收入、支出、账务流程，以及快递员佣金结算
