@@ -679,55 +679,63 @@ export const pendingOrderService = {
 // 系统设置服务（客户端使用）
 export const systemSettingsService = {
   // 获取计费规则
-  async getPricingSettings() {
+  async getPricingSettings(region?: string) {
     try {
       const { data, error } = await supabase
         .from('system_settings')
         .select('settings_key, settings_value')
         .like('settings_key', 'pricing.%');
 
-      if (error) {
-        LoggerService.error('获取计费设置失败:', error);
-        // 返回系统默认值
-        return {
-          baseFee: 1500,
-          perKmFee: 250,
-          weightSurcharge: 150,
-          urgentSurcharge: 500,
-          oversizeSurcharge: 300,
-          scheduledSurcharge: 200,
-          fragileSurcharge: 300,
-          foodBeverageSurcharge: 300,
-          freeKmThreshold: 3
-        };
-      }
+      if (error) throw error;
 
-      // 转换为对象格式
-      const settings: { [key: string]: number } = {};
-      data?.forEach((item: any) => {
-        const key = item.settings_key.replace('pricing.', '');
-        let value = item.settings_value;
-        if (typeof value === 'string') {
-          try {
-            value = JSON.parse(value);
-          } catch {
-            value = parseFloat(value) || 0;
+      // 默认全局计费
+      const settings: any = {
+        baseFee: 1500,
+        perKmFee: 250,
+        weightSurcharge: 150,
+        urgentSurcharge: 500,
+        oversizeSurcharge: 300,
+        scheduledSurcharge: 200,
+        fragileSurcharge: 300,
+        foodBeverageSurcharge: 300,
+        freeKmThreshold: 3,
+      };
+
+      if (data && data.length > 0) {
+        // 如果指定了区域，优先寻找该区域的配置
+        if (region) {
+          const regionPrefix = `pricing.${region.toLowerCase()}.`;
+          const regionSettings = data.filter(item => item.settings_key.startsWith(regionPrefix));
+          
+          if (regionSettings.length > 0) {
+            regionSettings.forEach((item: any) => {
+              const key = item.settings_key.replace(regionPrefix, '');
+              const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+              let value = item.settings_value;
+              if (typeof value === 'string') {
+                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+              }
+              settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
+            });
+            return settings;
           }
         }
-        settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-      });
 
-      return {
-        baseFee: settings.base_fee !== undefined ? settings.base_fee : 1500,
-        perKmFee: settings.per_km_fee !== undefined ? settings.per_km_fee : 250,
-        weightSurcharge: settings.weight_surcharge !== undefined ? settings.weight_surcharge : 150,
-        urgentSurcharge: settings.urgent_surcharge !== undefined ? settings.urgent_surcharge : 500,
-        oversizeSurcharge: settings.oversize_surcharge !== undefined ? settings.oversize_surcharge : 300,
-        scheduledSurcharge: settings.scheduled_surcharge !== undefined ? settings.scheduled_surcharge : 200,
-        fragileSurcharge: settings.fragile_surcharge !== undefined ? settings.fragile_surcharge : 300,
-        foodBeverageSurcharge: settings.food_beverage_surcharge !== undefined ? settings.food_beverage_surcharge : 300,
-        freeKmThreshold: settings.free_km_threshold !== undefined ? settings.free_km_threshold : 3
-      };
+        // 应用全局默认设置（排除掉其他领区的设置）
+        data.forEach((item: any) => {
+          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
+            const key = item.settings_key.replace('pricing.', '');
+            const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+            let value = item.settings_value;
+            if (typeof value === 'string') {
+              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+            }
+            settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
+          }
+        });
+      }
+
+      return settings;
     } catch (error) {
       LoggerService.error('获取计费设置异常:', error);
       return {

@@ -121,7 +121,7 @@ cd /Users/aungmyatthu/Desktop/ml-express
 
 # 2. 设置环境变量
 export REACT_APP_SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_SERVICE_ROLE="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+export SUPABASE_SERVICE_ROLE="YOUR_SUPABASE_ANON_KEY_HERE"
 
 # 3. 运行迁移脚本
 node scripts/force-migrate-passwords.js

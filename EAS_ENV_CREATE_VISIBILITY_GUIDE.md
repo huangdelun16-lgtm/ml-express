@@ -52,7 +52,7 @@
 
 ```bash
 # 方法 1: 交互式选择（当前方式）
-eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "YOUR_SUPABASE_ANON_KEY_HERE"
 
 # 然后选择 "Sensitive" 或 "Plain text"
 ```

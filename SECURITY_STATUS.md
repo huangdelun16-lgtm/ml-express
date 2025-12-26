@@ -167,7 +167,7 @@ Value: [请从 Supabase Dashboard → Settings → API → API Keys 获取 Anon 
 ```toml
 [build.environment]
   REACT_APP_SUPABASE_URL = "https://uopkyuluxnrewvlmutam.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  REACT_APP_SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"
 ```
 
 **注意**：这种方法仍然会将密钥暴露在代码仓库中，不推荐用于生产环境。

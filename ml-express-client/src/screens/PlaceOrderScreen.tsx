@@ -103,6 +103,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentRegion, setCurrentRegion] = useState<string>(''); // 当前订单所属区域
   
   // 寄件人信息
   const [senderName, setSenderName] = useState('');
@@ -719,14 +720,54 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
-  const loadPricingSettings = async () => {
+  const loadPricingSettings = async (region?: string) => {
     try {
-      const settings = await systemSettingsService.getPricingSettings();
+      const settings = await systemSettingsService.getPricingSettings(region);
       setPricingSettings(settings);
+      LoggerService.debug(`✅ 已加载${region ? region : '全局'}计费规则`);
     } catch (error) {
       errorService.handleError(error, { context: 'PlaceOrderScreen.loadPricingSettings' });
     }
   };
+
+  // 根据寄件地址检测领区并加载对应计费规则
+  useEffect(() => {
+    const detectAndLoadPricing = async () => {
+      if (!senderAddress) {
+        if (currentRegion !== '') {
+          setCurrentRegion('');
+          loadPricingSettings();
+        }
+        return;
+      }
+
+      // 领区映射逻辑（与ID生成一致）
+      const regionMap: { [key: string]: string } = {
+        '曼德勒': 'mandalay', 'Mandalay': 'mandalay', 'မန္တလေး': 'mandalay',
+        '眉苗': 'maymyo', 'Pyin Oo Lwin': 'maymyo', '彬乌伦': 'maymyo', 'ပင်းတလဲ': 'maymyo',
+        '仰光': 'yangon', 'Yangon': 'yangon', 'ရန်ကုန်': 'yangon',
+        '内比都': 'naypyidaw', 'NPW': 'naypyidaw', 'နေပြည်တော်': 'naypyidaw',
+        '东枝': 'taunggyi', 'TGI': 'taunggyi', 'တောင်ကြီး': 'taunggyi',
+        '腊戌': 'lashio', 'Lashio': 'lashio', 'လားရှိုး': 'lashio',
+        '木姐': 'muse', 'Muse': 'muse', 'မူဆယ်': 'muse'
+      };
+
+      let detectedRegion = '';
+      for (const [city, regionId] of Object.entries(regionMap)) {
+        if (senderAddress.includes(city)) {
+          detectedRegion = regionId;
+          break;
+        }
+      }
+
+      if (detectedRegion !== currentRegion) {
+        setCurrentRegion(detectedRegion);
+        loadPricingSettings(detectedRegion);
+      }
+    };
+
+    detectAndLoadPricing();
+  }, [senderAddress]);
 
   // 切换使用我的信息
   useEffect(() => {
@@ -1134,35 +1175,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
       const generateOrderId = (address: string) => {
         // 城市前缀映射（以曼德勒为中心）
         const cityPrefixMap: { [key: string]: string } = {
-          // 曼德勒（总部）
-          '曼德勒': 'MDY',
-          'Mandalay': 'MDY',
-          'မန္တလေး': 'MDY',
-          // 眉苗
-          '眉苗': 'POL',
-          'Pyin Oo Lwin': 'POL',
-          '彬乌伦': 'POL',
-          'ပင်းတလဲ': 'POL',
-          // 仰光（开发中）
-          '仰光': 'YGN',
-          'Yangon': 'YGN',
-          'ရန်ကုန်': 'YGN',
-          // 内比都（开发中）
-          '内比都': 'NPW',
-          'Naypyidaw': 'NPW',
-          'နေပြည်တော်': 'NPW',
-          // 东枝（开发中）
-          '东枝': 'TGI',
-          'Taunggyi': 'TGI',
-          'တောင်ကြီး': 'TGI',
-          // 腊戌（开发中）
-          '腊戌': 'LSO',
-          'Lashio': 'LSO',
-          'လားရှိုး': 'LSO',
-          // 木姐（开发中）
-          '木姐': 'MSE',
-          'Muse': 'MSE',
-          'မူဆယ်': 'MSE'
+          '曼德勒': 'MDY', 'Mandalay': 'MDY', 'မန္တလေး': 'MDY',
+          '眉苗': 'POL', 'Pyin Oo Lwin': 'POL', '彬乌伦': 'POL', 'ပင်းတလဲ': 'POL',
+          '仰光': 'YGN', 'Yangon': 'YGN', 'ရန်ကုန်': 'YGN',
+          '内比都': 'NPW', 'Naypyidaw': 'NPW', 'နေပြည်တော်': 'NPW',
+          '东枝': 'TGI', 'Taunggyi': 'TGI', 'တောင်ကြီး': 'TGI',
+          '腊戌': 'LSO', 'Lashio': 'LSO', 'လားရှိုး': 'LSO',
+          '木姐': 'MSE', 'Muse': 'MSE', 'မူဆယ်': 'MSE'
         };
         
         // 判断城市前缀

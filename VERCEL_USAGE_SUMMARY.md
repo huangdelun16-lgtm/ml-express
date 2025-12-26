@@ -126,7 +126,7 @@ console.error('请在部署平台（Vercel/Netlify）的环境变量设置中配
 3. **配置环境变量**
    - `REACT_APP_GOOGLE_MAPS_API_KEY`: `AIzaSyBQXxGLGseV9D0tXs01IaZlim6yksYG3mM`
    - `REACT_APP_SUPABASE_URL`: `https://uopkyuluxnrewvlmutam.supabase.co`
-   - `REACT_APP_SUPABASE_ANON_KEY`: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - `REACT_APP_SUPABASE_ANON_KEY`: `YOUR_SUPABASE_ANON_KEY_HERE`
 
 4. **配置域名**
    - 在 Vercel Dashboard 中添加自定义域名

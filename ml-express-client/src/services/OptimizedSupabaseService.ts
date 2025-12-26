@@ -172,8 +172,8 @@ export const optimizedCustomerService = {
 // 系统设置服务优化版本
 export const optimizedSystemSettingsService = {
   // 获取计费规则（带缓存）
-  async getPricingSettings(): Promise<any> {
-    const cacheKey = 'pricing_settings';
+  async getPricingSettings(region?: string): Promise<any> {
+    const cacheKey = region ? `pricing_settings_${region.toLowerCase()}` : 'pricing_settings_global';
     try {
       const cachedData = await settingsCache.get(cacheKey);
       if (cachedData) return cachedData;
@@ -196,17 +196,35 @@ export const optimizedSystemSettingsService = {
       };
 
       if (data && data.length > 0) {
-        data.forEach((item: any) => {
-          const key = item.settings_key.replace('pricing.', '');
-          let value = item.settings_value;
-          if (typeof value === 'string') {
-            try {
-              value = JSON.parse(value);
-            } catch {
-              value = parseFloat(value) || 0;
-            }
+        // 如果指定了区域，优先应用区域设置
+        if (region) {
+          const regionPrefix = `pricing.${region.toLowerCase()}.`;
+          const regionSpecificData = data.filter(item => item.settings_key.startsWith(regionPrefix));
+          
+          if (regionSpecificData.length > 0) {
+            regionSpecificData.forEach((item: any) => {
+              const key = item.settings_key.replace(regionPrefix, '');
+              let value = item.settings_value;
+              if (typeof value === 'string') {
+                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+              }
+              (pricingSettings as any)[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+            });
+            await settingsCache.set(cacheKey, pricingSettings);
+            return pricingSettings;
           }
-          (pricingSettings as any)[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        }
+
+        // 应用全局默认设置（排除掉其他领区的设置）
+        data.forEach((item: any) => {
+          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
+            const key = item.settings_key.replace('pricing.', '');
+            let value = item.settings_value;
+            if (typeof value === 'string') {
+              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+            }
+            (pricingSettings as any)[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+          }
         });
       }
 

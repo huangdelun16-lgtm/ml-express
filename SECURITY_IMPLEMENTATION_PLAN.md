@@ -49,9 +49,9 @@
 
 ```
 REACT_APP_SUPABASE_URL = https://uopkyuluxnrewvlmutam.supabase.co
-REACT_APP_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+REACT_APP_SUPABASE_ANON_KEY = YOUR_SUPABASE_ANON_KEY_HERE
 SUPABASE_URL = https://uopkyuluxnrewvlmutam.supabase.co
-SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_ANON_KEY = YOUR_SUPABASE_ANON_KEY_HERE
 ```
 
 #### 1.2 更新代码使用环境变量

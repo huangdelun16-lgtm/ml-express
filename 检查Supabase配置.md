@@ -22,7 +22,7 @@
 1. **Settings** → **API**
 2. **检查以下信息**：
    - Project URL: `https://uopkyuluxnrewvlmutam.supabase.co`
-   - Anon Key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - Anon Key: `YOUR_SUPABASE_ANON_KEY_HERE`
    - Service Role Key: (不要使用这个)
 
 #### 检查 CORS 设置（如果有）
@@ -41,7 +41,7 @@
 3. **Site settings** → **Environment variables**
 4. **确认以下变量已配置**：
    - `REACT_APP_SUPABASE_URL` = `https://uopkyuluxnrewvlmutam.supabase.co`
-   - `REACT_APP_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - `REACT_APP_SUPABASE_ANON_KEY` = `YOUR_SUPABASE_ANON_KEY_HERE`
 
 #### 重新部署
 - 环境变量更改后，需要**重新部署**站点

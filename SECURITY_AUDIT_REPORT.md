@@ -70,7 +70,7 @@ if (!supabaseKey) {
 - `SECURITY_IMPLEMENTATION_PLAN.md` - 包含示例 Anon Key
 
 **修复建议**: 将文档中的实际密钥替换为占位符，例如：
-- `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` → `YOUR_SUPABASE_ANON_KEY`
+- `YOUR_SUPABASE_ANON_KEY_HERE` → `YOUR_SUPABASE_ANON_KEY`
 - `AIzaSy...` → `YOUR_GOOGLE_MAPS_API_KEY`
 
 ---

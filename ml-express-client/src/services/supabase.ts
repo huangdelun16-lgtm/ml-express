@@ -1329,7 +1329,7 @@ export const systemSettingsService = {
   },
 
   // 获取计费规则
-  async getPricingSettings() {
+  async getPricingSettings(region?: string) {
     return retry(async () => {
       try {
         const { data, error } = await supabase
@@ -1339,43 +1339,59 @@ export const systemSettingsService = {
 
         if (error) throw error;
 
-        // 转换为对象格式
-        const settings: any = {};
-        data?.forEach((item: any) => {
-          const key = item.settings_key.replace('pricing.', '');
-          // settings_value 可能是 JSON 字符串，需要解析
-          let value = item.settings_value;
-          if (typeof value === 'string') {
-            try {
-              value = JSON.parse(value);
-            } catch {
-              value = parseFloat(value) || 0;
-            }
+        // 默认全局计费
+        const settings: any = {
+          base_fee: 1500,
+          per_km_fee: 250,
+          weight_surcharge: 150,
+          urgent_surcharge: 500,
+          scheduled_surcharge: 200,
+          oversize_surcharge: 300,
+          fragile_surcharge: 300,
+          food_beverage_surcharge: 300,
+          free_km_threshold: 3,
+        };
+
+        // 如果指定了区域，尝试寻找该区域的配置
+        if (region) {
+          const regionPrefix = `pricing.${region.toLowerCase()}.`;
+          const regionSettings = data?.filter(item => item.settings_key.startsWith(regionPrefix));
+          
+          if (regionSettings && regionSettings.length > 0) {
+            regionSettings.forEach((item: any) => {
+              const key = item.settings_key.replace(regionPrefix, '');
+              let value = item.settings_value;
+              if (typeof value === 'string') {
+                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+              }
+              settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+            });
+            return settings;
           }
-          settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        }
+
+        // 如果没有指定区域或没有特殊配置，使用默认的全局配置（排除掉带区域后缀的）
+        data?.forEach((item: any) => {
+          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
+            const key = item.settings_key.replace('pricing.', '');
+            let value = item.settings_value;
+            if (typeof value === 'string') {
+              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+            }
+            settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+          }
         });
 
-        return {
-          base_fee: settings.base_fee !== undefined ? settings.base_fee : 1500,
-          per_km_fee: settings.per_km_fee !== undefined ? settings.per_km_fee : 250,
-          weight_surcharge: settings.weight_surcharge !== undefined ? settings.weight_surcharge : 150,
-          urgent_surcharge: settings.urgent_surcharge !== undefined ? settings.urgent_surcharge : 500,
-          scheduled_surcharge: settings.scheduled_surcharge !== undefined ? settings.scheduled_surcharge : 200,
-          oversize_surcharge: settings.oversize_surcharge !== undefined ? settings.oversize_surcharge : 300,
-          fragile_surcharge: settings.fragile_surcharge !== undefined ? settings.fragile_surcharge : 300,
-          food_beverage_surcharge: settings.food_beverage_surcharge !== undefined ? settings.food_beverage_surcharge : 300,
-          free_km_threshold: settings.free_km_threshold !== undefined ? settings.free_km_threshold : 3,
-        };
+        return settings;
       } catch (error) {
-        throw error; // 抛出错误以触发重试
+        throw error;
       }
     }, {
-      retries: 3, // 计费规则很重要，多试几次
+      retries: 3,
       delay: 1000,
       shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
     }).catch(error => {
       errorService.handleError(error, { context: 'systemSettingsService.getPricingSettings', silent: true });
-      // 返回系统默认值
       return {
         base_fee: 1500,
         per_km_fee: 250,

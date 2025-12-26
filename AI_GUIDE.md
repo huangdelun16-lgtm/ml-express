@@ -99,7 +99,7 @@ MARKET LINK EXPRESS 现在是一个**完全分离的、企业级的快递管理�
 ```typescript
 // 所有组件使用相同的配置
 const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+const supabaseKey = 'YOUR_SUPABASE_ANON_KEY_HERE';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 ```
@@ -239,14 +239,14 @@ async function verifyPassword(password, hashedPassword) {
 **客户端 Web** (Netlify Dashboard):
 ```
 REACT_APP_SUPABASE_URL = https://uopkyuluxnrewvlmutam.supabase.co
-REACT_APP_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+REACT_APP_SUPABASE_ANON_KEY = YOUR_SUPABASE_ANON_KEY_HERE
 REACT_APP_GOOGLE_MAPS_API_KEY = AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c
 ```
 
 **后台管理** (Netlify Dashboard):
 ```
 REACT_APP_SUPABASE_URL = https://uopkyuluxnrewvlmutam.supabase.co
-REACT_APP_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+REACT_APP_SUPABASE_ANON_KEY = YOUR_SUPABASE_ANON_KEY_HERE
 REACT_APP_GOOGLE_MAPS_API_KEY = AIzaSyCYXeFO2DGWHpDhbwOC7fusLyiwLy506_c
 ```
 

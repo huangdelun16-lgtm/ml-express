@@ -9,7 +9,7 @@
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
 | `REACT_APP_SUPABASE_URL` | Supabase 项目 URL | `https://uopkyuluxnrewvlmutam.supabase.co` |
-| `REACT_APP_SUPABASE_ANON_KEY` | Supabase 匿名密钥 (Anon Key) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `REACT_APP_SUPABASE_ANON_KEY` | Supabase 匿名密钥 (Anon Key) | `YOUR_SUPABASE_ANON_KEY_HERE` |
 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Google Maps API 密钥 | `AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE` |
 
 ### 如何获取这些值

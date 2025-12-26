@@ -36,7 +36,7 @@ export EXPO_TOKEN="UYTE7q5Tlu8_bDU6H7OXUQKgYMItCFUNuHLFicrc"
 eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://uopkyuluxnrewvlmutam.supabase.co" --visibility plaintext --environment production --non-interactive
 
 # 创建 Supabase Anon Key
-eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY" --visibility sensitive --environment production --non-interactive
+eas env:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "YOUR_SUPABASE_ANON_KEY_HERE" --visibility sensitive --environment production --non-interactive
 
 # 创建 Netlify URL
 eas env:create --scope project --name EXPO_PUBLIC_NETLIFY_URL --value "https://admin-market-link-express.com" --visibility plaintext --environment production --non-interactive

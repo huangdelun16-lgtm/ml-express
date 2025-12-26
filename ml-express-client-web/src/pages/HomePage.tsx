@@ -265,10 +265,10 @@ const HomePage: React.FC = () => {
   }, [currentUser]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
-  const loadPricingSettings = async () => {
+  const loadPricingSettings = async (region?: string) => {
     try {
       // 从系统设置中心获取计费规则
-      const pricingSettings = await systemSettingsService.getPricingSettings();
+      const pricingSettings = await systemSettingsService.getPricingSettings(region);
       setPricingSettings({
         baseFee: pricingSettings.baseFee,
         perKmFee: pricingSettings.perKmFee,
@@ -276,11 +276,11 @@ const HomePage: React.FC = () => {
         urgentSurcharge: pricingSettings.urgentSurcharge,
         oversizeSurcharge: pricingSettings.oversizeSurcharge,
         scheduledSurcharge: pricingSettings.scheduledSurcharge,
-        fragileSurcharge: pricingSettings.fragileSurcharge, // 易碎品附加费：每公里200MMK
+        fragileSurcharge: pricingSettings.fragileSurcharge,
         foodBeverageSurcharge: pricingSettings.foodBeverageSurcharge,
         freeKmThreshold: pricingSettings.freeKmThreshold
       });
-      console.log('已从系统设置中心加载计费规则:', pricingSettings);
+      console.log(`✅ 已加载${region ? region : '全局'}计费规则:`, pricingSettings);
     } catch (error) {
       console.error('加载价格设置失败:', error);
       // 使用系统默认值
@@ -297,6 +297,40 @@ const HomePage: React.FC = () => {
       });
     }
   };
+
+  // 根据寄件地址检测领区并加载对应计费规则
+  useEffect(() => {
+    const detectAndLoadPricing = async () => {
+      const address = orderForm.senderAddress;
+      if (!address) {
+        // 如果没有地址，加载全局默认配置
+        loadPricingSettings();
+        return;
+      }
+
+      const regionMap: { [key: string]: string } = {
+        '曼德勒': 'mandalay', 'Mandalay': 'mandalay', 'မန္တလေး': 'mandalay',
+        '眉苗': 'maymyo', 'Pyin Oo Lwin': 'maymyo', '彬乌伦': 'maymyo', 'ပင်းတလဲ': 'maymyo',
+        '仰光': 'yangon', 'Yangon': 'yangon', 'ရန်ကုန်': 'yangon',
+        '内比都': 'naypyidaw', 'NPW': 'naypyidaw', 'နေပြည်တော်': 'naypyidaw',
+        '东枝': 'taunggyi', 'TGI': 'taunggyi', 'တောင်ကြီး': 'taunggyi',
+        '腊戌': 'lashio', 'Lashio': 'lashio', 'လားရှိုး': 'lashio',
+        '木姐': 'muse', 'Muse': 'muse', 'မူဆယ်': 'muse'
+      };
+
+      let detectedRegion = '';
+      for (const [city, regionId] of Object.entries(regionMap)) {
+        if (address.includes(city)) {
+          detectedRegion = regionId;
+          break;
+        }
+      }
+
+      loadPricingSettings(detectedRegion);
+    };
+
+    detectAndLoadPricing();
+  }, [orderForm.senderAddress]);
 
   // 处理"立即下单"按钮点击
   const handleOrderButtonClick = () => {

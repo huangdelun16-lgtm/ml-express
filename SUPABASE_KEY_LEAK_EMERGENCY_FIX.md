@@ -63,7 +63,7 @@
 **修改方式：**
 ```typescript
 // ❌ 错误：硬编码密钥
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
 
 // ✅ 正确：只使用环境变量
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
