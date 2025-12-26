@@ -232,9 +232,9 @@ export async function clearToken(): Promise<void> {
  * 验证 Token（调用服务端验证）
  * Token 现在通过 httpOnly Cookie 自动发送
  */
-export async function verifyToken(requiredRoles: string[] = []): Promise<{
+export async function verifyToken(requiredRoles: string[] = [], permissionId?: string): Promise<{
   valid: boolean;
-  user?: { username: string; role: string; name: string; region?: string };
+  user?: { username: string; role: string; name: string; region?: string; permissions?: string[] };
   error?: string;
 }> {
   try {
@@ -248,7 +248,8 @@ export async function verifyToken(requiredRoles: string[] = []): Promise<{
       credentials: 'include', // 重要：包含 Cookie
       body: JSON.stringify({
         action: 'verify',
-        requiredRoles
+        requiredRoles,
+        permissionId // 传递权限 ID
       })
     });
 

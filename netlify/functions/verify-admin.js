@@ -77,9 +77,10 @@ function verifyHMACSignature(data, signature) {
  * 验证管理员 Token
  * @param {string} token - JWT Token 或 Session Token
  * @param {string[]} requiredRoles - 需要的角色列表
+ * @param {string} permissionId - 需要的特有权限 ID
  * @returns {Promise<{valid: boolean, user?: object, error?: string}>}
  */
-async function verifyAdminToken(token, requiredRoles = []) {
+async function verifyAdminToken(token, requiredRoles = [], permissionId = null) {
   try {
     if (!token) {
       return { valid: false, error: '缺少认证令牌' };
@@ -139,7 +140,7 @@ async function verifyAdminToken(token, requiredRoles = []) {
       // 使用 Supabase 客户端
       const { data, error } = await supabaseClient
         .from('admin_accounts')
-        .select('id, username, employee_name, role, status')
+        .select('id, username, employee_name, role, status, permissions')
         .eq('username', username)
         .eq('role', role)
         .eq('status', 'active')
@@ -151,7 +152,7 @@ async function verifyAdminToken(token, requiredRoles = []) {
       account = data;
     } else {
       // 回退：使用 REST API 直接查询
-      const response = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?username=eq.${username}&role=eq.${role}&status=eq.active&select=id,username,employee_name,role,status`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?username=eq.${username}&role=eq.${role}&status=eq.active&select=id,username,employee_name,role,status,permissions`, {
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`,
@@ -166,8 +167,23 @@ async function verifyAdminToken(token, requiredRoles = []) {
       account = data[0];
     }
 
-    // 检查角色权限
-    if (requiredRoles.length > 0 && !requiredRoles.includes(role)) {
+    // 获取用户权限列表
+    const userPermissions = account.permissions || [];
+
+    // 检查权限：满足角色要求 OR 拥有特有权限
+    let hasAccess = false;
+    
+    // 1. 角色检查
+    if (requiredRoles.length === 0 || requiredRoles.includes(role)) {
+      hasAccess = true;
+    } 
+    
+    // 2. 特有权限检查 (如果角色检查没过，看看是否有指定的 permissionId)
+    if (!hasAccess && permissionId && userPermissions.includes(permissionId)) {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
       return { valid: false, error: '权限不足' };
     }
 
@@ -177,7 +193,8 @@ async function verifyAdminToken(token, requiredRoles = []) {
         id: account.id,
         username: account.username,
         name: account.employee_name,
-        role: account.role
+        role: account.role,
+        permissions: userPermissions
       }
     };
   } catch (error) {
@@ -222,7 +239,7 @@ exports.handler = async (event, context) => {
   });
 
   try {
-    const { action, token, requiredRoles } = JSON.parse(event.body || '{}');
+    const { action, token, requiredRoles, permissionId } = JSON.parse(event.body || '{}');
 
     if (action === 'verify') {
       // 优先从 Cookie 获取 Token（更安全）
@@ -253,8 +270,8 @@ exports.handler = async (event, context) => {
         };
       }
       
-      // 验证 Token
-      const result = await verifyAdminToken(tokenToVerify, requiredRoles || []);
+      // 验证 Token，传入 permissionId
+      const result = await verifyAdminToken(tokenToVerify, requiredRoles || [], permissionId);
       
       // 如果验证失败，清除 Cookie
       if (!result.valid) {

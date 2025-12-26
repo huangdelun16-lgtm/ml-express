@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: ('admin' | 'manager' | 'operator' | 'finance')[];
+  permissionId?: string; // 新增：特有权限 ID
 }
 
 /**
@@ -15,7 +16,8 @@ interface ProtectedRouteProps {
  */
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requiredRoles = ['admin', 'manager', 'operator', 'finance'] 
+  requiredRoles = ['admin', 'manager', 'operator', 'finance'],
+  permissionId
 }) => {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -26,7 +28,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const checkAuthStatus = async () => {
       try {
         // 调用服务端验证 Token（Token 通过 httpOnly Cookie 自动发送）
-        const result = await verifyToken(requiredRoles);
+        // 传递 requiredRoles 和 permissionId
+        const result = await verifyToken(requiredRoles, permissionId);
         
         if (result.valid) {
           setIsAuthenticated(true);

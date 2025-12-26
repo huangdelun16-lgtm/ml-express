@@ -42,7 +42,7 @@ function App() {
             <Route 
               path="/admin/city-packages" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']} permissionId="city_packages">
                   <CityPackages />
                 </ProtectedRoute>
               } 
@@ -50,7 +50,7 @@ function App() {
             <Route 
               path="/admin/users" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="users">
                   <UserManagement />
                 </ProtectedRoute>
               } 
@@ -58,7 +58,7 @@ function App() {
             <Route 
               path="/admin/finance" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="finance">
                   <FinanceManagement />
                 </ProtectedRoute>
               } 
@@ -66,7 +66,7 @@ function App() {
             <Route 
               path="/admin/tracking" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
                   <RealTimeTracking />
                 </ProtectedRoute>
               } 
@@ -74,7 +74,7 @@ function App() {
             <Route 
               path="/admin/realtime-tracking" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
                   <RealTimeTracking />
                 </ProtectedRoute>
               } 
@@ -82,7 +82,7 @@ function App() {
             <Route 
               path="/admin/settings" 
               element={
-                <ProtectedRoute requiredRoles={['admin']}>
+                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
                   <SystemSettings />
                 </ProtectedRoute>
               } 
@@ -90,7 +90,7 @@ function App() {
             <Route 
               path="/admin/system-settings" 
               element={
-                <ProtectedRoute requiredRoles={['admin']}>
+                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
                   <SystemSettings />
                 </ProtectedRoute>
               } 
@@ -98,7 +98,7 @@ function App() {
             <Route 
               path="/admin/accounts" 
               element={
-                <ProtectedRoute requiredRoles={['admin']}>
+                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
                   <AccountManagement />
                 </ProtectedRoute>
               } 
@@ -106,7 +106,7 @@ function App() {
             <Route 
               path="/admin/banners" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="banners">
                   <BannerManagement />
                 </ProtectedRoute>
               } 
@@ -114,7 +114,7 @@ function App() {
             <Route 
               path="/admin/delivery-stores" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="partner_stores">
                   <DeliveryStoreManagement />
                 </ProtectedRoute>
               } 
@@ -130,7 +130,7 @@ function App() {
             <Route 
               path="/admin/delivery-alerts" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="delivery_alerts">
                   <DeliveryAlerts />
                 </ProtectedRoute>
               } 
