@@ -74,6 +74,7 @@ export interface FinanceRecord {
   reference?: string;
   record_date: string;
   notes?: string;
+  created_by?: string;
   created_at?: string;
   updated_at?: string;
 }
