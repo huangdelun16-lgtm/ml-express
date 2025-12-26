@@ -301,7 +301,7 @@ const HomePage: React.FC = () => {
   // 根据寄件地址检测领区并加载对应计费规则
   useEffect(() => {
     const detectAndLoadPricing = async () => {
-      const address = orderForm.senderAddress;
+      const address = senderAddressText;
       if (!address) {
         // 如果没有地址，加载全局默认配置
         loadPricingSettings();
@@ -330,7 +330,7 @@ const HomePage: React.FC = () => {
     };
 
     detectAndLoadPricing();
-  }, [orderForm.senderAddress]);
+  }, [senderAddressText]);
 
   // 处理"立即下单"按钮点击
   const handleOrderButtonClick = () => {
