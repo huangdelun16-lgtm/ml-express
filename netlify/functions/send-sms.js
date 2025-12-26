@@ -99,7 +99,7 @@ exports.handler = async (event, context) => {
     } else if (language === 'en') {
       messageText = `[Myanmar Express] Your verification code is: ${code}. Valid for 5 minutes. Do not share with others.`;
     } else {
-      messageText = `[Myanmar Express] သင့်အတည်ပြုကုဒ်မှာ: ${code} ဖြစ်ပါသည်။ ၅ မိနစ်အတွင်း အသုံးပြုပါ။`;
+      messageText = '[Myanmar Express] သင့်အတည်ပြုကုဒ်မှာ: ' + code + ' ဖြစ်ပါသည်။ ၅ မိနစ်အတွင်း အသုံးပြုပါ။';
     }
 
     // 发送短信（缅甸手机号需要加国际区号 +95）

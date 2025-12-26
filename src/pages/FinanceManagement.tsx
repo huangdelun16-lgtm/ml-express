@@ -23,6 +23,16 @@ import {
   ComposedChart
 } from 'recharts';
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection' | 'partner_collection';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
@@ -106,16 +116,6 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
   income: '#2ecc71',
   expense: '#e74c3c'
 };
-
-const REGIONS = [
-  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
-  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
-  { id: 'yangon', name: '仰光', prefix: 'YGN' },
-  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
-  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
-  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
-  { id: 'muse', name: '木姐', prefix: 'MUSE' }
-];
 
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -316,7 +316,7 @@ const FinanceManagement: React.FC = () => {
     
     if (language === 'my') {
       const monthNames = ['ဇန်နဝါရီ', 'ဖေဖော်ဝါရီ', 'မတ်', 'ဧပြီ', 'မေ', 'ဇွန်', 'ဇူလိုင်', 'ဩဂုတ်', 'စက်တင်ဘာ', 'အောက်တိုဘာ', 'နိုဝင်ဘာ', 'ဒီဇင်ဘာ'];
-      return `${year} ခုနှစ် ${monthNames[index]}`;
+      return year + ' ခုနှစ် ' + monthNames[index];
     }
     
     if (language === 'en') {
@@ -391,6 +391,9 @@ const FinanceManagement: React.FC = () => {
       financeAuthOnly: '(您目前仅被授权查看由您本人创建的财务记录)',
       loadingData: '正在加载数据...',
       loadingSettings: '正在加载配置，请稍候...',
+      loading: '加载中...',
+      refresh: '刷新',
+      finance: '财务管理',
       lastSettled: '上次结清',
       totalIncomeDesc: '已完成的所有收入记录总和',
       partnerCollectionDesc: '所有合伙店铺的待收金额总计',
@@ -487,6 +490,9 @@ const FinanceManagement: React.FC = () => {
       financeAuthOnly: '(You are only authorized to view records created by yourself)',
       loadingData: 'Loading data...',
       loadingSettings: 'Loading settings, please wait...',
+      loading: 'Loading...',
+      refresh: 'Refresh',
+      finance: 'Finance Management',
       lastSettled: 'Last Settled',
       totalIncomeDesc: 'Sum of all completed income records',
       partnerCollectionDesc: 'Total COD amount pending from partners',
@@ -584,6 +590,9 @@ const FinanceManagement: React.FC = () => {
       financeAuthOnly: '(သင်ကိုယ်တိုင် ဖန်တီးထားသော မှတ်တမ်းများကိုသာ ကြည့်ရှုခွင့်ရှိသည်)',
       loadingData: 'ဒေတာများ ရယူနေဆဲ...',
       loadingSettings: 'ဆက်တင်များ ရယူနေဆဲ ခဏစောင့်ပါ...',
+      loading: 'လုပ်ဆောင်နေဆဲ...',
+      refresh: 'ဒေတာ အသစ်လုပ်ရန်',
+      finance: 'ဘဏ္ဍာရေး စီမံခန့်ခွဲမှု',
       lastSettled: 'နောက်ဆုံး ငွေရှင်းခဲ့သည့်အချိန်',
       totalIncomeDesc: 'ပြီးစီးပြီးသော ဝင်ငွေမှတ်တမ်းအားလုံး၏ စုစုပေါင်း',
       partnerCollectionDesc: 'မိတ်ဖက်ဆိုင်များမှ ကောက်ခံရန်ကျန်သော စုစုပေါင်း',
@@ -3193,7 +3202,7 @@ const FinanceManagement: React.FC = () => {
                     gap: '12px'
                   }}>
                     <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                      {language === 'zh' ? `显示第 ${packageDisplayStart} - ${packageDisplayEnd} 条，共 ${deliveredPackagesSorted.length} 条记录` : language === 'my' ? `${deliveredPackagesSorted.length} ခု အနက် ${packageDisplayStart} မှ ${packageDisplayEnd} အထိ ပြသနေသည်` : `Showing ${packageDisplayStart} to ${packageDisplayEnd} of ${deliveredPackagesSorted.length}`}
+                      {language === 'zh' ? `显示第 ${packageDisplayStart} - ${packageDisplayEnd} 条，共 ${deliveredPackagesSorted.length} 条记录` : language === 'my' ? deliveredPackagesSorted.length + ' ခု အနက် ' + packageDisplayStart + ' မှ ' + packageDisplayEnd + ' အထိ ပြသနေသည်' : `Showing ${packageDisplayStart} to ${packageDisplayEnd} of ${deliveredPackagesSorted.length}`}
                     </div>
                     
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -3520,7 +3529,7 @@ const FinanceManagement: React.FC = () => {
                 fontSize: '0.85rem',
                 marginLeft: 'auto'
               }}>
-                {language === 'zh' ? `共 ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录` : language === 'my' ? `စုစုပေါင်း ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} ခု` : `Total ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} records`}
+                {language === 'zh' ? `共 ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录` : language === 'my' ? 'စုစုပေါင်း ' + getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length + ' ခု' : `Total ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} records`}
               </div>
             </div>
 

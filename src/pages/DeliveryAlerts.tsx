@@ -87,6 +87,7 @@ export default function DeliveryAlerts() {
       courier: '骑手姓名',
       status: '处理状态',
       action: '操作',
+      actions: '操作',
       resolve: '处理',
       dismiss: '忽略',
       detail: '详情',
@@ -100,6 +101,8 @@ export default function DeliveryAlerts() {
       all: '全部',
       filterByStatus: '处理状态',
       filterBySeverity: '严重程度',
+      loading: '加载中...',
+      cancel: '取消',
     },
     en: {
       title: 'Delivery Alert Management',
@@ -117,6 +120,7 @@ export default function DeliveryAlerts() {
       courier: 'Courier',
       status: 'Status',
       action: 'Action',
+      actions: 'Actions',
       resolve: 'Resolve',
       dismiss: 'Dismiss',
       detail: 'Detail',
@@ -130,6 +134,8 @@ export default function DeliveryAlerts() {
       all: 'All',
       filterByStatus: 'Status',
       filterBySeverity: 'Severity',
+      loading: 'Loading...',
+      cancel: 'Cancel',
     },
     my: {
       title: 'ပို့ဆောင်ရေးသတိပေးချက်စီမံခန့်ခွဲမှု',
@@ -147,6 +153,7 @@ export default function DeliveryAlerts() {
       courier: 'ပို့ဆောင်သူအမည်',
       status: 'အခြေအနေ',
       action: 'ဆောင်ရွက်ချက်',
+      actions: 'ဆောင်ရွက်ချက်များ',
       resolve: 'ဖြေရှင်းရန်',
       dismiss: 'လျစ်လျူရှုရန်',
       detail: 'အသေးစိတ်',
@@ -160,10 +167,16 @@ export default function DeliveryAlerts() {
       all: 'အားလုံး',
       filterByStatus: 'အခြေအနေ',
       filterBySeverity: 'ပြင်းထန်မှု',
+      loading: 'လုပ်ဆောင်နေဆဲ...',
+      cancel: 'ပယ်ဖျက်ရန်',
+      refresh: 'ဒေတာ အသစ်လုပ်ရန်',
     }
   }[language as 'zh' | 'en' | 'my'] || {
     title: '配送警报管理',
     subtitle: '监控和管理骑手异常操作警报',
+    loading: '加载中...',
+    cancel: '取消',
+    refresh: '刷新',
   };
 
   // 获取当前用户角色和区域信息
@@ -964,7 +977,7 @@ export default function DeliveryAlerts() {
                 fontWeight: 500
               }}
             >
-              {loading ? t.loading : (language === 'my' ? '🔄 ဒေတာ အသစ်လုပ်ရန်' : '🔄 刷新')}
+              {loading ? t.loading : '🔄 ' + t.refresh}
             </button>
           </div>
         </div>

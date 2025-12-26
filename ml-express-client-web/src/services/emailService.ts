@@ -56,7 +56,7 @@ export async function sendEmailVerificationCode(
       success: false,
       message: language === 'zh' ? `发送验证码失败，请稍后重试${error.message ? ': ' + error.message : ''}` : 
                language === 'en' ? `Failed to send verification code, please try again later${error.message ? ': ' + error.message : ''}` :
-               `အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ၊ နောက်မှ ထပ်စမ်းကြည့်ပါ${error.message ? ': ' + error.message : ''}`
+               'အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ၊ နောက်မှ ထပ်စမ်းကြည့်ပါ' + (error.message ? ': ' + error.message : '')
     };
   }
 }

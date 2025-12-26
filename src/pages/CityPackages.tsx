@@ -341,13 +341,13 @@ const CityPackages: React.FC = () => {
           ? `成功删除 ${result.success} 个包裹` 
           : language === 'en' 
           ? `Successfully deleted ${result.success} packages`
-          : `ပက်ကေ့ဂျ် ${result.success} ခု ဖျက်ပြီးပါပြီ`);
+          : 'ပက်ကေ့ဂျ် ' + result.success + ' ခု ဖျက်ပြီးပါပြီ');
       } else {
         alert(language === 'zh' 
           ? `删除完成：成功 ${result.success} 个，失败 ${result.failed} 个` 
           : language === 'en' 
           ? `Delete completed: ${result.success} succeeded, ${result.failed} failed`
-          : `ဖျက်ပြီး: ${result.success} ခု အောင်မြင်, ${result.failed} ခု မအောင်မြင်`);
+          : 'ဖျက်ပြီး: ' + result.success + ' ခု အောင်မြင်, ' + result.failed + ' ခု မအောင်မြင်');
       }
 
       // 重新加载包裹列表
@@ -700,7 +700,7 @@ const CityPackages: React.FC = () => {
                     opacity: selectedPackages.size === 0 ? 0.5 : 1
                   }}
                 >
-                  🗑️ {language === 'zh' ? `批量删除 (${selectedPackages.size})` : language === 'en' ? `Batch Delete (${selectedPackages.size})` : `ဖျက်ရန် (${selectedPackages.size})`}
+                  🗑️ {language === 'zh' ? `批量删除 (${selectedPackages.size})` : language === 'en' ? `Batch Delete (${selectedPackages.size})` : 'ဖျက်ရန် (' + selectedPackages.size + ')'}
                 </button>
                 <button
                   onClick={toggleBatchMode}
@@ -1399,7 +1399,7 @@ const CityPackages: React.FC = () => {
                         ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${getFilteredPackages().length} 条`
                         : language === 'en'
                         ? `Page ${currentPage} / ${getTotalPages()}, Total ${getFilteredPackages().length} items`
-                        : `စာမျက်နှာ ${currentPage} / ${getTotalPages()}၊ စုစုပေါင်း ${getFilteredPackages().length} ခု`
+                        : 'စာမျက်နှာ ' + currentPage + ' / ' + getTotalPages() + '၊ စုစုပေါင်း ' + getFilteredPackages().length + ' ခု'
                       }
                     </span>
                   </div>
@@ -2770,7 +2770,7 @@ const CityPackages: React.FC = () => {
                 ? `确定要删除选中的 ${selectedPackages.size} 个包裹吗？此操作不可恢复。`
                 : language === 'en'
                 ? `Are you sure you want to delete ${selectedPackages.size} selected packages? This action cannot be undone.`
-                : `ရွေးချယ်ထားသော ပက်ကေ့ဂျ် ${selectedPackages.size} ခုကို ဖျက်ရန် သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်လည်ရယူ၍မရပါ။`}
+                : 'ရွေးချယ်ထားသော ပက်ကေ့ဂျ် ' + selectedPackages.size + ' ခုကို ဖျက်ရန် သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်လည်ရယူ၍မရပါ။'}
             </p>
             <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
               <button

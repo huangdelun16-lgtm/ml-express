@@ -518,7 +518,7 @@ const HomePage: React.FC = () => {
           setShowRegisterModal(false);
           alert(language === 'zh' ? `登录成功！欢迎回来，${store.store_name}` : 
                 language === 'en' ? `Login successful! Welcome back, ${store.store_name}` : 
-                `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${store.store_name}`);
+                'ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ' + store.store_name);
           
           // 清空表单
           setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
@@ -568,7 +568,7 @@ const HomePage: React.FC = () => {
         setShowRegisterModal(false);
         alert(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : 
               language === 'en' ? `Login successful! Welcome back, ${existingUser.name}` : 
-              `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${existingUser.name}`);
+              'ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ' + existingUser.name);
         
         // 清空表单
         setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
@@ -666,7 +666,7 @@ const HomePage: React.FC = () => {
     if (countdown > 0) {
       alert(language === 'zh' ? `请等待 ${countdown} 秒后再试` : 
             language === 'en' ? `Please wait ${countdown} seconds` : 
-            `${countdown} စက္ကန့် စောင့်ပါ`);
+            countdown + ' စက္ကန့် စောင့်ပါ');
       return;
     }
 
@@ -1619,7 +1619,7 @@ const HomePage: React.FC = () => {
                 resolve(roundedDistance);
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
-                alert(`${language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်'}\n${language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'}`);
+                alert((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
                 resolve(5);
               } else {
                 console.warn('⚠️ 距离计算状态异常:', element?.status);
@@ -1627,11 +1627,11 @@ const HomePage: React.FC = () => {
               }
             } else if (status === 'OVER_QUERY_LIMIT') {
               console.error('❌ Google Maps API 查询限额已达上限');
-              alert(`${language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km'}`);
+              alert(language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
               resolve(5);
             } else if (status === 'REQUEST_DENIED') {
               console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
-              alert(`${language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km'}`);
+              alert(language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
               resolve(5);
             } else {
               console.warn('⚠️ 距离计算失败，状态:', status);
@@ -1785,7 +1785,7 @@ const HomePage: React.FC = () => {
         `计算完成！\n配送距离: ${finalDistanceValue}km\n总费用: ${priceValue} MMK` :
         language === 'en' ? 
         `Calculation Complete!\nDelivery Distance: ${finalDistanceValue}km\nTotal Cost: ${priceValue} MMK` :
-        `တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ${finalDistanceValue}km\nစုစုပေါင်းကုန်ကျစရိတ်: ${priceValue} MMK`
+        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + finalDistanceValue + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
       );
       
     } catch (error) {

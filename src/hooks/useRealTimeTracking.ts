@@ -162,7 +162,7 @@ export const useRealTimeTracking = (options: UseRealTimeTrackingOptions = {}) =>
           lastUpdate: new Date()
         });
 
-        console.log(`🔄 轮询更新: ${courierLocations.length} 个在线骑手`);
+        console.log(`🔄 Polling update: ${courierLocations.length} online couriers`);
       } else {
         setState(prev => ({ ...prev, loading: false }));
       }

@@ -306,7 +306,7 @@ const HomePage: React.FC = () => {
         setShowRegisterModal(false);
         alert(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : 
               language === 'en' ? `Login successful! Welcome back, ${existingUser.name}` : 
-              `ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ${existingUser.name}`);
+              'ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ' + existingUser.name);
         
         // 清空表单
         setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
@@ -404,7 +404,7 @@ const HomePage: React.FC = () => {
     if (countdown > 0) {
       alert(language === 'zh' ? `请等待 ${countdown} 秒后再试` : 
             language === 'en' ? `Please wait ${countdown} seconds` : 
-            `${countdown} စက္ကန့် စောင့်ပါ`);
+            countdown + ' စက္ကန့် စောင့်ပါ');
       return;
     }
 
@@ -1290,7 +1290,7 @@ const HomePage: React.FC = () => {
         `计算完成！\n配送距离: ${roundedDistance}km\n总费用: ${price} MMK` :
         language === 'en' ? 
         `Calculation Complete!\nDelivery Distance: ${roundedDistance}km\nTotal Cost: ${price} MMK` :
-        `တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ${roundedDistance}km\nစုစုပေါင်းကုန်ကျစရိတ်: ${price} MMK`
+        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistance + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + price + ' MMK'
       );
       
     } catch (error) {
@@ -1689,7 +1689,7 @@ const HomePage: React.FC = () => {
               }}>
                 {language === 'zh' ? `欢迎，${currentUser.name}` : 
                  language === 'en' ? `Welcome, ${currentUser.name}` : 
-                 `ကြိုဆိုပါတယ်, ${currentUser.name}`}
+                 'ကြိုဆိုပါတယ်, ' + currentUser.name}
               </span>
               <button
                 onClick={handleLogout}

@@ -243,7 +243,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
               }}>
                 {language === 'zh' ? `欢迎，${currentUser.name}` : 
                  language === 'en' ? `Welcome, ${currentUser.name}` : 
-                 `ကြိုဆိုပါတယ်, ${currentUser.name}`}
+                 'ကြိုဆိုပါတယ်, ' + currentUser.name}
               </span>
               <button
                 onClick={onLogout}

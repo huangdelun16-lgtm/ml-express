@@ -1788,7 +1788,7 @@ const ProfilePage: React.FC = () => {
                   ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
                   : language === 'en'
                   ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} of ${userPackages.length}`
-                  : `${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} ကို ပြသထားသည်၊ စုစုပေါင်း ${userPackages.length}`
+                  : ((currentPage - 1) * packagesPerPage + 1) + '-' + Math.min(currentPage * packagesPerPage, userPackages.length) + ' ကို ပြသထားသည်၊ စုစုပေါင်း ' + userPackages.length
                 }
               </div>
             </>
