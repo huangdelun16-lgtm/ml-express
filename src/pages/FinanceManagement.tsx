@@ -67,19 +67,34 @@ const paymentOptions = [
   { value: 'bank_transfer', label: '银行转账' }
 ];
 
-
-const categoryOptions = [
-  '同城配送',
-  '次日配送',
-  '快递员佣金',
-  '员工工资',
-  '运营支出',
-  '车辆维护',
-  '营销推广',
-  '客户退款',
-  '其他收入',
-  '其他支出'
-];
+const getCategoryOptions = (language: string) => {
+  if (language === 'my') {
+    return [
+      'မြို့တွင်း ပို့ဆောင်မှု',
+      'နောက်နေ့ ပို့ဆောင်မှု',
+      'ပို့ဆောင်သူ ကော်မရှင်',
+      'ဝန်ထမ်း လစာ',
+      'လုပ်ငန်းလည်ပတ်မှု အသုံးစရိတ်',
+      'ယာဉ် ထိန်းသိမ်းမှု',
+      'စျေးကွက် မြှင့်တင်ရေး',
+      'ဝယ်ယူသူ ငွေပြန်အမ်းမှု',
+      'အခြား ဝင်ငွေ',
+      'အခြား အသုံးစရိတ်'
+    ];
+  }
+  return [
+    '同城配送',
+    '次日配送',
+    '快递员佣金',
+    '员工工资',
+    '运营支出',
+    '车辆维护',
+    '营销推广',
+    '客户退款',
+    '其他收入',
+    '其他支出'
+  ];
+};
 
 const statusColors: Record<FinanceRecord['status'], string> = {
   pending: '#f39c12',
@@ -129,6 +144,8 @@ const FinanceManagement: React.FC = () => {
   const isYGNFinance = isFinance && currentRegionPrefix === 'YGN';
   
   const isRegionalFinance = isMDYFinance || isYGNFinance;
+
+  const categoryOptions = useMemo(() => getCategoryOptions(language), [language]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'records' : 'overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
@@ -295,13 +312,27 @@ const FinanceManagement: React.FC = () => {
   const formatMonthDisplay = (month: string): string => {
     if (!month) return '';
     const [year, monthNum] = month.split('-');
+    const index = parseInt(monthNum) - 1;
+    
+    if (language === 'my') {
+      const monthNames = ['ဇန်နဝါရီ', 'ဖေဖော်ဝါရီ', 'မတ်', 'ဧပြီ', 'မေ', 'ဇွန်', 'ဇူလိုင်', 'ဩဂုတ်', 'စက်တင်ဘာ', 'အောက်တိုဘာ', 'နိုဝင်ဘာ', 'ဒီဇင်ဘာ'];
+      return `${year} ခုနှစ် ${monthNames[index]}`;
+    }
+    
+    if (language === 'en') {
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      return `${monthNames[index]} ${year}`;
+    }
+    
     const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
-    return `${year}年${monthNames[parseInt(monthNum) - 1]}`;
+    return `${year}年${monthNames[index]}`;
   };
   
   // 多语言翻译
   const t = {
     zh: {
+      title: '财务管理',
+      subtitle: '管理收入、支出、账务流程，以及快递员佣金结算',
       analysisPeriod: '分析周期',
       last7Days: '最近7天',
       last30Days: '最近30天',
@@ -314,9 +345,90 @@ const FinanceManagement: React.FC = () => {
       dailyAvg: '日均',
       profitMargin: '利润率',
       dataAnalysis: '数据趋势分析',
-      income: '收入'
+      income: '收入',
+      financeOverview: '📊 财务总览',
+      financeRecords: '📑 收支记录',
+      packageRecords: '📦 包裹收支记录',
+      courierRecords: '🚚 骑手收支记录',
+      cashCollection: '💵 当日收款管理',
+      partnerCollection: '🤝 合伙代收款',
+      refreshData: '刷新数据',
+      backToDashboard: '返回仪表板',
+      addRecord: '添加收支记录',
+      totalIncome: '总收入',
+      totalPartnerCollection: '总合伙店铺代收款',
+      totalExpense: '总支出',
+      netProfit: '净利润',
+      pendingPayments: '待处理金额',
+      orderIncome: '订单收入',
+      courierKmCost: '骑手送货费用',
+      searchPlaceholder: '搜索订单/快递员/类别',
+      allTypes: '所有类型',
+      expense: '支出',
+      allStatus: '所有状态',
+      pending: '待处理',
+      completed: '已完成',
+      cancelled: '已取消',
+      selectMonth: '选择月份',
+      recordsPerPage: '每页显示',
+      recordId: '记录ID',
+      type: '类型',
+      category: '分类',
+      amount: '金额',
+      currency: '币种',
+      status: '状态',
+      orderCourier: '订单/快递员',
+      date: '日期',
+      notes: '备注',
+      actions: '操作',
+      confirmSettle: '确认结清',
+      unsettled: '未结清',
+      settled: '已结清',
+      totalAmount: '总金额',
+      pendingAmount: '待结清金额',
+      unsettledOrders: '待结清订单数',
+      noRecords: '暂无收支记录',
+      financeAuthOnly: '(您目前仅被授权查看由您本人创建的财务记录)',
+      loadingData: '正在加载数据...',
+      loadingSettings: '正在加载配置，请稍候...',
+      lastSettled: '上次结清',
+      totalIncomeDesc: '已完成的所有收入记录总和',
+      partnerCollectionDesc: '所有合伙店铺的待收金额总计',
+      totalExpenseDesc: '已完成的所有支出记录总和',
+      netProfitDesc: '收入减去支出的净额',
+      pendingAmountDesc: '尚未确认完成的账目总额',
+      orderIncomeDesc: '已完成配送并结算的订单总收入',
+      courierFeeDesc: '结算给骑手的配送里程提成总额',
+      recordDate: '记录日期',
+      paymentMethod: '付款方式',
+      incomeType: '收支类型',
+      orderId: '订单编号',
+      courierId: '快递员编号',
+      refPlaceholder: '银行单号/扫码凭证',
+      saveChanges: '保存更改',
+      createRecord: '创建记录',
+      perPage: '每页显示',
+      deliveredCount: '已送达包裹数量',
+      deliveredIncome: '已送达包裹收入',
+      inProgressCount: '进行中的包裹',
+      expectedIncome: '预期收入',
+      riderCollection: '当日待收现金',
+      viewDetail: '查看详情',
+      online: '在线',
+      offline: '离线',
+      settleRiderDesc: '结清该骑手的所有现金收款',
+      noCourierData: '暂无快递员数据',
+      today: '今天',
+      prevDay: '前一天',
+      nextDay: '后一天',
+      statusFilter: '状态',
+      totalCourierCount: '总快递员数',
+      courierSuffix: '位快递员',
+      packageSuffix: '个包裹',
     },
     en: {
+      title: 'Finance Management',
+      subtitle: 'Manage income, expenses, accounting processes, and courier commission settlements',
       analysisPeriod: 'Analysis Period',
       last7Days: 'Last 7 Days',
       last30Days: 'Last 30 Days',
@@ -329,9 +441,90 @@ const FinanceManagement: React.FC = () => {
       dailyAvg: 'Daily Avg',
       profitMargin: 'Profit Margin',
       dataAnalysis: 'Data Trend Analysis',
-      income: 'Income'
+      income: 'Income',
+      financeOverview: '📊 Overview',
+      financeRecords: '📑 Records',
+      packageRecords: '📦 Package Records',
+      courierRecords: '🚚 Courier Records',
+      cashCollection: '💵 Daily Cash',
+      partnerCollection: '🤝 Partner COD',
+      refreshData: 'Refresh Data',
+      backToDashboard: 'Dashboard',
+      addRecord: 'Add Record',
+      totalIncome: 'Total Income',
+      totalPartnerCollection: 'Total Partner COD',
+      totalExpense: 'Total Expense',
+      netProfit: 'Net Profit',
+      pendingPayments: 'Pending Payments',
+      orderIncome: 'Order Income',
+      courierKmCost: 'Courier Distance Cost',
+      searchPlaceholder: 'Search order/courier/category',
+      allTypes: 'All Types',
+      expense: 'Expense',
+      allStatus: 'All Status',
+      pending: 'Pending',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+      selectMonth: 'Select Month',
+      recordsPerPage: 'Records per page',
+      recordId: 'Record ID',
+      type: 'Type',
+      category: 'Category',
+      amount: 'Amount',
+      currency: 'Currency',
+      status: 'Status',
+      orderCourier: 'Order/Courier',
+      date: 'Date',
+      notes: 'Notes',
+      actions: 'Actions',
+      confirmSettle: 'Confirm Settle',
+      unsettled: 'Unsettled',
+      settled: 'Settled',
+      totalAmount: 'Total Amount',
+      pendingAmount: 'Pending Amount',
+      unsettledOrders: 'Unsettled Orders',
+      noRecords: 'No records found',
+      financeAuthOnly: '(You are only authorized to view records created by yourself)',
+      loadingData: 'Loading data...',
+      loadingSettings: 'Loading settings, please wait...',
+      lastSettled: 'Last Settled',
+      totalIncomeDesc: 'Sum of all completed income records',
+      partnerCollectionDesc: 'Total COD amount pending from partners',
+      totalExpenseDesc: 'Sum of all completed expense records',
+      netProfitDesc: 'Net amount of income minus expenses',
+      pendingAmountDesc: 'Total amount of records not yet completed',
+      orderIncomeDesc: 'Revenue from delivered and settled orders',
+      courierFeeDesc: 'Total mileage-based commissions for couriers',
+      recordDate: 'Record Date',
+      paymentMethod: 'Payment Method',
+      incomeType: 'Type',
+      orderId: 'Order ID',
+      courierId: 'Courier ID',
+      refPlaceholder: 'Bank ref / QR proof',
+      saveChanges: 'Save Changes',
+      createRecord: 'Create Record',
+      perPage: 'per page',
+      deliveredCount: 'Delivered Packages',
+      deliveredIncome: 'Delivered Income',
+      inProgressCount: 'In Progress',
+      expectedIncome: 'Expected Income',
+      riderCollection: 'Pending Cash',
+      viewDetail: 'View Detail',
+      online: 'Online',
+      offline: 'Offline',
+      settleRiderDesc: 'Settle all cash for this courier',
+      noCourierData: 'No courier data',
+      today: 'Today',
+      prevDay: 'Prev Day',
+      nextDay: 'Next Day',
+      statusFilter: 'Status',
+      totalCourierCount: 'Total Couriers',
+      courierSuffix: 'couriers',
+      packageSuffix: 'packages',
     },
     my: {
+      title: 'ဘဏ္ဍာရေး စီမံခန့်ခွဲမှု',
+      subtitle: 'ဝင်ငွေ၊ အသုံးစရိတ်၊ စာရင်းကိုင် လုပ်ငန်းစဉ်များနှင့် ပို့ဆောင်သူ ကော်မရှင် ရှင်းလင်းမှုများကို စီမံခန့်ခွဲပါ',
       analysisPeriod: 'ခွဲခြမ်းစိတ်ဖြာမှုကာလ',
       last7Days: 'နောက်ဆုံး ၇ ရက်',
       last30Days: 'နောက်ဆုံး ၃၀ ရက်',
@@ -344,9 +537,91 @@ const FinanceManagement: React.FC = () => {
       dailyAvg: 'နေ့စဉ်ပျမ်းမျှ',
       profitMargin: 'အမြတ်နှုန်း',
       dataAnalysis: 'ဒေတာခေတ်ရေးခွဲခြမ်းစိတ်ဖြာခြင်း',
-      income: 'ဝင်ငွေ'
+      income: 'ဝင်ငွေ',
+      financeOverview: '📊 အနှစ်ချုပ်',
+      financeRecords: '📑 မှတ်တမ်းများ',
+      packageRecords: '📦 ပစ္စည်းမှတ်တမ်း',
+      courierRecords: '🚚 ပို့ဆောင်သူမှတ်တမ်း',
+      cashCollection: '💵 နေ့စဉ်ငွေကောက်ခံမှု',
+      partnerCollection: '🤝 လုပ်ဖော်ကိုင်ဖက် ငွေကောက်ခံမှု',
+      refreshData: 'ဒေတာ အသစ်လုပ်ရန်',
+      backToDashboard: 'ပင်မစာမျက်နှာ',
+      addRecord: 'မှတ်တမ်း အသစ်ထည့်ရန်',
+      totalIncome: 'စုစုပေါင်း ဝင်ငွေ',
+      totalPartnerCollection: 'ဆိုင်များမှ စုစုပေါင်း ငွေကောက်ခံမှု',
+      totalExpense: 'စုစုပေါင်း အသုံးစရိတ်',
+      netProfit: 'အသားတင် အမြတ်',
+      pendingPayments: 'ပေးရန်ကျန် ငွေပမာဏ',
+      orderIncome: 'အော်ဒါ ဝင်ငွေ',
+      courierKmCost: 'ပို့ဆောင်သူ ခရီးအကွာအဝေး စရိတ်',
+      searchPlaceholder: 'အော်ဒါ/ပို့ဆောင်သူ/အမျိုးအစား ရှာရန်',
+      allTypes: 'အမျိုးအစား အားလုံး',
+      expense: 'အသုံးစရိတ်',
+      allStatus: 'အခြေအနေ အားလုံး',
+      pending: 'စောင့်ဆိုင်းဆဲ',
+      completed: 'ပြီးစီးသည်',
+      preferred: 'ပြီးစီးသည်',
+      cancelled: 'ပယ်ဖျက်သည်',
+      selectMonth: 'လ ရွေးချယ်ပါ',
+      recordsPerPage: 'တစ်မျက်နှာလျှင် ပြမည့် အရေအတွက်',
+      recordId: 'မှတ်တမ်း ID',
+      type: 'အမျိုးအစား',
+      category: 'ကဏ္ဍ',
+      amount: 'ပမာဏ',
+      currency: 'ငွေကြေး',
+      status: 'အခြေအနေ',
+      orderCourier: 'အော်ဒါ/ပို့ဆောင်သူ',
+      date: 'ရက်စွဲ',
+      notes: 'မှတ်ချက်',
+      actions: 'ဆောင်ရွက်ချက်များ',
+      confirmSettle: 'ငွေရှင်းခြင်းကို အတည်ပြုပါ',
+      unsettled: 'မရှင်းရသေးပါ',
+      settled: 'ရှင်းပြီးပါပြီ',
+      totalAmount: 'စုစုပေါင်း ပမာဏ',
+      pendingAmount: 'ရှင်းရန်ကျန် ငွေပမာဏ',
+      unsettledOrders: 'မရှင်းရသေးသော အော်ဒါအရေအတွက်',
+      noRecords: 'မှတ်တမ်းများ မရှိသေးပါ',
+      financeAuthOnly: '(သင်ကိုယ်တိုင် ဖန်တီးထားသော မှတ်တမ်းများကိုသာ ကြည့်ရှုခွင့်ရှိသည်)',
+      loadingData: 'ဒေတာများ ရယူနေဆဲ...',
+      loadingSettings: 'ဆက်တင်များ ရယူနေဆဲ ခဏစောင့်ပါ...',
+      lastSettled: 'နောက်ဆုံး ငွေရှင်းခဲ့သည့်အချိန်',
+      totalIncomeDesc: 'ပြီးစီးပြီးသော ဝင်ငွေမှတ်တမ်းအားလုံး၏ စုစုပေါင်း',
+      partnerCollectionDesc: 'မိတ်ဖက်ဆိုင်များမှ ကောက်ခံရန်ကျန်သော စုစုပေါင်း',
+      totalExpenseDesc: 'ပြီးစီးပြီးသော အသုံးစရိတ်မှတ်တမ်းအားလုံး၏ စုစုပေါင်း',
+      netProfitDesc: 'ဝင်ငွေထဲမှ အသုံးစရိတ်နှုတ်ပြီး အသားတင်အမြတ်',
+      pendingAmountDesc: 'မပြီးစီးသေးသော ငွေပေးချေမှုမှတ်တမ်းများ စုစုပေါင်း',
+      orderIncomeDesc: 'ပို့ဆောင်ပြီး ရှင်းလင်းပြီးသော အော်ဒါများမှ ဝင်ငွေ',
+      courierFeeDesc: 'ပို့ဆောင်သူများအတွက် ခရီးကီလိုမီတာကြေး စုစုပေါင်း',
+      recordDate: 'မှတ်တမ်းတင်သည့်ရက်စွဲ',
+      paymentMethod: 'ငွေပေးချေမှုစနစ်',
+      incomeType: 'အမျိုးအစား',
+      orderId: 'အော်ဒါနံပါတ်',
+      courierId: 'ဝန်ထမ်းနံပါတ်',
+      refPlaceholder: 'ဘဏ်မှတ်တမ်း / QR သက်သေ',
+      saveChanges: 'ပြင်ဆင်ချက်များ သိမ်းဆည်းရန်',
+      createRecord: 'မှတ်တမ်းအသစ်ဖန်တီးရန်',
+      perPage: 'တစ်မျက်နှာလျှင်',
+      deliveredCount: 'ပို့ဆောင်ပြီး ပစ္စည်းအရေအတွက်',
+      deliveredIncome: 'ပို့ဆောင်ပြီး ပစ္စည်းများမှ ဝင်ငွေ',
+      inProgressCount: 'ပို့ဆောင်ဆဲ ပစ္စည်းများ',
+      expectedIncome: 'မျှော်မှန်းဝင်ငွေ',
+      riderCollection: 'ကောက်ခံရန်ကျန်ငွေ',
+      viewDetail: 'အသေးစိတ်ကြည့်ရန်',
+      online: 'အွန်လိုင်း',
+      offline: 'အော့ဖ်လိုင်း',
+      settleRiderDesc: 'ဤဝန်ထမ်း၏ ငွေကောက်ခံမှုအားလုံးကို ရှင်းလင်းရန်',
+      noCourierData: 'ပို့ဆောင်သူဒေတာ မရှိပါ',
+      today: 'ယနေ့',
+      prevDay: 'ယခင်နေ့',
+      nextDay: 'နောက်ရက်',
+      statusFilter: 'အခြေအနေ',
+      totalCourierCount: 'စုစုပေါင်းပို့ဆောင်သူ',
+      courierSuffix: 'ဦး',
+      packageSuffix: 'ခု',
     }
   }[language as 'zh' | 'en' | 'my'] || {
+    title: '财务管理',
+    subtitle: '管理收入、支出、账务流程，以及快递员佣金结算',
     analysisPeriod: '分析周期',
     last7Days: '最近7天',
     last30Days: '最近30天',
@@ -1045,7 +1320,7 @@ const FinanceManagement: React.FC = () => {
                 gap: '12px'
               }}
             >
-              💰 财务管理
+              💰 {t.title}
               {isRegionalUser && (
                 <span style={{ 
                   background: '#48bb78', 
@@ -1061,7 +1336,7 @@ const FinanceManagement: React.FC = () => {
               )}
             </h1>
             <p style={{ margin: '8px 0 0 0', color: 'rgba(255, 255, 255, 0.75)' }}>
-              管理收入、支出、账务流程，以及快递员佣金结算
+              {t.subtitle}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -1093,7 +1368,7 @@ const FinanceManagement: React.FC = () => {
                 }
               }}
             >
-              {loading ? '🔄 刷新中...' : '🔄 刷新数据'}
+              {loading ? `🔄 ${t.loadingData}` : `🔄 ${t.refreshData}`}
             </button>
             <button
               onClick={() => navigate('/admin/dashboard')}
@@ -1117,7 +1392,7 @@ const FinanceManagement: React.FC = () => {
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
-              ← 返回仪表板
+              ← {t.backToDashboard}
             </button>
           </div>
         </div>
@@ -1153,13 +1428,13 @@ const FinanceManagement: React.FC = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {key === 'overview' && '📊 财务总览'}
-              {key === 'records' && '📑 收支记录'}
-              {key === 'analytics' && '📈 数据分析'}
-              {key === 'package_records' && '📦 包裹收支记录'}
-              {key === 'courier_records' && '🚚 骑手收支记录'}
-              {key === 'cash_collection' && '💵 当日收款管理'}
-              {key === 'partner_collection' && '🤝 合伙代收款'}
+              {key === 'overview' && t.financeOverview}
+              {key === 'records' && t.financialRecords}
+              {key === 'analytics' && t.dataAnalysis}
+              {key === 'package_records' && t.packageFinanceRecords}
+              {key === 'courier_records' && t.courierFinanceRecords}
+              {key === 'cash_collection' && t.dailyCollection}
+              {key === 'partner_collection' && t.partnerCollection}
             </button>
           ))}
           {(activeTab === 'records' || activeTab === 'package_records') && (
@@ -1184,7 +1459,7 @@ const FinanceManagement: React.FC = () => {
                 zIndex: 5
               }}
             >
-              + 添加收支记录
+              + {t.addRecord}
             </button>
           )}
         </div>
@@ -1197,13 +1472,13 @@ const FinanceManagement: React.FC = () => {
               gap: '18px'
             }}
           >
-            {renderSummaryCard('总收入', summary.totalIncome, '已完成的所有收入记录总和', '#4cd137')}
-            {renderSummaryCard('总合伙店铺代收款', summary.partnerCollection, '所有合伙店铺的代收款总额', '#ef4444')}
-            {renderSummaryCard('总支出', summary.totalExpense, '已完成的所有支出记录总和', '#ff7979')}
-            {renderSummaryCard('净利润', summary.netProfit, '收入减去支出的净值', summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
-            {renderSummaryCard('待处理金额', summary.pendingPayments, '尚未完成的收支记录金额', '#fbc531')}
-            {renderSummaryCard('订单收入', summary.packageIncome, `已结算订单总收入 (${summary.packageCount}个)`, '#6c5ce7')}
-            {renderSummaryCard('骑手送货费用', summary.courierKmCost, `总送货距离 ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
+            {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
+            {renderSummaryCard(t.totalPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444')}
+            {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
+            {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
+            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531')}
+            {renderSummaryCard(t.orderIncome, summary.packageIncome, `${t.orderIncomeDesc} (${summary.packageCount} ${t.packageSuffix})`, '#6c5ce7')}
+            {renderSummaryCard(t.courierKmCost, summary.courierKmCost, `${t.courierFeeDesc}: ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
         )}
 
@@ -1227,7 +1502,7 @@ const FinanceManagement: React.FC = () => {
               }}
             >
               <input
-                placeholder="搜索订单/快递员/类别"
+                placeholder={t.searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -1249,9 +1524,9 @@ const FinanceManagement: React.FC = () => {
                   color: 'white'
                 }}
               >
-                <option value="all">所有类型</option>
-                <option value="income">收入</option>
-                <option value="expense">支出</option>
+                <option value="all" style={{ color: '#000' }}>{t.allTypes}</option>
+                <option value="income" style={{ color: '#000' }}>{t.income}</option>
+                <option value="expense" style={{ color: '#000' }}>{t.expense}</option>
               </select>
               <select
                 value={filterStatus}
@@ -1264,10 +1539,10 @@ const FinanceManagement: React.FC = () => {
                   color: 'white'
                 }}
               >
-                <option value="all">所有状态</option>
-                <option value="pending">待处理</option>
-                <option value="completed">已完成</option>
-                <option value="cancelled">已取消</option>
+                <option value="all" style={{ color: '#000' }}>{t.allStatus}</option>
+                <option value="pending" style={{ color: '#000' }}>{t.pending}</option>
+                <option value="completed" style={{ color: '#000' }}>{t.completed}</option>
+                <option value="cancelled" style={{ color: '#000' }}>{t.cancelled}</option>
               </select>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
@@ -1330,7 +1605,7 @@ const FinanceManagement: React.FC = () => {
                 >
                   ×
                 </button>
-                <h3 style={{ marginTop: 0, color: 'white' }}>{editingRecord ? '编辑财务记录' : '新增财务记录'}</h3>
+                <h3 style={{ marginTop: 0, color: 'white' }}>{editingRecord ? t.editRecord : t.addRecord}</h3>
                 <form onSubmit={handleCreateOrUpdate}>
                   <div
                     style={{
@@ -1341,7 +1616,7 @@ const FinanceManagement: React.FC = () => {
                   >
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        收支类型
+                        {t.incomeType}
                       </label>
                       <select
                         value={formData.record_type}
@@ -1356,13 +1631,13 @@ const FinanceManagement: React.FC = () => {
                           color: 'white'
                         }}
                       >
-                        <option value="income">收入</option>
-                        <option value="expense">支出</option>
+                        <option value="income" style={{ color: '#000' }}>{t.income}</option>
+                        <option value="expense" style={{ color: '#000' }}>{t.expense}</option>
                       </select>
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        分类
+                        {t.category}
                       </label>
                       <select
                         value={formData.category}
@@ -1378,7 +1653,7 @@ const FinanceManagement: React.FC = () => {
                         }}
                       >
                         {categoryOptions.map((option) => (
-                          <option key={option} value={option}>
+                          <option key={option} value={option} style={{ color: '#000' }}>
                             {option}
                           </option>
                         ))}
@@ -1386,12 +1661,12 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        订单编号 (可选)
+                        {t.orderId} ({language === 'zh' ? '可选' : language === 'my' ? 'မဖြစ်မနေမဟုတ်' : 'Optional'})
                       </label>
                       <input
                         value={formData.order_id}
                         onChange={(e) => setFormData((prev) => ({ ...prev, order_id: e.target.value }))}
-                        placeholder="如：MDY20250928121501"
+                        placeholder={language === 'zh' ? '如：MDY20250928121501' : 'e.g. MDY20250928121501'}
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -1404,12 +1679,12 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        快递员编号 (可选)
+                        {t.courierId} ({language === 'zh' ? '可选' : language === 'my' ? 'မဖြစ်မနေမဟုတ်' : 'Optional'})
                       </label>
                       <input
                         value={formData.courier_id}
                         onChange={(e) => setFormData((prev) => ({ ...prev, courier_id: e.target.value }))}
-                        placeholder="如：COU001"
+                        placeholder={language === 'zh' ? '如：COU001' : 'e.g. COU001'}
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -1422,7 +1697,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        金额
+                        {t.amount}
                       </label>
                       <input
                         type="number"
@@ -1431,7 +1706,7 @@ const FinanceManagement: React.FC = () => {
                         required
                         min="0"
                         step="0.01"
-                        placeholder="如：5000"
+                        placeholder={language === 'zh' ? '如：5000' : 'e.g. 5000'}
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -1444,7 +1719,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        币种
+                        {t.currency}
                       </label>
                       <select
                         value={formData.currency}
@@ -1459,7 +1734,7 @@ const FinanceManagement: React.FC = () => {
                         }}
                       >
                         {currencyOptions.map((option) => (
-                          <option key={option} value={option}>
+                          <option key={option} value={option} style={{ color: '#000' }}>
                             {option}
                           </option>
                         ))}
@@ -1467,7 +1742,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        状态
+                        {t.status}
                       </label>
                       <select
                         value={formData.status}
@@ -1481,14 +1756,14 @@ const FinanceManagement: React.FC = () => {
                           color: 'white'
                         }}
                       >
-                        <option value="pending">待处理</option>
-                        <option value="completed">已完成</option>
-                        <option value="cancelled">已取消</option>
+                        <option value="pending" style={{ color: '#000' }}>{t.pending}</option>
+                        <option value="completed" style={{ color: '#000' }}>{t.completed}</option>
+                        <option value="cancelled" style={{ color: '#000' }}>{t.cancelled}</option>
                       </select>
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        付款方式
+                        {t.paymentMethod}
                       </label>
                       <select
                         value={formData.payment_method}
@@ -1503,7 +1778,7 @@ const FinanceManagement: React.FC = () => {
                         }}
                       >
                         {paymentOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
+                          <option key={option.value} value={option.value} style={{ color: '#000' }}>
                             {option.label}
                           </option>
                         ))}
@@ -1511,12 +1786,12 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        参考号 (可选)
+                        {language === 'zh' ? '参考号 (可选)' : language === 'my' ? 'ကိုးကားချက်နံပါတ် (မဖြစ်မနေမဟုတ်)' : 'Reference (Optional)'}
                       </label>
                       <input
                         value={formData.reference}
                         onChange={(e) => setFormData((prev) => ({ ...prev, reference: e.target.value }))}
-                        placeholder="银行单号/扫码凭证"
+                        placeholder={t.refPlaceholder}
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -1529,7 +1804,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        记录日期
+                        {t.recordDate}
                       </label>
                       <input
                         type="date"
@@ -1549,7 +1824,7 @@ const FinanceManagement: React.FC = () => {
                   </div>
                   <div style={{ marginTop: '16px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                      备注
+                      {t.notes}
                     </label>
                     <textarea
                       value={formData.notes}
@@ -1581,7 +1856,7 @@ const FinanceManagement: React.FC = () => {
                         opacity: isProcessing ? 0.7 : 1
                       }}
                     >
-                      {isProcessing ? '保存中...' : editingRecord ? '保存更改' : '创建记录'}
+                      {isProcessing ? t.loading : editingRecord ? t.saveChanges : t.createRecord}
                     </button>
                     <button
                       type="button"
@@ -1598,7 +1873,7 @@ const FinanceManagement: React.FC = () => {
                         cursor: 'pointer'
                       }}
                     >
-                      取消
+                      {t.cancel}
                     </button>
                   </div>
                 </form>
@@ -1610,7 +1885,7 @@ const FinanceManagement: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
                 <thead>
                   <tr style={{ background: 'rgba(8, 32, 64, 0.6)' }}>
-                    {['记录ID', '类型', '分类', '金额', '币种', '状态', '订单/快递员', '日期', '备注', '操作'].map((header) => (
+                    {[t.recordId, t.type, t.category, t.amount, t.currency, t.status, t.orderCourier, t.date, t.notes, t.actions].map((header) => (
                       <th key={header} style={{ padding: '14px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
                         {header}
                       </th>
@@ -1621,7 +1896,7 @@ const FinanceManagement: React.FC = () => {
                   {loading ? (
                     <tr>
                       <td colSpan={12} style={{ textAlign: 'center', padding: '24px' }}>
-                        加载中...
+                        {t.loadingData}
                       </td>
                     </tr>
                   ) : filteredRecords.length === 0 ? (
@@ -1629,11 +1904,11 @@ const FinanceManagement: React.FC = () => {
                       <td colSpan={12} style={{ textAlign: 'center', padding: '48px 24px' }}>
                         <div style={{ fontSize: '2rem', marginBottom: '16px', opacity: 0.5 }}>📝</div>
                         <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
-                          暂无收支记录
+                          {t.noRecords}
                         </div>
                         {currentUser.toLowerCase() !== 'admin' && (
                           <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.9rem', marginTop: '8px' }}>
-                            (您目前仅被授权查看由您本人创建的财务记录)
+                            {t.financeAuthOnly}
                           </div>
                         )}
                       </td>
@@ -1653,7 +1928,7 @@ const FinanceManagement: React.FC = () => {
                               fontWeight: 600
                             }}
                           >
-                            {record.record_type === 'income' ? '收入' : '支出'}
+                            {record.record_type === 'income' ? t.income : t.expense}
                           </span>
                         </td>
                         <td style={{ padding: '14px' }}>{record.category}</td>
@@ -1672,22 +1947,22 @@ const FinanceManagement: React.FC = () => {
                               fontWeight: 600
                             }}
                           >
-                            {record.status === 'pending' ? '待处理' : record.status === 'completed' ? '已完成' : '已取消'}
+                            {record.status === 'pending' ? t.pending : record.status === 'completed' ? t.completed : t.cancelled}
                           </span>
                         </td>
                         <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
                           <div style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.9)' }}>
-                            订单: {record.order_id || '—'}
+                            {t.orderId}: {record.order_id || '—'}
                           </div>
                           <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.65)' }}>
-                            快递员: {record.courier_id || '—'}
+                            {t.courierId}: {record.courier_id || '—'}
                           </div>
                         </td>
                         <td style={{ padding: '14px' }}>{record.record_date}</td>
                         <td style={{ padding: '14px', maxWidth: '200px' }}>
                           <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)' }}>{record.notes || '—'}</div>
                           {record.reference && (
-                            <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}>参考: {record.reference}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}>{language === 'my' ? 'ကိုးကား' : '参考'}: {record.reference}</div>
                           )}
                         </td>
                         <td style={{ padding: '14px' }}>
@@ -1703,7 +1978,7 @@ const FinanceManagement: React.FC = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              编辑
+                              {t.edit}
                             </button>
                             <button
                               onClick={() => handleDeleteRecord(record.id)}
@@ -1716,7 +1991,7 @@ const FinanceManagement: React.FC = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              删除
+                              {t.delete}
                             </button>
                           </div>
                         </td>
@@ -2696,11 +2971,11 @@ const FinanceManagement: React.FC = () => {
               boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)'
             }}
           >
-            <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>📦 包裹收支记录</h3>
+            <h3 style={{ marginTop: 0, color: 'white', marginBottom: '20px' }}>📦 {t.packageRecords}</h3>
             
             {/* 包裹收入统计 */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>包裹收入统计</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>{t.packageIncomeOverview || '包裹收入统计'}</h4>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -2717,7 +2992,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {deliveredPackages.length}
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹数量</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>{t.deliveredCount}</div>
                 </div>
                 <div style={{
                   background: 'rgba(34, 197, 94, 0.2)',
@@ -2729,7 +3004,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {deliveredIncome.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>已送达包裹收入</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>{t.deliveredIncome}</div>
                 </div>
                 <div style={{
                   background: 'rgba(251, 191, 36, 0.2)',
@@ -2741,7 +3016,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {inProgressPackages.length}
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>进行中的包裹</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>{t.inProgressCount}</div>
                 </div>
                 <div style={{
                   background: 'rgba(251, 191, 36, 0.2)',
@@ -2753,7 +3028,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {inProgressIncome.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>预期收入</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>{t.expectedIncome}</div>
                 </div>
               </div>
             </div>
@@ -2769,10 +3044,10 @@ const FinanceManagement: React.FC = () => {
                 flexWrap: 'wrap',
                 gap: '12px'
               }}>
-                <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>包裹收入记录</h4>
+                <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>{language === 'zh' ? '包裹收入记录' : language === 'my' ? 'ပစ္စည်းပို့ဆောင်မှု ဝင်ငွေမှတ်တမ်း' : 'Package Income Records'}</h4>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                    每页显示：
+                    {t.recordsPerPage}：
                   </label>
                   <select
                     value={packageRecordsPerPage}
@@ -2806,20 +3081,20 @@ const FinanceManagement: React.FC = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>订单ID</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>寄件人</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>收件人</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>包裹类型</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>金额</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>状态</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达时间</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{t.orderId}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'ပို့ဆောင်သူ' : '寄件人'}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'လက်ခံသူ' : '收件人'}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'ပစ္စည်းအမျိုးအစား' : '包裹类型'}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{t.amount}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{t.status}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'ပို့ဆောင်ချိန်' : '送达时间'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {deliveredPackagesSorted.length === 0 ? (
                       <tr>
                         <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
-                          暂无已送达的包裹记录
+                          {t.noRecords}
                         </td>
                       </tr>
                     ) : (
@@ -2852,7 +3127,7 @@ const FinanceManagement: React.FC = () => {
                                 background: 'rgba(34, 197, 94, 0.2)',
                                 color: '#22c55e'
                               }}>
-                                已送达
+                                {t.completed}
                               </span>
                             </td>
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
@@ -2918,7 +3193,7 @@ const FinanceManagement: React.FC = () => {
                     gap: '12px'
                   }}>
                     <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                      显示第 {packageDisplayStart} - {packageDisplayEnd} 条，共 {deliveredPackagesSorted.length} 条记录
+                      {language === 'zh' ? `显示第 ${packageDisplayStart} - ${packageDisplayEnd} 条，共 ${deliveredPackagesSorted.length} 条记录` : language === 'my' ? `${deliveredPackagesSorted.length} ခု အနက် ${packageDisplayStart} မှ ${packageDisplayEnd} အထိ ပြသနေသည်` : `Showing ${packageDisplayStart} to ${packageDisplayEnd} of ${deliveredPackagesSorted.length}`}
                     </div>
                     
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2942,7 +3217,7 @@ const FinanceManagement: React.FC = () => {
                           transition: 'all 0.2s'
                         }}
                       >
-                        ← 上一页
+                        {language === 'zh' ? '← 上一页' : language === 'my' ? '← ယခင်' : '← Prev'}
                       </button>
                       
                       {/* 页码按钮 */}
@@ -2974,7 +3249,7 @@ const FinanceManagement: React.FC = () => {
                               background: isActive 
                                 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
                                 : 'rgba(255, 255, 255, 0.1)',
-                              color: 'white',
+                              color: white,
                               cursor: 'pointer',
                               fontSize: '0.9rem',
                               fontWeight: isActive ? 'bold' : 'normal',
@@ -3016,7 +3291,7 @@ const FinanceManagement: React.FC = () => {
                           transition: 'all 0.2s'
                         }}
                       >
-                        下一页 →
+                        {language === 'zh' ? '下一页 →' : language === 'my' ? 'နောက်သို့ →' : 'Next →'}
                       </button>
                     </div>
                   </div>
@@ -3040,7 +3315,7 @@ const FinanceManagement: React.FC = () => {
               flexWrap: 'wrap',
               alignItems: 'center'
             }}>
-              <h3 style={{ margin: 0, color: 'white', flex: '1 1 auto' }}>💰 骑手工资结算管理</h3>
+              <h3 style={{ margin: 0, color: 'white', flex: '1 1 auto' }}>💰 {t.courierFinanceRecords}</h3>
               
               {/* 状态筛选 */}
               <select
@@ -3055,11 +3330,11 @@ const FinanceManagement: React.FC = () => {
                   fontSize: '0.9rem'
                 }}
               >
-                <option value="all">全部状态</option>
-                <option value="pending">待结算</option>
-                <option value="approved">已审核</option>
-                <option value="paid">已发放</option>
-                <option value="rejected">已拒绝</option>
+                <option value="all" style={{ color: '#000' }}>{t.allStatus}</option>
+                <option value="pending" style={{ color: '#000' }}>{t.pending}</option>
+                <option value="approved" style={{ color: '#000' }}>{language === 'zh' ? '已审核' : language === 'my' ? 'အတည်ပြုပြီး' : 'Approved'}</option>
+                <option value="paid" style={{ color: '#000' }}>{t.settled}</option>
+                <option value="rejected" style={{ color: '#000' }}>{language === 'zh' ? '已拒绝' : language === 'my' ? 'ငြင်းပယ်ခံရသည်' : 'Rejected'}</option>
               </select>
               
               {/* 生成工资按钮 */}
@@ -3079,7 +3354,7 @@ const FinanceManagement: React.FC = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  🔄 生成本月工资
+                  🔄 {t.generateSalaries}
                 </button>
               )}
               
@@ -3215,7 +3490,7 @@ const FinanceManagement: React.FC = () => {
               flexWrap: 'wrap'
             }}>
               <label style={{ color: 'white', fontSize: '0.95rem', fontWeight: '600' }}>
-                📅 选择月份：
+                📅 {t.selectMonth}：
               </label>
               <select
                 value={selectedSalaryMonth}
@@ -3245,7 +3520,7 @@ const FinanceManagement: React.FC = () => {
                 fontSize: '0.85rem',
                 marginLeft: 'auto'
               }}>
-                共 {getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录
+                {language === 'zh' ? `共 ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录` : language === 'my' ? `စုစုပေါင်း ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} ခု` : `Total ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} records`}
               </div>
             </div>
 
@@ -3278,7 +3553,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: '#fbbf24', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                         {monthFilteredSalaries.filter(s => s.status === 'pending').length}
                       </div>
-                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>待结算</div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>{t.pending}</div>
                     </div>
                     
                     <div style={{
@@ -3291,7 +3566,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: '#22c55e', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                         {monthFilteredSalaries.filter(s => s.status === 'approved').length}
                       </div>
-                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已审核</div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>{language === 'zh' ? '已审核' : language === 'my' ? 'အတည်ပြုပြီး' : 'Approved'}</div>
                     </div>
                     
                     <div style={{
@@ -3304,7 +3579,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: '#3b82f6', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
                         {monthFilteredSalaries.filter(s => s.status === 'paid').length}
                       </div>
-                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>已发放</div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>{t.settled}</div>
                     </div>
                     
                     <div style={{
@@ -3317,7 +3592,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: '#a855f7', fontSize: '1.6rem', fontWeight: 'bold', marginBottom: '8px' }}>
                         {monthFilteredSalaries.reduce((sum, s) => sum + s.net_salary, 0).toLocaleString()} MMK
                       </div>
-                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>工资总额</div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.95rem' }}>{language === 'zh' ? '工资总额' : language === 'my' ? 'စုစုပေါင်း လစာ' : 'Total Salary'}</div>
                     </div>
                   </>
                 );
@@ -3333,7 +3608,7 @@ const FinanceManagement: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.18)',
               overflow: 'auto'
             }}>
-              <h4 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '1.1rem' }}>💼 工资记录表</h4>
+              <h4 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '1.1rem' }}>💼 {language === 'my' ? 'လစာမှတ်တမ်းဇယား' : '工资记录表'}</h4>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.1)', borderBottom: '2px solid rgba(255, 255, 255, 0.2)' }}>
@@ -3357,15 +3632,15 @@ const FinanceManagement: React.FC = () => {
                         style={{ cursor: 'pointer' }}
                       />
                     </th>
-                    <th style={{ padding: '14px 12px', textAlign: 'left', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>骑手ID</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'left', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>结算周期</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>基本工资</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>公里费</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>配送奖金</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>实发工资</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>配送单数</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>状态</th>
-                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>操作</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'left', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.riderId}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'left', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.settlementPeriod}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.baseSalary}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.kmFee}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.deliveryBonus}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'right', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{language === 'my' ? 'စုစုပေါင်းလစာ' : '实发工资'}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.deliveryCount}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.status}</th>
+                    <th style={{ padding: '14px 12px', textAlign: 'center', color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{t.action}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3430,7 +3705,7 @@ const FinanceManagement: React.FC = () => {
                           {salary.net_salary.toLocaleString()} MMK
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {salary.total_deliveries} 单
+                          {salary.total_deliveries} {t.packageSuffix || '单'}
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                           <span style={{
@@ -3449,10 +3724,10 @@ const FinanceManagement: React.FC = () => {
                               salary.status === 'paid' ? '#3b82f6' :
                               '#ef4444'
                           }}>
-                            {salary.status === 'pending' ? '待结算' :
-                             salary.status === 'approved' ? '已审核' :
-                             salary.status === 'paid' ? '已发放' :
-                             '已拒绝'}
+                            {salary.status === 'pending' ? t.pending :
+                             salary.status === 'approved' ? (language === 'my' ? 'အတည်ပြုပြီး' : '已审核') :
+                             salary.status === 'paid' ? t.settled :
+                             (language === 'my' ? 'ငြင်းပယ်ခံရသည်' : '已拒绝')}
                           </span>
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
@@ -3475,7 +3750,7 @@ const FinanceManagement: React.FC = () => {
                                 fontWeight: '600'
                               }}
                             >
-                              详情
+                              {t.viewDetail || '详情'}
                             </button>
                             
                             {!isRegionalFinance && (
@@ -3483,7 +3758,7 @@ const FinanceManagement: React.FC = () => {
                                 {salary.status === 'pending' && (
                                   <button
                                     onClick={async () => {
-                                      if (!window.confirm('确认审核通过？')) return;
+                                      if (!window.confirm(language === 'my' ? 'အတည်ပြုမှာ သေချာပါသလား?' : '确认审核通过？')) return;
                                       
                                       setLoading(true);
                                       try {
@@ -3494,10 +3769,10 @@ const FinanceManagement: React.FC = () => {
                                         });
                                         
                                         if (success) {
-                                          window.alert('审核成功！');
+                                          window.alert(language === 'my' ? 'အတည်ပြုခြင်း အောင်မြင်သည်!' : '审核成功！');
                                           await loadRecords();
                                         } else {
-                                          window.alert('审核失败！');
+                                          window.alert(language === 'my' ? 'အတည်ပြုခြင်း မအောင်မြင်ပါ!' : '审核失败！');
                                         }
                                       } catch (error) {
                                         console.error('审核失败:', error);
@@ -3517,7 +3792,7 @@ const FinanceManagement: React.FC = () => {
                                       fontWeight: '600'
                                     }}
                                   >
-                                    审核
+                                    {t.audit || '审核'}
                                   </button>
                                 )}
                                 
@@ -4176,7 +4451,7 @@ const FinanceManagement: React.FC = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem' }}>
-                  💵 当日收款管理
+                  💵 {t.cashCollection}
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.3)', padding: '4px 8px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
                   <button
@@ -4197,7 +4472,7 @@ const FinanceManagement: React.FC = () => {
                     }}
                     onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
                     onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
-                    title="前一天"
+                    title={t.prevDay}
                   >
                     &lt;
                   </button>
@@ -4237,7 +4512,7 @@ const FinanceManagement: React.FC = () => {
                     }}
                     onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
                     onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
-                    title="后一天"
+                    title={t.nextDay}
                   >
                     &gt;
                   </button>
@@ -4258,12 +4533,12 @@ const FinanceManagement: React.FC = () => {
                     onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
                     onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    今天
+                    {t.today}
                   </button>
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>状态:</span>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>{t.statusFilter}:</span>
                   <select
                     value={cashSettlementStatus}
                     onChange={(e) => setCashSettlementStatus(e.target.value as any)}
@@ -4277,9 +4552,9 @@ const FinanceManagement: React.FC = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="unsettled">未结清</option>
-                    <option value="settled">已结清</option>
-                    <option value="all">全部</option>
+                    <option value="unsettled" style={{ color: '#000' }}>{t.unsettled}</option>
+                    <option value="settled" style={{ color: '#000' }}>{t.settled}</option>
+                    <option value="all" style={{ color: '#000' }}>{t.all}</option>
                   </select>
                 </div>
               </div>
@@ -4336,12 +4611,12 @@ const FinanceManagement: React.FC = () => {
                       padding: '20px',
                       border: '1px solid rgba(254, 243, 199, 0.3)'
                     }}>
-                      <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '8px' }}>总跑腿费</div>
+                      <div style={{ color: '#fef3c7', fontSize: '0.9rem', marginBottom: '8px' }}>{language === 'my' ? 'စုစုပေါင်း ပို့ဆောင်ခ' : '总跑腿费'}</div>
                       <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {totalDeliveryFee.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                        {cashPackages.length} 个包裹
+                        {cashPackages.length} {t.packageSuffix}
                       </div>
                     </div>
 
@@ -4352,12 +4627,12 @@ const FinanceManagement: React.FC = () => {
                       padding: '20px',
                       border: '1px solid rgba(254, 202, 202, 0.3)'
                     }}>
-                      <div style={{ color: '#fecaca', fontSize: '0.9rem', marginBottom: '8px' }}>总代收款</div>
+                      <div style={{ color: '#fecaca', fontSize: '0.9rem', marginBottom: '8px' }}>{language === 'my' ? 'စုစုပေါင်း ကိုယ်စားကောက်ခံငွေ' : '总代收款'}</div>
                       <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {totalCOD.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                        Partner店铺代收
+                        Partner {language === 'my' ? 'ဆိုင်မှ ကောက်ခံငွေ' : '店铺代收'}
                       </div>
                     </div>
 
@@ -4368,7 +4643,7 @@ const FinanceManagement: React.FC = () => {
                       padding: '20px',
                       border: '1px solid rgba(167, 243, 208, 0.3)'
                     }}>
-                      <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '8px' }}>总金额 (跑腿费+代收)</div>
+                      <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '8px' }}>{language === 'my' ? 'စုစုပေါင်း ပမာဏ (ပို့ဆောင်ခ+ကိုယ်စားကောက်)' : t.totalAmount}</div>
                       <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {totalAmount.toLocaleString()} MMK
                       </div>
@@ -4381,12 +4656,12 @@ const FinanceManagement: React.FC = () => {
                       padding: '20px',
                       border: '1px solid rgba(219, 234, 254, 0.3)'
                     }}>
-                      <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>总快递员数</div>
+                      <div style={{ color: '#dbeafe', fontSize: '0.9rem', marginBottom: '8px' }}>{t.totalCourierCount}</div>
                       <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {couriers.length}
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                        位快递员
+                        {couriers.length} {t.courierSuffix}
                       </div>
                     </div>
                   </div>
@@ -4520,11 +4795,11 @@ const FinanceManagement: React.FC = () => {
                             border: '1px solid rgba(255,255,255,0.05)',
                             display: 'inline-block'
                           }}>
-                            <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>当日待收现金</div>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>{t.riderCollection}</div>
                             <div style={{ color: cashData.total > 0 ? '#fbbf24' : 'rgba(255,255,255,0.4)', fontSize: '1.2rem', fontWeight: 800 }}>
                               {cashData.total.toLocaleString()} MMK
                               <span style={{ fontSize: '0.85rem', fontWeight: 500, marginLeft: '8px', opacity: 0.7 }}>
-                                ({cashData.packages.length} 个包裹)
+                                ({cashData.packages.length} {t.packageSuffix})
                               </span>
                             </div>
                           </div>
@@ -4537,14 +4812,14 @@ const FinanceManagement: React.FC = () => {
                             padding: '6px 16px', 
                             borderRadius: '10px', 
                             fontSize: '0.85rem', 
-                            fontWeight: 800,
+                            fontWeight: 800, 
                             border: `1px solid ${courier.status === 'active' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px'
                           }}>
                             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 8px currentColor' }}></span>
-                            {courier.status === 'active' ? '在线' : '离线'}
+                            {courier.status === 'active' ? t.online : t.offline}
                           </div>
                           
                           <button
@@ -4588,7 +4863,7 @@ const FinanceManagement: React.FC = () => {
                               }
                             }}
                           >
-                            详情
+                            {t.viewDetail}
                           </button>
                         </div>
                       </div>
@@ -5210,7 +5485,7 @@ const FinanceManagement: React.FC = () => {
                     fontSize: '0.85rem',
                     fontWeight: '600'
                   }}>
-                    {store.unclearedAmount > 0 ? '未结清' : '已结清'}
+                    {store.unclearedAmount > 0 ? t.unsettled : t.settled}
                   </div>
                 </div>
 
@@ -5237,7 +5512,7 @@ const FinanceManagement: React.FC = () => {
                   )}
                   {store.store_code && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                      <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>代码:</span>
+                      <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>{language === 'zh' ? '代码' : language === 'my' ? 'ကုဒ်' : 'Code'}:</span>
                       <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.85rem' }}>{store.store_code}</span>
                     </div>
                   )}
@@ -5245,13 +5520,13 @@ const FinanceManagement: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>总代收款</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>{language === 'my' ? 'စုစုပေါင်း ကိုယ်စားကောက်ခံငွေ' : t.totalAmount}</div>
                     <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.totalAmount.toLocaleString()}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>待结清金额</div>
+                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>{language === 'my' ? 'ရှင်းလင်းရန် ကျန်ငွေ' : t.pendingAmount}</div>
                     <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.unclearedAmount.toLocaleString()}
                     </div>
@@ -5259,12 +5534,12 @@ const FinanceManagement: React.FC = () => {
                 </div>
 
                 <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
-                  待结清订单数: <span style={{ color: 'white', fontWeight: 'bold' }}>{store.unclearedCount}</span> 单
+                  {t.unsettledOrders}: <span style={{ color: 'white', fontWeight: 'bold' }}>{store.unclearedCount}</span> {language === 'zh' ? '单' : ''}
                 </div>
 
                 {store.lastSettledAt && (
                   <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginTop: '4px' }}>
-                    上次结清: <span style={{ color: 'white', fontWeight: '500' }}>{new Date(store.lastSettledAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    {t.lastSettled}: <span style={{ color: 'white', fontWeight: '500' }}>{new Date(store.lastSettledAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 )}
 
@@ -5298,10 +5573,10 @@ const FinanceManagement: React.FC = () => {
                       if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <span>确认结清 ({store.unclearedAmount.toLocaleString()} MMK)</span>
+                    <span>{t.confirmSettle} ({store.unclearedAmount.toLocaleString()} MMK)</span>
                     {isRegionalUser && (
                       <span style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.8 }}>
-                        🔒 仅限总公司管理员操作
+                        🔒 {language === 'zh' ? '仅限总公司管理员操作' : language === 'my' ? 'ပင်မရုံးချုပ် စီမံခန့်ခွဲသူသာ ဆောင်ရွက်နိုင်သည်' : 'HQ Admin Only'}
                       </span>
                     )}
                   </button>
@@ -5316,7 +5591,7 @@ const FinanceManagement: React.FC = () => {
                 padding: '60px',
                 color: 'rgba(255,255,255,0.5)' 
               }}>
-                暂无合伙店铺数据
+                {language === 'zh' ? '暂无合伙店铺数据' : language === 'my' ? 'လုပ်ဖော်ကိုင်ဖက်ဆိုင် အချက်အလက် မရှိသေးပါ' : 'No partner store data'}
               </div>
             )}
           </div>

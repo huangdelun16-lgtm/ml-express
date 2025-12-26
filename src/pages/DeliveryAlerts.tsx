@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { deliveryAlertService } from '../services/deliveryAlertService';
 import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface DeliveryAlert {
   id: string;
@@ -66,7 +67,105 @@ interface AdminAuditLog {
 
 export default function DeliveryAlerts() {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   
+  // 多语言翻译
+  const t = {
+    zh: {
+      title: '配送警报管理',
+      subtitle: '监控和管理骑手异常操作警报',
+      backToDashboard: '返回仪表板',
+      criticalAlerts: '紧急警报',
+      resolvedToday: '今日已处理',
+      pendingAlerts: '待处理警报',
+      totalAlerts: '总警报',
+      newAlert: '新警报',
+      rider: '骑手',
+      alertId: '警报ID',
+      alertType: '警报类型',
+      severity: '严重程度',
+      courier: '骑手姓名',
+      status: '处理状态',
+      action: '操作',
+      resolve: '处理',
+      dismiss: '忽略',
+      detail: '详情',
+      resolved: '已处理',
+      dismissed: '已忽略',
+      pending: '待处理',
+      low: '低',
+      medium: '中',
+      high: '高',
+      critical: '紧急',
+      all: '全部',
+      filterByStatus: '处理状态',
+      filterBySeverity: '严重程度',
+    },
+    en: {
+      title: 'Delivery Alert Management',
+      subtitle: 'Monitor and manage courier anomaly alerts',
+      backToDashboard: 'Dashboard',
+      criticalAlerts: 'Critical',
+      resolvedToday: 'Resolved Today',
+      pendingAlerts: 'Pending Alerts',
+      totalAlerts: 'Total Alerts',
+      newAlert: 'New Alert',
+      rider: 'Rider',
+      alertId: 'ID',
+      alertType: 'Type',
+      severity: 'Severity',
+      courier: 'Courier',
+      status: 'Status',
+      action: 'Action',
+      resolve: 'Resolve',
+      dismiss: 'Dismiss',
+      detail: 'Detail',
+      resolved: 'Resolved',
+      dismissed: 'Dismissed',
+      pending: 'Pending',
+      low: 'Low',
+      medium: 'Medium',
+      high: 'High',
+      critical: 'Critical',
+      all: 'All',
+      filterByStatus: 'Status',
+      filterBySeverity: 'Severity',
+    },
+    my: {
+      title: 'ပို့ဆောင်ရေးသတိပေးချက်စီမံခန့်ခွဲမှု',
+      subtitle: 'ပို့ဆောင်သူများ၏ ပုံမှန်မဟုတ်သော လုပ်ဆောင်ချက်များကို စောင့်ကြည့်စီမံပါ',
+      backToDashboard: 'ပင်မစာမျက်နှာ',
+      criticalAlerts: 'အရေးကြီးသတိပေးချက်',
+      resolvedToday: 'ယနေ့ဖြေရှင်းပြီး',
+      pendingAlerts: 'စောင့်ဆိုင်းဆဲသတိပေးချက်',
+      totalAlerts: 'စုစုပေါင်းသတိပေးချက်',
+      newAlert: 'သတိပေးချက်အသစ်',
+      rider: 'ပို့ဆောင်သူ',
+      alertId: 'နံပါတ်',
+      alertType: 'အမျိုးအစား',
+      severity: 'ပြင်းထန်မှု',
+      courier: 'ပို့ဆောင်သူအမည်',
+      status: 'အခြေအနေ',
+      action: 'ဆောင်ရွက်ချက်',
+      resolve: 'ဖြေရှင်းရန်',
+      dismiss: 'လျစ်လျူရှုရန်',
+      detail: 'အသေးစိတ်',
+      resolved: 'ဖြေရှင်းပြီး',
+      dismissed: 'လျစ်လျူရှုပြီး',
+      pending: 'စောင့်ဆိုင်းဆဲ',
+      low: 'နိမ့်',
+      medium: 'အလယ်အလတ်',
+      high: 'မြင့်',
+      critical: 'အလွန်မြင့်',
+      all: 'အားလုံး',
+      filterByStatus: 'အခြေအနေ',
+      filterBySeverity: 'ပြင်းထန်မှု',
+    }
+  }[language as 'zh' | 'en' | 'my'] || {
+    title: '配送警报管理',
+    subtitle: '监控和管理骑手异常操作警报',
+  };
+
   // 获取当前用户角色和区域信息
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
@@ -696,7 +795,7 @@ export default function DeliveryAlerts() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  🚨 配送警报管理
+                  🚨 {t.title}
                   {isRegionalUser && (
                     <span style={{ 
                       background: '#48bb78', 
@@ -712,7 +811,7 @@ export default function DeliveryAlerts() {
                   )}
                 </h1>
                 <p style={{ margin: '8px 0 0 0', color: '#718096', fontSize: '1rem' }}>
-                  监控和管理骑手异常操作警报
+                  {t.subtitle}
                 </p>
               </div>
               
@@ -744,7 +843,7 @@ export default function DeliveryAlerts() {
                 }}
               >
                 <span style={{ fontSize: '1.2rem' }}>← </span>
-                <span>返回仪表板</span>
+                <span>{t.backToDashboard}</span>
               </button>
             </div>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -758,7 +857,7 @@ export default function DeliveryAlerts() {
                 position: 'relative'
               }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.criticalAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>紧急警报</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.criticalAlerts}</div>
                 <div style={{
                   position: 'absolute',
                   top: '8px',
@@ -778,7 +877,7 @@ export default function DeliveryAlerts() {
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.pendingAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>待处理</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.pendingAlerts}</div>
               </div>
               <div style={{
                 background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
@@ -788,7 +887,7 @@ export default function DeliveryAlerts() {
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.totalAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>今日总数</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.totalAlerts}</div>
               </div>
               <div style={{
                 background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
@@ -798,7 +897,7 @@ export default function DeliveryAlerts() {
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.resolvedToday}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>今日已解决</div>
+                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.resolvedToday}</div>
               </div>
             </div>
           </div>
@@ -807,7 +906,7 @@ export default function DeliveryAlerts() {
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
-                状态筛选
+                {t.filterByStatus}
               </label>
               <select
                 value={filter}
@@ -820,17 +919,16 @@ export default function DeliveryAlerts() {
                   minWidth: '150px'
                 }}
               >
-                <option value="all">全部</option>
-                <option value="pending">待处理</option>
-                <option value="acknowledged">已确认</option>
-                <option value="resolved">已解决</option>
-                <option value="dismissed">已忽略</option>
+                <option value="all" style={{ color: '#000' }}>{t.all}</option>
+                <option value="pending" style={{ color: '#000' }}>{t.pending}</option>
+                <option value="resolved" style={{ color: '#000' }}>{t.resolved}</option>
+                <option value="dismissed" style={{ color: '#000' }}>{t.dismissed}</option>
               </select>
             </div>
 
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
-                严重程度
+                {t.filterBySeverity}
               </label>
               <select
                 value={severityFilter}
@@ -843,11 +941,11 @@ export default function DeliveryAlerts() {
                   minWidth: '150px'
                 }}
               >
-                <option value="all">全部</option>
-                <option value="critical">紧急</option>
-                <option value="high">高</option>
-                <option value="medium">中</option>
-                <option value="low">低</option>
+                <option value="all" style={{ color: '#000' }}>{t.all}</option>
+                <option value="critical" style={{ color: '#000' }}>{t.critical}</option>
+                <option value="high" style={{ color: '#000' }}>{t.high}</option>
+                <option value="medium" style={{ color: '#000' }}>{t.medium}</option>
+                <option value="low" style={{ color: '#000' }}>{t.low}</option>
               </select>
             </div>
 
@@ -866,7 +964,7 @@ export default function DeliveryAlerts() {
                 fontWeight: 500
               }}
             >
-              {loading ? '加载中...' : '🔄 刷新'}
+              {loading ? t.loading : `🔄 ${language === 'my' ? 'ဒေတာ အသစ်လုပ်ရန်' : '刷新'}`}
             </button>
           </div>
         </div>
@@ -963,7 +1061,7 @@ export default function DeliveryAlerts() {
                         {new Date(alert.created_at).toLocaleString('zh-CN')}
                       </div>
                       <div style={{ marginTop: '8px', fontSize: '0.875rem', color: '#4a5568' }}>
-                        <strong>骑手:</strong> {alert.courier_name}
+                        <strong>{t.rider}:</strong> {alert.courier_name}
                         {(() => {
                           const stats = getCourierViolationStats(alert.courier_id);
                           if (stats.totalViolations > 0) {
@@ -976,7 +1074,7 @@ export default function DeliveryAlerts() {
                                 borderRadius: '4px',
                                 fontSize: '10px'
                               }}>
-                                ⚠️ {stats.totalViolations}次违规 ({stats.totalPenaltyPoints}分)
+                                ⚠️ {stats.totalViolations}{language === 'my' ? 'ကြိမ်ဖောက်ဖျက်မှု' : '次违规'} ({stats.totalPenaltyPoints}{language === 'my' ? 'မှတ်' : '分'})
                               </span>
                             );
                           }
@@ -984,7 +1082,7 @@ export default function DeliveryAlerts() {
                         })()}
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '0.875rem', color: '#4a5568' }}>
-                        <strong>包裹:</strong> {alert.package_id}
+                        <strong>{language === 'my' ? 'ပစ္စည်း' : '包裹'}:</strong> {alert.package_id}
                       </div>
                       {alert.distance_from_destination && (
                         <div style={{
@@ -996,7 +1094,7 @@ export default function DeliveryAlerts() {
                           color: '#991b1b',
                           fontWeight: 600
                         }}>
-                          距离: {alert.distance_from_destination.toFixed(0)} 米
+                          {language === 'my' ? 'အကွာအဝေး' : '距离'}: {alert.distance_from_destination.toFixed(0)} {language === 'my' ? 'မီတာ' : '米'}
                         </div>
                       )}
                     </div>
@@ -1289,7 +1387,7 @@ export default function DeliveryAlerts() {
                   fontWeight: 500
                 }}
               >
-                关闭
+                {t.cancel}
               </button>
               <button
                 onClick={() => handleViewPackageDetail(selectedAlert)}
@@ -1308,7 +1406,7 @@ export default function DeliveryAlerts() {
                 }}
               >
                 <span>📸</span>
-                <span>骑手拍照记录</span>
+                <span>{language === 'my' ? 'ဓာတ်ပုံမှတ်တမ်း' : '骑手拍照记录'}</span>
               </button>
               
               <button
@@ -1328,7 +1426,7 @@ export default function DeliveryAlerts() {
                 }}
               >
                 <span>⚠️</span>
-                <span>创建违规记录</span>
+                <span>{language === 'my' ? 'ဖောက်ဖျက်မှုမှတ်တမ်းပြုလုပ်ရန်' : '创建违规记录'}</span>
               </button>
               
               <button
@@ -1348,7 +1446,7 @@ export default function DeliveryAlerts() {
                 }}
               >
                 <span>📋</span>
-                <span>违规历史</span>
+                <span>{language === 'my' ? 'ဖောက်ဖျက်မှုသမိုင်း' : '违规历史'}</span>
               </button>
               
               {selectedAlert.status === 'pending' && (
@@ -1367,7 +1465,7 @@ export default function DeliveryAlerts() {
                       fontWeight: 500
                     }}
                   >
-                    👀 确认
+                    👀 {language === 'my' ? 'အတည်ပြုရန်' : '确认'}
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'resolved')}
@@ -1383,7 +1481,7 @@ export default function DeliveryAlerts() {
                       fontWeight: 500
                     }}
                   >
-                    ✅ 解决
+                    ✅ {t.resolve}
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'dismissed')}
@@ -1399,7 +1497,7 @@ export default function DeliveryAlerts() {
                       fontWeight: 500
                     }}
                   >
-                    ❌ 忽略
+                    ❌ {t.dismiss}
                   </button>
                 </>
               )}
