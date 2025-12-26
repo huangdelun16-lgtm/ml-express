@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SystemSetting, systemSettingsService } from '../services/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 
 type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | 'tracking' | 'security';
@@ -336,6 +337,7 @@ const REGIONS = [
 
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<SettingCategory>('general');
   const [selectedRegion, setSelectedRegion] = useState<string>('mandalay');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
