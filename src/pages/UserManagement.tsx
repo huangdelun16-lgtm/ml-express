@@ -2155,7 +2155,10 @@ const UserManagement: React.FC = () => {
                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                <span style={{ color: '#60a5fa', fontSize: '1.1rem' }}>📍</span>
                                <span style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 700 }}>
-                                 {REGIONS.find(r => r.id === courier.region)?.name || courier.region || '-'}
+                                 {(() => {
+                                   const r = REGIONS.find(reg => reg.id === courier.region || reg.prefix === courier.region);
+                                   return r ? `${r.name} (${r.prefix})` : (courier.region || '-');
+                                 })()}
                                </span>
                              </div>
                              <p style={{ margin: '0 0 16px 0', color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', lineHeight: '1.6' }}>
@@ -2256,7 +2259,7 @@ const UserManagement: React.FC = () => {
                       {/* 只读的核心信息（由账号系统决定） */}
                       <div style={{ background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', gridColumn: '1 / -1' }}>
                         <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#90cdf4', fontWeight: 700 }}>以下信息由账号系统决定，无法在此修改：</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr 1fr', gap: '16px' }}>
                           <div>
                             <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>姓名</label>
                             <p style={{ margin: 0, color: 'white', fontWeight: 600 }}>{courierForm.name}</p>
@@ -2268,6 +2271,15 @@ const UserManagement: React.FC = () => {
                           <div>
                             <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>员工编号</label>
                             <p style={{ margin: 0, color: '#48bb78', fontWeight: 800, fontFamily: 'monospace' }}>{courierForm.employee_id}</p>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', opacity: 0.5, marginBottom: '4px' }}>所属地区</label>
+                            <p style={{ margin: 0, color: '#93c5fd', fontWeight: 700 }}>
+                              {(() => {
+                                const r = REGIONS.find(reg => reg.id === courierForm.region || reg.prefix === courierForm.region);
+                                return r ? `${r.name} (${r.prefix})` : (courierForm.region || '-');
+                              })()}
+                            </p>
                           </div>
                         </div>
                       </div>
