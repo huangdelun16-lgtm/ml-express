@@ -92,6 +92,16 @@ const typeColors: Record<FinanceRecord['record_type'], string> = {
   expense: '#e74c3c'
 };
 
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
+  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'yangon', name: '仰光', prefix: 'YGN' },
+  { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
+  { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
+  { id: 'lashio', name: '腊戌', prefix: 'LSO' },
+  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+];
+
 const FinanceManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
