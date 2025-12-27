@@ -61,16 +61,47 @@ export default function LoginScreen({ navigation }: any) {
         
         if (account.position === '骑手' || account.position === '骑手队长') {
           try {
-            const { data: courierData } = await supabase
+            // 1. 尝试查找现有骑手记录
+            let { data: courierData, error: fetchError } = await supabase
               .from('couriers')
-              .select('id, name')
+              .select('*')
               .eq('name', account.employee_name)
-              .single();
+              .maybeSingle();
             
+            // 2. 如果不存在，则创建一个新的骑手记录
+            if (!courierData && !fetchError) {
+              console.log('📝 正在为新账号创建骑手记录...');
+              const { data: newData, error: insertError } = await supabase
+                .from('couriers')
+                .insert([{
+                  id: `COU${Date.now()}`,
+                  name: account.employee_name,
+                  phone: account.phone,
+                  employee_id: account.employee_id,
+                  status: 'active',
+                  vehicle_type: account.position === '骑手队长' ? 'car' : 'motorcycle',
+                  last_active: new Date().toISOString()
+                }])
+                .select()
+                .single();
+              
+              if (!insertError) {
+                courierData = newData;
+                console.log('✅ 骑手记录创建成功');
+              } else {
+                console.error('❌ 创建骑手记录失败:', insertError);
+              }
+            }
+            
+            // 3. 更新活跃状态和保存 ID
             if (courierData) {
               await supabase
                 .from('couriers')
-                .update({ last_active: new Date().toISOString(), status: 'active' })
+                .update({ 
+                  last_active: new Date().toISOString(), 
+                  status: 'active',
+                  employee_id: account.employee_id // 确保员工编号同步
+                })
                 .eq('id', courierData.id);
               
               await AsyncStorage.setItem('currentCourierId', courierData.id);

@@ -327,14 +327,18 @@ const RealTimeTracking: React.FC = () => {
           const currentPackages = packageCounts[acc.employee_name] || 0;
 
           // 确定在线状态逻辑
+          const lastActiveStr = courierRt?.last_active || acc.last_login;
           let displayStatus: Courier['status'] = 'offline';
-          const lastActive = courierRt?.last_active || acc.last_login;
           
           if (acc.status === 'active') {
-            if (lastActive) {
-              const lastActiveTime = new Date(lastActive).getTime();
+            // 比较 couriers 表的最后活跃时间和 admin_accounts 的最后登录时间，取最近的一个
+            const rtActiveTime = courierRt?.last_active ? new Date(courierRt.last_active).getTime() : 0;
+            const loginActiveTime = acc.last_login ? new Date(acc.last_login).getTime() : 0;
+            const mostRecentActiveTime = Math.max(rtActiveTime, loginActiveTime);
+
+            if (mostRecentActiveTime > 0) {
               const now = Date.now();
-              const diffMinutes = (now - lastActiveTime) / (1000 * 60);
+              const diffMinutes = (now - mostRecentActiveTime) / (1000 * 60);
               
               // 30分钟内有活动视为在线
               if (diffMinutes < 30) {
