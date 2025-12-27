@@ -2943,7 +2943,7 @@ const FinanceManagement: React.FC = () => {
                               background: isActive 
                                 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
                                 : 'rgba(255, 255, 255, 0.1)',
-                              color: white,
+                              color: 'white',
                               cursor: 'pointer',
                               fontSize: '0.9rem',
                               fontWeight: isActive ? 'bold' : 'normal',
