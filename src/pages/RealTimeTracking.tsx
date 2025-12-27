@@ -309,46 +309,53 @@ const RealTimeTracking: React.FC = () => {
       });
 
       // 7. 合并数据并过滤
-      const enrichedCouriers: CourierWithLocation[] = couriersData
-        .filter(courier => {
+      // 以账号系统 (riderAccounts) 为准，确保所有骑手都能显示
+      const enrichedCouriers: CourierWithLocation[] = riderAccounts
+        .filter(acc => {
           // 只显示当前区域的骑手
           if (activePrefix) {
-            return courier.employee_id && courier.employee_id.startsWith(activePrefix);
+            return acc.employee_id && acc.employee_id.startsWith(activePrefix);
           }
           return true;
         })
-        .map(courier => {
-          const location = locationsData?.find(loc => loc.courier_id === courier.id);
-          const currentPackages = packageCounts[courier.name] || 0;
+        .map(acc => {
+          // 在 couriers 表中查找对应的实时数据
+          const courierRt = couriersData.find(c => c.employee_id === acc.employee_id || c.phone === acc.phone);
+          // 在 courier_locations 表中查找位置
+          const location = locationsData?.find(loc => loc.courier_id === (courierRt?.id || acc.id));
+          
+          const currentPackages = packageCounts[acc.employee_name] || 0;
 
-          // 确定显示状态
-          let displayStatus: Courier['status'] = courier.status as Courier['status'];
-          if (courier.status === 'active') {
-            if (courier.last_active) {
-              const lastActiveTime = new Date(courier.last_active).getTime();
+          // 确定在线状态逻辑
+          let displayStatus: Courier['status'] = 'offline';
+          const lastActive = courierRt?.last_active || acc.last_login;
+          
+          if (acc.status === 'active') {
+            if (lastActive) {
+              const lastActiveTime = new Date(lastActive).getTime();
               const now = Date.now();
               const diffMinutes = (now - lastActiveTime) / (1000 * 60);
               
+              // 30分钟内有活动视为在线
               if (diffMinutes < 30) {
                 displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
-              } else {
-                displayStatus = 'offline';
               }
-            } else {
-              displayStatus = 'offline';
             }
-          } else {
-            displayStatus = 'offline';
           }
 
           return {
-            ...courier,
-            latitude: location?.latitude || (myanmarCities[selectedCity].lat + (Math.random() - 0.5) * 0.05),
-            longitude: location?.longitude || (myanmarCities[selectedCity].lng + (Math.random() - 0.5) * 0.05),
+            id: courierRt?.id || acc.id,
+            name: acc.employee_name,
+            phone: acc.phone,
+            employee_id: acc.employee_id,
+            // 使用位置信息，如果没有则使用该城市中心点的随机偏移
+            latitude: location?.latitude || (myanmarCities[selectedCity].lat + (Math.random() - 0.5) * 0.02),
+            longitude: location?.longitude || (myanmarCities[selectedCity].lng + (Math.random() - 0.5) * 0.02),
             status: displayStatus,
             currentPackages: currentPackages,
-            todayDeliveries: courier.total_deliveries || 0,
-            batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
+            todayDeliveries: courierRt?.total_deliveries || 0,
+            batteryLevel: location?.battery_level || 100,
+            vehicle_type: acc.position === '骑手队长' ? 'car' : 'motorcycle'
           } as CourierWithLocation;
         });
 
