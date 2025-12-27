@@ -738,21 +738,23 @@ const DeliveryStoreManagement: React.FC = () => {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '10px 12px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.25)',
-    background: 'rgba(15, 32, 60, 0.55)',
+    padding: '12px 16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255, 255, 255, 0.05)',
     color: 'white',
-    fontSize: '0.9rem',
-    outline: 'none'
+    fontSize: '0.95rem',
+    outline: 'none',
+    transition: 'all 0.3s ease'
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    marginBottom: '5px',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: '0.85rem',
-    fontWeight: 500
+    marginBottom: '8px',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    letterSpacing: '0.5px'
   };
 
   // const mapContainerStyle = {
@@ -770,8 +772,8 @@ const DeliveryStoreManagement: React.FC = () => {
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        padding: '20px',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #334155 100%)',
+        padding: '24px',
         fontFamily: 'Segoe UI, Arial, sans-serif'
       }}
     >
@@ -795,13 +797,23 @@ const DeliveryStoreManagement: React.FC = () => {
           <button
             onClick={() => navigate('/admin/dashboard')}
             style={{
-              background: 'rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.08)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              padding: '10px 18px',
-              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              padding: '12px 24px',
+              borderRadius: '12px',
               cursor: 'pointer',
-              flex: isMobile ? 1 : 'none'
+              fontWeight: 600,
+              flex: isMobile ? 1 : 'none',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             ← 返回仪表板
@@ -823,17 +835,31 @@ const DeliveryStoreManagement: React.FC = () => {
               }
             }}
             style={{
-              background: showForm ? 'rgba(245, 101, 101, 0.8)' : 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+              background: showForm ? 'rgba(245, 101, 101, 0.2)' : 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
               color: 'white',
-              border: 'none',
-              padding: '10px 24px',
-              borderRadius: '10px',
+              border: showForm ? '1px solid rgba(245, 101, 101, 0.5)' : 'none',
+              padding: '12px 28px',
+              borderRadius: '12px',
               cursor: 'pointer',
-              boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)',
-              flex: isMobile ? 1 : 'none'
+              fontWeight: 'bold',
+              boxShadow: showForm ? 'none' : '0 8px 25px rgba(56, 161, 105, 0.4)',
+              flex: isMobile ? 1 : 'none',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              if (!showForm) {
+                e.currentTarget.style.boxShadow = '0 12px 30px rgba(56, 161, 105, 0.5)';
+              }
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              if (!showForm) {
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(56, 161, 105, 0.4)';
+              }
             }}
           >
-            {showForm ? (isEditing ? '取消编辑' : '取消') : '+ 新增合伙店铺'}
+            {showForm ? (isEditing ? '✕ 取消编辑' : '✕ 取消') : '➕ 新增合伙店铺'}
           </button>
         </div>
       </div>
@@ -878,13 +904,13 @@ const DeliveryStoreManagement: React.FC = () => {
       {/* 新增表单 */}
       {showForm && (
         <div style={{
-          background: 'rgba(15, 32, 60, 0.5)',
-          borderRadius: '20px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          borderRadius: '24px',
           padding: isMobile ? '24px' : '32px',
           marginBottom: '32px',
-          border: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
-          backdropFilter: 'blur(20px)'
+          border: '1px solid rgba(255,255,255,0.2)',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(30px)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
             <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', color: 'white' }}>
@@ -966,6 +992,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   <option value="drinks_snacks">饮料和小吃</option>
                   <option value="grocery">杂货店</option>
                   <option value="transit_station">中转站</option>
+                  <option value="other">其它</option>
                 </select>
               </div>
               <div>
@@ -1128,29 +1155,36 @@ const DeliveryStoreManagement: React.FC = () => {
             </div>
 
             {/* 地图位置选择按钮 */}
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <label style={labelStyle}>地图位置选择</label>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
                 <button
                   type="button"
                   onClick={openMapSelection}
                   style={{
-                    background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                    background: 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)',
                     color: 'white',
                     border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
+                    padding: '12px 24px',
+                    borderRadius: '12px',
                     cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: '500',
+                    fontSize: '0.95rem',
+                    fontWeight: 'bold',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(44, 82, 130, 0.3)',
-                    transition: 'all 0.3s ease'
+                    gap: '10px',
+                    boxShadow: '0 8px 20px rgba(49, 130, 206, 0.3)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 12px 25px rgba(49, 130, 206, 0.4)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(49, 130, 206, 0.3)';
+                  }}
+                >
                     e.currentTarget.style.boxShadow = '0 6px 16px rgba(44, 82, 130, 0.4)';
                   }}
                   onMouseOut={(e) => {
@@ -1177,15 +1211,24 @@ const DeliveryStoreManagement: React.FC = () => {
                 background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                 color: 'white',
                 border: 'none',
-                padding: '10px 28px',
-                borderRadius: '10px',
+                padding: '12px 32px',
+                borderRadius: '12px',
                 cursor: 'pointer',
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                boxShadow: '0 6px 16px rgba(56, 161, 105, 0.3)'
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(56, 161, 105, 0.45)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(56, 161, 105, 0.35)';
               }}
             >
-              {isEditing ? '更新合伙店铺' : '创建合伙店铺'}
+              {isEditing ? '✅ 更新合伙店铺' : '🚀 创建合伙店铺'}
             </button>
           </form>
         </div>
@@ -1225,12 +1268,26 @@ const DeliveryStoreManagement: React.FC = () => {
                   data-store-id={store.id}
                   onClick={() => handleStoreClick(store)}
                   style={{
-                    background: selectedStore?.id === store.id ? 'rgba(49, 130, 206, 0.3)' : 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '12px',
-                    padding: '16px',
+                    background: selectedStore?.id === store.id ? 'rgba(66, 153, 225, 0.25)' : 'rgba(255,255,255,0.08)',
+                    border: selectedStore?.id === store.id ? '1px solid rgba(66, 153, 225, 0.5)' : '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '20px',
+                    padding: '20px',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: selectedStore?.id === store.id ? '0 10px 25px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-5px)';
+                    if (selectedStore?.id !== store.id) {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.12)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    if (selectedStore?.id !== store.id) {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                    }
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
