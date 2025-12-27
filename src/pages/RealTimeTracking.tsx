@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
@@ -41,6 +41,8 @@ const RealTimeTracking: React.FC = () => {
   const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
+  const [regionalRiderCount, setRegionalRiderCount] = useState(0);
+  const [onlineRiderCount, setOnlineRiderCount] = useState(0);
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -242,7 +244,31 @@ const RealTimeTracking: React.FC = () => {
 
   const loadCouriers = async () => {
     try {
-      // 1. 从数据库获取快递员列表
+      // 1. 获取所有账号系统中的账号（同步用户管理页面的来源）
+      const accounts = await adminAccountService.getAllAccounts();
+      const riderAccounts = accounts.filter(acc => 
+        acc.position === '骑手' || acc.position === '骑手队长'
+      );
+
+      // 2. 确定当前过滤前缀
+      let activePrefix = currentRegionPrefix;
+      if (!isRegionalUser) {
+        if (selectedCity === 'yangon') activePrefix = 'YGN';
+        else if (selectedCity === 'mandalay') activePrefix = 'MDY';
+        else if (selectedCity === 'pyinoolwin') activePrefix = 'POL';
+        else activePrefix = ''; // 其他城市暂不按前缀过滤
+      }
+
+      // 3. 计算该区域的骑手总数
+      const regionalRiders = riderAccounts.filter(acc => {
+        if (activePrefix) {
+          return acc.employee_id && acc.employee_id.startsWith(activePrefix);
+        }
+        return true;
+      });
+      setRegionalRiderCount(regionalRiders.length);
+
+      // 4. 从数据库获取快递员实时位置和状态
       const { data: couriersData, error: couriersError } = await supabase
         .from('couriers')
         .select('*')
@@ -256,10 +282,11 @@ const RealTimeTracking: React.FC = () => {
 
       if (!couriersData || couriersData.length === 0) {
         setCouriers([]);
+        setOnlineRiderCount(0);
         return;
       }
 
-      // 2. 获取快递员位置信息
+      // 5. 获取位置信息
       const { data: locationsData, error: locationsError } = await supabase
         .from('courier_locations')
         .select('*');
@@ -268,13 +295,12 @@ const RealTimeTracking: React.FC = () => {
         console.warn('获取位置信息失败:', locationsError);
       }
 
-      // 3. 计算每个快递员的当前包裹数
+      // 6. 计算每个快递员的当前包裹数
       const { data: packagesData } = await supabase
         .from('packages')
         .select('courier, status')
         .in('status', ['已取件', '配送中']);
 
-      // 统计每个快递员的包裹数
       const packageCounts: { [key: string]: number } = {};
       packagesData?.forEach(pkg => {
         if (pkg.courier && pkg.courier !== '待分配') {
@@ -282,59 +308,57 @@ const RealTimeTracking: React.FC = () => {
         }
       });
 
-      // 4. 合并数据并根据权限过滤
+      // 7. 合并数据并过滤
       const enrichedCouriers: CourierWithLocation[] = couriersData
         .filter(courier => {
-          // 如果是领区用户，只显示该领区的快递员
-          if (isRegionalUser) {
-            return courier.employee_id && courier.employee_id.startsWith(currentRegionPrefix);
+          // 只显示当前区域的骑手
+          if (activePrefix) {
+            return courier.employee_id && courier.employee_id.startsWith(activePrefix);
           }
           return true;
         })
         .map(courier => {
-          // 查找对应的位置信息
           const location = locationsData?.find(loc => loc.courier_id === courier.id);
-        
-        // 计算当前包裹数
-        const currentPackages = packageCounts[courier.name] || 0;
+          const currentPackages = packageCounts[courier.name] || 0;
 
-        // 确定显示状态
-        let displayStatus: Courier['status'] = courier.status as Courier['status'];
-        if (courier.status === 'active') {
-          // 根据last_active判断是否在线
-          if (courier.last_active) {
-            const lastActiveTime = new Date(courier.last_active).getTime();
-            const now = Date.now();
-            const diffMinutes = (now - lastActiveTime) / (1000 * 60);
-            
-            if (diffMinutes < 30) {
-              displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
+          // 确定显示状态
+          let displayStatus: Courier['status'] = courier.status as Courier['status'];
+          if (courier.status === 'active') {
+            if (courier.last_active) {
+              const lastActiveTime = new Date(courier.last_active).getTime();
+              const now = Date.now();
+              const diffMinutes = (now - lastActiveTime) / (1000 * 60);
+              
+              if (diffMinutes < 30) {
+                displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
+              } else {
+                displayStatus = 'offline';
+              }
             } else {
               displayStatus = 'offline';
             }
           } else {
             displayStatus = 'offline';
           }
-        } else {
-          displayStatus = 'offline';
-        }
 
-        return {
-          ...courier,
-          // 使用位置信息，如果没有则使用默认位置（仰光中心附近随机位置）
-          latitude: location?.latitude || (16.8661 + (Math.random() - 0.5) * 0.05),
-          longitude: location?.longitude || (96.1951 + (Math.random() - 0.5) * 0.05),
-          status: displayStatus,
-          currentPackages: currentPackages,
-          todayDeliveries: courier.total_deliveries || 0,
-          batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
-        } as CourierWithLocation;
-      });
+          return {
+            ...courier,
+            latitude: location?.latitude || (myanmarCities[selectedCity].lat + (Math.random() - 0.5) * 0.05),
+            longitude: location?.longitude || (myanmarCities[selectedCity].lng + (Math.random() - 0.5) * 0.05),
+            status: displayStatus,
+            currentPackages: currentPackages,
+            todayDeliveries: courier.total_deliveries || 0,
+            batteryLevel: location?.battery_level || Math.floor(Math.random() * 30) + 70
+          } as CourierWithLocation;
+        });
 
       setCouriers(enrichedCouriers);
+      // 更新在线骑手数量 (仅计算状态为 online 的，busy 另计)
+      setOnlineRiderCount(enrichedCouriers.filter(c => c.status === 'online').length);
     } catch (error) {
       errorHandler.handleErrorSilent(error, '加载快递员数据');
       setCouriers([]);
+      setOnlineRiderCount(0);
     }
   };
 
@@ -446,6 +470,8 @@ const RealTimeTracking: React.FC = () => {
       setSelectedCity(validCityKey);
       const city = myanmarCities[validCityKey];
       setMapCenter({ lat: city.lat, lng: city.lng });
+      // 切换城市后立即重新加载该区域的快递员数据
+      setTimeout(() => loadCouriers(), 100);
     }
   };
   
@@ -582,7 +608,7 @@ const RealTimeTracking: React.FC = () => {
             borderRadius: '8px',
             fontWeight: 'bold'
           }}>
-            🟢 在线: {couriers.filter(c => c.status === 'online').length}
+            🟢 在线: {onlineRiderCount}
           </div>
           <div style={{ 
             background: '#f59e0b', 
@@ -615,19 +641,17 @@ const RealTimeTracking: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ margin: 0, color: '#1f2937' }}>🗺️ 快递员实时位置</h2>
-            {couriers.length > 0 && (
-              <div style={{ 
-                background: '#ecfdf5', 
-                border: '1px solid #86efac', 
-                borderRadius: '6px', 
-                padding: '0.5rem 1rem', 
-                fontSize: '0.8rem',
-                color: '#065f46',
-                fontWeight: 'bold'
-              }}>
-                ✅ 已加载 {couriers.length} 名快递员
-              </div>
-            )}
+            <div style={{ 
+              background: '#ecfdf5', 
+              border: '1px solid #86efac', 
+              borderRadius: '6px', 
+              padding: '0.5rem 1rem', 
+              fontSize: '0.8rem',
+              color: '#065f46',
+              fontWeight: 'bold'
+            }}>
+              ✅ {isRegionalUser ? currentRegionPrefix : (selectedCity === 'yangon' ? 'YGN' : (selectedCity === 'mandalay' ? 'MDY' : (selectedCity === 'pyinoolwin' ? 'POL' : '')))} 骑手账号: {regionalRiderCount}
+            </div>
           </div>
           
           {couriers.length === 0 && (
