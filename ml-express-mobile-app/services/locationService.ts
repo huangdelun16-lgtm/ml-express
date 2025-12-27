@@ -37,21 +37,36 @@ async function saveLocationToSupabase(latitude: number, longitude: number) {
     const now = Date.now();
     const lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr) : 0;
 
-    // 至少间隔 1 分钟更新一次数据库（后台模式下）
-    if (now - lastUpdate < 60 * 1000) return;
+    // 至少间隔 30 秒更新一次数据库（前台/后台模式下）
+    if (now - lastUpdate < 30 * 1000) return;
 
+    // 🚀 核心修复：更新 courier_locations 表，而不是 couriers 表中的不存在字段
+    const { error: locError } = await supabase
+      .from('courier_locations')
+      .upsert({
+        courier_id: courierId,
+        latitude,
+        longitude,
+        last_update: new Date().toISOString(),
+        status: 'active'
+      }, { onConflict: 'courier_id' });
+
+    if (locError) {
+      console.warn('⚠️ 更新实时位置失败:', locError.message);
+    }
+
+    // 同时更新 couriers 表的最后活跃时间
     await supabase
       .from('couriers')
       .update({
-        current_location: { latitude, longitude },
         last_active: new Date().toISOString()
       })
       .eq('id', courierId);
 
     await AsyncStorage.setItem('last_location_update_time', now.toString());
-    // console.log('✅ 后台位置同步成功');
+    console.log('📍 位置同步成功:', { latitude, longitude });
   } catch (err) {
-    // console.error('后台位置同步失败:', err);
+    // console.error('位置同步异常:', err);
   }
 }
 
