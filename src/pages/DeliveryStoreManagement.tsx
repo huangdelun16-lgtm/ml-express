@@ -1185,13 +1185,6 @@ const DeliveryStoreManagement: React.FC = () => {
                     e.currentTarget.style.boxShadow = '0 8px 20px rgba(49, 130, 206, 0.3)';
                   }}
                 >
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(44, 82, 130, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 82, 130, 0.3)';
-                  }}
-                >
                   🗺️ 选择地图位置
                 </button>
                 {formData.latitude && formData.longitude && (
