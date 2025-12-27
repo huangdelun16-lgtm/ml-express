@@ -917,9 +917,13 @@ const FinanceManagement: React.FC = () => {
   };
 
   // 新增：处理合伙代收款卡片点击
-  const handlePartnerCollectionClick = () => {
+  const handlePartnerCollectionClick = (storeName?: string) => {
     // 找出所有已结清的合伙店铺订单
     const settledOrders = packages.filter(pkg => {
+      // 如果指定了店铺名，只看该店铺的
+      if (storeName && pkg.sender_name !== storeName && !pkg.sender_name?.startsWith(storeName)) {
+        return false;
+      }
       const isStoreMatch = deliveryStores.some(store => 
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
@@ -933,14 +937,18 @@ const FinanceManagement: React.FC = () => {
     });
 
     setModalOrders(settledOrders);
-    setModalTitle('上次结清记录');
+    setModalTitle(storeName ? `${storeName} - 上次结清记录` : '上次结清记录');
     setShowPartnerSettledModal(true);
   };
 
   // 新增：处理待结清金额卡片点击
-  const handlePendingPaymentsClick = () => {
+  const handlePendingPaymentsClick = (storeName?: string) => {
     // 找出所有待结清的代收订单 (rider_settled && !cod_settled)
     const pendingOrders = packages.filter(pkg => {
+      // 如果指定了店铺名，只看该店铺的
+      if (storeName && pkg.sender_name !== storeName && !pkg.sender_name?.startsWith(storeName)) {
+        return false;
+      }
       const isStoreMatch = deliveryStores.some(store => 
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
@@ -950,7 +958,7 @@ const FinanceManagement: React.FC = () => {
     });
 
     setModalOrders(pendingOrders);
-    setModalTitle('待结清订单明细');
+    setModalTitle(storeName ? `${storeName} - 待结清订单明细` : '待结清订单明细');
     setShowPendingOrdersModal(true);
   };
 
@@ -1226,10 +1234,10 @@ const FinanceManagement: React.FC = () => {
             }}
           >
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
-            {renderSummaryCard(t.monthlyPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444', handlePartnerCollectionClick)}
+            {renderSummaryCard(t.totalPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444', () => handlePartnerCollectionClick())}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
-            {renderSummaryCard(t.pendingAmount, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', handlePendingPaymentsClick)}
+            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handlePendingPaymentsClick())}
             {renderSummaryCard(t.orderIncome, summary.packageIncome, `${t.orderIncomeDesc} (${summary.packageCount} ${t.packageSuffix})`, '#6c5ce7')}
             {renderSummaryCard(t.courierKmCost, summary.courierKmCost, `${t.courierFeeDesc}: ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
@@ -5272,14 +5280,54 @@ const FinanceManagement: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px' }}>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>{language === 'my' ? 'စုစုပေါင်း ကိုယ်စားကောက်ခံငွေ' : t.totalAmount}</div>
+                  <div 
+                    onClick={() => handlePartnerCollectionClick(store.store_name)}
+                    style={{ 
+                      background: 'rgba(255, 255, 255, 0.08)', 
+                      padding: '12px', 
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>
+                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyPartnerCollection}
+                    </div>
                     <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.totalAmount.toLocaleString()}
                     </div>
                   </div>
-                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>{language === 'my' ? 'ရှင်းလင်းရန် ကျန်ငွေ' : t.pendingAmount}</div>
+                  <div 
+                    onClick={() => handlePendingPaymentsClick(store.store_name)}
+                    style={{ 
+                      background: 'rgba(239, 68, 68, 0.1)', 
+                      padding: '12px', 
+                      borderRadius: '12px', 
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>
+                      {language === 'my' ? 'ရှင်းလင်းရန် ကျန်ငွေ' : t.pendingAmount}
+                    </div>
                     <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.unclearedAmount.toLocaleString()}
                     </div>
