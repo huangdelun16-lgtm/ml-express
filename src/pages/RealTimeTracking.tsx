@@ -22,6 +22,7 @@ const RealTimeTracking: React.FC = () => {
   
   // 获取当前用户角色和区域信息
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
   // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
@@ -34,8 +35,8 @@ const RealTimeTracking: React.FC = () => {
   };
 
   const currentRegionPrefix = getDetectedRegion();
-  // 只要不是唯一的超级总管账号 "admin"，且检测到了领区前缀，就强制开启领区锁定
-  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+  // 角色为系统管理员则不分领区，否则如果检测到了领区前缀，就强制开启领区锁定
+  const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
 
   const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();

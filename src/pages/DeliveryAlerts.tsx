@@ -183,6 +183,7 @@ export default function DeliveryAlerts() {
 
   // 获取当前用户角色和区域信息
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
   // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
@@ -195,7 +196,7 @@ export default function DeliveryAlerts() {
   };
 
   const currentRegionPrefix = getDetectedRegion();
-  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+  const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
 
   const [alerts, setAlerts] = useState<DeliveryAlert[]>([]);
   const [loading, setLoading] = useState(true);

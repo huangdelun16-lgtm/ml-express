@@ -1246,6 +1246,9 @@ const AccountManagement: React.FC = () => {
                           <span style={{ fontSize: '1rem' }}>📍</span>
                           <span style={{ fontWeight: 'bold', color: '#48bb78' }}>
                             {(() => {
+                              // 0. 如果是系统管理员，显示“万能”
+                              if (account.role === 'admin') return '万能';
+                              
                               // 1. 优先尝试从 region 字段映射
                               const region = REGIONS.find(r => r.id === account.region);
                               if (region) return region.prefix;

@@ -11,8 +11,8 @@ const CityPackages: React.FC = () => {
   const { language } = useLanguage();
   
   // 获取当前用户角色和区域信息
-  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
+  const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
   // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
@@ -25,8 +25,8 @@ const CityPackages: React.FC = () => {
   };
 
   const currentRegionPrefix = getDetectedRegion();
-  // 只要不是唯一的超级总管账号 "admin"，且检测到了领区前缀，就强制开启领区过滤
-  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+  // 系统管理员角色不开启领区过滤，其他角色如果有领区前缀则强制开启
+  const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
 
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();

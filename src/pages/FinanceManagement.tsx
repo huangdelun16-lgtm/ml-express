@@ -139,7 +139,7 @@ const FinanceManagement: React.FC = () => {
   };
 
   const currentRegionPrefix = getDetectedRegion();
-  const isRegionalUser = currentUser.toLowerCase() !== 'admin' && currentRegionPrefix !== '';
+  const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
   
   const isMDYFinance = isFinance && currentRegionPrefix === 'MDY';
   const isYGNFinance = isFinance && currentRegionPrefix === 'YGN';
@@ -774,9 +774,9 @@ const FinanceManagement: React.FC = () => {
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
-      // 🔒 权限逻辑优化：让MDY账号和YGN账号只能看到他们添加过的记录
-      if (currentUser.toLowerCase() !== 'admin') {
-        // 如果是地区账号，只显示自己创建的记录
+      // 🔒 权限逻辑优化：非系统管理员账号只能看到他们自己添加过的记录
+      if (currentUserRole !== 'admin') {
+        // 如果不是系统管理员，只显示自己创建的记录
         if (record.created_by !== currentUser) return false;
       }
 
@@ -1667,7 +1667,7 @@ const FinanceManagement: React.FC = () => {
                         <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.1rem' }}>
                           {t.noRecords}
                         </div>
-                        {currentUser.toLowerCase() !== 'admin' && (
+                        {currentUserRole !== 'admin' && (
                           <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '0.9rem', marginTop: '8px' }}>
                             {t.financeAuthOnly}
                           </div>

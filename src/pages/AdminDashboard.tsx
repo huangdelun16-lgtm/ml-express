@@ -18,6 +18,9 @@ const AdminDashboard: React.FC = () => {
 
   // 获取工作区域
   const getWorkRegion = () => {
+    if (currentUserRole === 'admin') {
+      return language === 'zh' ? '万能' : language === 'en' ? 'Universal' : 'အားလုံး';
+    }
     if (currentUserRegion === 'yangon' || currentUser.startsWith('YGN')) return 'YGN';
     if (currentUserRegion === 'mandalay' || currentUser.startsWith('MDY')) return 'MDY';
     if (currentUserRegion === 'maymyo' || currentUser.startsWith('POL')) return 'POL';
