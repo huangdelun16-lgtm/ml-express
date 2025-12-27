@@ -194,6 +194,12 @@ const FinanceManagement: React.FC = () => {
   const [selectedCashPackages, setSelectedCashPackages] = useState<Set<string>>(new Set()); // 选中的包裹ID集合
   const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
+  // 新增：合伙人已结清和待结清弹窗状态
+  const [showPartnerSettledModal, setShowPartnerSettledModal] = useState<boolean>(false);
+  const [showPendingOrdersModal, setShowPendingOrdersModal] = useState<boolean>(false);
+  const [modalOrders, setModalOrders] = useState<Package[]>([]);
+  const [modalTitle, setModalTitle] = useState<string>('');
+
   const deliveredPackages = useMemo(() => {
     let filtered = packages.filter(pkg => pkg.status === '已送达');
     if (isRegionalFinance) {
@@ -910,6 +916,44 @@ const FinanceManagement: React.FC = () => {
     setShowForm(true);
   };
 
+  // 新增：处理合伙代收款卡片点击
+  const handlePartnerCollectionClick = () => {
+    // 找出所有已结清的合伙店铺订单
+    const settledOrders = packages.filter(pkg => {
+      const isStoreMatch = deliveryStores.some(store => 
+        store.store_name === pkg.sender_name || 
+        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+      );
+      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+      return isPartner && pkg.cod_settled;
+    }).sort((a, b) => {
+      const dateA = a.cod_settled_at ? new Date(a.cod_settled_at).getTime() : 0;
+      const dateB = b.cod_settled_at ? new Date(b.cod_settled_at).getTime() : 0;
+      return dateB - dateA; // 最新的在前面
+    });
+
+    setModalOrders(settledOrders);
+    setModalTitle('上次结清记录');
+    setShowPartnerSettledModal(true);
+  };
+
+  // 新增：处理待结清金额卡片点击
+  const handlePendingPaymentsClick = () => {
+    // 找出所有待结清的代收订单 (rider_settled && !cod_settled)
+    const pendingOrders = packages.filter(pkg => {
+      const isStoreMatch = deliveryStores.some(store => 
+        store.store_name === pkg.sender_name || 
+        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
+      );
+      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+      return isPartner && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
+    });
+
+    setModalOrders(pendingOrders);
+    setModalTitle('待结清订单明细');
+    setShowPendingOrdersModal(true);
+  };
+
   const handleDeleteRecord = async (id: string) => {
     if (!window.confirm('确定要删除这条财务记录吗？')) return;
 
@@ -944,8 +988,9 @@ const FinanceManagement: React.FC = () => {
     }
   };
 
-  const renderSummaryCard = (title: string, value: number, description: string, color: string) => (
+  const renderSummaryCard = (title: string, value: number, description: string, color: string, onClick?: () => void) => (
     <div
+      onClick={onClick}
       style={{
         background: 'rgba(255, 255, 255, 0.12)',
         borderRadius: '16px',
@@ -953,7 +998,21 @@ const FinanceManagement: React.FC = () => {
         border: '1px solid rgba(255, 255, 255, 0.25)',
         boxShadow: '0 10px 30px rgba(10, 31, 68, 0.35)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.3s ease'
+      }}
+      onMouseOver={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-5px)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
+        }
+      }}
+      onMouseOut={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+        }
       }}
     >
       <div
@@ -1167,10 +1226,10 @@ const FinanceManagement: React.FC = () => {
             }}
           >
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
-            {renderSummaryCard(t.totalPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444')}
+            {renderSummaryCard(t.monthlyPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444', handlePartnerCollectionClick)}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
-            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531')}
+            {renderSummaryCard(t.pendingAmount, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', handlePendingPaymentsClick)}
             {renderSummaryCard(t.orderIncome, summary.packageIncome, `${t.orderIncomeDesc} (${summary.packageCount} ${t.packageSuffix})`, '#6c5ce7')}
             {renderSummaryCard(t.courierKmCost, summary.courierKmCost, `${t.courierFeeDesc}: ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
@@ -5291,6 +5350,134 @@ const FinanceManagement: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 订单明细弹窗 (已结清 / 待结清) */}
+      {(showPartnerSettledModal || showPendingOrdersModal) && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 2000, padding: isMobile ? '10px' : '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
+            borderRadius: '24px', width: '100%', maxWidth: '900px',
+            maxHeight: '90vh', overflow: 'hidden', display: 'flex',
+            flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {showPartnerSettledModal ? '🤝' : '⏳'} {modalTitle}
+                <span style={{ fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', opacity: 0.8 }}>
+                  {modalOrders.length} {language === 'zh' ? '单' : ''}
+                </span>
+              </h2>
+              <button
+                onClick={() => {
+                  setShowPartnerSettledModal(false);
+                  setShowPendingOrdersModal(false);
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', border: 'none',
+                  color: 'white', fontSize: '1.5rem', cursor: 'pointer',
+                  width: '40px', height: '40px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                {modalOrders.map(pkg => (
+                  <div key={pkg.id} style={{
+                    background: 'rgba(255,255,255,0.05)', borderRadius: '16px',
+                    padding: '16px', border: '1px solid rgba(255,255,255,0.1)',
+                    transition: 'transform 0.2s'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <span style={{ fontWeight: 'bold', color: '#4facfe', fontSize: '1rem' }}>{pkg.id}</span>
+                      <span style={{ 
+                        padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600,
+                        background: pkg.cod_settled ? 'rgba(39, 174, 96, 0.2)' : 'rgba(243, 156, 18, 0.2)',
+                        color: pkg.cod_settled ? '#2ecc71' : '#f39c12'
+                      }}>
+                        {pkg.cod_settled ? (language === 'zh' ? '已结清' : 'Settled') : (language === 'zh' ? '待结清' : 'Pending')}
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                        <span style={{ opacity: 0.6 }}>{language === 'zh' ? '店铺' : 'Store'}:</span>
+                        <span style={{ color: 'white' }}>{pkg.sender_name}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                        <span style={{ opacity: 0.6 }}>{language === 'zh' ? '代收金额' : 'COD'}:</span>
+                        <span style={{ fontWeight: 'bold', color: '#ff7675' }}>{Number(pkg.cod_amount || 0).toLocaleString()} MMK</span>
+                      </div>
+
+                      {pkg.delivery_time && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                          <span style={{ opacity: 0.6 }}>{language === 'zh' ? '送达时间' : 'Delivered'}:</span>
+                          <span style={{ opacity: 0.8 }}>{pkg.delivery_time}</span>
+                        </div>
+                      )}
+
+                      {pkg.cod_settled_at && (
+                        <div style={{ 
+                          marginTop: '8px', paddingTop: '8px', 
+                          borderTop: '1px solid rgba(255,255,255,0.05)',
+                          fontSize: '0.8rem', opacity: 0.5, textAlign: 'right' 
+                        }}>
+                          {language === 'zh' ? '结清时间' : 'Settled at'}: {new Date(pkg.cod_settled_at).toLocaleString('zh-CN')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {modalOrders.length === 0 && (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>Empty</div>
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.1rem' }}>
+                      {language === 'zh' ? '暂无相关订单记录' : 'No related orders found'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'right' }}>
+              <button
+                onClick={() => {
+                  setShowPartnerSettledModal(false);
+                  setShowPendingOrdersModal(false);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  border: 'none', color: '#05223b', padding: '10px 24px',
+                  borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(79, 172, 254, 0.3)'
+                }}
+              >
+                {language === 'zh' ? '确认' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -361,6 +361,20 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 打开地图选择
   const openMapSelection = () => {
+    // 如果已经有了经纬度，则以经纬度为中心
+    if (formData.latitude && formData.longitude) {
+      setMapCenter({ 
+        lat: Number(formData.latitude), 
+        lng: Number(formData.longitude) 
+      });
+    } else {
+      // 否则以当前选择的区域为中心
+      const cityKey = formData.region === 'maymyo' ? 'pyinoolwin' : formData.region;
+      const cityCoords = (myanmarCities as any)[cityKey];
+      if (cityCoords) {
+        setMapCenter({ lat: cityCoords.lat, lng: cityCoords.lng });
+      }
+    }
     setShowMapModal(true);
   };
 
@@ -543,6 +557,15 @@ const DeliveryStoreManagement: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
+    // 当切换区域时，自动更新地图中心点
+    if (name === 'region') {
+      const cityKey = value === 'maymyo' ? 'pyinoolwin' : value;
+      const cityCoords = (myanmarCities as any)[cityKey];
+      if (cityCoords) {
+        setMapCenter({ lat: cityCoords.lat, lng: cityCoords.lng });
+      }
+    }
+
     // 自动生成店铺代码逻辑
     if (!isEditing && (name === 'store_name' || name === 'region')) {
       setFormData(prev => {
