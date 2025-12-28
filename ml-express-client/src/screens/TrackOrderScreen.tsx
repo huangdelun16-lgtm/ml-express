@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  FlatList,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +18,7 @@ import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,7 +66,45 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const mapRef = useRef<MapView>(null);
+
+  // 加载正在进行的订单
+  const loadInTransitOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const userData = await AsyncStorage.getItem('currentUser');
+      const user = userData ? JSON.parse(userData) : null;
+      if (!user || user.id === 'guest') {
+        setLoadingOrders(false);
+        return;
+      }
+
+      const userEmail = await AsyncStorage.getItem('userEmail');
+      const userPhone = await AsyncStorage.getItem('userPhone');
+      const storedUserType = await AsyncStorage.getItem('userType');
+      const finalUserType = storedUserType === 'partner' ? 'partner' : 'customer';
+
+      const { orders } = await packageService.getAllOrders(user.id, {
+        userType: finalUserType,
+        email: userEmail || user?.email,
+        phone: userPhone || user?.phone
+      });
+
+      // 过滤配送中订单
+      const transit = orders.filter((o: any) => o.status === '配送中' || o.status === '配送进行中');
+      setInTransitOrders(transit);
+    } catch (error) {
+      console.error('Failed to load in-transit orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInTransitOrders();
+  }, []);
 
   // 🚀 新增：如果从导航参数传入了 orderId，自动触发查询
   useEffect(() => {
@@ -175,6 +215,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     };
   }, [packageData?.status, courierId]);
 
+  // 当骑手位置更新时，自动平滑移动地图中心
+  useEffect(() => {
+    if (riderLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: riderLocation.latitude,
+        longitude: riderLocation.longitude,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03,
+      }, 1000);
+    }
+  }, [riderLocation]);
+
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -214,6 +266,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: '请输入订单号',
       searchError: '查询失败',
       searching: '查询中...',
+      ongoingOrders: '进行中的配送',
+      tapToTrack: '点击立即追踪',
     },
     en: {
       title: 'Track Order',
@@ -247,6 +301,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: 'Please enter order number',
       searchError: 'Search failed',
       searching: 'Searching...',
+      ongoingOrders: 'Ongoing Deliveries',
+      tapToTrack: 'Tap to track live',
     },
     my: {
       title: 'အော်ဒါခြေရာခံ',
@@ -280,6 +336,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: 'အော်ဒါနံပါတ်ထည့်ပါ',
       searchError: 'ရှာဖွေမှုမအောင်မြင်',
       searching: 'ရှာဖွေနေသည်...',
+      ongoingOrders: 'ပို့ဆောင်နေဆဲအော်ဒါများ',
+      tapToTrack: 'တိုက်ရိုက်ခြေရာခံရန် နှိပ်ပါ',
     },
   };
 
@@ -374,6 +432,40 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
           <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }}>{t.subtitle}</Text>
         </View>
+
+        {/* 正在配送中的订单列表 (快捷访问) */}
+        {!packageData && inTransitOrders.length > 0 && (
+          <View style={styles.ongoingContainer}>
+            <Text style={styles.ongoingTitle}>🛵 {t.ongoingOrders}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
+              {inTransitOrders.map((order) => (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.ongoingCard}
+                  onPress={() => {
+                    setTrackingCode(order.id);
+                    handleTrackInternal(order.id);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#ffffff', '#f1f5f9']}
+                    style={styles.ongoingCardGradient}
+                  >
+                    <View style={styles.ongoingCardHeader}>
+                      <Text style={styles.ongoingOrderId}>#{order.id.slice(-6).toUpperCase()}</Text>
+                      <View style={styles.ongoingBadge}>
+                        <Text style={styles.ongoingBadgeText}>{order.status}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.ongoingAddress} numberOfLines={1}>📍 {order.receiver_address}</Text>
+                    <Text style={styles.ongoingTap}>{t.tapToTrack}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* 搜索框 */}
         <View style={[styles.searchContainer, { marginTop: 0 }]}>
@@ -751,7 +843,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
@@ -912,5 +1004,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  ongoingContainer: {
+    marginBottom: 20,
+  },
+  ongoingTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  ongoingCard: {
+    width: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  ongoingCardGradient: {
+    padding: 16,
+    height: 100,
+    justifyContent: 'space-between',
+  },
+  ongoingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ongoingOrderId: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1e3a8a',
+  },
+  ongoingBadge: {
+    backgroundColor: '#8b5cf6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  ongoingBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  ongoingAddress: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 8,
+  },
+  ongoingTap: {
+    fontSize: 10,
+    color: '#3b82f6',
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

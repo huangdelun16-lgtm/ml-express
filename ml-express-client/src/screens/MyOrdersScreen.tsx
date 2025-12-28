@@ -653,16 +653,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   )}
                   <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {(order.status === '配送中' || order.status === '配送进行中') && (
-                    <TouchableOpacity
-                      style={[styles.detailButton, { backgroundColor: '#8b5cf615' }]}
-                      onPress={() => navigation.navigate('TrackOrder', { orderId: order.id })}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.detailButtonText, { color: '#8b5cf6' }]}>📍 {t.track}</Text>
-                    </TouchableOpacity>
-                  )}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity
                     style={styles.detailButton}
                     onPress={() => handleViewDetail(order.id)}
