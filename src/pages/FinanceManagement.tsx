@@ -129,7 +129,7 @@ const FinanceManagement: React.FC = () => {
   
   const isFinance = currentUserRole === 'finance';
   
-  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  // 领区识别逻辑更新：优先检查数据库存储的 region，其次检查用户名开头
   const getDetectedRegion = () => {
     const userUpper = currentUser.toUpperCase();
     if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
