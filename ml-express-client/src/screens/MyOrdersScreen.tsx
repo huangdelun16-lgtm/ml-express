@@ -89,6 +89,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       price: '价格',
       time: '下单时间',
       detail: '查看详情',
+      track: '实时追踪',
       cancel: '取消订单',
       rate: '评价',
       loading: '加载中...',
@@ -116,6 +117,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       price: 'Price',
       time: 'Order Time',
       detail: 'View Details',
+      track: 'Track Live',
       cancel: 'Cancel',
       rate: 'Rate',
       loading: 'Loading...',
@@ -143,6 +145,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       price: 'စျေးနှုန်း',
       time: 'အော်ဒါအချိန်',
       detail: 'အသေးစိတ်',
+      track: 'တိုက်ရိုက်ခြေရာခံ',
       cancel: 'ပယ်ဖျက်',
       rate: 'အဆင့်သတ်မှတ်',
       loading: 'တင်နေသည်...',
@@ -646,18 +649,27 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                       </Text>
                     </View>
                   ) : (
-                    <Text style={styles.orderPrice}>{order.price} MMK</Text>
-                  )}
                   <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.detailButton}
-                  onPress={() => handleViewDetail(order.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.detailButtonText}>{t.detail}</Text>
-                  <Text style={styles.detailButtonIcon}>→</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {(order.status === '配送中' || order.status === '配送进行中') && (
+                    <TouchableOpacity
+                      style={[styles.detailButton, { backgroundColor: '#8b5cf615' }]}
+                      onPress={() => navigation.navigate('TrackOrder', { orderId: order.id })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.detailButtonText, { color: '#8b5cf6' }]}>📍 {t.track}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.detailButton}
+                    onPress={() => handleViewDetail(order.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.detailButtonText}>{t.detail}</Text>
+                    <Text style={styles.detailButtonIcon}>→</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </TouchableOpacity>
           ))

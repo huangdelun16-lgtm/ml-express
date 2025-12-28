@@ -55,9 +55,9 @@ interface TrackingEvent {
   longitude?: number;
 }
 
-export default function TrackOrderScreen({ navigation }: any) {
+export default function TrackOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
-  const [trackingCode, setTrackingCode] = useState('');
+  const [trackingCode, setTrackingCode] = useState(route?.params?.orderId || '');
   const [loading, setLoading] = useState(false);
   const [packageData, setPackageData] = useState<Package | null>(null);
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
@@ -65,6 +65,66 @@ export default function TrackOrderScreen({ navigation }: any) {
   const [courierId, setCourierId] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const mapRef = useRef<MapView>(null);
+
+  // 🚀 新增：如果从导航参数传入了 orderId，自动触发查询
+  useEffect(() => {
+    if (route?.params?.orderId) {
+      setTrackingCode(route.params.orderId);
+      // 延迟一小会儿确保状态已更新
+      setTimeout(() => {
+        handleTrackInternal(route.params.orderId);
+      }, 300);
+    }
+  }, [route?.params?.orderId]);
+
+  // 为了能被 useEffect 调用，提取核心查询逻辑
+  const handleTrackInternal = async (code: string) => {
+    if (!code.trim()) return;
+
+    setLoading(true);
+    setSearched(true);
+    
+    try {
+      // 查询订单
+      const order = await packageService.trackOrder(code.trim());
+      
+      if (order) {
+        setPackageData(order);
+        
+        // 🚀 新增：获取骑手ID以进行实时追踪
+        if (order.courier && order.courier !== '待分配') {
+          supabase
+            .from('couriers')
+            .select('id')
+            .eq('name', order.courier)
+            .single()
+            .then(({ data }) => {
+              if (data) setCourierId(data.id);
+            });
+        } else {
+          setCourierId(null);
+          setRiderLocation(null);
+        }
+        
+        // 获取追踪历史
+        const history = await packageService.getTrackingHistory(order.id);
+        setTrackingHistory(history);
+        
+        showToast('查询成功！', 'success');
+      } else {
+        setPackageData(null);
+        setTrackingHistory([]);
+        showToast(t.notFound, 'error');
+      }
+    } catch (error: any) {
+      LoggerService.error('查询失败:', error);
+      setPackageData(null);
+      setTrackingHistory([]);
+      showToast(t.searchError, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 监听骑手实时位置
   useEffect(() => {
@@ -233,55 +293,8 @@ export default function TrackOrderScreen({ navigation }: any) {
   };
 
   // 查询订单
-  const handleTrack = async () => {
-    if (!trackingCode.trim()) {
-      showToast(t.inputError, 'warning');
-      return;
-    }
-
-    setLoading(true);
-    setSearched(true);
-    
-    try {
-      // 查询订单
-      const order = await packageService.trackOrder(trackingCode.trim());
-      
-      if (order) {
-        setPackageData(order);
-        
-        // 🚀 新增：获取骑手ID以进行实时追踪
-        if (order.courier && order.courier !== '待分配') {
-          supabase
-            .from('couriers')
-            .select('id')
-            .eq('name', order.courier)
-            .single()
-            .then(({ data }) => {
-              if (data) setCourierId(data.id);
-            });
-        } else {
-          setCourierId(null);
-          setRiderLocation(null);
-        }
-        
-        // 获取追踪历史
-        const history = await packageService.getTrackingHistory(order.id);
-        setTrackingHistory(history);
-        
-        showToast('查询成功！', 'success');
-      } else {
-        setPackageData(null);
-        setTrackingHistory([]);
-        showToast(t.notFound, 'error');
-      }
-    } catch (error: any) {
-      LoggerService.error('查询失败:', error);
-      setPackageData(null);
-      setTrackingHistory([]);
-      showToast(t.searchError, 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleTrack = () => {
+    handleTrackInternal(trackingCode);
   };
 
   // 获取状态颜色
