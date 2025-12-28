@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -68,12 +69,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const mapRef = useRef<MapView>(null);
 
   // 加载正在进行的订单
   const loadInTransitOrders = async () => {
     try {
-      setLoadingOrders(true);
+      if (!refreshing) setLoadingOrders(true);
       const userData = await AsyncStorage.getItem('currentUser');
       const user = userData ? JSON.parse(userData) : null;
       if (!user || user.id === 'guest') {
@@ -95,12 +97,27 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       // 过滤配送中订单
       const transit = orders.filter((o: any) => o.status === '配送中' || o.status === '配送进行中');
       setInTransitOrders(transit);
+      
+      // 如果当前正在追踪的订单状态变了（不再是配送中），清除追踪详情
+      if (packageData && !transit.find(o => o.id === packageData.id) && packageData.status !== '已送达') {
+        // 只有当订单还在“配送中”列表里才维持实时追踪，否则只保留静态详情
+        // 这里可以根据需求决定是否清除
+      }
     } catch (error) {
       console.error('Failed to load in-transit orders:', error);
     } finally {
       setLoadingOrders(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadInTransitOrders();
+    if (trackingCode) {
+      handleTrackInternal(trackingCode);
+    }
+  }, [trackingCode]);
 
   useEffect(() => {
     loadInTransitOrders();
@@ -426,6 +443,9 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         style={styles.scrollView} 
         contentContainerStyle={[styles.scrollContent, { paddingTop: 60 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
+        }
       >
         <View style={[styles.headerStyle, { marginBottom: 30, paddingHorizontal: 20 }]}>
           <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
@@ -433,36 +453,46 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }}>{t.subtitle}</Text>
         </View>
 
-        {/* 正在配送中的订单列表 (快捷访问) */}
-        {!packageData && inTransitOrders.length > 0 && (
+        {/* 正在配送中的订单列表 (快捷访问) - 始终显示，除非列表为空 */}
+        {inTransitOrders.length > 0 && (
           <View style={styles.ongoingContainer}>
-            <Text style={styles.ongoingTitle}>🛵 {t.ongoingOrders}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
-              {inTransitOrders.map((order) => (
-                <TouchableOpacity
-                  key={order.id}
-                  style={styles.ongoingCard}
-                  onPress={() => {
-                    setTrackingCode(order.id);
-                    handleTrackInternal(order.id);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={['#ffffff', '#f1f5f9']}
-                    style={styles.ongoingCardGradient}
+            <Text style={styles.ongoingTitle}>🛵 {t.ongoingOrders} ({inTransitOrders.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10, paddingHorizontal: 4 }}>
+              {inTransitOrders.map((order) => {
+                const isSelected = packageData?.id === order.id;
+                return (
+                  <TouchableOpacity
+                    key={order.id}
+                    style={[
+                      styles.ongoingCard, 
+                      isSelected && { borderWidth: 2, borderColor: '#fbbf24', elevation: 8, shadowOpacity: 0.3 }
+                    ]}
+                    onPress={() => {
+                      setTrackingCode(order.id);
+                      handleTrackInternal(order.id);
+                    }}
+                    activeOpacity={0.8}
                   >
-                    <View style={styles.ongoingCardHeader}>
-                      <Text style={styles.ongoingOrderId}>#{order.id.slice(-6).toUpperCase()}</Text>
-                      <View style={styles.ongoingBadge}>
-                        <Text style={styles.ongoingBadgeText}>{order.status}</Text>
+                    <LinearGradient
+                      colors={isSelected ? ['#eff6ff', '#dbeafe'] : ['#ffffff', '#f1f5f9']}
+                      style={styles.ongoingCardGradient}
+                    >
+                      <View style={styles.ongoingCardHeader}>
+                        <Text style={[styles.ongoingOrderId, isSelected && { color: '#2563eb' }]}>
+                          #{order.id.slice(-6).toUpperCase()}
+                        </Text>
+                        <View style={[styles.ongoingBadge, isSelected && { backgroundColor: '#3b82f6' }]}>
+                          <Text style={styles.ongoingBadgeText}>{order.status}</Text>
+                        </View>
                       </View>
-                    </View>
-                    <Text style={styles.ongoingAddress} numberOfLines={1}>📍 {order.receiver_address}</Text>
-                    <Text style={styles.ongoingTap}>{t.tapToTrack}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
+                      <Text style={styles.ongoingAddress} numberOfLines={1}>📍 {order.receiver_address}</Text>
+                      <Text style={[styles.ongoingTap, isSelected && { fontWeight: 'bold' }]}>
+                        {isSelected ? '👀 ' + (language === 'zh' ? '正在追踪' : 'Tracking') : t.tapToTrack}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         )}
