@@ -148,7 +148,7 @@ const FinanceManagement: React.FC = () => {
 
   const categoryOptions = useMemo(() => getCategoryOptions(language), [language]);
 
-  const [activeTab, setActiveTab] = useState<TabKey>(isRegionalFinance ? 'records' : 'overview');
+  const [activeTab, setActiveTab] = useState<TabKey>(isRegionalUser ? 'records' : 'overview');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [cashSettlementStatus, setCashSettlementStatus] = useState<'unsettled' | 'settled' | 'all'>('unsettled');
@@ -202,11 +202,11 @@ const FinanceManagement: React.FC = () => {
 
   const deliveredPackages = useMemo(() => {
     let filtered = packages.filter(pkg => pkg.status === '已送达');
-    if (isRegionalFinance) {
+    if (isRegionalUser) {
       filtered = filtered.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
     }
     return filtered;
-  }, [packages, isRegionalFinance, currentRegionPrefix]);
+  }, [packages, isRegionalUser, currentRegionPrefix]);
 
   const deliveredPackagesSorted = useMemo(() => {
     return [...deliveredPackages].sort((a, b) => {
@@ -218,11 +218,11 @@ const FinanceManagement: React.FC = () => {
 
   const inProgressPackages = useMemo(() => {
     let filtered = packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消');
-    if (isRegionalFinance) {
+    if (isRegionalUser) {
       filtered = filtered.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
     }
     return filtered;
-  }, [packages, isRegionalFinance, currentRegionPrefix]);
+  }, [packages, isRegionalUser, currentRegionPrefix]);
 
   const deliveredIncome = useMemo(() => {
     return deliveredPackages.reduce((sum, pkg) => {
@@ -3099,7 +3099,7 @@ const FinanceManagement: React.FC = () => {
               </select>
               
               {/* 生成工资按钮 */}
-              {!isRegionalFinance && (
+              {!isRegionalUser && (
                 <button
                   onClick={generateMonthlySalaries}
                   disabled={loading}
@@ -3119,7 +3119,7 @@ const FinanceManagement: React.FC = () => {
                 </button>
               )}
               
-              {selectedSalaries.length > 0 && !isRegionalFinance && (
+              {selectedSalaries.length > 0 && !isRegionalUser && (
                 <>
                   <button
                     onClick={async () => {
@@ -3296,7 +3296,7 @@ const FinanceManagement: React.FC = () => {
                 let monthFilteredSalaries = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
                 
                 // 领区过滤
-                if (isRegionalFinance) {
+                if (isRegionalUser) {
                   monthFilteredSalaries = monthFilteredSalaries.filter(s => 
                     s.courier_id && s.courier_id.startsWith(currentRegionPrefix)
                   );
@@ -3410,7 +3410,7 @@ const FinanceManagement: React.FC = () => {
                     let monthFiltered = getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth);
                     
                     // 领区过滤
-                    if (isRegionalFinance) {
+                    if (isRegionalUser) {
                       monthFiltered = monthFiltered.filter(s => 
                         s.courier_id && s.courier_id.startsWith(currentRegionPrefix)
                       );
@@ -3514,7 +3514,7 @@ const FinanceManagement: React.FC = () => {
                               {t.viewDetail || '详情'}
                             </button>
                             
-                            {!isRegionalFinance && (
+                            {!isRegionalUser && (
                               <>
                                 {salary.status === 'pending' && (
                                   <button
@@ -4334,7 +4334,7 @@ const FinanceManagement: React.FC = () => {
                   if (!deliveryDate.includes(cashCollectionDate)) return false;
 
                   // 领区过滤
-                  if (isRegionalFinance && !pkg.id.startsWith(currentRegionPrefix)) return false;
+                  if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix)) return false;
                   
                   return true;
                 });
@@ -4456,9 +4456,9 @@ const FinanceManagement: React.FC = () => {
                 courierCashMap[courier].total += price;
               });
 
-                // 过滤快递员列表（如果为领区财务，仅显示所属领区的骑手）
+                // 过滤快递员列表（如果为领区用户，仅显示所属领区的骑手）
                 let displayCouriers = [...couriers];
-                if (isRegionalFinance) {
+                if (isRegionalUser) {
                   displayCouriers = displayCouriers.filter(c => 
                     c.employee_id && c.employee_id.startsWith(currentRegionPrefix)
                   );

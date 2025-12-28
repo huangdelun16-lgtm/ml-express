@@ -144,6 +144,18 @@ export default function LoginScreen({ navigation }: any) {
           // 确保 user_type 正确
           await AsyncStorage.setItem('userType', 'customer');
           
+          // 🚀 新增：注册并保存推送令牌
+          try {
+            const NotificationService = require('../services/notificationService').default;
+            const ns = NotificationService.getInstance();
+            const token = await ns.getExpoPushToken();
+            if (token) {
+              await ns.savePushTokenToSupabase(result.data.id, token);
+            }
+          } catch (nsError) {
+            console.warn('推送注册失败，但不影响登录:', nsError);
+          }
+          
           feedbackService.success(currentT.loginSuccess);
           navigation.replace('Main');
         } else {
@@ -204,6 +216,23 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userPhone', store.contact_phone || '');
         await AsyncStorage.setItem('userType', 'partner');
         await AsyncStorage.setItem('currentStoreCode', store.store_code);
+
+        // 🚀 新增：注册并保存推送令牌（合伙人使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
+        // 如果合伙人也需要推送，建议将推送令牌也保存到 delivery_stores 表
+        try {
+          const NotificationService = require('../services/notificationService').default;
+          const ns = NotificationService.getInstance();
+          const token = await ns.getExpoPushToken();
+          if (token) {
+            // 目前先尝试更新 delivery_stores 表（假设也有该字段）
+            await supabase
+              .from('delivery_stores')
+              .update({ push_token: token })
+              .eq('id', store.id);
+          }
+        } catch (nsError) {
+          console.warn('推送注册失败，但不影响登录:', nsError);
+        }
 
         feedbackService.success(`${currentT.welcomePartner}${store.store_name}`);
         navigation.replace('Main');

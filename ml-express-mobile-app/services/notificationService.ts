@@ -84,6 +84,94 @@ export const notificationService = {
   },
 
   /**
+   * 发送通知给特定用户 (通过保存的 Push Token)
+   */
+  async sendPushNotificationToUser(userId: string, title: string, body: string, data?: any): Promise<boolean> {
+    try {
+      // 1. 获取用户的推送令牌
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('push_token')
+        .eq('id', userId)
+        .single();
+
+      if (error || !userData?.push_token) {
+        console.warn(`⚠️ 无法发送推送：找不到用户 ${userId} 的有效令牌`);
+        return false;
+      }
+
+      // 2. 调用 Expo 推送服务 (通常通过后端转发，这里模拟或直接调用)
+      // 注意：直接从客户端调用需要 projectId，最好是通过 Netlify Function
+      const message = {
+        to: userData.push_token,
+        sound: 'default',
+        title: title,
+        body: body,
+        data: data || {},
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log('📤 推送发送结果:', result);
+      return true;
+    } catch (error) {
+      console.error('❌ 发送推送通知异常:', error);
+      return false;
+    }
+  },
+
+  /**
+   * 保存站内通知到数据库
+   */
+  async saveInAppNotification(userId: string, title: string, content: string, type: string = 'order', relatedId?: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .insert([{
+          user_id: userId,
+          title,
+          content,
+          type,
+          related_id: relatedId,
+          is_read: false,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error('❌ 保存站内通知失败:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('❌ 保存站内通知异常:', error);
+      return false;
+    }
+  },
+
+  /**
+   * 发送订单送达通知给寄件人
+   */
+  async notifySenderOnDelivery(packageId: string, customerId: string): Promise<void> {
+    const title = '📦 订单已送达';
+    const content = `您的订单 ${packageId} 已成功送达收件人手中。感谢使用 ML Express！`;
+    
+    // 同时发送推送和站内通知
+    await Promise.all([
+      this.sendPushNotificationToUser(customerId, title, content, { packageId }),
+      this.saveInAppNotification(customerId, title, content, 'order', packageId)
+    ]);
+  },
+
+  /**
    * 将 Token 保存到 Supabase
    */
   async savePushTokenToSupabase(token: string): Promise<boolean> {

@@ -370,11 +370,35 @@ class NotificationService {
           lightColor: '#FF231F7C',
         });
       }
-      const token = await NotificationsModule.getExpoPushTokenAsync();
+      const token = await NotificationsModule.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId || '9831d961-9124-46ed-8581-bf406616439f',
+      });
       return token.data;
     } catch (error) {
       LoggerService.error('获取Expo推送令牌失败', error);
       return null;
+    }
+  }
+
+  // 保存推送令牌到 Supabase
+  public async savePushTokenToSupabase(userId: string, token: string): Promise<boolean> {
+    const { supabase } = require('./supabase');
+    try {
+      LoggerService.debug(`📤 正在为用户 ${userId} 保存推送令牌...`);
+      const { error } = await supabase
+        .from('users')
+        .update({ push_token: token })
+        .eq('id', userId);
+
+      if (error) {
+        LoggerService.error('保存推送令牌失败:', error);
+        return false;
+      }
+      LoggerService.debug('✅ 推送令牌保存成功');
+      return true;
+    } catch (error) {
+      LoggerService.error('保存推送令牌异常:', error);
+      return false;
     }
   }
 

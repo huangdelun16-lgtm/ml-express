@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import LoggerService from './../services/LoggerService';
 import {
   View,
@@ -9,23 +9,29 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface Package {
   id: string;
   sender_name: string;
   sender_phone: string;
   sender_address: string;
+  sender_latitude?: number;
+  sender_longitude?: number;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
+  receiver_latitude?: number;
+  receiver_longitude?: number;
   package_type: string;
   weight: string;
   description?: string;
@@ -56,6 +62,58 @@ export default function TrackOrderScreen({ navigation }: any) {
   const [packageData, setPackageData] = useState<Package | null>(null);
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [searched, setSearched] = useState(false);
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const mapRef = useRef<MapView>(null);
+
+  // 监听骑手实时位置
+  useEffect(() => {
+    let channel: any = null;
+
+    if (packageData?.status === '配送中' && courierId) {
+      console.log('📡 启动骑手实时追踪:', courierId);
+      
+      // 1. 获取初始位置
+      supabase
+        .from('courier_locations')
+        .select('latitude, longitude')
+        .eq('courier_id', courierId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setRiderLocation({ latitude: data.latitude, longitude: data.longitude });
+          }
+        });
+
+      // 2. 订阅位置更新
+      channel = supabase
+        .channel(`rider-tracking-${courierId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'courier_locations',
+            filter: `courier_id=eq.${courierId}`
+          },
+          (payload) => {
+            console.log('📍 收到骑手位置更新:', payload.new);
+            setRiderLocation({
+              latitude: payload.new.latitude,
+              longitude: payload.new.longitude
+            });
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (channel) {
+        console.log('🛑 停止骑手实时追踪');
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [packageData?.status, courierId]);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -190,6 +248,21 @@ export default function TrackOrderScreen({ navigation }: any) {
       
       if (order) {
         setPackageData(order);
+        
+        // 🚀 新增：获取骑手ID以进行实时追踪
+        if (order.courier && order.courier !== '待分配') {
+          supabase
+            .from('couriers')
+            .select('id')
+            .eq('name', order.courier)
+            .single()
+            .then(({ data }) => {
+              if (data) setCourierId(data.id);
+            });
+        } else {
+          setCourierId(null);
+          setRiderLocation(null);
+        }
         
         // 获取追踪历史
         const history = await packageService.getTrackingHistory(order.id);
@@ -345,6 +418,81 @@ export default function TrackOrderScreen({ navigation }: any) {
         {/* 订单信息 */}
         {packageData && !loading && (
           <>
+            {/* 实时地图追踪 */}
+            {packageData.status === '配送中' && (
+              <View style={styles.mapContainer}>
+                <MapView
+                  ref={mapRef}
+                  provider={PROVIDER_GOOGLE}
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
+                    longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                >
+                  {/* 起点标记 */}
+                  {packageData.sender_latitude && packageData.sender_longitude && (
+                    <Marker
+                      coordinate={{
+                        latitude: packageData.sender_latitude,
+                        longitude: packageData.sender_longitude
+                      }}
+                      title="发货点"
+                      pinColor="#3b82f6"
+                    />
+                  )}
+
+                  {/* 终点标记 */}
+                  {packageData.receiver_latitude && packageData.receiver_longitude && (
+                    <Marker
+                      coordinate={{
+                        latitude: packageData.receiver_latitude,
+                        longitude: packageData.receiver_longitude
+                      }}
+                      title="我的位置"
+                      pinColor="#ef4444"
+                    />
+                  )}
+
+                  {/* 骑手标记 */}
+                  {riderLocation && (
+                    <Marker
+                      coordinate={riderLocation}
+                      title="骑手正在赶来"
+                    >
+                      <View style={styles.riderMarker}>
+                        <Text style={{ fontSize: 24 }}>🛵</Text>
+                      </View>
+                    </Marker>
+                  )}
+
+                  {/* 路线预览 */}
+                  {riderLocation && packageData.receiver_latitude && (
+                    <Polyline
+                      coordinates={[
+                        riderLocation,
+                        {
+                          latitude: packageData.receiver_latitude,
+                          longitude: packageData.receiver_longitude
+                        }
+                      ]}
+                      strokeColor="#3b82f6"
+                      strokeWidth={3}
+                      lineDashPattern={[5, 5]}
+                    />
+                  )}
+                </MapView>
+                
+                <View style={styles.mapOverlay}>
+                  <Text style={styles.mapOverlayText}>
+                    ✨ {language === 'zh' ? '正在为您进行实时追踪' : language === 'en' ? 'Live Tracking Enabled' : 'တိုက်ရိုက်ခြေရာခံနေသည်'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* 状态卡片 */}
             <View style={styles.statusCard}>
               <LinearGradient
@@ -707,5 +855,49 @@ const styles = StyleSheet.create({
   trackingTime: {
     fontSize: 12,
     color: '#94a3b8',
+  },
+  mapContainer: {
+    height: 300,
+    width: '100%',
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  map: {
+    flex: 1,
+  },
+  riderMarker: {
+    backgroundColor: 'white',
+    padding: 5,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#3b82f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(30, 58, 138, 0.85)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backdropFilter: 'blur(5px)',
+  },
+  mapOverlayText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

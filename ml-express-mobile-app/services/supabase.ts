@@ -486,21 +486,30 @@ export const packageService = {
     console.log('包裹状态更新成功');
     
     // 如果是送达状态且有骑手位置信息，进行违规检测
-    if (status === '已送达' && courierLocation && courierName) {
+    if (status === '已送达') {
       try {
-        // 获取包裹信息以进行违规检测
+        // 获取包裹信息以进行违规检测和发送通知
         const { data: packageData } = await supabase
           .from('packages')
-          .select('receiver_latitude, receiver_longitude, courier')
+          .select('receiver_latitude, receiver_longitude, courier, customer_id')
           .eq('id', id)
           .single();
 
         if (packageData) {
-          // 调用违规检测函数
-          await detectViolationsAsync(id, courierName, courierLocation.latitude, courierLocation.longitude);
+          // 1. 调用违规检测函数
+          if (courierLocation && courierName) {
+            await detectViolationsAsync(id, courierName, courierLocation.latitude, courierLocation.longitude);
+          }
+
+          // 2. 🚀 新增：通知寄件人订单已送达
+          if (packageData.customer_id) {
+            const { notificationService } = require('./notificationService');
+            await notificationService.notifySenderOnDelivery(id, packageData.customer_id);
+            console.log(`✅ 已发送送达通知给寄件人 (ID: ${packageData.customer_id})`);
+          }
         }
       } catch (error) {
-        console.error('违规检测失败:', error);
+        console.error('送达后续处理失败:', error);
       }
     }
     
