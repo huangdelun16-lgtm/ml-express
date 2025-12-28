@@ -1654,15 +1654,14 @@ const HomePage: React.FC = () => {
     let totalPrice = pricingSettings.baseFee;
     
     // 2. 距离费用（超过免费公里数后按每公里费用计算）
-    if (distance > pricingSettings.freeKmThreshold) {
-      const chargeableDistance = distance - pricingSettings.freeKmThreshold;
-      totalPrice += chargeableDistance * pricingSettings.perKmFee;
-    }
+    const distanceFee = Math.max(0, distance - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee;
+    totalPrice += distanceFee;
     
-    // 3. 重量附加费（假设阈值为5kg）
-    const weightNum = parseFloat(weight) || 1;
+    // 3. 重量附加费
+    const weightNum = parseFloat(weight) || 0;
     const weightThreshold = 5;
-    if (weightNum > weightThreshold) {
+    // 仅超重件计算重量附加费，匹配 App 逻辑
+    if ((packageType === t.ui.overweightPackageDetail || packageType === '超重件（5KG）以上') && weightNum > weightThreshold) {
       totalPrice += (weightNum - weightThreshold) * pricingSettings.weightSurcharge;
     }
     
@@ -1670,10 +1669,8 @@ const HomePage: React.FC = () => {
     if (packageType === t.ui.oversizedPackageDetail || packageType === '超规件（45x60x15cm）以上') {
       // 超规件：按距离计算附加费
       totalPrice += distance * pricingSettings.oversizeSurcharge;
-    } else if (packageType === t.ui.overweightPackageDetail || packageType === '超重件（5KG）以上') {
-      // 超重件：已经按重量计算了附加费，这里可以加特定类型费（如有）
     } else if (packageType === t.ui.fragile || packageType === '易碎品') {
-      // 易碎品：按距离计算附加费（MMK/公里）
+      // 易碎品：按距离计算附加费
       totalPrice += distance * pricingSettings.fragileSurcharge;
     } else if (packageType === t.ui.foodDrinks || packageType === '食品和饮料') {
       // 食品和饮料：按距离计算附加费
@@ -1681,16 +1678,14 @@ const HomePage: React.FC = () => {
     }
     
     // 5. 配送速度附加费
-    if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '急送达') {
-      // 急送达：固定附加费
+    if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '加急配送' || deliverySpeed === '急送达') {
       totalPrice += pricingSettings.urgentSurcharge;
-    } else if (deliverySpeed === t.ui.scheduledDelivery || deliverySpeed === '定时达') {
-      // 定时达：固定附加费
+    } else if (deliverySpeed === t.ui.scheduledDelivery || deliverySpeed === '定时达' || deliverySpeed === '预约配送') {
       totalPrice += pricingSettings.scheduledSurcharge;
     }
     
-    // 返回向上取整到百位的价格
-    return Math.ceil(totalPrice / 100) * 100;
+    // 返回四舍五入后的价格，匹配 App 的 Math.round(totalPrice)
+    return Math.round(totalPrice);
   };
 
   // 重置表单和计算状态

@@ -787,11 +787,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         const form = document.querySelector('form') as HTMLFormElement;
                         if (!form) return 0;
                         const formData = new FormData(form);
+                        const pType = formData.get('packageType') as string;
                         const weight = formData.get('weight') as string;
-                        const weightNum = parseFloat(weight) || 1;
+                        const weightNum = parseFloat(weight) || 0;
                         const weightThreshold = 5;
-                        const weightFee = weightNum > weightThreshold ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
-                        return weightFee;
+                        // 仅超重件且超过阈值才计费
+                        const isOverweight = pType === t.ui.overweightPackageDetail || pType === '超重件（5KG）以上';
+                        return (isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
                       })()} MMK
                     </span>
                   </div>
@@ -800,8 +802,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     const form = document.querySelector('form') as HTMLFormElement;
                     if (!form) return null;
                     const formData = new FormData(form);
-                    const packageType = formData.get('packageType') as string;
-                    const isOversized = packageType === t.ui.oversizedPackage || packageType === '超规件';
+                    const pType = formData.get('packageType') as string;
+                    const isOversized = pType === t.ui.oversizedPackageDetail || pType === '超规件（45x60x15cm）以上';
                     if (!isOversized) return null;
                     return (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -820,8 +822,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     const form = document.querySelector('form') as HTMLFormElement;
                     if (!form) return null;
                     const formData = new FormData(form);
-                    const packageType = formData.get('packageType') as string;
-                    const isFragile = packageType === t.ui.fragile || packageType === '易碎品';
+                    const pType = formData.get('packageType') as string;
+                    const isFragile = pType === t.ui.fragile || pType === '易碎品';
                     if (!isFragile) return null;
                     return (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -840,8 +842,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     const form = document.querySelector('form') as HTMLFormElement;
                     if (!form) return null;
                     const formData = new FormData(form);
-                    const packageType = formData.get('packageType') as string;
-                    const isFoodDrinks = packageType === t.ui.foodDrinks || packageType === '食品和饮料';
+                    const pType = formData.get('packageType') as string;
+                    const isFoodDrinks = pType === t.ui.foodDrinks || pType === '食品和饮料';
                     if (!isFoodDrinks) return null;
                     return (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -863,14 +865,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         const form = document.querySelector('form') as HTMLFormElement;
                         if (!form) return 0;
                         const formData = new FormData(form);
-                        const deliverySpeed = formData.get('deliverySpeed') as string;
+                        const dSpeed = formData.get('deliverySpeed') as string;
                         let speedFee = 0;
-                        if (deliverySpeed === t.ui.urgentDelivery || deliverySpeed === '加急配送') {
+                        if (dSpeed === t.ui.urgentDelivery || dSpeed === '加急配送' || dSpeed === '急送达') {
                           speedFee = pricingSettings.urgentSurcharge;
-                        } else if (deliverySpeed === t.ui.scheduledDelivery || deliverySpeed === '定时达') {
+                        } else if (dSpeed === t.ui.scheduledDelivery || dSpeed === '定时达' || dSpeed === '预约配送') {
                           speedFee = pricingSettings.scheduledSurcharge;
                         }
-                        // 准时达不加费，所以不需要处理 t.ui.onTimeDelivery
                         return speedFee;
                       })()} MMK
                     </span>
