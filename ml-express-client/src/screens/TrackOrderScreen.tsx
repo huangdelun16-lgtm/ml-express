@@ -88,8 +88,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       const storedUserType = await AsyncStorage.getItem('userType');
       const finalUserType = storedUserType === 'partner' ? 'partner' : 'customer';
 
+      // 🚀 新增：如果是合伙人，获取店铺名称用于匹配（与 MyOrdersScreen 同步）
+      let storeName: string | undefined;
+      if (finalUserType === 'partner') {
+        const userName = await AsyncStorage.getItem('userName');
+        if (userName) {
+          storeName = userName;
+        }
+      }
+
       const { orders } = await packageService.getAllOrders(user.id, {
         userType: finalUserType,
+        storeName: storeName, // 传入店铺名称
         email: userEmail || user?.email,
         phone: userPhone || user?.phone
       });
