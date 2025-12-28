@@ -649,6 +649,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                       </Text>
                     </View>
                   ) : (
+                    <Text style={styles.orderPrice}>{order.price} MMK</Text>
+                  )}
                   <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
