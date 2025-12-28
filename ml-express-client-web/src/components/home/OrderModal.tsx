@@ -785,91 +785,60 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <span style={{ color: '#ef4444', fontWeight: '600' }}>
                       {(() => {
                         const form = document.querySelector('form') as HTMLFormElement;
-                        if (!form) return 0;
-                        const formData = new FormData(form);
-                        const pType = formData.get('packageType') as string;
-                        const weight = formData.get('weight') as string;
+                        const weight = form ? (new FormData(form).get('weight') as string) : '0';
                         const weightNum = parseFloat(weight) || 0;
                         const weightThreshold = 5;
                         // 仅超重件且超过阈值才计费
-                        const isOverweight = pType === t.ui.overweightPackageDetail || pType === '超重件（5KG）以上';
+                        const isOverweight = selectedPackageType === t.ui.overweightPackageDetail || selectedPackageType === '超重件（5KG）以上';
                         return (isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
                       })()} MMK
                     </span>
                   </div>
                   {/* 超规费 - 仅超规件显示 */}
-                  {(() => {
-                    const form = document.querySelector('form') as HTMLFormElement;
-                    if (!form) return null;
-                    const formData = new FormData(form);
-                    const pType = formData.get('packageType') as string;
-                    const isOversized = pType === t.ui.oversizedPackageDetail || pType === '超规件（45x60x15cm）以上';
-                    if (!isOversized) return null;
-                    return (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                          {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
-                        </span>
-                        <span style={{ color: '#f97316', fontWeight: '600' }}>
-                          {calculatedDistanceDetail * pricingSettings.oversizeSurcharge} MMK
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  {(selectedPackageType === t.ui.oversizedPackageDetail || selectedPackageType === '超规件（45x60x15cm）以上') && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
+                      </span>
+                      <span style={{ color: '#f97316', fontWeight: '600' }}>
+                        {calculatedDistanceDetail * pricingSettings.oversizeSurcharge} MMK
+                      </span>
+                    </div>
+                  )}
                   
                   {/* 易碎品费 - 仅易碎品显示 */}
-                  {(() => {
-                    const form = document.querySelector('form') as HTMLFormElement;
-                    if (!form) return null;
-                    const formData = new FormData(form);
-                    const pType = formData.get('packageType') as string;
-                    const isFragile = pType === t.ui.fragile || pType === '易碎品';
-                    if (!isFragile) return null;
-                    return (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                          {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
-                        </span>
-                        <span style={{ color: '#f97316', fontWeight: '600' }}>
-                          {calculatedDistanceDetail * pricingSettings.fragileSurcharge} MMK
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  {(selectedPackageType === t.ui.fragile || selectedPackageType === '易碎品') && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
+                      </span>
+                      <span style={{ color: '#f97316', fontWeight: '600' }}>
+                        {calculatedDistanceDetail * pricingSettings.fragileSurcharge} MMK
+                      </span>
+                    </div>
+                  )}
                   
                   {/* 食品饮料费 - 仅食品饮料显示 */}
-                  {(() => {
-                    const form = document.querySelector('form') as HTMLFormElement;
-                    if (!form) return null;
-                    const formData = new FormData(form);
-                    const pType = formData.get('packageType') as string;
-                    const isFoodDrinks = pType === t.ui.foodDrinks || pType === '食品和饮料';
-                    if (!isFoodDrinks) return null;
-                    return (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                          {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
-                        </span>
-                        <span style={{ color: '#f97316', fontWeight: '600' }}>
-                          {calculatedDistanceDetail * pricingSettings.foodBeverageSurcharge} MMK
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  {(selectedPackageType === t.ui.foodDrinks || selectedPackageType === '食品和饮料') && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
+                      </span>
+                      <span style={{ color: '#f97316', fontWeight: '600' }}>
+                        {calculatedDistanceDetail * pricingSettings.foodBeverageSurcharge} MMK
+                      </span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
                       {language === 'zh' ? '配送速度费用' : language === 'en' ? 'Delivery Speed Fee' : 'ပို့ဆောင်မြန်နှုန်းအခ'}:
                     </span>
                     <span style={{ color: '#06b6d4', fontWeight: '600' }}>
                       {(() => {
-                        const form = document.querySelector('form') as HTMLFormElement;
-                        if (!form) return 0;
-                        const formData = new FormData(form);
-                        const dSpeed = formData.get('deliverySpeed') as string;
                         let speedFee = 0;
-                        if (dSpeed === t.ui.urgentDelivery || dSpeed === '加急配送' || dSpeed === '急送达') {
+                        if (selectedDeliverySpeed === t.ui.urgentDelivery || selectedDeliverySpeed === '加急配送' || selectedDeliverySpeed === '急送达') {
                           speedFee = pricingSettings.urgentSurcharge;
-                        } else if (dSpeed === t.ui.scheduledDelivery || dSpeed === '定时达' || dSpeed === '预约配送') {
+                        } else if (selectedDeliverySpeed === t.ui.scheduledDelivery || selectedDeliverySpeed === '定时达' || selectedDeliverySpeed === '预约配送') {
                           speedFee = pricingSettings.scheduledSurcharge;
                         }
                         return speedFee;
