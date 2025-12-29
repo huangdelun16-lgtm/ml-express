@@ -8,35 +8,33 @@ module.exports = ({ config }) => {
                            (expoConfig.ios && expoConfig.ios.config && expoConfig.ios.config.googleMapsApiKey) || 
                            '';
 
+  // 🚀 关键修复：Expo app.config.js 应该返回 expo 对象本身的内容，而不是包含 "expo" 键的对象
+  // 之前的逻辑返回了 { expo: { ... } }，导致 EAS 无法正确读取版本号和构建号
   return {
-    ...baseConfig,
-    expo: {
-      ...expoConfig,
-      ios: {
-        ...(expoConfig.ios || {}),
-        config: {
-          ...((expoConfig.ios && expoConfig.ios.config) || {}),
-          googleMapsApiKey,
-        },
-      },
-      android: {
-        ...(expoConfig.android || {}),
-        config: {
-          ...((expoConfig.android && expoConfig.android.config) || {}),
-          googleMaps: {
-            ...(((expoConfig.android &&
-              expoConfig.android.config &&
-              expoConfig.android.config.googleMaps) ||
-              {})),
-            apiKey: googleMapsApiKey,
-          },
-        },
-      },
-      extra: {
-        ...(expoConfig.extra || {}),
+    ...expoConfig,
+    ios: {
+      ...(expoConfig.ios || {}),
+      config: {
+        ...((expoConfig.ios && expoConfig.ios.config) || {}),
         googleMapsApiKey,
       },
     },
+    android: {
+      ...(expoConfig.android || {}),
+      config: {
+        ...((expoConfig.android && expoConfig.android.config) || {}),
+        googleMaps: {
+          ...(((expoConfig.android &&
+            expoConfig.android.config &&
+            expoConfig.android.config.googleMaps) ||
+            {})),
+          apiKey: googleMapsApiKey,
+        },
+      },
+    },
+    extra: {
+      ...(expoConfig.extra || {}),
+      googleMapsApiKey,
+    },
   };
 };
-
