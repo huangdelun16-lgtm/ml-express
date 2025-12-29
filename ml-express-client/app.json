@@ -41,13 +41,13 @@
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",
-          "UIInterfaceOrientationLandscapeLeft",
-          "UIInterfaceOrientationLandscapeRight"
+          "AudioInterfaceOrientationLandscapeLeft",
+          "AudioInterfaceOrientationLandscapeRight"
         ]
       },
       "config": {
         "usesNonExemptEncryption": false,
-        "googleMapsApiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
+        "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI"
       },
       "associatedDomains": [
         "applinks:mlexpress.com",
@@ -70,7 +70,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc"
+          "apiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI"
         }
       }
     },
