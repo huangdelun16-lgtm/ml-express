@@ -874,41 +874,40 @@ CI=true npm run build
 
 ---
 
-### 🛡️ Windows 登录兼容性修复 (2025年12月3日) ✅
+### 🔧 最新功能更新 (2025年12月29日) ✅
 
-**问题描述**:
-Windows 环境下 Admin Web 登录后 `verify-admin` 返回 401 错误，原因是 Cookie 在传输过程中丢失或签名校验失败。
+#### 1. 精准里程计费架构优化 (全链路)
+**核心逻辑变更**:
+- **逻辑分离**: 实现了“对客计费”与“对骑手结算”的逻辑分离。
+  - **对客计费**: 维持 `Math.ceil` (向上取整) 逻辑（如 6.1km 按 7km 算），保护运营利润。
+  - **对骑手结算**: 采用**精准小数**逻辑（如 3.4km 即按 3.4km 计算），取消四舍五入，确保薪资统计公平透明。
+- **数据存储**: 订单创建时，`delivery_distance` 字段统一存储最原始的物理距离（保留小数）。
+- **显示精度**: 全平台（Admin Web, 骑手 App, 客户端 App）统一采用 **1 位小数**显示精度（如 `3.4 KM`）。
 
+**修改范围**:
+- `ml-express-client`: `PlaceOrderScreen` 存储逻辑更新。
+- `ml-express-client-web`: `HomePage` 价格估算与距离计算同步。
+- `src/pages/FinanceManagement.tsx`: 骑手工资生成算法改为精准距离。
+- `ml-express-mobile-app`: `PerformanceAnalytics` 与 `DeliveryHistory` 里程精度更新。
+
+#### 2. 客户端实时追踪系统增强 ✅
+**功能改进**:
+- **多订单支持**: 在“追踪订单”页面顶部新增“进行中配送”横向滚动列表。
+- **快捷切换**: 客户无需手动输入单号，可直接点击列表中的订单卡片一键开启实时追踪。
+- **状态同步**: 正在追踪的订单在列表中会有“金色边框”高亮提示，并显示 `👀 正在追踪`。
+- **自动清理**: 订单一旦变为“已送达”，刷新列表后会自动消失。
+- **体验优化**: 追踪页面添加“下拉刷新”功能，地图随骑手位置实时平滑平移动画。
+
+#### 3. 跨端价格估算逻辑对齐 ✅
 **修复内容**:
-
-1. **Cookie 策略优化**:
-   - 强制使用 `SameSite=Lax`（提升 Windows 浏览器兼容性）
-   - 显式设置 `Domain=admin-market-link-express.com`
-   - 智能判断 HTTPS 环境设置 `Secure` 标志
-
-2. **签名校验容错**:
-   - `admin-password.js`: 移除旧版 `resolveCookieDomain` 依赖
-   - `verify-admin.js`: 在校验 HMAC 签名时，**自动移除 Base64 填充符 `=`**，解决 Cookie 传输过程中填充符可能丢失导致的签名不匹配问题
-
-3. **调试增强**:
-   - 在 Netlify Functions 中添加了详细的签名对比日志（Payload, Expected Signature, Received Signature）
-   - 方便在 Netlify Dashboard 中快速定位签名问题
-
-**修改文件**:
-- `netlify/functions/admin-password.js`
-- `netlify/functions/verify-admin.js`
-- `netlify/functions/utils/cors.js`
-
-**部署注意事项**:
-- 必须在 Netlify 环境变量中配置 `JWT_SECRET` 和 `REACT_APP_JWT_SECRET`
-- 部署后需清除浏览器缓存（Cookie）才能生效
+- **Web 端明细修复**: 修复了 `OrderModal.tsx` 中特殊包裹费（超规、易碎、食品）不显示的逻辑 Bug。
+- **多语言适配**: 统一了中/英/缅三语环境下包裹类型与配送速度的判定字符串，确保计费 100% 准确。
 
 ---
 
 ## 📋 版本信息
 
-*最后更新：2025年12月3日*  
-*版本：4.3.1*  
+*最后更新：2025年12月29日*  
+*版本：4.5.0*  
 *状态：生产环境运行中*
-*架构：完全分离的客户端和后台管理系统*  
-*最新更新：Windows 登录兼容性修复、Cookie 策略优化、签名校验容错*
+*架构：精准里程计费系统 + 增强版订单实时追踪系统*  
