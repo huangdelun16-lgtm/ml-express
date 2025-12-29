@@ -1650,11 +1650,14 @@ const HomePage: React.FC = () => {
 
   // 计算配送价格（使用系统设置中的价格）
   const calculatePrice = (packageType: string, weight: string, deliverySpeed: string, distance: number): number => {
+    // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
+    const billingDistance = Math.max(1, Math.ceil(distance));
+    
     // 1. 基础起步价
     let totalPrice = pricingSettings.baseFee;
     
     // 2. 距离费用（超过免费公里数后按每公里费用计算）
-    const distanceFee = Math.max(0, distance - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee;
+    const distanceFee = Math.max(0, billingDistance - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee;
     totalPrice += distanceFee;
     
     // 3. 重量附加费
@@ -1667,14 +1670,14 @@ const HomePage: React.FC = () => {
     
     // 4. 包裹类型附加费
     if (packageType === t.ui.oversizedPackageDetail || packageType === '超规件（45x60x15cm）以上') {
-      // 超规件：按距离计算附加费
-      totalPrice += distance * pricingSettings.oversizeSurcharge;
+      // 超规件：按计费距离计算附加费
+      totalPrice += billingDistance * pricingSettings.oversizeSurcharge;
     } else if (packageType === t.ui.fragile || packageType === '易碎品') {
-      // 易碎品：按距离计算附加费
-      totalPrice += distance * pricingSettings.fragileSurcharge;
+      // 易碎品：按计费距离计算附加费
+      totalPrice += billingDistance * pricingSettings.fragileSurcharge;
     } else if (packageType === t.ui.foodDrinks || packageType === '食品和饮料') {
-      // 食品和饮料：按距离计算附加费
-      totalPrice += distance * pricingSettings.foodBeverageSurcharge;
+      // 食品和饮料：按计费距离计算附加费
+      totalPrice += billingDistance * pricingSettings.foodBeverageSurcharge;
     }
     
     // 5. 配送速度附加费
@@ -1684,7 +1687,7 @@ const HomePage: React.FC = () => {
       totalPrice += pricingSettings.scheduledSurcharge;
     }
     
-    // 返回四舍五入后的价格，匹配 App 的 Math.round(totalPrice)
+    // 返回四舍五入后的价格
     return Math.round(totalPrice);
   };
 
@@ -1760,9 +1763,9 @@ const HomePage: React.FC = () => {
       // 按照要求：用于给客户计费的距离向上取整（例如 6.1km = 7km）
       const roundedDistanceForBilling = Math.max(1, Math.ceil(distance));
       
-      // 存储原始精确距离，用于给骑手算 KM 费
-      setCalculatedDistanceDetail(distance);
-
+      // 🚀 核心修改：设置显示给客户看的距离为取整后的整数
+      setCalculatedDistanceDetail(roundedDistanceForBilling);
+      
       // 计算价格（计费仍按取整后的距离）
       const priceValue = calculatePrice(
         orderInfo.packageType,
@@ -1776,10 +1779,10 @@ const HomePage: React.FC = () => {
       
       // 显示计算结果
       alert(language === 'zh' ? 
-        `计算完成！\n配送距离: ${distance.toFixed(1)}km\n总费用: ${priceValue} MMK` :
+        `计算完成！\n配送距离: ${roundedDistanceForBilling}km\n总费用: ${priceValue} MMK` :
         language === 'en' ? 
-        `Calculation Complete!\nDelivery Distance: ${distance.toFixed(1)}km\nTotal Cost: ${priceValue} MMK` :
-        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + distance.toFixed(1) + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
+        `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
+        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
       );
       
     } catch (error) {

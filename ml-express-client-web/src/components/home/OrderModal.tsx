@@ -759,7 +759,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {language === 'zh' ? '配送距离' : language === 'en' ? 'Delivery Distance' : 'ပို့ဆောင်အကွာအဝေး'}:
                     </span>
                     <span style={{ color: '#10b981', fontWeight: '600' }}>
-                      {calculatedDistanceDetail} {language === 'zh' ? '公里' : language === 'en' ? 'km' : 'ကီလိုမီတာ'}
+                      {Math.ceil(calculatedDistanceDetail)} {language === 'zh' ? '公里' : language === 'en' ? 'km' : 'ကီလိုမီတာ'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -775,7 +775,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {language === 'zh' ? '距离费用' : language === 'en' ? 'Distance Fee' : 'အကွာအဝေးအခ'}:
                     </span>
                     <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
-                      {Math.max(0, calculatedDistanceDetail - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee} MMK
+                      {Math.round(Math.max(0, Math.ceil(calculatedDistanceDetail) - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee)} MMK
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -788,9 +788,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         const weight = form ? (new FormData(form).get('weight') as string) : '0';
                         const weightNum = parseFloat(weight) || 0;
                         const weightThreshold = 5;
-                        // 仅超重件且超过阈值才计费
                         const isOverweight = selectedPackageType === t.ui.overweightPackageDetail || selectedPackageType === '超重件（5KG）以上';
-                        return (isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0;
+                        return Math.round((isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0);
                       })()} MMK
                     </span>
                   </div>
@@ -801,7 +800,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
                       </span>
                       <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {calculatedDistanceDetail * pricingSettings.oversizeSurcharge} MMK
+                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.oversizeSurcharge)} MMK
                       </span>
                     </div>
                   )}
@@ -813,7 +812,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
                       </span>
                       <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {calculatedDistanceDetail * pricingSettings.fragileSurcharge} MMK
+                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.fragileSurcharge)} MMK
                       </span>
                     </div>
                   )}
@@ -825,7 +824,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
                       </span>
                       <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {calculatedDistanceDetail * pricingSettings.foodBeverageSurcharge} MMK
+                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.foodBeverageSurcharge)} MMK
                       </span>
                     </div>
                   )}
@@ -841,7 +840,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         } else if (selectedDeliverySpeed === t.ui.scheduledDelivery || selectedDeliverySpeed === '定时达' || selectedDeliverySpeed === '预约配送') {
                           speedFee = pricingSettings.scheduledSurcharge;
                         }
-                        return speedFee;
+                        return Math.round(speedFee);
                       })()} MMK
                     </span>
                   </div>
@@ -856,7 +855,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {language === 'zh' ? '总费用' : language === 'en' ? 'Total Cost' : 'စုစုပေါင်းကုန်ကျစရိတ်'}:
                     </span>
                     <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      {calculatedPriceDetail} MMK
+                      {Math.round(calculatedPriceDetail)} MMK
                     </span>
                   </div>
                 </div>
