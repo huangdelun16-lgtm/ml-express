@@ -21,6 +21,7 @@ interface User {
   total_spent: number;
   rating: number;
   notes?: string;
+  register_region?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -160,6 +161,7 @@ const UserManagement: React.FC = () => {
     password: '123456',  // 默认密码
     user_type: 'customer' as 'customer' | 'courier' | 'admin',
     status: 'active' as 'active' | 'inactive' | 'suspended',
+    register_region: 'mandalay',
     notes: ''
   });
 
@@ -250,7 +252,8 @@ const UserManagement: React.FC = () => {
       last_login: '从未登录',
       total_orders: 0,
       total_spent: 0,
-      rating: 0
+      rating: 0,
+      register_region: userForm.register_region // 明确包含注册地区
     };
 
     try {
@@ -277,6 +280,7 @@ const UserManagement: React.FC = () => {
         password: '123456',
         user_type: 'customer',
         status: 'active',
+        register_region: 'mandalay',
         notes: ''
       });
     } catch (error) {
@@ -297,6 +301,7 @@ const UserManagement: React.FC = () => {
       password: '',  // 编辑时不显示密码，留空表示不修改
       user_type: user.user_type || 'customer',
       status: user.status || 'active',
+      register_region: user.register_region || 'mandalay',
       notes: user.notes || ''
     });
     // setShowUserForm(true);
@@ -338,6 +343,7 @@ const UserManagement: React.FC = () => {
         password: '123456',
         user_type: 'customer',
         status: 'active',
+        register_region: 'mandalay',
         notes: ''
       });
     } catch (error) {
@@ -1142,6 +1148,7 @@ const UserManagement: React.FC = () => {
                     password: '123456',
                     user_type: 'customer',
                     status: 'active',
+                    register_region: 'mandalay',
                     notes: ''
                   });
                 }}
@@ -1226,17 +1233,32 @@ const UserManagement: React.FC = () => {
                   const isSelected = selectedUsers.has(user.id);
                   return (
                     <div key={user.id} style={{
-                      background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.1)',
-                      borderRadius: '16px',
-                      padding: isMobile ? '16px' : '24px',
-                      border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.15)',
-                      transition: 'all 0.3s ease',
+                      background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                      borderRadius: '20px',
+                      padding: isMobile ? '20px' : '28px',
+                      border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       position: 'relative',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: isSelected ? '0 8px 24px rgba(52, 152, 219, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.1)'
+                      backdropFilter: 'blur(12px)',
+                      boxShadow: isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)',
+                      cursor: 'pointer'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                        e.currentTarget.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
+                      }
                     }}
                     onClick={(e) => {
-                      if ((e.target as HTMLElement).tagName !== 'BUTTON') {
+                      if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).parentElement?.tagName !== 'BUTTON') {
                         handleSelectUser(user.id);
                       }
                     }}
@@ -1275,14 +1297,39 @@ const UserManagement: React.FC = () => {
                         paddingRight: '40px'
                       }}>
                       <div>
-                        <h3 style={{ color: 'white', margin: '0 0 5px 0', fontSize: '1.2rem' }}>
-                          {user.name} ({user.id})
-                        </h3>
-                        <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '0.9rem' }}>
-                          注册时间: {user.registration_date} | 最后登录: {user.last_login}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                          <h3 style={{ color: 'white', margin: 0, fontSize: '1.3rem', fontWeight: 'bold' }}>
+                            {user.name}
+                          </h3>
+                          <span style={{ 
+                            background: 'rgba(255,255,255,0.1)', 
+                            padding: '2px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.75rem', 
+                            color: 'rgba(255,255,255,0.6)',
+                            fontFamily: 'monospace'
+                          }}>
+                            {user.id}
+                          </span>
+                        </div>
+                        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.85rem' }}>
+                          📅 注册: {user.registration_date} | 🔑 最后登录: {user.last_login}
                         </p>
                       </div>
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        {user.register_region && (
+                          <div style={{
+                            background: 'rgba(52, 152, 219, 0.2)',
+                            color: '#3498db',
+                            padding: '5px 15px',
+                            borderRadius: '20px',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            border: '1px solid rgba(52, 152, 219, 0.3)'
+                          }}>
+                            📍 {REGIONS.find(r => r.id === user.register_region)?.name || user.register_region}
+                          </div>
+                        )}
                         <div style={{
                           background: getUserTypeColor(user.user_type),
                           color: 'white',
@@ -1309,108 +1356,161 @@ const UserManagement: React.FC = () => {
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '15px',
-                      marginBottom: '15px'
+                      gap: '20px',
+                      marginBottom: '20px',
+                      background: 'rgba(0,0,0,0.15)',
+                      padding: '20px',
+                      borderRadius: '15px'
                     }}>
                       <div>
-                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>联系信息</h4>
-                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.7 }}>电话:</span>
-                          <span style={{ fontWeight: 500 }}>{user.phone}</span>
+                        <h4 style={{ color: '#3498db', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📞 联系信息</h4>
+                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>电话:</span>
+                          <span style={{ fontWeight: 600 }}>{user.phone}</span>
                         </p>
-                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.7 }}>邮箱:</span>
-                          <span>{user.email}</span>
+                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>邮箱:</span>
+                          <span style={{ opacity: 0.9 }}>{user.email || '未绑定'}</span>
                         </p>
                         <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>地址:</span>
-                          <span style={{ opacity: 0.9 }}>{user.address}</span>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>地址:</span>
+                          <span style={{ opacity: 0.8, lineHeight: '1.4' }}>{user.address || '未填写'}</span>
                         </p>
                       </div>
                       <div>
-                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>统计信息</h4>
-                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.7 }}>订单数:</span>
-                          <span style={{ fontWeight: 500 }}>{user.total_orders}</span>
+                        <h4 style={{ color: '#f1c40f', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📊 业务统计</h4>
+                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>订单总数:</span>
+                          <span style={{ fontWeight: 700, color: '#3498db' }}>{user.total_orders}</span>
                         </p>
-                        <p style={{ color: 'white', margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.7 }}>消费:</span>
-                          <span style={{ fontWeight: 500, color: '#fbbf24' }}>{user.total_spent.toLocaleString()} MMK</span>
+                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>累计消费:</span>
+                          <span style={{ fontWeight: 700, color: '#2ecc71' }}>{user.total_spent.toLocaleString()} MMK</span>
                         </p>
                         <p style={{ color: 'white', margin: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.7 }}>评分:</span>
-                          <span style={{ color: '#fbbf24' }}>★ {user.rating}/5.0</span>
+                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>综合评分:</span>
+                          <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>⭐ {user.rating.toFixed(1)}</span>
                         </p>
                       </div>
                       <div>
-                        <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>备注</h4>
-                        <p style={{ color: 'rgba(255,255,255,0.85)', margin: 0, fontSize: '0.9rem', lineHeight: '1.5' }}>
-                          {user.notes || '无备注'}
+                        <h4 style={{ color: '#e67e22', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📝 内部备注</h4>
+                        <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '0.9rem', lineHeight: '1.6', fontStyle: user.notes ? 'normal' : 'italic' }}>
+                          {user.notes || '暂无备注信息'}
                         </p>
                       </div>
                     </div>
 
                     {/* 操作按钮 */}
+                    {/* 操作按钮 */}
                     <div style={{
                       display: 'flex',
-                      gap: '10px',
+                      gap: '12px',
                       flexWrap: 'wrap'
                     }}>
                       <button
                         onClick={() => handleEditUser(user)}
                         style={{
-                          background: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          background: 'rgba(52, 152, 219, 0.2)',
+                          color: '#3498db',
+                          border: '1px solid rgba(52, 152, 219, 0.3)',
+                          padding: '10px 20px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem'
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(52, 152, 219, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(52, 152, 219, 0.2)';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        编辑
+                        ✏️ 编辑资料
                       </button>
                       <button
                         onClick={() => updateUserStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
                         style={{
-                          background: user.status === 'active' ? '#f39c12' : '#27ae60',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          background: user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)',
+                          color: user.status === 'active' ? '#f39c12' : '#2ecc71',
+                          border: '1px solid ' + (user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)'),
+                          padding: '10px 20px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem'
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        {user.status === 'active' ? '停用' : '启用'}
+                        {user.status === 'active' ? '🚫 停用账户' : '✅ 启用账户'}
                       </button>
                       <button
                         onClick={() => updateUserStatus(user.id, 'suspended')}
                         style={{
-                          background: '#e74c3c',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          background: 'rgba(231, 76, 60, 0.15)',
+                          color: '#e74c3c',
+                          border: '1px solid rgba(231, 76, 60, 0.25)',
+                          padding: '10px 20px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem'
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.25)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.15)';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }}
                       >
-                        暂停
+                        ⚠️ 暂停服务
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user.id)}
                         style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
-                          padding: '8px 16px',
-                          borderRadius: '5px',
+                          marginLeft: 'auto',
+                          background: 'transparent',
+                          color: 'rgba(255,255,255,0.4)',
+                          border: 'none',
+                          padding: '10px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem'
+                          fontSize: '0.85rem',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.color = '#e74c3c';
+                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+                          e.currentTarget.style.background = 'transparent';
                         }}
                       >
-                        删除
+                        🗑️ 删除账户
                       </button>
                     </div>
                   </div>
@@ -1616,6 +1716,32 @@ const UserManagement: React.FC = () => {
                         e.currentTarget.style.boxShadow = 'none';
                       }}
                     />
+                    
+                    <div style={{ marginTop: '10px' }}>
+                      <label style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>📍 注册地区</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {REGIONS.map(region => (
+                          <button
+                            key={region.id}
+                            type="button"
+                            onClick={() => setUserForm({...userForm, register_region: region.id})}
+                            style={{
+                              padding: '10px 18px',
+                              borderRadius: '10px',
+                              border: '1px solid ' + (userForm.register_region === region.id ? '#3498db' : 'rgba(255, 255, 255, 0.2)'),
+                              background: userForm.register_region === region.id ? 'rgba(52, 152, 219, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+                              color: userForm.register_region === region.id ? '#3498db' : 'white',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              fontWeight: userForm.register_region === region.id ? 'bold' : 'normal',
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            {region.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <input
                       type="text"
                       placeholder={editingUser ? "密码（留空则不修改）" : "密码（默认：123456）"}
