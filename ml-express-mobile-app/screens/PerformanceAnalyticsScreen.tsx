@@ -107,9 +107,9 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
     const completedDeliveries = packages.filter(p => p.status === '已送达').length;
     const pendingDeliveries = packages.filter(p => ['待取件', '已取件', '配送中'].includes(p.status)).length;
     
-    // 计算总距离
+    // 计算总距离 - 使用精确的 delivery_distance
     const totalDistance = packages.reduce((sum, pkg) => {
-      const distance = parseFloat(pkg.distance || '0');
+      const distance = parseFloat(pkg.delivery_distance || pkg.distance || '0');
       return sum + distance;
     }, 0);
 
@@ -178,7 +178,7 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
       }
       
       monthlyData[monthKey].deliveries++;
-      monthlyData[monthKey].distance += parseFloat(pkg.distance || '0');
+      monthlyData[monthKey].distance += parseFloat(pkg.delivery_distance || pkg.distance || '0');
       
       if (pkg.customer_rating) {
         monthlyData[monthKey].rating += pkg.customer_rating;
@@ -211,7 +211,7 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
       }
       
       dailyData[dateKey].deliveries++;
-      dailyData[dateKey].distance += parseFloat(pkg.distance || '0');
+      dailyData[dateKey].distance += parseFloat(pkg.delivery_distance || pkg.distance || '0');
       
       if (pkg.status === '已送达') {
         dailyData[dateKey].completed++;
@@ -316,13 +316,13 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
           {renderStatCard(
             language === 'zh' ? '总距离' : 'Total Distance',
             `${stats.totalDistance.toFixed(1)}km`,
-            language === 'zh' ? '配送里程' : 'Delivery Miles',
+            language === 'zh' ? '精准里程统计' : 'Precise Distance',
             '#f59e0b'
           )}
           {renderStatCard(
-            language === 'zh' ? '平均时间' : 'Avg Time',
-            `${stats.averageDeliveryTime.toFixed(1)}h`,
-            language === 'zh' ? '配送时长' : 'Delivery Time',
+            language === 'zh' ? '里程报酬' : 'KM Fee',
+            `${(stats.totalDistance * 500).toLocaleString()} MMK`,
+            language === 'zh' ? '每公里 500 MMK' : '500 MMK per KM',
             '#8b5cf6'
           )}
           {renderStatCard(

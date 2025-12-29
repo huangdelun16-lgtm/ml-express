@@ -154,6 +154,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
 
   const completedCount = packages.filter(p => p.status === '已送达').length;
   const cancelledCount = packages.filter(p => p.status === '已取消').length;
+  const totalDistance = packages.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
 
   return (
     <View style={styles.container}>
@@ -183,8 +184,8 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{cancelledCount}</Text>
-            <Text style={styles.summaryLabel}>{language === 'zh' ? '已取消' : 'Cancelled'}</Text>
+            <Text style={styles.summaryNumber}>{totalDistance.toFixed(1)}</Text>
+            <Text style={styles.summaryLabel}>{language === 'zh' ? '总里程' : 'Distance'}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>

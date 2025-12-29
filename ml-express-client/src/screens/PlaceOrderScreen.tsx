@@ -1056,15 +1056,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
         receiverCoordinates.lng
       );
 
-      // 按照要求：6.1km = 7km（向上取整）
-      const roundedDistance = Math.ceil(exactDistance);
-      setCalculatedDistance(roundedDistance);
+      // 按照要求：6.1km = 7km（向上取整）用于给客户计费
+      const roundedDistanceForPrice = Math.ceil(exactDistance);
+      
+      // 存储原始精确距离，用于给骑手算 KM 费
+      setCalculatedDistance(exactDistance);
 
-      // 计算各项费用
+      // 计算各项费用（计费仍按取整后的距离）
       let totalPrice = pricingSettings.base_fee; // 基础费用
 
       // 距离费用（超过免费公里数后收费）
-      const distanceFee = Math.max(0, roundedDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee;
+      const distanceFee = Math.max(0, roundedDistanceForPrice - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee;
       totalPrice += distanceFee;
 
       // 重量附加费
@@ -1081,14 +1083,14 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
       // 包裹类型附加费
       if (packageType === '超规件（45x60x15cm）以上') {
-        totalPrice += roundedDistance * pricingSettings.oversize_surcharge;
+        totalPrice += roundedDistanceForPrice * pricingSettings.oversize_surcharge;
       }
       if (packageType === '易碎品') {
         // 易碎品：按距离计算附加费 (MMK/公里)
-        totalPrice += roundedDistance * pricingSettings.fragile_surcharge;
+        totalPrice += roundedDistanceForPrice * pricingSettings.fragile_surcharge;
       }
       if (packageType === '食品和饮料') {
-        totalPrice += roundedDistance * pricingSettings.food_beverage_surcharge;
+        totalPrice += roundedDistanceForPrice * pricingSettings.food_beverage_surcharge;
       }
 
       // 更新计算结果
@@ -1096,7 +1098,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       setIsCalculated(true);
       
       hideLoading();
-      Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistance}km\n总费用: ${Math.round(totalPrice)} MMK`);
+      Alert.alert(currentT.calculateSuccess, `距离: ${exactDistance.toFixed(1)}km\n总费用: ${Math.round(totalPrice)} MMK`);
       
     } catch (error) {
       hideLoading();

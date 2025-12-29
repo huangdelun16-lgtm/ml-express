@@ -1614,9 +1614,9 @@ const HomePage: React.FC = () => {
               if (element?.status === 'OK') {
                 const distanceInMeters = element.distance.value;
                 const distanceInKm = distanceInMeters / 1000;
-                const roundedDistance = Math.round(distanceInKm * 10) / 10;
-                console.log('✅ 距离计算成功:', roundedDistance, 'km');
-                resolve(roundedDistance);
+                // 不再进行四舍五入，保留最精准的数值
+                console.log('✅ 距离计算成功:', distanceInKm, 'km');
+                resolve(distanceInKm);
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
                 alert((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
@@ -1757,19 +1757,18 @@ const HomePage: React.FC = () => {
         distance = await calculateDistance(senderAddressTextValue, receiverAddressTextValue);
       }
       
-      // 按照要求：6.1km = 7km（向上取整）
-      const roundedDistance = Math.ceil(distance);
-      // 确保至少有 1km，防止 0 距离导致计费异常
-      const finalDistanceValue = Math.max(1, roundedDistance);
+      // 按照要求：用于给客户计费的距离向上取整（例如 6.1km = 7km）
+      const roundedDistanceForBilling = Math.max(1, Math.ceil(distance));
       
-      setCalculatedDistanceDetail(finalDistanceValue);
+      // 存储原始精确距离，用于给骑手算 KM 费
+      setCalculatedDistanceDetail(distance);
 
-      // 计算价格
+      // 计算价格（计费仍按取整后的距离）
       const priceValue = calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
-        finalDistanceValue
+        roundedDistanceForBilling
       );
       
       setCalculatedPriceDetail(priceValue);
@@ -1777,10 +1776,10 @@ const HomePage: React.FC = () => {
       
       // 显示计算结果
       alert(language === 'zh' ? 
-        `计算完成！\n配送距离: ${finalDistanceValue}km\n总费用: ${priceValue} MMK` :
+        `计算完成！\n配送距离: ${distance.toFixed(1)}km\n总费用: ${priceValue} MMK` :
         language === 'en' ? 
-        `Calculation Complete!\nDelivery Distance: ${finalDistanceValue}km\nTotal Cost: ${priceValue} MMK` :
-        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + finalDistanceValue + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
+        `Calculation Complete!\nDelivery Distance: ${distance.toFixed(1)}km\nTotal Cost: ${priceValue} MMK` :
+        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + distance.toFixed(1) + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
       );
       
     } catch (error) {

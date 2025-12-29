@@ -3981,7 +3981,7 @@ const FinanceManagement: React.FC = () => {
                       </div>
                       <div>
                         <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginBottom: '4px' }}>配送距离</div>
-                        <div style={{ color: '#fd79a8', fontSize: '1rem', fontWeight: '600' }}>{selectedSalary.total_km.toFixed(2)} KM</div>
+                        <div style={{ color: '#fd79a8', fontSize: '1rem', fontWeight: '600' }}>{selectedSalary.total_km.toFixed(1)} KM</div>
                       </div>
                     </div>
                   </div>
