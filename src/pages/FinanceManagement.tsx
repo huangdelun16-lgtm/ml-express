@@ -918,8 +918,8 @@ const FinanceManagement: React.FC = () => {
 
   // 新增：处理合伙代收款卡片点击
   const handlePartnerCollectionClick = (storeName?: string) => {
-    // 找出所有已结清的合伙店铺订单
-    const settledOrders = packages.filter(pkg => {
+    // 找出所有已送达且有代收款的合伙店铺订单（包括已结清和未结清）
+    const codOrders = packages.filter(pkg => {
       // 如果指定了店铺名，只看该店铺的
       if (storeName && pkg.sender_name !== storeName && !pkg.sender_name?.startsWith(storeName)) {
         return false;
@@ -929,15 +929,16 @@ const FinanceManagement: React.FC = () => {
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
       const isPartner = !!pkg.delivery_store_id || isStoreMatch;
-      return isPartner && pkg.cod_settled;
+      // 只要是已送达且代收款 > 0 的订单
+      return isPartner && pkg.status === '已送达' && Number(pkg.cod_amount || 0) > 0;
     }).sort((a, b) => {
-      const dateA = a.cod_settled_at ? new Date(a.cod_settled_at).getTime() : 0;
-      const dateB = b.cod_settled_at ? new Date(b.cod_settled_at).getTime() : 0;
-      return dateB - dateA; // 最新的在前面
+      const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
+      const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
+      return dateB - dateA; // 最近的在前面
     });
 
-    setModalOrders(settledOrders);
-    setModalTitle(storeName ? `${storeName} - 上次结清记录` : '上次结清记录');
+    setModalOrders(codOrders);
+    setModalTitle(storeName ? `${storeName} - 代收款订单明细` : '代收款订单明细');
     setShowPartnerSettledModal(true);
   };
 
