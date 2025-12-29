@@ -1800,7 +1800,6 @@ const UserManagement: React.FC = () => {
                         <option value="admin">Admin</option>
                       </select>
                     ) : (
-                       {/* 隐藏用户类型选择，显示固定文本 */}
                        <div style={{
                          padding: '14px',
                          border: '1px solid rgba(255, 255, 255, 0.1)',
