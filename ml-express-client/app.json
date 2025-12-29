@@ -88,7 +88,9 @@
     "extra": {
       "eas": {
         "projectId": "80b0873d-1d76-429e-8c79-738a817d8a15"
-      }
+      },
+      "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI",
+      "googlePlacesApiKey": "AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk"
     },
     "owner": "amt349"
   }

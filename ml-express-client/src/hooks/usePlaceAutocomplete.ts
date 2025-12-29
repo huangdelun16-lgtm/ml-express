@@ -23,7 +23,7 @@ export function usePlaceAutocomplete({
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastSearchQueryRef = useRef('');
   const failureCountRef = useRef(0);
-  const googleMapsApiKey = useGoogleMapsApiKey();
+  const googleMapsApiKey = useGoogleMapsApiKey('places'); // 🚀 使用无限制的 KEY-B
   const performAutocompleteSearch = useCallback(
     async (input: string) => {
       if (!input.trim() || input.length < 1) {
@@ -91,17 +91,25 @@ export function usePlaceAutocomplete({
           setIsLoadingSuggestions(false);
           return;
         }
-        // 优化搜索：优先搜索店铺和商业地点
-        // 使用 types 参数限制为商业地点，提高店铺搜索准确性
+        // 优化搜索：移除限制性的 types 参数，使其与 Web 端行为一致
+        // Google Places API (Web Service) 不支持用 | 分隔多个 type
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
             input.trim()
-          )}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&types=establishment|geocode&key=${googleMapsApiKey}&language=${
+          )}&location=${selectedLocation.latitude},${selectedLocation.longitude}&radius=50000&components=country:mm&key=${googleMapsApiKey}&language=${
             language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'
           }`,
           { signal: controller.signal }
         );
         const data = await response.json();
+        
+        if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+          LoggerService.error('Google Places API 错误:', data.status, data.error_message);
+          if (__DEV__) {
+            console.warn('Autocomplete Error:', data.status, data.error_message);
+          }
+        }
+
         if (lastSearchQueryRef.current === input.trim()) {
           if (data.status === 'OK' && data.predictions && data.predictions.length > 0) {
             // 优化建议列表：优先显示店铺/商业地点，并提取类型信息
