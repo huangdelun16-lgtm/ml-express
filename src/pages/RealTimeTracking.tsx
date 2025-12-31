@@ -25,12 +25,12 @@ const RealTimeTracking: React.FC = () => {
   const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
   
-  // 领区识别逻辑：优先检查数据库存储的 region，其次检查用户名开头
+  // 领区识别逻辑更新：确保 MDY 和 POL 彻底分开
   const getDetectedRegion = () => {
     const userUpper = currentUser.toUpperCase();
     if (currentUserRegion === 'yangon' || userUpper.startsWith('YGN')) return 'YGN';
-    if (currentUserRegion === 'mandalay' || currentUserRegion === 'maymyo' || 
-        userUpper.startsWith('MDY') || userUpper.startsWith('POL')) return 'MDY';
+    if (currentUserRegion === 'maymyo' || userUpper.startsWith('POL')) return 'POL';
+    if (currentUserRegion === 'mandalay' || userUpper.startsWith('MDY')) return 'MDY';
     return '';
   };
 

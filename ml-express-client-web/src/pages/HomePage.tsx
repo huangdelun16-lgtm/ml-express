@@ -1525,21 +1525,14 @@ const HomePage: React.FC = () => {
     const random1 = Math.floor(Math.random() * 10);
     const random2 = Math.floor(Math.random() * 10);
     
-    // 根据寄件地址自动识别城市前缀（以曼德勒为中心）
+    // 根据寄件地址自动识别城市前缀（优先级从高到低）
+    // 🚀 核心修复：将具体城市（如 POL）放在前面，通用名称（如 MDY 曼德勒省）放在最后
     const cityPrefixMap: { [key: string]: string } = {
-      // 曼德勒（总部）
-      '曼德勒': 'MDY',
-      'Mandalay': 'MDY',
-      'မန္တလေး': 'MDY',
-      // 眉苗
+      // 眉苗 / 彬乌伦
       '眉苗': 'POL',
       'Pyin Oo Lwin': 'POL',
       '彬乌伦': 'POL',
       'ပင်းတလဲ': 'POL',
-      // 仰光（开发中）
-      '仰光': 'YGN',
-      'Yangon': 'YGN',
-      'ရန်ကုန်': 'YGN',
       // 内比都（开发中）
       '内比都': 'NPW',
       'Naypyidaw': 'NPW',
@@ -1555,7 +1548,15 @@ const HomePage: React.FC = () => {
       // 木姐（开发中）
       '木姐': 'MSE',
       'Muse': 'MSE',
-      'မူဆယ်': 'MSE'
+      'မူဆယ်': 'MSE',
+      // 仰光（开发中）
+      '仰光': 'YGN',
+      'Yangon': 'YGN',
+      'ရန်ကုန်': 'YGN',
+      // 曼德勒（总部/省份名，放最后作为兜底）
+      '曼德勒': 'MDY',
+      'Mandalay': 'MDY',
+      'မန္တလေး': 'MDY'
     };
     
     // 判断城市前缀

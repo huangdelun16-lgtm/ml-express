@@ -1098,7 +1098,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       setIsCalculated(true);
       
       hideLoading();
-      Alert.alert(currentT.calculateSuccess, `距离: ${exactDistance.toFixed(1)}km\n总费用: ${Math.round(totalPrice)} MMK`);
+      Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistanceForPrice}km\n总费用: ${Math.round(totalPrice)} MMK`);
       
     } catch (error) {
       hideLoading();
@@ -1175,15 +1175,17 @@ export default function PlaceOrderScreen({ navigation }: any) {
 
       // 生成订单ID（根据寄件地址所在城市自动选择前缀）
       const generateOrderId = (address: string) => {
-        // 城市前缀映射（以曼德勒为中心）
+        // 城市前缀映射（优先级从高到低）
+        // 🚀 注意：必须将具体的小城市放在前面，将“曼德勒”等大省份名称放在后面，
+        // 否则“彬乌伦 曼德勒省”会因为包含“曼德勒”而错误识别为 MDY
         const cityPrefixMap: { [key: string]: string } = {
-          '曼德勒': 'MDY', 'Mandalay': 'MDY', 'မန္တလေး': 'MDY',
           '眉苗': 'POL', 'Pyin Oo Lwin': 'POL', '彬乌伦': 'POL', 'ပင်းတလဲ': 'POL',
-          '仰光': 'YGN', 'Yangon': 'YGN', 'ရန်ကုန်': 'YGN',
           '内比都': 'NPW', 'Naypyidaw': 'NPW', 'နေပြည်တော်': 'NPW',
           '东枝': 'TGI', 'Taunggyi': 'TGI', 'တောင်ကြီး': 'TGI',
           '腊戌': 'LSO', 'Lashio': 'LSO', 'လားရှိုး': 'LSO',
-          '木姐': 'MSE', 'Muse': 'MSE', 'မူဆယ်': 'MSE'
+          '木姐': 'MSE', 'Muse': 'MSE', 'မူဆယ်': 'MSE',
+          '仰光': 'YGN', 'Yangon': 'YGN', 'ရန်ကုန်': 'YGN',
+          '曼德勒': 'MDY', 'Mandalay': 'MDY', 'မန္တလေး': 'MDY' // 曼德勒放在最后作为兜底
         };
         
         // 判断城市前缀
