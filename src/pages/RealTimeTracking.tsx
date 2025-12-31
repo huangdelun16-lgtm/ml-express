@@ -142,7 +142,7 @@ const RealTimeTracking: React.FC = () => {
   // 缅甸主要城市数据（以曼德勒为中心）
   const myanmarCities: Record<CityKey, { name: string; nameEn: string; nameMm: string; lat: number; lng: number }> = {
     mandalay: { name: '曼德勒', nameEn: 'Mandalay', nameMm: 'မန္တလေး', lat: 21.9588, lng: 96.0891 }, // 总部
-    pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', nameMm: 'ပင်းတလဲ', lat: 22.0333, lng: 96.4667 }, // 眉苗
+    pyinoolwin: { name: '彬乌伦', nameEn: 'Pyin Oo Lwin', nameMm: 'ပင်းတလဲ', lat: 22.0333, lng: 96.4667 }, // 彬乌伦
     yangon: { name: '仰光', nameEn: 'Yangon', nameMm: 'ရန်ကုန်', lat: 16.8661, lng: 96.1951 }, // 开发中
     naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', nameMm: 'နေပြည်တော်', lat: 19.7633, lng: 96.0785 }, // 开发中
     taunggyi: { name: '东枝', nameEn: 'Taunggyi', nameMm: 'တောင်ကြီး', lat: 20.7892, lng: 97.0378 }, // 开发中
@@ -496,7 +496,7 @@ const RealTimeTracking: React.FC = () => {
     // 城市前缀映射（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
       'mandalay': 'MDY',      // 曼德勒（总部）
-      'pyinoolwin': 'POL',    // 眉苗
+      'pyinoolwin': 'POL',    // 彬乌伦
       'yangon': 'YGN',        // 仰光（开发中）
       'naypyidaw': 'NPW',     // 内比都（开发中）
       'taunggyi': 'TGI',      // 东枝（开发中）

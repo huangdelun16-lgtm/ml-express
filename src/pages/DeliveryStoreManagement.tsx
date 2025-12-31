@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
-  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'maymyo', name: '彬乌伦', prefix: 'POL' },
   { id: 'yangon', name: '仰光', prefix: 'YGN' },
   { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
   { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
@@ -132,7 +132,7 @@ const DeliveryStoreManagement: React.FC = () => {
   // 缅甸主要城市数据
   const myanmarCities = {
     mandalay: { name: '曼德勒', nameEn: 'Mandalay', lat: 21.9588, lng: 96.0891, radius: 0.5 },
-    pyinoolwin: { name: '眉苗', nameEn: 'Pyin Oo Lwin', lat: 22.0333, lng: 96.4667, radius: 0.3 },
+    pyinoolwin: { name: '彬乌伦', nameEn: 'Pyin Oo Lwin', lat: 22.0333, lng: 96.4667, radius: 0.3 },
     yangon: { name: '仰光', nameEn: 'Yangon', lat: 16.8661, lng: 96.1951, radius: 0.8 },
     naypyidaw: { name: '内比都', nameEn: 'Naypyidaw', lat: 19.7633, lng: 96.0785, radius: 0.5 },
     taunggyi: { name: '东枝', nameEn: 'Taunggyi', lat: 20.7892, lng: 97.0378, radius: 0.3 },

@@ -1097,7 +1097,7 @@ const HomePage: React.FC = () => {
     // 根据选中的城市生成对应的前缀（以曼德勒为中心）
     const cityPrefixMap: { [key: string]: string } = {
       'mandalay': 'MDY',      // 曼德勒（总部）
-      'pyinoolwin': 'POL',    // 眉苗
+      'pyinoolwin': 'POL',    // 彬乌伦
       'yangon': 'YGN',        // 仰光（开发中）
       'naypyidaw': 'NPW',     // 内比都（开发中）
       'taunggyi': 'TGI',      // 东枝（开发中）

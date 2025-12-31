@@ -9,7 +9,7 @@ import { useResponsive } from '../hooks/useResponsive';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
-  { id: 'maymyo', name: '眉苗', prefix: 'POL' },
+  { id: 'maymyo', name: '彬乌伦', prefix: 'POL' },
   { id: 'yangon', name: '仰光', prefix: 'YGN' },
   { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
   { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
