@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { TranslationKeys, translations as financeTranslations } from './FinanceManagement.translations';
@@ -24,16 +23,6 @@ import {
   ResponsiveContainer,
   ComposedChart
 } from 'recharts';
-
-// 使用 require 并放在所有 import 之后，修复 ESLint 的 import/first 报错
-const ReactWindow = require('react-window');
-
-// 兼容不同的导入方式，解决 Netlify 构建失败问题
-const ListComponent = (ReactWindow as any).FixedSizeList || 
-                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
-                     (ReactWindow as any).List;
-                     
-const AutoSizerComponent = AutoSizer as any;
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -127,117 +116,6 @@ const statusColors: Record<FinanceRecord['status'], string> = {
 const typeColors: Record<FinanceRecord['record_type'], string> = {
   income: '#2ecc71',
   expense: '#e74c3c'
-};
-
-// 虚拟列表行组件 - 财务记录
-const RecordRow = ({ index, style, data }: any) => {
-  const { 
-    filteredRecords, 
-    t, 
-    typeColors, 
-    statusColors, 
-    language, 
-    handleEditRecord, 
-    handleDeleteRecord, 
-    currentUserRole 
-  } = data;
-  
-  const record = filteredRecords[index];
-  if (!record) return null;
-
-  return (
-    <div style={{ 
-      ...style, 
-      borderBottom: '1px solid rgba(255, 255, 255, 0.12)', 
-      display: 'flex', 
-      alignItems: 'center',
-      background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
-    }}>
-      <div style={{ padding: '14px', width: '100px', flexShrink: 0, fontSize: '0.85rem' }}>{record.id}</div>
-      <div style={{ padding: '14px', width: '100px', flexShrink: 0 }}>
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '4px 8px',
-            borderRadius: '999px',
-            background: `${typeColors[record.record_type]}22`,
-            color: typeColors[record.record_type],
-            fontWeight: 600,
-            fontSize: '0.8rem'
-          }}
-        >
-          {record.record_type === 'income' ? t.income : t.expense}
-        </span>
-      </div>
-      <div style={{ padding: '14px', width: '150px', flexShrink: 0, fontSize: '0.9rem' }}>{record.category}</div>
-      <div style={{ padding: '14px', width: '120px', flexShrink: 0, color: record.record_type === 'income' ? '#4cd137' : '#ff7979', fontWeight: 600 }}>
-        {record.amount?.toLocaleString()}
-      </div>
-      <div style={{ padding: '14px', width: '80px', flexShrink: 0, fontSize: '0.9rem' }}>{record.currency}</div>
-      <div style={{ padding: '14px', width: '120px', flexShrink: 0 }}>
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '4px 8px',
-            borderRadius: '999px',
-            background: `${statusColors[record.status]}22`,
-            color: statusColors[record.status],
-            fontWeight: 600,
-            fontSize: '0.8rem'
-          }}
-        >
-          {record.status === 'pending' ? t.pending : record.status === 'completed' ? t.completed : t.cancelled}
-        </span>
-      </div>
-      <div style={{ padding: '14px', width: '220px', flexShrink: 0, overflow: 'hidden' }}>
-        <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-          {t.orderId}: {record.order_id || '—'}
-        </div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-          {t.courierId}: {record.courier_id || '—'}
-        </div>
-      </div>
-      <div style={{ padding: '14px', width: '120px', flexShrink: 0, fontSize: '0.85rem' }}>{record.record_date}</div>
-      <div style={{ padding: '14px', flexGrow: 1, minWidth: '200px', overflow: 'hidden' }}>
-        <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{record.notes || '—'}</div>
-        {record.reference && (
-          <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.4)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{language === 'my' ? 'ကိုးကား' : '参考'}: {record.reference}</div>
-        )}
-      </div>
-      <div style={{ padding: '14px', width: '160px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => handleEditRecord(record)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'rgba(76, 209, 55, 0.2)',
-              color: '#4cd137',
-              cursor: 'pointer',
-              fontSize: '0.85rem'
-            }}
-          >
-            {t.edit}
-          </button>
-          <button
-            onClick={() => handleDeleteRecord(record.id)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'rgba(255, 71, 87, 0.2)',
-              color: '#ff4757',
-              cursor: 'pointer',
-              fontSize: '0.85rem'
-            }}
-          >
-            {t.delete}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const FinanceManagement: React.FC = () => {
@@ -1764,78 +1642,137 @@ const FinanceManagement: React.FC = () => {
               </div>
             )}
 
-            {/* Records Virtual List */}
-            <div style={{ 
-              background: 'rgba(8, 32, 64, 0.4)',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              {/* Header */}
-              <div style={{ 
-                display: 'flex', 
-                background: 'rgba(8, 32, 64, 0.8)',
-                borderBottom: '2px solid rgba(255, 255, 255, 0.1)',
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.95rem',
-                paddingRight: '15px' // Space for scrollbar
-              }}>
-                <div style={{ padding: '14px', width: '100px', flexShrink: 0 }}>{t.recordId}</div>
-                <div style={{ padding: '14px', width: '100px', flexShrink: 0 }}>{t.type}</div>
-                <div style={{ padding: '14px', width: '150px', flexShrink: 0 }}>{t.category}</div>
-                <div style={{ padding: '14px', width: '120px', flexShrink: 0 }}>{t.amount}</div>
-                <div style={{ padding: '14px', width: '80px', flexShrink: 0 }}>{t.currency}</div>
-                <div style={{ padding: '14px', width: '120px', flexShrink: 0 }}>{t.status}</div>
-                <div style={{ padding: '14px', width: '220px', flexShrink: 0 }}>{t.orderCourier}</div>
-                <div style={{ padding: '14px', width: '120px', flexShrink: 0 }}>{t.date}</div>
-                <div style={{ padding: '14px', flexGrow: 1, minWidth: '200px' }}>{t.notes}</div>
-                <div style={{ padding: '14px', width: '160px', flexShrink: 0 }}>{t.actions}</div>
-              </div>
-
-              <div style={{ height: '600px', width: '100%' }}>
-                {loading ? (
-                  <div style={{ textAlign: 'center', padding: '48px', color: 'white' }}>
-                    <div className="spinner" style={{ marginBottom: '16px' }}></div>
-                    {t.loadingData}
-                  </div>
-                ) : filteredRecords.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '80px 24px', color: 'white' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.5 }}>📝</div>
-                    <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.2rem', fontWeight: 500 }}>
-                      {t.noRecords}
-                    </div>
-                    {currentUserRole !== 'admin' && (
-                      <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '1rem', marginTop: '12px' }}>
-                        {t.financeAuthOnly}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <AutoSizerComponent>
-                    {({ height, width }: any) => (
-                      <ListComponent
-                        height={height}
-                        itemCount={filteredRecords.length}
-                        itemSize={85}
-                        width={width}
-                        itemData={{
-                          filteredRecords,
-                          t,
-                          typeColors,
-                          statusColors,
-                          language,
-                          handleEditRecord,
-                          handleDeleteRecord,
-                          currentUserRole
+            {/* Records Table - Reverted to standard table for reliability */}
+            <div style={{ overflowX: 'auto', background: 'rgba(8, 32, 64, 0.4)', borderRadius: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', minWidth: '1200px' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(8, 32, 64, 0.8)', borderBottom: '2px solid rgba(255, 255, 255, 0.1)' }}>
+                    {[t.recordId, t.type, t.category, t.amount, t.currency, t.status, t.orderCourier, t.date, t.notes, t.actions].map((header) => (
+                      <th key={header} style={{ padding: '14px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '48px' }}>
+                        <div className="spinner" style={{ marginBottom: '16px' }}></div>
+                        {t.loadingData}
+                      </td>
+                    </tr>
+                  ) : filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '80px 24px' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.5 }}>📝</div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.2rem', fontWeight: 500 }}>
+                          {t.noRecords}
+                        </div>
+                        {currentUserRole !== 'admin' && (
+                          <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '1rem', marginTop: '12px' }}>
+                            {t.financeAuthOnly}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((record, index) => (
+                      <tr 
+                        key={record.id} 
+                        style={{ 
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+                          background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
                         }}
                       >
-                        {RecordRow}
-                      </ListComponent>
-                    )}
-                  </AutoSizerComponent>
-                )}
-              </div>
+                        <td style={{ padding: '14px', fontSize: '0.85rem' }}>{record.id}</td>
+                        <td style={{ padding: '14px' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '999px',
+                              background: `${typeColors[record.record_type]}22`,
+                              color: typeColors[record.record_type],
+                              fontWeight: 600,
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            {record.record_type === 'income' ? t.income : t.expense}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px', fontSize: '0.9rem' }}>{record.category}</td>
+                        <td style={{ padding: '14px', color: record.record_type === 'income' ? '#4cd137' : '#ff7979', fontWeight: 600 }}>
+                          {record.amount?.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '14px', fontSize: '0.9rem' }}>{record.currency}</td>
+                        <td style={{ padding: '14px' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '999px',
+                              background: `${statusColors[record.status]}22`,
+                              color: statusColors[record.status],
+                              fontWeight: 600,
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            {record.status === 'pending' ? t.pending : record.status === 'completed' ? t.completed : t.cancelled}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px' }}>
+                          <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)' }}>
+                            {t.orderId}: {record.order_id || '—'}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)' }}>
+                            {t.courierId}: {record.courier_id || '—'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px', fontSize: '0.85rem' }}>{record.record_date}</td>
+                        <td style={{ padding: '14px', maxWidth: '300px' }}>
+                          <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)' }}>{record.notes || '—'}</div>
+                          {record.reference && (
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.4)' }}>{language === 'my' ? 'ကိုးကား' : '参考'}: {record.reference}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleEditRecord(record)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: 'rgba(76, 209, 55, 0.2)',
+                                color: '#4cd137',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              {t.edit}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRecord(record.id)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: 'rgba(255, 71, 87, 0.2)',
+                                color: '#ff4757',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              {t.delete}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

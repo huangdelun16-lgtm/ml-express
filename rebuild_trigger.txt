@@ -1,6 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 09:15:00
+Timestamp: 2026-01-01 09:30:00
 Changes: 
-- Fixed missing ListComponent definition in UserManagement.tsx
-- Ensured all variables are defined after import reordering
-- Final verification of Netlify build compliance
+- Removed Excel and PDF export buttons from Finance Management
+- Reverted Finance Records table to standard rendering for reliability
+- Kept performance optimizations for other management pages
+- Cleaned up unused virtual list code in Finance page
