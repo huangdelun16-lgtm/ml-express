@@ -558,22 +558,60 @@ export const userService = {
     password?: string;
   }): Promise<User | null> {
     try {
+      // 明确只提取需要的字段，防止多余字段导致插入失败
+      const { name, phone, email, address, password } = userData;
+      
+      // 生成唯一ID，格式与后台系统保持一致 (USR + 6位随机数/时间戳)
+      const newId = `USR${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+      
+      const cleanData = {
+        id: newId,
+        name,
+        phone: phone || '',
+        email: email || '',
+        address: address || '',
+        password: password || '123456',
+        user_type: 'customer' as const,
+        registration_date: new Date().toLocaleDateString('zh-CN'),
+        last_login: '从未登录',
+        status: 'active',
+        // 补充缺失的必须字段，防止数据库报错
+        total_orders: 0,
+        total_spent: 0,
+        rating: 5,
+        notes: '通过 Web 注册'
+      };
+
+      LoggerService.debug('尝试在数据库创建新用户:', cleanData);
+
       const { data, error } = await supabase
         .from('users')
-        .insert([{
-          ...userData,
-          user_type: 'customer'
-        }])
+        .insert([cleanData])
         .select()
         .single();
       
       if (error) {
-        LoggerService.error('创建用户失败:', error);
+        LoggerService.error('创建用户失败 (数据库错误):', error);
+        // 如果是因为 ID 冲突，再试一次
+        if (error.code === '23505') {
+          const retryId = `USR${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+          cleanData.id = retryId;
+          const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .insert([cleanData])
+            .select()
+            .single();
+          if (retryError) {
+            LoggerService.error('重试创建用户依然失败:', retryError);
+            return null;
+          }
+          return retryData;
+        }
         return null;
       }
       return data;
     } catch (err) {
-      LoggerService.error('创建用户异常:', err);
+      LoggerService.error('创建用户异常 (服务层):', err);
       return null;
     }
   },

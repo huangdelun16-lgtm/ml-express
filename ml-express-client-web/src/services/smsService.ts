@@ -66,13 +66,14 @@ export async function verifyVerificationCode(
     });
     
     const result = await response.json();
+    LoggerService.debug('短信验证 API 返回结果:', result);
     
-    if (result.valid) {
+    if (result.success === true || result.valid === true) {
       return {
         success: true,
-        message: language === 'zh' ? '验证码正确' : 
+        message: result.message || (language === 'zh' ? '验证码正确' : 
                  language === 'en' ? 'Verification code is correct' :
-                 'အတည်ပြုကုဒ် မှန်ကန်ပါသည်'
+                 'အတည်ပြုကုဒ် မှန်ကန်ပါသည်')
       };
     } else {
       return {

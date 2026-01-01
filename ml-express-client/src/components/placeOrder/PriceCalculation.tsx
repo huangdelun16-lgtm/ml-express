@@ -51,6 +51,9 @@ const PriceCalculation = memo<PriceCalculationProps>(({
   pricingSettings,
   onCalculate,
 }) => {
+  // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
+  const billingDistance = useMemo(() => Math.max(1, Math.ceil(calculatedDistance)), [calculatedDistance]);
+
   const speedExtra = useMemo(() => {
     return deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0;
   }, [deliverySpeed, deliverySpeeds]);
@@ -64,28 +67,28 @@ const PriceCalculation = memo<PriceCalculationProps>(({
 
   const oversizeFee = useMemo(() => {
     if (packageType === '超规件（45x60x15cm）以上') {
-      return Math.round(calculatedDistance * pricingSettings.oversize_surcharge);
+      return Math.round(billingDistance * pricingSettings.oversize_surcharge);
     }
     return 0;
-  }, [packageType, calculatedDistance, pricingSettings.oversize_surcharge]);
+  }, [packageType, billingDistance, pricingSettings.oversize_surcharge]);
 
   const fragileFee = useMemo(() => {
     if (packageType === '易碎品') {
-      return Math.round(calculatedDistance * pricingSettings.fragile_surcharge);
+      return Math.round(billingDistance * pricingSettings.fragile_surcharge);
     }
     return 0;
-  }, [packageType, calculatedDistance, pricingSettings.fragile_surcharge]);
+  }, [packageType, billingDistance, pricingSettings.fragile_surcharge]);
 
   const foodFee = useMemo(() => {
     if (packageType === '食品和饮料') {
-      return Math.round(calculatedDistance * pricingSettings.food_beverage_surcharge);
+      return Math.round(billingDistance * pricingSettings.food_beverage_surcharge);
     }
     return 0;
-  }, [packageType, calculatedDistance, pricingSettings.food_beverage_surcharge]);
+  }, [packageType, billingDistance, pricingSettings.food_beverage_surcharge]);
 
   const distanceFee = useMemo(() => {
-    return Math.round(Math.max(0, calculatedDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee);
-  }, [calculatedDistance, pricingSettings.free_km_threshold, pricingSettings.per_km_fee]);
+    return Math.round(Math.max(0, billingDistance - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee);
+  }, [billingDistance, pricingSettings.free_km_threshold, pricingSettings.per_km_fee]);
 
   return (
     <ScaleInView delay={400}>
@@ -125,7 +128,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
             <>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>{currentT.distance}:</Text>
-                <Text style={styles.priceValue}>{calculatedDistance} {currentT.kmUnit}</Text>
+                <Text style={styles.priceValue}>{billingDistance} {currentT.kmUnit}</Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>

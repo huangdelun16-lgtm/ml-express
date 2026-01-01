@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import * as ReactWindow from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonTable } from '../components/SkeletonLoader';
+
+const AutoSizerComponent = AutoSizer as any;
+const ListComponent = (ReactWindow as any).FixedSizeList || (ReactWindow as any).List;
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -58,6 +63,535 @@ const REGIONS = [
   { id: 'lashio', name: '腊戌', prefix: 'LSO' },
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'active': return '#27ae60';
+    case 'inactive': return '#f39c12';
+    case 'suspended': return '#e74c3c';
+    default: return '#95a5a6';
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'active': return '活跃';
+    case 'inactive': return '非活跃';
+    case 'suspended': return '已暂停';
+    default: return status;
+  }
+};
+
+const getUserTypeText = (type: string) => {
+  switch (type) {
+    case 'customer': return 'Member';
+    case 'courier': return 'Courier';
+    case 'admin': return 'Admin';
+    default: return type;
+  }
+};
+
+const getUserTypeColor = (type: string) => {
+  switch (type) {
+    case 'customer': return '#3498db';
+    case 'courier': return '#9b59b6';
+    case 'admin': return '#e67e22';
+    default: return '#95a5a6';
+  }
+};
+
+const getVehicleIcon = (type: string) => {
+  switch (type) {
+    case 'motorcycle': return '🏍️';
+    case 'car': return '🚗';
+    case 'bicycle': return '🚲';
+    case 'truck': return '🚚';
+    case 'tricycle': return '🛺';
+    case 'small_truck': return '🚛';
+    default: return '🚚';
+  }
+};
+
+// 虚拟列表行组件 - 用户
+const UserRow = ({ index, style, ...data }: any) => {
+  const { 
+    filteredUsers, 
+    selectedUsers, 
+    handleSelectUser, 
+    isMobile, 
+    handleEditUser, 
+    updateUserStatus, 
+    handleDeleteUser 
+  } = data;
+  
+  const user = filteredUsers[index];
+  if (!user) return null;
+  
+  const isSelected = selectedUsers.has(user.id);
+  
+  return (
+    <div style={{ ...style, paddingBottom: '15px', boxSizing: 'border-box' }}>
+      <div 
+        key={user.id} 
+        style={{
+          background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+          borderRadius: '20px',
+          padding: isMobile ? '20px' : '28px',
+          border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: 'relative',
+          backdropFilter: 'blur(12px)',
+          boxShadow: isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)',
+          cursor: 'pointer',
+          height: '100%',
+          boxSizing: 'border-box'
+        }}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).parentElement?.tagName !== 'BUTTON') {
+            handleSelectUser(user.id);
+          }
+        }}
+      >
+        {/* Checkbox Badge */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSelectUser(user.id);
+          }}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            width: '24px',
+            height: '24px',
+            borderRadius: '6px',
+            border: isSelected ? 'none' : '2px solid rgba(255, 255, 255, 0.3)',
+            background: isSelected ? '#3498db' : 'rgba(255, 255, 255, 0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            zIndex: 10
+          }}
+        >
+          {isSelected && <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>✓</span>}
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '15px',
+          paddingRight: '40px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '1.3rem', fontWeight: 'bold' }}>
+                {user.name}
+              </h3>
+              <span style={{ 
+                background: 'rgba(255,255,255,0.1)', 
+                padding: '2px 8px', 
+                borderRadius: '6px', 
+                fontSize: '0.75rem', 
+                color: 'rgba(255,255,255,0.6)',
+                fontFamily: 'monospace'
+              }}>
+                {user.id}
+              </span>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.85rem' }}>
+              📅 注册: {user.registration_date} | 🔑 最后登录: {user.last_login}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {user.register_region && (
+              <div style={{
+                background: 'rgba(52, 152, 219, 0.2)',
+                color: '#3498db',
+                padding: '5px 15px',
+                borderRadius: '20px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold',
+                border: '1px solid rgba(52, 152, 219, 0.3)'
+              }}>
+                📍 {REGIONS.find(r => r.id === user.register_region)?.name || user.register_region}
+              </div>
+            )}
+            <div style={{
+              background: getUserTypeColor(user.user_type),
+              color: 'white',
+              padding: '5px 15px',
+              borderRadius: '20px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold'
+            }}>
+              {getUserTypeText(user.user_type)}
+            </div>
+            <div style={{
+              background: getStatusColor(user.status),
+              color: 'white',
+              padding: '5px 15px',
+              borderRadius: '20px',
+              fontSize: '0.9rem',
+              fontWeight: 'bold'
+            }}>
+              {getStatusText(user.status)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '20px',
+          marginBottom: '20px',
+          background: 'rgba(0,0,0,0.15)',
+          padding: '20px',
+          borderRadius: '15px'
+        }}>
+          <div>
+            <h4 style={{ color: '#3498db', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📞 联系信息</h4>
+            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>电话:</span>
+              <span style={{ fontWeight: 600 }}>{user.phone}</span>
+            </p>
+            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>邮箱:</span>
+              <span style={{ opacity: 0.9 }}>{user.email || '未绑定'}</span>
+            </p>
+            <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>地址:</span>
+              <span style={{ opacity: 0.8, lineHeight: '1.4' }}>{user.address || '未填写'}</span>
+            </p>
+          </div>
+          <div>
+            <h4 style={{ color: '#f1c40f', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📊 业务统计</h4>
+            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>订单总数:</span>
+              <span style={{ fontWeight: 700, color: '#3498db' }}>{user.total_orders}</span>
+            </p>
+            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>累计消费:</span>
+              <span style={{ fontWeight: 700, color: '#2ecc71' }}>{user.total_spent.toLocaleString()} MMK</span>
+            </p>
+            <p style={{ color: 'white', margin: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>综合评分:</span>
+              <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>⭐ {user.rating.toFixed(1)}</span>
+            </p>
+          </div>
+          <div>
+            <h4 style={{ color: '#e67e22', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📝 内部备注</h4>
+            <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '0.9rem', lineHeight: '1.6', fontStyle: user.notes ? 'normal' : 'italic' }}>
+              {user.notes || '暂无备注信息'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={() => handleEditUser(user)}
+            style={{
+              background: 'rgba(52, 152, 219, 0.2)',
+              color: '#3498db',
+              border: '1px solid rgba(52, 152, 219, 0.3)',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            ✏️ 编辑资料
+          </button>
+          <button
+            onClick={() => updateUserStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
+            style={{
+              background: user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)',
+              color: user.status === 'active' ? '#f39c12' : '#2ecc71',
+              border: '1px solid ' + (user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)'),
+              padding: '10px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            {user.status === 'active' ? '🚫 停用账户' : '✅ 启用账户'}
+          </button>
+          <button
+            onClick={() => updateUserStatus(user.id, 'suspended')}
+            style={{
+              background: 'rgba(231, 76, 60, 0.15)',
+              color: '#e74c3c',
+              border: '1px solid rgba(231, 76, 60, 0.25)',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            ⚠️ 暂停服务
+          </button>
+          <button
+            onClick={() => handleDeleteUser(user.id)}
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.4)',
+              border: 'none',
+              padding: '10px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            🗑️ 删除账户
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 虚拟列表行组件 - 快递员
+const CourierRow = ({ index, style, ...data }: any) => {
+  const { 
+    filteredCouriers, 
+    isMobile, 
+    handleEditCourier, 
+    handleCourierStatusChange, 
+    handleDeleteCourier 
+  } = data;
+  
+  const courier = filteredCouriers[index];
+  if (!courier) return null;
+  
+  return (
+    <div style={{ ...style, paddingBottom: '20px', boxSizing: 'border-box' }}>
+      <div 
+        key={courier.id} 
+        style={{ 
+          background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)', 
+          padding: '28px', 
+          borderRadius: '24px', 
+          border: '1px solid rgba(255, 255, 255, 0.15)', 
+          backdropFilter: 'blur(15px)',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: 'relative',
+          overflow: 'hidden',
+          height: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* 背景光晕装饰 */}
+        <div style={{
+          position: 'absolute',
+          top: '-20px',
+          right: '-20px',
+          width: '100px',
+          height: '100px',
+          background: 'rgba(59, 130, 246, 0.1)',
+          borderRadius: '50%',
+          filter: 'blur(30px)',
+          pointerEvents: 'none'
+        }}></div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1.5fr 1fr 1fr', gap: '32px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          {/* 个人信息栏 */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ 
+                width: '60px', 
+                height: '60px', 
+                borderRadius: '18px', 
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.4) 100%)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                fontSize: '2rem',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+              }}>
+                {getVehicleIcon(courier.vehicle_type)}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.5px' }}>{courier.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 700, fontFamily: 'monospace', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                    #{courier.employee_id || '-'}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{courier.position || '骑手'}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ color: 'white', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ background: 'rgba(255,255,255,0.1)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>📞</span> 
+                <span style={{ fontWeight: 600 }}>{courier.phone}</span>
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ background: 'rgba(255,255,255,0.05)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>📧</span> 
+                <span>{courier.email || '未设置邮箱'}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* 区域与地址 */}
+          <div style={{ paddingLeft: isMobile ? 0 : '20px', borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ color: '#60a5fa', fontSize: '1.1rem' }}>📍</span>
+              <span style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 700 }}>
+                {(() => {
+                  const r = REGIONS.find(reg => reg.id === courier.region || reg.prefix === courier.region);
+                  return r ? `${r.name} (${r.prefix})` : (courier.region || '-');
+                })()}
+              </span>
+            </div>
+            <p style={{ margin: '0 0 16px 0', color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', lineHeight: '1.6' }}>
+              {courier.address || '暂无详细地址'}
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                📅 入职: {courier.join_date}
+              </span>
+            </div>
+          </div>
+
+          {/* 业务数据 */}
+          <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>配送成就</p>
+                <p style={{ margin: 0, color: '#f59e0b', fontSize: '1.8rem', fontWeight: 900 }}>{courier.total_deliveries}</p>
+              </div>
+              <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>星级评价</p>
+                <p style={{ margin: 0, color: '#fbbf24', fontSize: '1.4rem', fontWeight: 900 }}>⭐ {courier.rating}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 状态与操作 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: isMobile ? 'flex-start' : 'flex-end' }}>
+            <div style={{ 
+              background: courier.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
+              color: courier.status === 'active' ? '#10b981' : '#f87171', 
+              padding: '8px 20px', 
+              borderRadius: '14px', 
+              fontSize: '0.9rem', 
+              fontWeight: 800,
+              border: `1px solid ${courier.status === 'active' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 10px currentColor' }}></span>
+              {courier.status === 'active' ? '在线中' : courier.status === 'inactive' ? '休假中' : '忙碌中'}
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => handleEditCourier(courier)} 
+                title="编辑业务信息"
+                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
+              >✏️</button>
+              <button 
+                onClick={() => handleCourierStatusChange(courier.id, courier.status === 'active' ? 'inactive' : 'active')} 
+                title={courier.status === 'active' ? '停用账号' : '启用账号'}
+                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)' }}
+              >{courier.status === 'active' ? '💤' : '⚡'}</button>
+              <button 
+                onClick={() => handleDeleteCourier(courier.id)} 
+                title="永久删除"
+                style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)' }}
+              >🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 虚拟列表行组件 - 合伙店铺
+const StoreRow = ({ index, style, ...data }: any) => {
+  const { partnerStores, isMobile } = data;
+  const store = partnerStores[index];
+  if (!store) return null;
+  
+  return (
+    <div style={{ ...style, paddingBottom: '15px', boxSizing: 'border-box' }}>
+      <div 
+        key={store.id} 
+        style={{
+          background: 'rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          padding: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          backdropFilter: 'blur(10px)',
+          transition: 'all 0.3s ease',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          height: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+            🏪 {store.store_name}
+          </h3>
+          <span style={{ 
+            background: store.status === 'active' ? 'rgba(39, 174, 96, 0.9)' : 'rgba(149, 165, 166, 0.9)', 
+            color: 'white', 
+            padding: '6px 12px', 
+            borderRadius: '20px', 
+            fontSize: '0.85rem',
+            fontWeight: '600',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            {store.status === 'active' ? '营业中' : '休息'}
+          </span>
+        </div>
+        
+        <div style={{ color: 'white', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.1rem' }}>📞</span>
+            <span style={{ fontWeight: 500 }}>{store.contact_phone || '无电话'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <span style={{ fontSize: '1.1rem' }}>📍</span>
+            <span style={{ lineHeight: '1.5', opacity: 0.9 }}>{store.address || '无地址'}</span>
+          </div>
+          {store.store_code && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <span style={{ opacity: 0.7 }}>代码:</span>
+              <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>{store.store_code}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -392,42 +926,6 @@ const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('更新用户状态异常:', error);
       setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u));
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#27ae60';
-      case 'inactive': return '#f39c12';
-      case 'suspended': return '#e74c3c';
-      default: return '#95a5a6';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return '活跃';
-      case 'inactive': return '非活跃';
-      case 'suspended': return '已暂停';
-      default: return status;
-    }
-  };
-
-  const getUserTypeText = (type: string) => {
-    switch (type) {
-      case 'customer': return 'Member';
-      case 'courier': return 'Courier';
-      case 'admin': return 'Admin';
-      default: return type;
-    }
-  };
-
-  const getUserTypeColor = (type: string) => {
-    switch (type) {
-      case 'customer': return '#3498db';
-      case 'courier': return '#9b59b6';
-      case 'admin': return '#e67e22';
-      default: return '#95a5a6';
     }
   };
 
@@ -788,18 +1286,6 @@ const UserManagement: React.FC = () => {
       case 'inactive': return '#e74c3c';
       case 'busy': return '#f39c12';
       default: return '#95a5a6';
-    }
-  };
-
-  const getVehicleIcon = (vehicleType: string) => {
-    switch (vehicleType) {
-      case 'motorcycle': return '🏍️';
-      case 'car': return '🚗';
-      case 'bicycle': return '🚲';
-      case 'truck': return '🚚';
-      case 'tricycle': return '🛺';
-      case 'small_truck': return '🚛';
-      default: return '🚚';
     }
   };
 
@@ -1211,8 +1697,9 @@ const UserManagement: React.FC = () => {
             </div>
           ) : (
             <div style={{
-              display: 'grid',
-              gap: '15px'
+              height: '75vh',
+              width: '100%',
+              position: 'relative'
             }}>
               {filteredUsers.length === 0 ? (
                 <div style={{ 
@@ -1229,293 +1716,27 @@ const UserManagement: React.FC = () => {
                   <p style={{ fontSize: '1.1rem', margin: 0, opacity: 0.6 }}>请尝试调整搜索关键词或筛选条件</p>
                 </div>
               ) : (
-                filteredUsers.map((user) => {
-                  const isSelected = selectedUsers.has(user.id);
-                  return (
-                    <div key={user.id} style={{
-                      background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                      borderRadius: '20px',
-                      padding: isMobile ? '20px' : '28px',
-                      border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      position: 'relative',
-                      backdropFilter: 'blur(12px)',
-                      boxShadow: isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)',
-                      cursor: 'pointer'
-                    }}
-                    onMouseOver={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                        e.currentTarget.style.transform = 'translateY(-3px)';
-                        e.currentTarget.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
-                      }
-                    }}
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).parentElement?.tagName !== 'BUTTON') {
-                        handleSelectUser(user.id);
-                      }
-                    }}
+                <AutoSizerComponent>
+                  {({ height, width }: any) => (
+                    <ListComponent
+                      height={height}
+                      itemCount={filteredUsers.length}
+                      itemSize={isMobile ? 540 : 480}
+                      width={width}
+                      itemData={{
+                        filteredUsers,
+                        selectedUsers,
+                        handleSelectUser,
+                        isMobile,
+                        handleEditUser,
+                        updateUserStatus,
+                        handleDeleteUser
+                      }}
                     >
-                      {/* Checkbox Badge */}
-                      <div 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectUser(user.id);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '16px',
-                          right: '16px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: isSelected ? 'none' : '2px solid rgba(255, 255, 255, 0.3)',
-                          background: isSelected ? '#3498db' : 'rgba(255, 255, 255, 0.05)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          zIndex: 10
-                        }}
-                      >
-                        {isSelected && <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>✓</span>}
-                      </div>
-
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: '15px',
-                        paddingRight: '40px'
-                      }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                          <h3 style={{ color: 'white', margin: 0, fontSize: '1.3rem', fontWeight: 'bold' }}>
-                            {user.name}
-                          </h3>
-                          <span style={{ 
-                            background: 'rgba(255,255,255,0.1)', 
-                            padding: '2px 8px', 
-                            borderRadius: '6px', 
-                            fontSize: '0.75rem', 
-                            color: 'rgba(255,255,255,0.6)',
-                            fontFamily: 'monospace'
-                          }}>
-                            {user.id}
-                          </span>
-                        </div>
-                        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.85rem' }}>
-                          📅 注册: {user.registration_date} | 🔑 最后登录: {user.last_login}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        {user.register_region && (
-                          <div style={{
-                            background: 'rgba(52, 152, 219, 0.2)',
-                            color: '#3498db',
-                            padding: '5px 15px',
-                            borderRadius: '20px',
-                            fontSize: '0.85rem',
-                            fontWeight: 'bold',
-                            border: '1px solid rgba(52, 152, 219, 0.3)'
-                          }}>
-                            📍 {REGIONS.find(r => r.id === user.register_region)?.name || user.register_region}
-                          </div>
-                        )}
-                        <div style={{
-                          background: getUserTypeColor(user.user_type),
-                          color: 'white',
-                          padding: '5px 15px',
-                          borderRadius: '20px',
-                          fontSize: '0.9rem',
-                          fontWeight: 'bold'
-                        }}>
-                          {getUserTypeText(user.user_type)}
-                        </div>
-                        <div style={{
-                          background: getStatusColor(user.status),
-                          color: 'white',
-                          padding: '5px 15px',
-                          borderRadius: '20px',
-                          fontSize: '0.9rem',
-                          fontWeight: 'bold'
-                        }}>
-                          {getStatusText(user.status)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '20px',
-                      marginBottom: '20px',
-                      background: 'rgba(0,0,0,0.15)',
-                      padding: '20px',
-                      borderRadius: '15px'
-                    }}>
-                      <div>
-                        <h4 style={{ color: '#3498db', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📞 联系信息</h4>
-                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>电话:</span>
-                          <span style={{ fontWeight: 600 }}>{user.phone}</span>
-                        </p>
-                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>邮箱:</span>
-                          <span style={{ opacity: 0.9 }}>{user.email || '未绑定'}</span>
-                        </p>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>地址:</span>
-                          <span style={{ opacity: 0.8, lineHeight: '1.4' }}>{user.address || '未填写'}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <h4 style={{ color: '#f1c40f', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📊 业务统计</h4>
-                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>订单总数:</span>
-                          <span style={{ fontWeight: 700, color: '#3498db' }}>{user.total_orders}</span>
-                        </p>
-                        <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>累计消费:</span>
-                          <span style={{ fontWeight: 700, color: '#2ecc71' }}>{user.total_spent.toLocaleString()} MMK</span>
-                        </p>
-                        <p style={{ color: 'white', margin: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>综合评分:</span>
-                          <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>⭐ {user.rating.toFixed(1)}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <h4 style={{ color: '#e67e22', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📝 内部备注</h4>
-                        <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '0.9rem', lineHeight: '1.6', fontStyle: user.notes ? 'normal' : 'italic' }}>
-                          {user.notes || '暂无备注信息'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 操作按钮 */}
-                    {/* 操作按钮 */}
-                    <div style={{
-                      display: 'flex',
-                      gap: '12px',
-                      flexWrap: 'wrap'
-                    }}>
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        style={{
-                          background: 'rgba(52, 152, 219, 0.2)',
-                          color: '#3498db',
-                          border: '1px solid rgba(52, 152, 219, 0.3)',
-                          padding: '10px 20px',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(52, 152, 219, 0.3)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(52, 152, 219, 0.2)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      >
-                        ✏️ 编辑资料
-                      </button>
-                      <button
-                        onClick={() => updateUserStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
-                        style={{
-                          background: user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)',
-                          color: user.status === 'active' ? '#f39c12' : '#2ecc71',
-                          border: '1px solid ' + (user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)'),
-                          padding: '10px 20px',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      >
-                        {user.status === 'active' ? '🚫 停用账户' : '✅ 启用账户'}
-                      </button>
-                      <button
-                        onClick={() => updateUserStatus(user.id, 'suspended')}
-                        style={{
-                          background: 'rgba(231, 76, 60, 0.15)',
-                          color: '#e74c3c',
-                          border: '1px solid rgba(231, 76, 60, 0.25)',
-                          padding: '10px 20px',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.25)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      >
-                        ⚠️ 暂停服务
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        style={{
-                          marginLeft: 'auto',
-                          background: 'transparent',
-                          color: 'rgba(255,255,255,0.4)',
-                          border: 'none',
-                          padding: '10px',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.color = '#e74c3c';
-                          e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        🗑️ 删除账户
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+                      {UserRow}
+                    </ListComponent>
+                  )}
+                </AutoSizerComponent>
               )}
             </div>
           )}
@@ -1969,52 +2190,23 @@ const UserManagement: React.FC = () => {
                暂无合伙店铺数据
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '15px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
-              {partnerStores.map((store: any) => (
-                <div key={store.id} style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                      🏪 {store.store_name}
-                    </h3>
-                    <span style={{ 
-                      background: store.status === 'active' ? 'rgba(39, 174, 96, 0.9)' : 'rgba(149, 165, 166, 0.9)', 
-                      color: 'white', 
-                      padding: '6px 12px', 
-                      borderRadius: '20px', 
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}>
-                      {store.status === 'active' ? '营业中' : '休息'}
-                    </span>
-                  </div>
-                  
-                  <div style={{ color: 'white', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '1.1rem' }}>📞</span>
-                      <span style={{ fontWeight: 500 }}>{store.contact_phone || '无电话'}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '1.1rem' }}>📍</span>
-                      <span style={{ lineHeight: '1.5', opacity: 0.9 }}>{store.address || '无地址'}</span>
-                    </div>
-                    {store.store_code && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <span style={{ opacity: 0.7 }}>代码:</span>
-                        <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>{store.store_code}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div style={{ height: '70vh', width: '100%' }}>
+              <AutoSizerComponent>
+                {({ height, width }: any) => (
+                  <ListComponent
+                    height={height}
+                    itemCount={partnerStores.length}
+                    itemSize={isMobile ? 260 : 220}
+                    width={width}
+                    itemData={{
+                      partnerStores,
+                      isMobile
+                    }}
+                  >
+                    {StoreRow}
+                  </ListComponent>
+                )}
+              </AutoSizerComponent>
             </div>
           )}
         </div>
@@ -2197,165 +2389,26 @@ const UserManagement: React.FC = () => {
                   border: '1px dashed rgba(255,255,255,0.1)'
                 }}>没有找到匹配的快递员</div>
               ) : (
-                <div style={{ display: 'grid', gap: '20px' }}>
-                  {filteredCouriers.map(courier => (
-                    <div 
-                      key={courier.id} 
-                      style={{ 
-                        background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)', 
-                        padding: '28px', 
-                        borderRadius: '24px', 
-                        border: '1px solid rgba(255, 255, 255, 0.15)', 
-                        backdropFilter: 'blur(15px)',
-                        boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
-                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-6px) scale(1.01)';
-                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
-                        e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-                        e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
-                      }}
-                    >
-                       {/* 背景光晕装饰 */}
-                       <div style={{
-                         position: 'absolute',
-                         top: '-20px',
-                         right: '-20px',
-                         width: '100px',
-                         height: '100px',
-                         background: 'rgba(59, 130, 246, 0.1)',
-                         borderRadius: '50%',
-                         filter: 'blur(30px)',
-                         pointerEvents: 'none'
-                       }}></div>
-
-                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1.5fr 1fr 1fr', gap: '32px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                          {/* 个人信息栏 */}
-                          <div>
-                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                               <div style={{ 
-                                 width: '60px', 
-                                 height: '60px', 
-                                 borderRadius: '18px', 
-                                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.4) 100%)', 
-                                 display: 'flex', 
-                                 alignItems: 'center', 
-                                 justifyContent: 'center',
-                                 fontSize: '2rem',
-                                 border: '1px solid rgba(59, 130, 246, 0.3)',
-                                 boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-                               }}>
-                                 {getVehicleIcon(courier.vehicle_type)}
-                               </div>
-                               <div>
-                                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.5px' }}>{courier.name}</h3>
-                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                                   <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 700, fontFamily: 'monospace', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
-                                     #{courier.employee_id || '-'}
-                                   </span>
-                                   <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{courier.position || '骑手'}</span>
-                                 </div>
-                               </div>
-                             </div>
-                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                               <div style={{ color: 'white', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                 <span style={{ background: 'rgba(255,255,255,0.1)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>📞</span> 
-                                 <span style={{ fontWeight: 600 }}>{courier.phone}</span>
-                               </div>
-                               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                 <span style={{ background: 'rgba(255,255,255,0.05)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>📧</span> 
-                                 <span>{courier.email || '未设置邮箱'}</span>
-                               </div>
-                             </div>
-                          </div>
-                          
-                          {/* 区域与地址 */}
-                          <div style={{ paddingLeft: isMobile ? 0 : '20px', borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
-                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                               <span style={{ color: '#60a5fa', fontSize: '1.1rem' }}>📍</span>
-                               <span style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 700 }}>
-                                 {(() => {
-                                   const r = REGIONS.find(reg => reg.id === courier.region || reg.prefix === courier.region);
-                                   return r ? `${r.name} (${r.prefix})` : (courier.region || '-');
-                                 })()}
-                               </span>
-                             </div>
-                             <p style={{ margin: '0 0 16px 0', color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                               {courier.address || '暂无详细地址'}
-                             </p>
-                             <div style={{ display: 'flex', gap: '10px' }}>
-                               <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                 📅 入职: {courier.join_date}
-                               </span>
-                             </div>
-                          </div>
-
-                          {/* 业务数据 */}
-                          <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                               <div>
-                                 <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>配送成就</p>
-                                 <p style={{ margin: 0, color: '#f59e0b', fontSize: '1.8rem', fontWeight: 900 }}>{courier.total_deliveries}</p>
-                               </div>
-                               <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                 <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>星级评价</p>
-                                 <p style={{ margin: 0, color: '#fbbf24', fontSize: '1.4rem', fontWeight: 900 }}>⭐ {courier.rating}</p>
-                               </div>
-                             </div>
-                          </div>
-
-                          {/* 状态与操作 */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: isMobile ? 'flex-start' : 'flex-end' }}>
-                             <div style={{ 
-                               background: courier.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
-                               color: courier.status === 'active' ? '#10b981' : '#f87171', 
-                               padding: '8px 20px', 
-                               borderRadius: '14px', 
-                               fontSize: '0.9rem', 
-                               fontWeight: 800,
-                               border: `1px solid ${courier.status === 'active' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                               display: 'flex',
-                               alignItems: 'center',
-                               gap: '8px'
-                             }}>
-                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 10px currentColor' }}></span>
-                                {courier.status === 'active' ? '在线中' : courier.status === 'inactive' ? '休假中' : '忙碌中'}
-                             </div>
-                             <div style={{ display: 'flex', gap: '12px' }}>
-                                <button 
-                                  onClick={() => handleEditCourier(courier)} 
-                                  title="编辑业务信息"
-                                  style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)' }}
-                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                >✏️</button>
-                                <button 
-                                  onClick={() => handleCourierStatusChange(courier.id, courier.status === 'active' ? 'inactive' : 'active')} 
-                                  title={courier.status === 'active' ? '停用账号' : '启用账号'}
-                                  style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)' }}
-                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                >{courier.status === 'active' ? '💤' : '⚡'}</button>
-                                <button 
-                                  onClick={() => handleDeleteCourier(courier.id)} 
-                                  title="永久删除"
-                                  style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)' }}
-                                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                >🗑️</button>
-                             </div>
-                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 600 }}>最后活跃: {courier.last_active}</p>
-                          </div>
-                       </div>
-                    </div>
-                  ))}
+                <div style={{ height: '75vh', width: '100%' }}>
+                  <AutoSizerComponent>
+                    {({ height, width }: any) => (
+                      <ListComponent
+                        height={height}
+                        itemCount={filteredCouriers.length}
+                        itemSize={isMobile ? 650 : 350}
+                        width={width}
+                        itemData={{
+                          filteredCouriers,
+                          isMobile,
+                          handleEditCourier,
+                          handleCourierStatusChange,
+                          handleDeleteCourier
+                        }}
+                      >
+                        {CourierRow}
+                      </ListComponent>
+                    )}
+                  </AutoSizerComponent>
                 </div>
               )}
             </div>

@@ -744,7 +744,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
       // 领区映射逻辑（与ID生成一致）
       const regionMap: { [key: string]: string } = {
         '曼德勒': 'mandalay', 'Mandalay': 'mandalay', 'မန္တလေး': 'mandalay',
-        '眉苗': 'maymyo', 'Pyin Oo Lwin': 'maymyo', '彬乌伦': 'maymyo', 'ပင်းတလဲ': 'maymyo',
+        '彬乌伦': 'maymyo', 'Pyin Oo Lwin': 'maymyo', 'ပင်းတလဲ': 'maymyo',
         '仰光': 'yangon', 'Yangon': 'yangon', 'ရန်ကုန်': 'yangon',
         '内比都': 'naypyidaw', 'NPW': 'naypyidaw', 'နေပြည်တော်': 'naypyidaw',
         '东枝': 'taunggyi', 'TGI': 'taunggyi', 'တောင်ကြီး': 'taunggyi',
@@ -1179,7 +1179,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         // 🚀 注意：必须将具体的小城市放在前面，将“曼德勒”等大省份名称放在后面，
         // 否则“彬乌伦 曼德勒省”会因为包含“曼德勒”而错误识别为 MDY
         const cityPrefixMap: { [key: string]: string } = {
-          '眉苗': 'POL', 'Pyin Oo Lwin': 'POL', '彬乌伦': 'POL', 'ပင်းတလဲ': 'POL',
+          '彬乌伦': 'POL', 'Pyin Oo Lwin': 'POL', 'ပင်းတလဲ': 'POL',
           '内比都': 'NPW', 'Naypyidaw': 'NPW', 'နေပြည်တော်': 'NPW',
           '东枝': 'TGI', 'Taunggyi': 'TGI', 'တောင်ကြီး': 'TGI',
           '腊戌': 'LSO', 'Lashio': 'LSO', 'လားရှိုး': 'LSO',

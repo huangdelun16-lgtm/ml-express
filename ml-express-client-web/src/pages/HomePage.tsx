@@ -310,7 +310,7 @@ const HomePage: React.FC = () => {
 
       const regionMap: { [key: string]: string } = {
         '曼德勒': 'mandalay', 'Mandalay': 'mandalay', 'မန္တလေး': 'mandalay',
-        '眉苗': 'maymyo', 'Pyin Oo Lwin': 'maymyo', '彬乌伦': 'maymyo', 'ပင်းတလဲ': 'maymyo',
+        '彬乌伦': 'maymyo', 'Pyin Oo Lwin': 'maymyo', 'ပင်းတလဲ': 'maymyo',
         '仰光': 'yangon', 'Yangon': 'yangon', 'ရန်ကုန်': 'yangon',
         '内比都': 'naypyidaw', 'NPW': 'naypyidaw', 'နေပြည်တော်': 'naypyidaw',
         '东枝': 'taunggyi', 'TGI': 'taunggyi', 'တောင်ကြီး': 'taunggyi',
@@ -540,12 +540,6 @@ const HomePage: React.FC = () => {
         }
 
         if (!existingUser) {
-          console.error('登录失败：未找到用户', {
-            account: registerForm.email || normalizedPhone,
-            verificationType: currentVerificationType,
-            error: '用户不存在或查询失败'
-          });
-          
           alert(language === 'zh' ? '该账号未注册，请先注册' : language === 'en' ? 'Account not registered, please register first' : 'အကောင့်မရှိပါ၊ မှတ်ပုံတင်ပါ');
           setIsLoginMode(false);
           return;
@@ -605,19 +599,28 @@ const HomePage: React.FC = () => {
         let verifyResult;
         if (verificationType === 'email') {
           const { verifyEmailCode } = await import('../services/emailService');
+          console.log('正在调用邮箱验证服务，邮箱:', registerForm.email, '验证码:', registerForm.verificationCode);
           verifyResult = await verifyEmailCode(registerForm.email, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
         } else {
           const { verifyVerificationCode } = await import('../services/smsService');
+          console.log('正在调用短信验证服务，手机:', normalizedPhone, '验证码:', registerForm.verificationCode);
           verifyResult = await verifyVerificationCode(normalizedPhone, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
         }
         
+        console.log('验证服务返回结果:', verifyResult);
+        
         if (!verifyResult.success) {
+          console.error('验证码验证失败:', verifyResult.message);
           alert(verifyResult.message);
           return;
         }
 
-        // 检查邮箱是否已存在
+        console.log('验证码验证通过，准备检查邮箱是否已存在...');
+
+        // 再次检查邮箱是否已存在（防止并发注册）
+        // 这里使用之前查询的结果，如果之前没查到，这里 existingUser 应该为 null
         if (existingUser) {
+          console.warn('账号已存在，跳转到登录:', existingUser.email || existingUser.phone);
           alert(language === 'zh' ? '该邮箱已注册，请直接登录' : 
                 language === 'en' ? 'Email already registered, please login' : 
                 'အီးမေးလ်မှတ်ပုံတင်ပြီးပါပြီ၊ ဝင်ပါ');
@@ -625,19 +628,25 @@ const HomePage: React.FC = () => {
           return;
         }
 
+        console.log('账号不存在，开始创建新用户...');
+
         // 创建新用户（使用邮箱）
         const newUser = await userService.createCustomer({
-          ...registerForm,
-          phone: registerForm.phone || '', // 手机号可选
-          email: registerForm.email, // 邮箱必填
-          password: registerForm.password // 添加密码字段
+          name: registerForm.name,
+          phone: registerForm.phone || '',
+          email: registerForm.email,
+          address: registerForm.address || '',
+          password: registerForm.password
         });
+        
+        console.log('创建用户返回结果:', newUser);
         
         if (newUser) {
           setCurrentUser(newUser);
           localStorage.setItem('ml-express-customer', JSON.stringify(newUser));
           setShowRegisterModal(false);
           setShowOrderForm(true);
+          console.log('注册成功，已保存用户信息');
           alert(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : 
                 language === 'en' ? 'Registration successful! Welcome to Myanmar Express' : 
                 'မှတ်ပုံတင်ခြင်း အောင်မြင်ပါသည်!');
@@ -647,6 +656,7 @@ const HomePage: React.FC = () => {
           setCodeSent(false);
           setCountdown(0);
         } else {
+          console.error('注册失败：userService.createCustomer 返回 null');
           alert(language === 'zh' ? '注册失败，请稍后重试' : 
                 language === 'en' ? 'Registration failed, please try again later' : 
                 'မှတ်ပုံတင်ခြင်း မအောင်မြင်ပါ');
@@ -1528,10 +1538,9 @@ const HomePage: React.FC = () => {
     // 根据寄件地址自动识别城市前缀（优先级从高到低）
     // 🚀 核心修复：将具体城市（如 POL）放在前面，通用名称（如 MDY 曼德勒省）放在最后
     const cityPrefixMap: { [key: string]: string } = {
-      // 眉苗 / 彬乌伦
-      '眉苗': 'POL',
-      'Pyin Oo Lwin': 'POL',
+      // 彬乌伦
       '彬乌伦': 'POL',
+      'Pyin Oo Lwin': 'POL',
       'ပင်းတလဲ': 'POL',
       // 内比都（开发中）
       '内比都': 'NPW',
@@ -1559,7 +1568,7 @@ const HomePage: React.FC = () => {
       'မန္တလေး': 'MDY'
     };
     
-    // 判断城市前缀
+    // 🚀 修正：不再依赖 selectedCity 状态，而是根据地址文本自动检测
     let prefix = 'MDY'; // 默认曼德勒
     if (senderAddress) {
       for (const [city, cityPrefix] of Object.entries(cityPrefixMap)) {

@@ -601,7 +601,7 @@ CREATE TABLE pending_orders (
 
 **更新内容**:
 - ✅ 更新城市前缀映射，以曼德勒为中心
-- ✅ 支持的城市：曼德勒(MDY)、眉苗(POL)、仰光(YGN)、内比都(NPW)、东枝(TGI)、腊戌(LSO)、木姐(MSE)
+- ✅ 支持的城市：曼德勒(MDY)、彬乌伦(POL)、仰光(YGN)、内比都(NPW)、东枝(TGI)、腊戌(LSO)、木姐(MSE)
 - ✅ 客户端Web根据寄件地址自动识别城市前缀
 - ✅ 客户端App和后台管理Web使用城市选择
 

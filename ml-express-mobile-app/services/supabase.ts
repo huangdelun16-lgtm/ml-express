@@ -87,8 +87,9 @@ export interface Package {
   rider_settled_at?: string; // 骑手结清时间
   // 费用明细字段
   store_fee?: string | number; // 待付款（店铺填写）
-  delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
-}
+    delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
+    delivery_distance?: number; // 配送距离 (KM)
+  }
 
 export interface AdminAccount {
   id?: string;

@@ -365,10 +365,11 @@ const HomePage: React.FC = () => {
 
         // 创建新用户（使用邮箱）
         const newUser = await userService.createCustomer({
-          ...registerForm,
-          phone: registerForm.phone || '', // 手机号可选
-          email: registerForm.email, // 邮箱必填
-          password: registerForm.password // 添加密码字段
+          name: registerForm.name,
+          phone: registerForm.phone || '',
+          email: registerForm.email,
+          address: registerForm.address || '',
+          password: registerForm.password
         });
         
         if (newUser) {

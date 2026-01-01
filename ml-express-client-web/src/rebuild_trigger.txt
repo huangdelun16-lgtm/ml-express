@@ -1,1 +1,7 @@
-rebuild-trigger-Sun Dec 28 12:06:38 +0630 2025
+Manual rebuild trigger after fixing registration and virtual scrolling.
+Timestamp: 2026-01-01 07:45:00
+Changes: 
+- Fixed Client Web registration logic (id generation, field filtering)
+- Optimized Admin Web table rendering with virtual scrolling
+- Fixed email/sms verification result handling
+- Corrected database insertion fields for new users
