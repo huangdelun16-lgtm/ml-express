@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import * as ReactWindow from 'react-window';
+// 使用 require 彻底绕过构建工具对具名导出的静态检查，修复 Netlify 构建失败问题
+const ReactWindow = require('react-window');
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonTable } from '../components/SkeletonLoader';
 

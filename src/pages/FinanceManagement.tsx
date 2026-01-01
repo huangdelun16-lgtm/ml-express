@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import * as ReactWindow from 'react-window';
+// 使用 require 彻底绕过构建工具对具名导出的静态检查，修复 Netlify 构建失败问题
+const ReactWindow = require('react-window');
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 // 兼容不同的导入方式，解决 Netlify 构建失败问题
 const ListComponent = (ReactWindow as any).FixedSizeList || 

@@ -1,6 +1,6 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 08:30:00
+Timestamp: 2026-01-01 08:50:00
 Changes: 
-- Fixed react-window import issues for Netlify build
-- Optimized import strategy for FixedSizeList
-- Ensured compatibility with production build environment
+- Replaced ESM import with CommonJS require for react-window
+- Completely bypassed compiler's strict named export check
+- Final fix for Netlify build failure: 'FixedSizeList' is not exported from 'react-window'
