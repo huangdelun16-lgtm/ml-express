@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 12:00:00
+Timestamp: 2026-01-01 13:00:00
 Changes: 
-- Synchronized Partner Store data fields in User Management with official Store Management page
-- Switched display from contact_phone to standard phone field
-- Removed redundant ID display from Store cards
-- Improved data consistency across the administrative dashboard
+- Implemented 'Universal' (万能) label for records created by the admin account
+- Synchronized 'Work Region' display with creator identity in Finance Management
+- Enhanced region detection logic to support global admin role
+- Updated translations for regional labels across all supported languages

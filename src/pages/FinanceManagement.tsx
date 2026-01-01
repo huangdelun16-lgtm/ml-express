@@ -340,6 +340,9 @@ const FinanceManagement: React.FC = () => {
   const getRecordRegion = (createdBy?: string) => {
     if (!createdBy) return '—';
     
+    // 0. 特殊处理 admin 万能账号
+    if (createdBy.toLowerCase() === 'admin') return t.universal;
+    
     // 1. 先通过前缀快速识别 (MDY, YGN, POL)
     const userUpper = createdBy.toUpperCase();
     if (userUpper.startsWith('YGN')) return 'YGN';
@@ -354,12 +357,19 @@ const FinanceManagement: React.FC = () => {
         (acc.id && acc.id.toLowerCase() === createdBy.toLowerCase())
       );
       
-      if (account && account.region) {
-        const r = account.region.toLowerCase();
-        if (r === 'mandalay' || r === 'mdy') return 'MDY';
-        if (r === 'yangon' || r === 'ygn') return 'YGN';
-        if (r === 'maymyo' || r === 'pol') return 'POL';
-        return account.region.toUpperCase();
+      if (account) {
+        // 如果账号角色是超级管理员，也显示万能
+        if (account.role === 'admin' && account.username.toLowerCase() === 'admin') {
+          return t.universal;
+        }
+
+        if (account.region) {
+          const r = account.region.toLowerCase();
+          if (r === 'mandalay' || r === 'mdy') return 'MDY';
+          if (r === 'yangon' || r === 'ygn') return 'YGN';
+          if (r === 'maymyo' || r === 'pol') return 'POL';
+          return account.region.toUpperCase();
+        }
       }
     }
 
