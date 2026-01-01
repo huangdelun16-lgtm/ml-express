@@ -491,52 +491,127 @@ const StoreRow = ({ store, isMobile }: any) => {
   if (!store) return null;
   
   return (
-    <div style={{ paddingBottom: '15px', boxSizing: 'border-box' }}>
+    <div style={{ paddingBottom: '20px', boxSizing: 'border-box' }}>
       <div 
         key={store.id} 
         style={{
-          background: 'rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          padding: '24px',
+          background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
+          borderRadius: '24px',
+          padding: '28px',
           border: '1px solid rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(10px)',
-          transition: 'all 0.3s ease',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          backdropFilter: 'blur(15px)',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
+          position: 'relative',
+          overflow: 'hidden',
           boxSizing: 'border-box'
         }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+          e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0) scale(1)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-            🏪 {store.store_name}
-          </h3>
-          <span style={{ 
-            background: store.status === 'active' ? 'rgba(39, 174, 96, 0.9)' : 'rgba(149, 165, 166, 0.9)', 
-            color: 'white', 
-            padding: '6px 12px', 
-            borderRadius: '20px', 
-            fontSize: '0.85rem',
-            fontWeight: '600',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            {store.status === 'active' ? '营业中' : '休息'}
-          </span>
-        </div>
-        
-        <div style={{ color: 'white', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.1rem' }}>📞</span>
-            <span style={{ fontWeight: 500 }}>{store.contact_phone || '无电话'}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <span style={{ fontSize: '1.1rem' }}>📍</span>
-            <span style={{ lineHeight: '1.5', opacity: 0.9 }}>{store.address || '无地址'}</span>
-          </div>
-          {store.store_code && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ opacity: 0.7 }}>代码:</span>
-              <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold', letterSpacing: '1px' }}>{store.store_code}</span>
+        {/* 背景装饰光晕 */}
+        <div style={{
+          position: 'absolute',
+          top: '-50px',
+          right: '-50px',
+          width: '150px',
+          height: '150px',
+          background: store.status === 'active' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(148, 163, 184, 0.1)',
+          borderRadius: '50%',
+          filter: 'blur(40px)',
+          pointerEvents: 'none'
+        }}></div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 2fr 1fr', gap: '32px', alignItems: 'center' }}>
+          {/* 店铺名称与状态 */}
+          <div style={{ borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', paddingRight: isMobile ? 0 : '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ 
+                width: '50px', 
+                height: '50px', 
+                borderRadius: '16px', 
+                background: 'rgba(255,255,255,0.1)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                fontSize: '1.8rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}>🏪</div>
+              <div>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.5px' }}>{store.store_name}</h3>
+                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>ID: {store.id}</span>
+              </div>
             </div>
-          )}
+            <div style={{ 
+              background: store.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(148, 163, 184, 0.2)',
+              color: store.status === 'active' ? '#4ade80' : '#94a3b8',
+              padding: '8px 16px',
+              borderRadius: '12px',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: `1px solid ${store.status === 'active' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
+            }}>
+              <span style={{ 
+                width: '8px', 
+                height: '8px', 
+                borderRadius: '50%', 
+                background: store.status === 'active' ? '#22c55e' : '#94a3b8',
+                boxShadow: store.status === 'active' ? '0 0 10px #22c55e' : 'none'
+              }}></span>
+              {store.status === 'active' ? '正在营业' : '暂停营业'}
+            </div>
+          </div>
+
+          {/* 店铺详细信息 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ background: 'rgba(255,255,255,0.1)', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📞</span>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>联系电话</p>
+                <p style={{ margin: 0, color: 'white', fontWeight: 600, fontSize: '1rem' }}>{store.contact_phone || '尚未绑定'}</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <span style={{ background: 'rgba(255,255,255,0.1)', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</span>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>详细地址</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', lineHeight: '1.5' }}>{store.address || '尚未填写地址'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 店铺代码 */}
+          <div style={{ 
+            background: 'rgba(0,0,0,0.2)', 
+            padding: '20px', 
+            borderRadius: '20px', 
+            textAlign: 'center', 
+            border: '1px solid rgba(255,255,255,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center'
+          }}>
+            <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase' }}>店铺专属代码</p>
+            <span style={{ 
+              fontFamily: 'monospace', 
+              color: '#60a5fa', 
+              fontSize: '1.4rem', 
+              fontWeight: 900, 
+              letterSpacing: '2px',
+              textShadow: '0 0 15px rgba(96, 165, 250, 0.3)'
+            }}>{store.store_code || 'N/A'}</span>
+          </div>
         </div>
       </div>
     </div>

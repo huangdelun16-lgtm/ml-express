@@ -347,22 +347,24 @@ const FinanceManagement: React.FC = () => {
     if (userUpper.startsWith('MDY')) return 'MDY';
     
     // 2. 如果前缀识别不到，从账号列表中查找该用户的 region 字段
-    // 确保查找是区分大小写的或统一转换
-    const account = adminAccounts.find(acc => 
-      acc.username?.toLowerCase() === createdBy.toLowerCase()
-    );
-    
-    if (account && account.region) {
-      const r = account.region.toLowerCase();
-      if (r === 'mandalay' || r === 'mdy') return 'MDY';
-      if (r === 'yangon' || r === 'ygn') return 'YGN';
-      if (r === 'maymyo' || r === 'pol') return 'POL';
-      return account.region.toUpperCase();
+    // 确保 adminAccounts 已经加载
+    if (adminAccounts && adminAccounts.length > 0) {
+      const account = adminAccounts.find(acc => 
+        (acc.username && acc.username.toLowerCase() === createdBy.toLowerCase()) ||
+        (acc.id && acc.id.toLowerCase() === createdBy.toLowerCase())
+      );
+      
+      if (account && account.region) {
+        const r = account.region.toLowerCase();
+        if (r === 'mandalay' || r === 'mdy') return 'MDY';
+        if (r === 'yangon' || r === 'ygn') return 'YGN';
+        if (r === 'maymyo' || r === 'pol') return 'POL';
+        return account.region.toUpperCase();
+      }
     }
 
-    // 3. 特殊回退：如果是超级管理员创建的，或者当前页面顶部已经显示了领区
-    // 且没有其他识别方式，可以考虑显示当前领区（作为兜底）
-    if (currentRegionPrefix) {
+    // 3. 特殊逻辑：如果创建者就是当前登录用户，且没有识别出来，使用当前检测到的领区
+    if (createdBy.toLowerCase() === currentUser.toLowerCase() && currentRegionPrefix) {
       return currentRegionPrefix;
     }
     
