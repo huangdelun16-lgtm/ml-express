@@ -336,7 +336,16 @@ const FinanceManagement: React.FC = () => {
   };
   const t: TranslationKeys = (financeTranslations[language as string] || financeTranslations.zh) as TranslationKeys;
 
-  
+  // 获取记录创建者的工作地区
+  const getRecordRegion = (createdBy?: string) => {
+    if (!createdBy) return '—';
+    const userUpper = createdBy.toUpperCase();
+    if (userUpper.startsWith('YGN')) return 'YGN';
+    if (userUpper.startsWith('POL')) return 'POL';
+    if (userUpper.startsWith('MDY')) return 'MDY';
+    return '—';
+  };
+
   // 根据时间周期获取天数
   const getDaysFromPeriod = (period: typeof timePeriod): number | null => {
     switch (period) {
@@ -1647,7 +1656,7 @@ const FinanceManagement: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', minWidth: '1200px' }}>
                 <thead>
                   <tr style={{ background: 'rgba(8, 32, 64, 0.8)', borderBottom: '2px solid rgba(255, 255, 255, 0.1)' }}>
-                    {[t.recordId, t.type, t.category, t.amount, t.currency, t.status, t.orderCourier, t.date, t.notes, t.actions].map((header) => (
+                    {[t.recordId, t.type, t.category, t.amount, t.currency, t.status, t.orderCourier, t.date, t.workRegion, t.notes, t.actions].map((header) => (
                       <th key={header} style={{ padding: '14px', textAlign: 'left', fontWeight: 600, fontSize: '0.95rem' }}>
                         {header}
                       </th>
@@ -1657,14 +1666,14 @@ const FinanceManagement: React.FC = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '48px' }}>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '48px' }}>
                         <div className="spinner" style={{ marginBottom: '16px' }}></div>
                         {t.loadingData}
                       </td>
                     </tr>
                   ) : filteredRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '80px 24px' }}>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '80px 24px' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.5 }}>📝</div>
                         <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '1.2rem', fontWeight: 500 }}>
                           {t.noRecords}
@@ -1730,6 +1739,16 @@ const FinanceManagement: React.FC = () => {
                           </div>
                         </td>
                         <td style={{ padding: '14px', fontSize: '0.85rem' }}>{record.record_date}</td>
+                        <td style={{ padding: '14px', fontSize: '0.9rem', fontWeight: 600 }}>
+                          <span style={{ 
+                            background: 'rgba(255, 255, 255, 0.1)', 
+                            padding: '4px 10px', 
+                            borderRadius: '6px',
+                            color: '#4facfe'
+                          }}>
+                            {getRecordRegion(record.created_by)}
+                          </span>
+                        </td>
                         <td style={{ padding: '14px', maxWidth: '300px' }}>
                           <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)' }}>{record.notes || '—'}</div>
                           {record.reference && (
