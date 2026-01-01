@@ -339,10 +339,23 @@ const FinanceManagement: React.FC = () => {
   // 获取记录创建者的工作地区
   const getRecordRegion = (createdBy?: string) => {
     if (!createdBy) return '—';
+    
+    // 1. 先通过前缀快速识别
     const userUpper = createdBy.toUpperCase();
     if (userUpper.startsWith('YGN')) return 'YGN';
     if (userUpper.startsWith('POL')) return 'POL';
     if (userUpper.startsWith('MDY')) return 'MDY';
+    
+    // 2. 如果前缀识别不到，从账号列表中查找该用户的 region 字段
+    const account = adminAccounts.find(acc => acc.username === createdBy);
+    if (account && account.region) {
+      const r = account.region.toLowerCase();
+      if (r === 'mandalay' || r === 'mdy') return 'MDY';
+      if (r === 'yangon' || r === 'ygn') return 'YGN';
+      if (r === 'maymyo' || r === 'pol') return 'POL';
+      return account.region.toUpperCase();
+    }
+    
     return '—';
   };
 
@@ -1739,15 +1752,21 @@ const FinanceManagement: React.FC = () => {
                           </div>
                         </td>
                         <td style={{ padding: '14px', fontSize: '0.85rem' }}>{record.record_date}</td>
-                        <td style={{ padding: '14px', fontSize: '0.9rem', fontWeight: 600 }}>
-                          <span style={{ 
-                            background: 'rgba(255, 255, 255, 0.1)', 
+                        <td style={{ padding: '14px' }}>
+                          <div style={{ 
+                            background: getRecordRegion(record.created_by) === '—' ? 'rgba(255, 255, 255, 0.05)' : '#48bb78', 
+                            color: 'white', 
                             padding: '4px 10px', 
-                            borderRadius: '6px',
-                            color: '#4facfe'
+                            borderRadius: '8px', 
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            display: 'inline-block',
+                            minWidth: '45px',
+                            textAlign: 'center',
+                            boxShadow: getRecordRegion(record.created_by) === '—' ? 'none' : '0 2px 6px rgba(0,0,0,0.2)'
                           }}>
                             {getRecordRegion(record.created_by)}
-                          </span>
+                          </div>
                         </td>
                         <td style={{ padding: '14px', maxWidth: '300px' }}>
                           <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)' }}>{record.notes || '—'}</div>

@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 09:45:00
+Timestamp: 2026-01-01 10:00:00
 Changes: 
-- Added 'Work Region' column to Finance Records table
-- Fixed missing translation properties to resolve Netlify build error (TS2741)
-- Implemented smart region detection based on account prefixes
-- Synchronized translations across Chinese, English, and Burmese
+- Enhanced 'Work Region' detection logic in Finance Records
+- Region labels now display as green badges matching the top indicator
+- Implemented account-based region lookup for creators without username prefixes
+- Improved visual clarity for regional financial record tracking
