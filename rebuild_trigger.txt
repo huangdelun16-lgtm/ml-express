@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 09:30:00
+Timestamp: 2026-01-01 09:45:00
 Changes: 
-- Removed Excel and PDF export buttons from Finance Management
-- Reverted Finance Records table to standard rendering for reliability
-- Kept performance optimizations for other management pages
-- Cleaned up unused virtual list code in Finance page
+- Added 'Work Region' column to Finance Records table
+- Fixed missing translation properties to resolve Netlify build error (TS2741)
+- Implemented smart region detection based on account prefixes
+- Synchronized translations across Chinese, English, and Burmese
