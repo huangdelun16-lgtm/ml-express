@@ -4,7 +4,11 @@ import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonTable } from '../components/SkeletonLoader';
 
 const AutoSizerComponent = AutoSizer as any;
-const ListComponent = (ReactWindow as any).FixedSizeList || (ReactWindow as any).List;
+// 兼容不同的导入方式，解决 Netlify 构建失败问题
+const ListComponent = (ReactWindow as any).FixedSizeList || 
+                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
+                     (ReactWindow as any).List;
+                     
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
