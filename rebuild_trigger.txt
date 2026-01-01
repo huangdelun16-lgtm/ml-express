@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 11:30:00
+Timestamp: 2026-01-01 12:00:00
 Changes: 
-- Enhanced visual design for Partner Store cards in User Management
-- Added modern gradients, glassmorphism effects, and hover animations
-- Improved information hierarchy and typography for store details
-- Synchronized card styles with the overall professional dashboard UI
+- Synchronized Partner Store data fields in User Management with official Store Management page
+- Switched display from contact_phone to standard phone field
+- Removed redundant ID display from Store cards
+- Improved data consistency across the administrative dashboard

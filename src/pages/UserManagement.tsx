@@ -547,7 +547,6 @@ const StoreRow = ({ store, isMobile }: any) => {
               }}>🏪</div>
               <div>
                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.5px' }}>{store.store_name}</h3>
-                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>ID: {store.id}</span>
               </div>
             </div>
             <div style={{ 
@@ -579,7 +578,7 @@ const StoreRow = ({ store, isMobile }: any) => {
               <span style={{ background: 'rgba(255,255,255,0.1)', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📞</span>
               <div>
                 <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>联系电话</p>
-                <p style={{ margin: 0, color: 'white', fontWeight: 600, fontSize: '1rem' }}>{store.contact_phone || '尚未绑定'}</p>
+                <p style={{ margin: 0, color: 'white', fontWeight: 600, fontSize: '1rem' }}>{store.phone || '尚未绑定'}</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
