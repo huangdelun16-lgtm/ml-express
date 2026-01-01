@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
-// 使用 require 彻底绕过构建工具对具名导出的静态检查，修复 Netlify 构建失败问题
-const ReactWindow = require('react-window');
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonTable } from '../components/SkeletonLoader';
-
-const AutoSizerComponent = AutoSizer as any;
-// 兼容不同的导入方式，解决 Netlify 构建失败问题
-const ListComponent = (ReactWindow as any).FixedSizeList || 
-                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
-                     (ReactWindow as any).List;
-                     
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
+
+// 使用 require 并放在所有 import 之后，修复 ESLint 的 import/first 报错
+const ReactWindow = require('react-window');
+
+const AutoSizerComponent = AutoSizer as any;
 
 // 用户数据类型定义
 interface User {

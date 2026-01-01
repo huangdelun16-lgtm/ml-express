@@ -1,13 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-// 使用 require 彻底绕过构建工具对具名导出的静态检查，修复 Netlify 构建失败问题
-const ReactWindow = require('react-window');
 import { AutoSizer } from 'react-virtualized-auto-sizer';
-// 兼容不同的导入方式，解决 Netlify 构建失败问题
-const ListComponent = (ReactWindow as any).FixedSizeList || 
-                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
-                     (ReactWindow as any).List;
-                     
-const AutoSizerComponent = AutoSizer as any;
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { TranslationKeys, translations as financeTranslations } from './FinanceManagement.translations';
@@ -32,6 +24,16 @@ import {
   ResponsiveContainer,
   ComposedChart
 } from 'recharts';
+
+// 使用 require 并放在所有 import 之后，修复 ESLint 的 import/first 报错
+const ReactWindow = require('react-window');
+
+// 兼容不同的导入方式，解决 Netlify 构建失败问题
+const ListComponent = (ReactWindow as any).FixedSizeList || 
+                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
+                     (ReactWindow as any).List;
+                     
+const AutoSizerComponent = AutoSizer as any;
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
