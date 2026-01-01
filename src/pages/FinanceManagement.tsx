@@ -340,20 +340,30 @@ const FinanceManagement: React.FC = () => {
   const getRecordRegion = (createdBy?: string) => {
     if (!createdBy) return '—';
     
-    // 1. 先通过前缀快速识别
+    // 1. 先通过前缀快速识别 (MDY, YGN, POL)
     const userUpper = createdBy.toUpperCase();
     if (userUpper.startsWith('YGN')) return 'YGN';
     if (userUpper.startsWith('POL')) return 'POL';
     if (userUpper.startsWith('MDY')) return 'MDY';
     
     // 2. 如果前缀识别不到，从账号列表中查找该用户的 region 字段
-    const account = adminAccounts.find(acc => acc.username === createdBy);
+    // 确保查找是区分大小写的或统一转换
+    const account = adminAccounts.find(acc => 
+      acc.username?.toLowerCase() === createdBy.toLowerCase()
+    );
+    
     if (account && account.region) {
       const r = account.region.toLowerCase();
       if (r === 'mandalay' || r === 'mdy') return 'MDY';
       if (r === 'yangon' || r === 'ygn') return 'YGN';
       if (r === 'maymyo' || r === 'pol') return 'POL';
       return account.region.toUpperCase();
+    }
+
+    // 3. 特殊回退：如果是超级管理员创建的，或者当前页面顶部已经显示了领区
+    // 且没有其他识别方式，可以考虑显示当前领区（作为兜底）
+    if (currentRegionPrefix) {
+      return currentRegionPrefix;
     }
     
     return '—';

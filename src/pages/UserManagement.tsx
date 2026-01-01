@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 
-// 使用 require 并放在所有 import 之后，修复 ESLint 的 import/first 报错
-const ReactWindow = require('react-window');
-
-// 兼容不同的导入方式，解决 Netlify 构建失败问题
-const ListComponent = (ReactWindow as any).FixedSizeList || 
-                     ((ReactWindow as any).default && (ReactWindow as any).default.FixedSizeList) || 
-                     (ReactWindow as any).List;
-
-const AutoSizerComponent = AutoSizer as any;
+// 移除虚拟滚动相关库，恢复标准渲染以提高稳定性
+// const ReactWindow = require('react-window');
+// const { AutoSizer } = require('react-virtualized-auto-sizer');
 
 // 用户数据类型定义
 interface User {
@@ -1722,14 +1715,13 @@ const UserManagement: React.FC = () => {
                   <p style={{ fontSize: '1.1rem', margin: 0, opacity: 0.6 }}>请尝试调整搜索关键词或筛选条件</p>
                 </div>
               ) : (
-                <AutoSizerComponent>
-                  {({ height, width }: any) => (
-                    <ListComponent
-                      height={height}
-                      itemCount={filteredUsers.length}
-                      itemSize={isMobile ? 540 : 480}
-                      width={width}
-                      itemData={{
+                <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
+                  {filteredUsers.map((_, index) => (
+                    <UserRow 
+                      key={filteredUsers[index].id}
+                      index={index} 
+                      style={{}} 
+                      data={{
                         filteredUsers,
                         selectedUsers,
                         handleSelectUser,
@@ -1738,11 +1730,9 @@ const UserManagement: React.FC = () => {
                         updateUserStatus,
                         handleDeleteUser
                       }}
-                    >
-                      {UserRow}
-                    </ListComponent>
-                  )}
-                </AutoSizerComponent>
+                    />
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -2135,7 +2125,7 @@ const UserManagement: React.FC = () => {
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  取消
+                  取消·
                 </button>
                 <button
                   type="submit"
@@ -2196,23 +2186,18 @@ const UserManagement: React.FC = () => {
                暂无合伙店铺数据
             </div>
           ) : (
-            <div style={{ height: '70vh', width: '100%' }}>
-              <AutoSizerComponent>
-                {({ height, width }: any) => (
-                  <ListComponent
-                    height={height}
-                    itemCount={partnerStores.length}
-                    itemSize={isMobile ? 260 : 220}
-                    width={width}
-                    itemData={{
-                      partnerStores,
-                      isMobile
-                    }}
-                  >
-                    {StoreRow}
-                  </ListComponent>
-                )}
-              </AutoSizerComponent>
+            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
+              {partnerStores.map((_, index) => (
+                <StoreRow 
+                  key={partnerStores[index].id}
+                  index={index} 
+                  style={{}} 
+                  data={{
+                    partnerStores,
+                    isMobile
+                  }}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -2395,26 +2380,21 @@ const UserManagement: React.FC = () => {
                   border: '1px dashed rgba(255,255,255,0.1)'
                 }}>没有找到匹配的快递员</div>
               ) : (
-                <div style={{ height: '75vh', width: '100%' }}>
-                  <AutoSizerComponent>
-                    {({ height, width }: any) => (
-                      <ListComponent
-                        height={height}
-                        itemCount={filteredCouriers.length}
-                        itemSize={isMobile ? 650 : 350}
-                        width={width}
-                        itemData={{
-                          filteredCouriers,
-                          isMobile,
-                          handleEditCourier,
-                          handleCourierStatusChange,
-                          handleDeleteCourier
-                        }}
-                      >
-                        {CourierRow}
-                      </ListComponent>
-                    )}
-                  </AutoSizerComponent>
+                <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
+                  {filteredCouriers.map((_, index) => (
+                    <CourierRow 
+                      key={filteredCouriers[index].id}
+                      index={index} 
+                      style={{}} 
+                      data={{
+                        filteredCouriers,
+                        isMobile,
+                        handleEditCourier,
+                        handleCourierStatusChange,
+                        handleDeleteCourier
+                      }}
+                    />
+                  ))}
                 </div>
               )}
             </div>

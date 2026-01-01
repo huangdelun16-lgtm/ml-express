@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 10:00:00
+Timestamp: 2026-01-01 10:30:00
 Changes: 
-- Enhanced 'Work Region' detection logic in Finance Records
-- Region labels now display as green badges matching the top indicator
-- Implemented account-based region lookup for creators without username prefixes
-- Improved visual clarity for regional financial record tracking
+- Reverted all virtual lists in User Management to standard rendering for stability
+- Fixed 'Work Region' logic in Finance Records with case-insensitive lookup and robust fallback
+- Ensured all management lists (Customers, Admins, Stores, Couriers) are visible
+- Improved reliability of regional data display in financial tracking
