@@ -617,64 +617,156 @@ const CityPackages: React.FC = () => {
             draggable
             onDragStart={() => handleDragStart(pkg.id)}
             style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              padding: '15px',
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: '18px',
               cursor: 'grab',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
+              backdropFilter: 'blur(8px)',
+              position: 'relative',
+              overflow: 'hidden'
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.25)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.18)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.15)';
+            }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontWeight: 'bold', color: '#90cdf4', fontSize: '0.9rem' }}>{pkg.id}</span>
-              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{pkg.package_type}</span>
+            {/* 顶部标签栏 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ 
+                fontWeight: 'bold', 
+                color: '#90cdf4', 
+                fontSize: '0.95rem',
+                fontFamily: 'monospace',
+                background: 'rgba(144, 205, 244, 0.15)',
+                padding: '2px 8px',
+                borderRadius: '6px'
+              }}>
+                {pkg.id}
+              </span>
+              <span style={{ 
+                fontSize: '0.75rem', 
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                {pkg.package_type}
+              </span>
             </div>
-            <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'white' }}>
-              👤 {pkg.sender_name} → {pkg.receiver_name}
-            </p>
-            <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              📍 {pkg.receiver_address}
-            </p>
+
+            {/* 物流路线 */}
+            <div style={{ marginBottom: '15px', position: 'relative', paddingLeft: '15px' }}>
+              {/* 装饰连线 */}
+              <div style={{ 
+                position: 'absolute', 
+                left: '4px', 
+                top: '10px', 
+                bottom: '10px', 
+                width: '2px', 
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderLeft: '1px dashed rgba(255, 255, 255, 0.3)'
+              }}></div>
+              
+              <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.8rem', color: '#4ade80' }}>●</span>
+                <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 500 }}>{pkg.sender_name}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.8rem', color: '#f87171' }}>●</span>
+                <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 500 }}>{pkg.receiver_name}</span>
+              </div>
+            </div>
+
+            <div style={{ 
+              fontSize: '0.85rem', 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              marginBottom: '15px',
+              padding: '8px 12px',
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '10px',
+              lineHeight: '1.4'
+            }}>
+              <span style={{ marginRight: '5px' }}>📍</span>
+              {pkg.receiver_address}
+            </div>
             
-            {/* 骑手选择器 */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>🛵 骑手:</span>
+            {/* 底部操作区 */}
+            <div style={{ 
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
+              paddingTop: '15px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '10px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  borderRadius: '50%', 
+                  background: pkg.courier && pkg.courier !== '待分配' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1rem'
+                }}>🛵</div>
                 <select
                   value={pkg.courier || '待分配'}
                   onChange={(e) => handleCourierAssign(pkg.id, e.target.value)}
                   style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '6px',
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '8px',
                     color: 'white',
-                    fontSize: '0.8rem',
-                    padding: '2px 5px',
-                    width: '100%'
+                    fontSize: '0.85rem',
+                    padding: '6px 10px',
+                    flex: 1,
+                    outline: 'none',
+                    cursor: 'pointer'
                   }}
                 >
-                  <option value="待分配">待分配</option>
+                  <option value="待分配" style={{ background: '#2c5282' }}>待分配</option>
                   {couriers.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
+                    <option key={c.id} value={c.name} style={{ background: '#2c5282' }}>{c.name}</option>
                   ))}
                 </select>
               </div>
+              
               <button
                 onClick={() => handleViewDetail(pkg)}
                 style={{
-                  background: 'rgba(255,255,255,0.1)',
-                  border: 'none',
-                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '10px',
                   color: '#90cdf4',
-                  fontSize: '0.8rem',
-                  padding: '5px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  padding: '8px',
                   cursor: 'pointer',
-                  width: '100%'
+                  width: '100%',
+                  transition: 'all 0.2s ease'
                 }}
-              >查看详情</button>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(144, 205, 244, 0.2)';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = '#90cdf4';
+                }}
+              >
+                查看详细信息
+              </button>
             </div>
           </div>
         ))}

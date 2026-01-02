@@ -1,8 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 16:00:00
+Timestamp: 2026-01-01 16:30:00
 Changes: 
-- Implemented Trello-style Kanban Board for Package Management
-- Added Drag and Drop support for changing package status
-- Integrated courier re-assignment directly from Kanban cards
-- Added responsive design for Kanban view (scrolling columns)
-- Enhanced operational efficiency for administrative workflows
+- Major visual overhaul for Kanban Board cards in City Management
+- Implemented glassmorphism effects and enhanced hover animations
+- Redesigned information hierarchy with better typography and icons
+- Added visual delivery route indicators (sender to receiver)
+- Optimized layout for better readability and professional look
