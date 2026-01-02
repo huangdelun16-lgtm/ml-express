@@ -58,6 +58,10 @@ const CityPackages: React.FC = () => {
   const [searchResult, setSearchResult] = useState<Package | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   
+  // 审计日志状态
+  const [packageLogs, setPackageLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  
   // 状态过滤功能状态
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   
@@ -495,6 +499,19 @@ const CityPackages: React.FC = () => {
   const handleViewDetail = async (pkg: Package) => {
     setSelectedPackage(pkg);
     setShowDetailModal(true);
+    fetchPackageLogs(pkg.id); // 🚀 新增：获取包裹操作日志
+  };
+
+  const fetchPackageLogs = async (packageId: string) => {
+    try {
+      setLogsLoading(true);
+      const logs = await auditLogService.getLogsByTargetId(packageId);
+      setPackageLogs(logs || []);
+    } catch (error) {
+      console.error('获取包裹日志失败:', error);
+    } finally {
+      setLogsLoading(false);
+    }
   };
 
   const closeDetailModal = () => {
@@ -2734,6 +2751,70 @@ const CityPackages: React.FC = () => {
               )}
                 </div>
             </div>
+
+              {/* 📜 操作痕迹追踪 (Timeline) */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                padding: isMobile ? '12px' : '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📜 {language === 'zh' ? '操作痕迹追踪' : language === 'en' ? 'Audit Trail' : 'လုပ်ဆောင်ချက်မှတ်တမ်း'}
+                  {logsLoading && <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>({language === 'zh' ? '加载中...' : 'Loading...'})</span>}
+                </h3>
+                
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '0', 
+                  position: 'relative',
+                  paddingLeft: '20px',
+                  borderLeft: '2px solid rgba(255, 255, 255, 0.1)',
+                  marginLeft: '10px'
+                }}>
+                  {packageLogs.length === 0 && !logsLoading ? (
+                    <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '0.9rem', fontStyle: 'italic' }}>
+                      {language === 'zh' ? '暂无详细操作记录' : language === 'en' ? 'No audit logs found' : 'မှတ်တမ်းများမရှိပါ'}
+                    </p>
+                  ) : (
+                    packageLogs.map((log, index) => (
+                      <div key={log.id || index} style={{ position: 'relative', marginBottom: '20px' }}>
+                        {/* 时间轴圆点 */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '-27px',
+                          top: '4px',
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          background: index === packageLogs.length - 1 ? '#48bb78' : 'rgba(255, 255, 255, 0.3)',
+                          border: '3px solid rgba(0, 0, 0, 0.2)',
+                          zIndex: 2
+                        }}></div>
+                        
+                        <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '4px' }}>
+                          {new Date(log.action_time || log.created_at || Date.now()).toLocaleString('zh-CN', { 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            month: '2-digit', 
+                            day: '2-digit' 
+                          })}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.95rem', 
+                          color: 'white', 
+                          fontWeight: 500,
+                          lineHeight: '1.4'
+                        }}>
+                          <span style={{ color: '#90cdf4', marginRight: '8px' }}>{log.user_name}</span>
+                          {log.action_description}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 13:00:00
+Timestamp: 2026-01-01 14:00:00
 Changes: 
-- Implemented 'Universal' (万能) label for records created by the admin account
-- Synchronized 'Work Region' display with creator identity in Finance Management
-- Enhanced region detection logic to support global admin role
-- Updated translations for regional labels across all supported languages
+- Implemented Visual Audit Trail (Timeline) in Order Details
+- Added automatic audit logging for all package status updates
+- Centralized audit logging in service layer for both Web and Mobile
+- Enhanced order transparency with detailed action history tracking

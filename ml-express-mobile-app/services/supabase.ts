@@ -485,6 +485,26 @@ export const packageService = {
     }
     
     console.log('包裹状态更新成功');
+
+    // 🚀 新增：自动记录审计日志
+    try {
+      const currentUserId = await AsyncStorage.getItem('currentUser') || 'unknown_mobile';
+      const currentUserName = await AsyncStorage.getItem('currentUserName') || '骑手';
+      
+      await supabase.from('audit_logs').insert([{
+        user_id: currentUserId,
+        user_name: currentUserName,
+        action_type: 'update',
+        module: 'packages',
+        target_id: id,
+        target_name: `包裹 ${id}`,
+        action_description: `骑手更新状态为：${status}${courierName ? ' (执行人: ' + courierName + ')' : ''}`,
+        new_value: JSON.stringify({ status, courier: courierName }),
+        action_time: new Date().toISOString()
+      }]);
+    } catch (logError) {
+      console.warn('记录移动端审计日志失败:', logError);
+    }
     
     // 如果是送达状态且有骑手位置信息，进行违规检测
     if (status === '已送达') {

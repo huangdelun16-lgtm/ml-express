@@ -402,6 +402,26 @@ export const packageService = {
     }
     
     console.log('✅ 包裹状态更新成功');
+
+    // 🚀 新增：自动记录审计日志 (Admin Web)
+    try {
+      const currentUserId = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'admin_system';
+      const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '系统管理员';
+      
+      await supabase.from('audit_logs').insert([{
+        user_id: currentUserId,
+        user_name: currentUserName,
+        action_type: 'update',
+        module: 'packages',
+        target_id: id,
+        target_name: `包裹 ${id}`,
+        action_description: `更新状态为：${status}${courierName ? ' (分配给骑手: ' + courierName + ')' : ''}`,
+        new_value: JSON.stringify({ status, courier: courierName }),
+        action_time: new Date().toISOString()
+      }]);
+    } catch (logError) {
+      console.warn('记录管理端审计日志失败:', logError);
+    }
     
     // 🔍 如果是完成配送状态，自动检测违规行为
     if (status === '已送达' && courierLocation && courierName) {
@@ -1974,6 +1994,28 @@ export const auditLogService = {
       return data || [];
     } catch (err) {
       console.error('获取用户审计日志异常:', err);
+      return [];
+    }
+  },
+
+  // 根据目标 ID 获取日志（如包裹 ID）
+  async getLogsByTargetId(targetId: string, limit: number = 50): Promise<AuditLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('target_id', targetId)
+        .order('action_time', { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error('获取目标审计日志失败:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (err) {
+      console.error('获取目标审计日志异常:', err);
       return [];
     }
   },

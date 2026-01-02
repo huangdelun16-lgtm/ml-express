@@ -403,6 +403,21 @@ const RealTimeTracking: React.FC = () => {
       );
 
       if (success) {
+        // 🚀 新增：记录审计日志
+        const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'unknown';
+        const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '未知用户';
+        
+        await auditLogService.log({
+          user_id: currentUser,
+          user_name: currentUserName,
+          action_type: 'update',
+          module: 'packages',
+          target_id: packageData.id,
+          target_name: `包裹 ${packageData.id}`,
+          action_description: `管理员分配包裹给骑手：${courier.name}`,
+          new_value: JSON.stringify({ courier_id: courier.id, courier_name: courier.name, status: '待取件' })
+        });
+
         // 🔔 发送通知给快递员
         const notificationSuccess = await notificationService.sendPackageAssignedNotification(
           courier.id,
