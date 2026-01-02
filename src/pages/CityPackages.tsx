@@ -28,13 +28,14 @@ const CityPackages: React.FC = () => {
   // 系统管理员角色不开启领区过滤，其他角色如果有领区前缀则强制开启
   const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
 
-  const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'map' | 'kanban'>('list');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
+  const [couriers, setCouriers] = useState<any[]>([]); // 🚀 新增：存储骑手列表
   const [courierDetail, setCourierDetail] = useState<any>(null);
   const [courierLoading, setCourierLoading] = useState(false);
   
@@ -99,6 +100,7 @@ const CityPackages: React.FC = () => {
   useEffect(() => {
     loadPackages();
     loadDeliveryStores();
+    loadCouriers(); // 🚀 新增：加载骑手数据
     
     // 设置定时刷新，每30秒刷新一次包裹状态
     const refreshInterval = setInterval(() => {
@@ -117,6 +119,19 @@ const CityPackages: React.FC = () => {
       setDeliveryStores(data || []);
     } catch (error) {
       console.error('加载店铺列表失败:', error);
+    }
+  };
+
+  const loadCouriers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('status', 'active');
+      if (error) throw error;
+      setCouriers(data || []);
+    } catch (error) {
+      console.error('加载骑手列表失败:', error);
     }
   };
 
@@ -519,6 +534,172 @@ const CityPackages: React.FC = () => {
     setSelectedPackage(null);
   };
 
+  // --- 🚀 看板拖拽逻辑 ---
+  const [draggedPackageId, setDraggedPackageId] = useState<string | null>(null);
+
+  const handleDragStart = (packageId: string) => {
+    setDraggedPackageId(packageId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // 必须调用，否则无法触发 drop
+  };
+
+  const handleDrop = async (newStatus: string) => {
+    if (!draggedPackageId) return;
+    
+    const pkg = packages.find(p => p.id === draggedPackageId);
+    if (pkg && pkg.status !== newStatus) {
+      console.log(`🚚 拖拽更新状态: ${draggedPackageId} -> ${newStatus}`);
+      await updatePackageStatus(draggedPackageId, newStatus);
+    }
+    
+    setDraggedPackageId(null);
+  };
+
+  const handleCourierAssign = async (packageId: string, courierName: string) => {
+    const success = await packageService.updatePackageStatus(packageId, undefined as any, undefined, undefined, courierName);
+    if (success) {
+      // 记录审计日志
+      const currentUserAccount = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'unknown';
+      const currentUserNameStr = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '未知用户';
+      
+      await auditLogService.log({
+        user_id: currentUserAccount,
+        user_name: currentUserNameStr,
+        action_type: 'update',
+        module: 'packages',
+        target_id: packageId,
+        target_name: `包裹 ${packageId}`,
+        action_description: `看板分配骑手为：${courierName}`,
+        new_value: JSON.stringify({ courier: courierName })
+      });
+      
+      loadPackages();
+    }
+  };
+
+  // 渲染看板列
+  const renderKanbanColumn = (title: string, status: string, color: string) => {
+    const columnPackages = getFilteredPackages().filter(p => {
+      if (status === '配送中') return p.status === '配送中' || p.status === '配送进行中';
+      return p.status === status;
+    });
+
+    return (
+      <div 
+        onDragOver={handleDragOver}
+        onDrop={() => handleDrop(status)}
+        style={{
+          flex: 1,
+          minWidth: '300px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: '15px',
+          padding: '15px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '15px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          maxHeight: '75vh',
+          overflowY: 'auto'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h3 style={{ margin: 0, color: 'white', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color }}></span>
+            {title} ({columnPackages.length})
+          </h3>
+        </div>
+
+        {columnPackages.map(pkg => (
+          <div
+            key={pkg.id}
+            draggable
+            onDragStart={() => handleDragStart(pkg.id)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '15px',
+              cursor: 'grab',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 'bold', color: '#90cdf4', fontSize: '0.9rem' }}>{pkg.id}</span>
+              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>{pkg.package_type}</span>
+            </div>
+            <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: 'white' }}>
+              👤 {pkg.sender_name} → {pkg.receiver_name}
+            </p>
+            <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              📍 {pkg.receiver_address}
+            </p>
+            
+            {/* 骑手选择器 */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>🛵 骑手:</span>
+                <select
+                  value={pkg.courier || '待分配'}
+                  onChange={(e) => handleCourierAssign(pkg.id, e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '0.8rem',
+                    padding: '2px 5px',
+                    width: '100%'
+                  }}
+                >
+                  <option value="待分配">待分配</option>
+                  {couriers.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => handleViewDetail(pkg)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#90cdf4',
+                  fontSize: '0.8rem',
+                  padding: '5px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >查看详情</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderKanbanBoard = () => {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        gap: '20px', 
+        overflowX: 'auto', 
+        padding: '10px 0',
+        minHeight: '70vh'
+      }}>
+        {renderKanbanColumn('待取件', '待取件', '#f39c12')}
+        {renderKanbanColumn('已取件', '已取件', '#3498db')}
+        {renderKanbanColumn('配送中', '配送中', '#9b59b6')}
+        {renderKanbanColumn('已送达', '已送达', '#27ae60')}
+        {renderKanbanColumn('已取消', '已取消', '#e74c3c')}
+      </div>
+    );
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -671,6 +852,42 @@ const CityPackages: React.FC = () => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* 🚀 模式切换按钮 */}
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '10px', marginRight: '10px' }}>
+              <button
+                onClick={() => setActiveTab('list')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'list' ? '#3b82f6' : 'transparent',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📊 列表
+              </button>
+              <button
+                onClick={() => setActiveTab('kanban')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: activeTab === 'kanban' ? '#3b82f6' : 'transparent',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📋 看板
+              </button>
+            </div>
+
             {batchMode ? (
               <>
                 <button
@@ -923,6 +1140,9 @@ const CityPackages: React.FC = () => {
             <div style={{ textAlign: 'center', color: 'white', padding: '2rem' }}>
               <p>加载中...</p>
             </div>
+          ) : activeTab === 'kanban' ? (
+            /* 🚀 看板视图渲染 */
+            renderKanbanBoard()
           ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
             {/* 过滤状态提示 */}

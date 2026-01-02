@@ -1,8 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 15:00:00
+Timestamp: 2026-01-01 16:00:00
 Changes: 
-- Implemented Global Abnormal Delivery Alert System
-- Automatic detection of orders in 'Delivering' status with no updates for > 2 hours
-- Real-time browser notifications and audio alerts for administrators
-- Integrated a floating warning panel in the Real-time Tracking dashboard
-- Centralized background monitor in App.tsx for cross-page protection
+- Implemented Trello-style Kanban Board for Package Management
+- Added Drag and Drop support for changing package status
+- Integrated courier re-assignment directly from Kanban cards
+- Added responsive design for Kanban view (scrolling columns)
+- Enhanced operational efficiency for administrative workflows
