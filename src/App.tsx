@@ -18,10 +18,12 @@ import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AbnormalAlertManager from './components/AbnormalAlertManager';
 
 function App() {
   return (
     <LanguageProvider>
+      <AbnormalAlertManager />
       <Router>
         <div className="App">
           <Routes>

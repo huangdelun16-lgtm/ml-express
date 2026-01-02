@@ -1,6 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 14:15:00
+Timestamp: 2026-01-01 15:00:00
 Changes: 
-- Fixed missing auditLogService import in RealTimeTracking.tsx
-- Ensured all audit trail logging functions have access to required services
-- Verified build compliance across all modified administrative pages
+- Implemented Global Abnormal Delivery Alert System
+- Automatic detection of orders in 'Delivering' status with no updates for > 2 hours
+- Real-time browser notifications and audio alerts for administrators
+- Integrated a floating warning panel in the Real-time Tracking dashboard
+- Centralized background monitor in App.tsx for cross-page protection

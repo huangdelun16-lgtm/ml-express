@@ -46,6 +46,9 @@ const RealTimeTracking: React.FC = () => {
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [abnormalPackages, setAbnormalPackages] = useState<Package[]>([]); // 🚨 新增：异常包裹状态
+  const [showAbnormalAlert, setShowAbnormalAlert] = useState(false); // 🚨 新增：异常警报弹窗显示状态
+  
   type CityKey = 'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse';
   
   // 初始化城市和坐标逻辑
@@ -187,6 +190,58 @@ const RealTimeTracking: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 🚨 新增：检测配送中的异常包裹（超过2小时未更新状态/位置）
+  useEffect(() => {
+    const checkAbnormalStatus = () => {
+      if (packages.length === 0) return;
+
+      const now = new Date();
+      const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+      
+      const abnormal = packages.filter(pkg => {
+        // 只有配送中的包裹需要检测
+        if (pkg.status !== '配送中' && pkg.status !== '配送进行中') return false;
+        
+        // 使用 updated_at 或 created_at 作为参考时间
+        const lastUpdateTime = pkg.updated_at ? new Date(pkg.updated_at) : (pkg.created_at ? new Date(pkg.created_at) : null);
+        
+        if (!lastUpdateTime) return false;
+        
+        // 如果最后更新时间在2小时之前，标记为异常
+        return lastUpdateTime < twoHoursAgo;
+      });
+
+      // 如果发现了新的异常包裹，触发警报
+      if (abnormal.length > abnormalPackages.length) {
+        // 播放警报音
+        if (soundEnabledRef.current && audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(e => console.error('播放警报音失败:', e));
+        }
+
+        // 桌面通知
+        if (Notification.permission === 'granted') {
+          new Notification('⚠️ 订单配送异常警报', {
+            body: `有 ${abnormal.length} 个订单配送超时（超过2小时未更新位置），请立即处理！`,
+            icon: '/favicon.ico',
+            tag: 'abnormal-alert'
+          });
+        }
+        
+        setShowAbnormalAlert(true);
+      }
+
+      setAbnormalPackages(abnormal);
+    };
+
+    // 初始执行一次
+    checkAbnormalStatus();
+
+    // 每 5 分钟检测一次
+    const timer = setInterval(checkAbnormalStatus, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [packages, abnormalPackages.length]);
   
   // 加载快递店数据
   const loadStores = async () => {
@@ -1883,6 +1938,79 @@ const RealTimeTracking: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 🚨 新增：配送异常警报浮窗 */}
+      {showAbnormalAlert && abnormalPackages.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          width: '350px',
+          background: 'rgba(231, 76, 60, 0.95)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+          zIndex: 2000,
+          padding: '20px',
+          border: '2px solid rgba(255, 255, 255, 0.2)',
+          animation: 'slideUp 0.5s ease-out'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚠️ 配送超时警告 ({abnormalPackages.length})
+            </h3>
+            <button 
+              onClick={() => setShowAbnormalAlert(false)}
+              style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.2rem' }}
+            >✕</button>
+          </div>
+          
+          <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {abnormalPackages.map(pkg => (
+              <div key={pkg.id} style={{ 
+                background: 'rgba(255, 255, 255, 0.15)', 
+                padding: '12px', 
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                // 点击异常包裹可以自动定位地图（未来可扩展）
+                if (pkg.receiver_latitude && pkg.receiver_longitude) {
+                  setMapCenter({ lat: pkg.receiver_latitude, lng: pkg.receiver_longitude });
+                }
+              }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                  <span style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{pkg.id}</span>
+                  <span style={{ fontSize: '0.8rem', color: '#fff', background: '#e74c3c', padding: '2px 6px', borderRadius: '4px' }}>
+                    超时未更新
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>🛵</span> 骑手: <strong style={{ color: '#fcd34d' }}>{pkg.courier || '未知'}</strong>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  📍 目的地: {pkg.receiver_address}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div style={{ marginTop: '15px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+              请尽快联系骑手确认包裹位置安全
+            </p>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes slideUp {
+          from { transform: translateY(100px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}} />
     </div>
   );
 };
