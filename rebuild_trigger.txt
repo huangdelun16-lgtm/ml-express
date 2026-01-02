@@ -1,8 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 16:30:00
+Timestamp: 2026-01-01 17:00:00
 Changes: 
-- Major visual overhaul for Kanban Board cards in City Management
-- Implemented glassmorphism effects and enhanced hover animations
-- Redesigned information hierarchy with better typography and icons
-- Added visual delivery route indicators (sender to receiver)
-- Optimized layout for better readability and professional look
+- Fixed Kanban card squishing issue by setting flex-shrink to 0
+- Ensured 'View Details' button is always visible by removing overflow constraints
+- Added minimum height and bottom padding to Kanban columns for better scrolling
+- Improved layout stability for cards with long addresses or many details

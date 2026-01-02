@@ -592,15 +592,15 @@ const CityPackages: React.FC = () => {
         onDrop={() => handleDrop(status)}
         style={{
           flex: 1,
-          minWidth: '300px',
+          minWidth: '320px',
           background: 'rgba(255, 255, 255, 0.05)',
           borderRadius: '15px',
-          padding: '15px',
+          padding: '15px 15px 100px 15px', // 🚀 底部增加大量留白，防止底部卡片被遮挡
           display: 'flex',
           flexDirection: 'column',
-          gap: '15px',
+          gap: '20px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          maxHeight: '75vh',
+          height: '75vh',
           overflowY: 'auto'
         }}
       >
@@ -626,7 +626,10 @@ const CityPackages: React.FC = () => {
               boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
               backdropFilter: 'blur(8px)',
               position: 'relative',
-              overflow: 'hidden'
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '280px',
+              flexShrink: 0 // 🚨 核心修复：防止卡片在固定高度的列中被压缩变形
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
