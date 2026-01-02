@@ -19,6 +19,8 @@ import RealTimeTracking from './pages/RealTimeTracking';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
+import AdminLayout from './components/AdminLayout';
+import { Outlet } from 'react-router-dom';
 
 function App() {
   return (
@@ -31,112 +33,121 @@ function App() {
             <Route path="/" element={<Navigate to="/admin/login" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             
-            {/* 后台管理路由（受保护） */}
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            {/* 后台管理路由（受保护且带有侧边栏） */}
             <Route 
-              path="/admin/dashboard" 
+              path="/admin" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/city-packages" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']} permissionId="city_packages">
-                  <CityPackages />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/users" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="users">
-                  <UserManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/finance" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="finance">
-                  <FinanceManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/tracking" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
-                  <RealTimeTracking />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/realtime-tracking" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
-                  <RealTimeTracking />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/settings" 
-              element={
-                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
-                  <SystemSettings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/system-settings" 
-              element={
-                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
-                  <SystemSettings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/accounts" 
-              element={
-                <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
-                  <AccountManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/banners" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="banners">
-                  <BannerManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/delivery-stores" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="partner_stores">
-                  <DeliveryStoreManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/supervision" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                  <EmployeeSupervision />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/delivery-alerts" 
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="delivery_alerts">
-                  <DeliveryAlerts />
-                </ProtectedRoute>
-              } 
-            />
+                <AdminLayout>
+                  <Outlet />
+                </AdminLayout>
+              }
+            >
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route 
+                path="dashboard" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="city-packages" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']} permissionId="city_packages">
+                    <CityPackages />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="users" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="users">
+                    <UserManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="finance" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="finance">
+                    <FinanceManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="tracking" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
+                    <RealTimeTracking />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="realtime-tracking" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager', 'operator']} permissionId="tracking">
+                    <RealTimeTracking />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="settings" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
+                    <SystemSettings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="system-settings" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
+                    <SystemSettings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="accounts" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin']} permissionId="settings">
+                    <AccountManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="banners" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="banners">
+                    <BannerManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="delivery-stores" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="partner_stores">
+                    <DeliveryStoreManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="supervision" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                    <EmployeeSupervision />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="delivery-alerts" 
+                element={
+                  <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="delivery_alerts">
+                    <DeliveryAlerts />
+                  </ProtectedRoute>
+                } 
+              />
+            </Route>
           </Routes>
         </div>
       </Router>
