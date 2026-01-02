@@ -648,19 +648,20 @@ const CityPackages: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ 
                 fontWeight: 'bold', 
-                color: '#90cdf4', 
+                color: '#3b82f6', // 🚀 调深 ID 颜色
                 fontSize: '0.95rem',
                 fontFamily: 'monospace',
-                background: 'rgba(144, 205, 244, 0.15)',
-                padding: '2px 8px',
-                borderRadius: '6px'
+                background: '#fff', // 🚀 使用纯白底色增强对比度
+                padding: '2px 10px',
+                borderRadius: '6px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                 {pkg.id}
               </span>
               <span style={{ 
-                fontSize: '0.75rem', 
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontWeight: 600,
+                fontSize: '0.8rem', 
+                color: '#ffffff', // 🚀 改为纯白
+                fontWeight: 'bold',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}>
@@ -677,70 +678,80 @@ const CityPackages: React.FC = () => {
                 top: '10px', 
                 bottom: '10px', 
                 width: '2px', 
-                background: 'rgba(255, 255, 255, 0.1)',
-                borderLeft: '1px dashed rgba(255, 255, 255, 0.3)'
+                background: 'rgba(255, 255, 255, 0.3)', // 🚀 调亮连线
+                borderLeft: '1px dashed rgba(255, 255, 255, 0.5)'
               }}></div>
               
               <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '0.8rem', color: '#4ade80' }}>●</span>
-                <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 500 }}>{pkg.sender_name}</span>
+                <span style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 'bold' }}>{pkg.sender_name}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '0.8rem', color: '#f87171' }}>●</span>
-                <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 500 }}>{pkg.receiver_name}</span>
+                <span style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 'bold' }}>{pkg.receiver_name}</span>
               </div>
             </div>
 
             <div style={{ 
-              fontSize: '0.85rem', 
-              color: 'rgba(255, 255, 255, 0.7)', 
+              fontSize: '0.9rem', // 🚀 增大字号
+              color: '#ffffff', // 🚀 改为纯白
+              fontWeight: 500,
               marginBottom: '15px',
-              padding: '8px 12px',
-              background: 'rgba(0, 0, 0, 0.2)',
+              padding: '10px 14px',
+              background: 'rgba(0, 0, 0, 0.4)', // 🚀 调深背景
               borderRadius: '10px',
-              lineHeight: '1.4'
+              lineHeight: '1.5',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
-              <span style={{ marginRight: '5px' }}>📍</span>
+              <span style={{ marginRight: '8px' }}>📍</span>
               {pkg.receiver_address}
             </div>
             
             {/* 底部操作区 */}
             <div style={{ 
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
+              borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
               paddingTop: '15px', 
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '10px' 
+              gap: '12px' 
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ 
-                  width: '32px', 
-                  height: '32px', 
-                  borderRadius: '50%', 
-                  background: pkg.courier && pkg.courier !== '待分配' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                  width: '36px', 
+                  height: '36px', 
+                  borderRadius: '10px', 
+                  background: pkg.courier && pkg.courier !== '待分配' ? '#4ade80' : 'rgba(255, 255, 255, 0.2)',
+                  color: pkg.courier && pkg.courier !== '待分配' ? '#064e3b' : 'white',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1rem'
+                  fontSize: '1.1rem',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}>🛵</div>
                 <select
                   value={pkg.courier || '待分配'}
                   onChange={(e) => handleCourierAssign(pkg.id, e.target.value)}
                   style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '10px',
                     color: 'white',
-                    fontSize: '0.85rem',
-                    padding: '6px 10px',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    padding: '8px 12px',
                     flex: 1,
                     outline: 'none',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'3\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 10px center',
+                    backgroundSize: '14px'
                   }}
                 >
-                  <option value="待分配" style={{ background: '#2c5282' }}>待分配</option>
+                  <option value="待分配" style={{ background: '#1e3a8a', color: 'white' }}>待分配</option>
                   {couriers.map(c => (
-                    <option key={c.id} value={c.name} style={{ background: '#2c5282' }}>{c.name}</option>
+                    <option key={c.id} value={c.name} style={{ background: '#1e3a8a', color: 'white' }}>{c.name}</option>
                   ))}
                 </select>
               </div>
@@ -748,27 +759,29 @@ const CityPackages: React.FC = () => {
               <button
                 onClick={() => handleViewDetail(pkg)}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '10px',
-                  color: '#90cdf4',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  padding: '8px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', // 🚀 使用实色渐变
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: 'white', // 🚀 改为白色文字
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  padding: '12px',
                   cursor: 'pointer',
                   width: '100%',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.2)'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(144, 205, 244, 0.2)';
-                  e.currentTarget.style.color = 'white';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.color = '#90cdf4';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
                 }}
               >
-                查看详细信息
+                🔍 查看详细信息
               </button>
             </div>
           </div>

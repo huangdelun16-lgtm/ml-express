@@ -1,7 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 17:00:00
+Timestamp: 2026-01-01 17:30:00
 Changes: 
-- Fixed Kanban card squishing issue by setting flex-shrink to 0
-- Ensured 'View Details' button is always visible by removing overflow constraints
-- Added minimum height and bottom padding to Kanban columns for better scrolling
-- Improved layout stability for cards with long addresses or many details
+- Enhanced typography contrast for Kanban cards
+- Increased font weight and brightness for better legibility
+- Redesigned 'View Details' button with high-contrast styling
+- Improved visual separation of information blocks within cards
+- Fixed readability issues caused by low-opacity white fonts
