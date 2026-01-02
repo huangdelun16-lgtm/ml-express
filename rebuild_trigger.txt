@@ -1,8 +1,7 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 18:00:00
+Timestamp: 2026-01-01 18:30:00
 Changes: 
-- Implemented Responsive & Collapsible Sidebar for Admin Dashboard
-- Added icon-only collapsed mode to maximize map and table space
-- Integrated Sidebar into all protected admin routes via AdminLayout
-- Optimized mobile experience with a dedicated drawer-style sidebar
-- Enhanced overall dashboard navigation efficiency and UI aesthetics
+- Removed Responsive Sidebar and AdminLayout as per user request
+- Restored original flat routing structure in App.tsx
+- Cleaned up unused sidebar and layout components
+- Ensured original dashboard-centric navigation remains active
