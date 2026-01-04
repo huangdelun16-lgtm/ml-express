@@ -655,6 +655,32 @@ export default function MapScreen({ navigation }: any) {
     setRefreshing(false);
   }, [loadPackages, loadCurrentDeliveringPackage]);
 
+  // 当弹窗打开时，自动调整地图缩放以显示所有点
+  useEffect(() => {
+    if (showMapPreview && optimizedPackagesWithCoords.length > 0 && mapRef.current) {
+      const coords = optimizedPackagesWithCoords.flatMap(p => {
+        const points = [];
+        if (p.pickupCoords) points.push({ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng });
+        if (p.deliveryCoords) points.push({ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng });
+        return points;
+      });
+      
+      if (location) {
+        coords.push({ latitude: location.latitude, longitude: location.longitude });
+      }
+
+      if (coords.length > 0) {
+        // 延迟一点确保地图加载完成
+        setTimeout(() => {
+          mapRef.current?.fitToCoordinates(coords, {
+            edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
+            animated: true,
+          });
+        }, 500);
+      }
+    }
+  }, [showMapPreview, optimizedPackagesWithCoords, location]);
+
   // 6. 渲染辅助
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
     const isCurrent = currentDeliveringPackageId === item.id;
@@ -922,41 +948,55 @@ export default function MapScreen({ navigation }: any) {
             <View style={{ width: 40 }} />
           </LinearGradient>
           <View style={{ flex: 1, position: 'relative' }}>
-            {location && (
-              <MapView 
-                provider={PROVIDER_GOOGLE} 
-                style={StyleSheet.absoluteFillObject} 
-                initialRegion={{ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.1, longitudeDelta: 0.1 }}
-              >
-                <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} title={language === 'zh' ? '我' : 'Me'}>
-                  <View style={styles.courierMarker}><Text style={styles.courierMarkerText}>🏍️</Text></View>
+            <MapView 
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE} 
+              style={StyleSheet.absoluteFillObject} 
+              initialRegion={{ 
+                latitude: location?.latitude || 21.9588, 
+                longitude: location?.longitude || 96.0891, 
+                latitudeDelta: 0.05, 
+                longitudeDelta: 0.05 
+              }}
+            >
+              {location && (
+                <Marker 
+                  coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
+                  title={language === 'zh' ? '当前位置' : 'My Location'}
+                >
+                  <View style={styles.courierMarker}>
+                    <Text style={styles.courierMarkerText}>🛵</Text>
+                  </View>
                 </Marker>
-                {optimizedPackagesWithCoords.map((p, i) => (
-                  <React.Fragment key={p.id}>
-                    {p.pickupCoords && (
-                      <Marker 
-                        coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
-                        title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
-                      >
-                        <View style={styles.pickupMarker}>
-                          <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
-                        </View>
-                      </Marker>
-                    )}
-                    {p.deliveryCoords && (
-                      <Marker 
-                        coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
-                        title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
-                      >
-                        <View style={styles.packageMarker}>
-                          <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
-                        </View>
-                      </Marker>
-                    )}
-                  </React.Fragment>
-                ))}
-              </MapView>
-            )}
+              )}
+              
+              {optimizedPackagesWithCoords.map((p, i) => (
+                <React.Fragment key={`${p.id}-${i}`}>
+                  {p.pickupCoords && (
+                    <Marker 
+                      coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
+                      title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
+                      description={p.sender_address}
+                    >
+                      <View style={styles.pickupMarker}>
+                        <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
+                      </View>
+                    </Marker>
+                  )}
+                  {p.deliveryCoords && (
+                    <Marker 
+                      coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
+                      title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
+                      description={p.receiver_address}
+                    >
+                      <View style={styles.packageMarker}>
+                        <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
+                      </View>
+                    </Marker>
+                  )}
+                </React.Fragment>
+              ))}
+            </MapView>
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
               <View style={styles.routeListContainer}>
                 <View style={styles.routeListHeader}>
