@@ -292,6 +292,126 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify(result)
       };
+    } else if (action === 'updatePassword') {
+      // 修改密码逻辑
+      const { username, currentPassword, newPassword } = JSON.parse(event.body || '{}');
+      if (!username || !currentPassword || !newPassword) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: '缺少必要参数' })
+        };
+      }
+
+      // 1. 从 Supabase 获取用户信息
+      const response = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?username=eq.${encodeURIComponent(username)}&select=*`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const accounts = await response.json();
+      if (!accounts || accounts.length === 0) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ success: false, error: '用户不存在' })
+        };
+      }
+
+      const account = accounts[0];
+
+      // 2. 验证当前密码
+      const passwordResult = await verifyPassword(currentPassword, account.password);
+      if (!passwordResult.valid) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ success: false, error: '当前密码不正确' })
+        };
+      }
+
+      // 3. 加密新密码并更新数据库
+      const hashedPassword = await hashPassword(newPassword);
+      const updateResponse = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?id=eq.${account.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ password: hashedPassword })
+      });
+
+      if (updateResponse.ok) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ success: true })
+        };
+      } else {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ success: false, error: '数据库更新失败' })
+        };
+      }
+    } else if (action === 'updateUsername') {
+      // 修改用户名逻辑
+      const { currentUsername, newUsername } = JSON.parse(event.body || '{}');
+      if (!currentUsername || !newUsername) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: '缺少必要参数' })
+        };
+      }
+
+      // 1. 检查新用户名是否已存在
+      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?username=eq.${encodeURIComponent(newUsername)}&select=id`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        }
+      });
+
+      const existingAccounts = await checkResponse.json();
+      if (existingAccounts && existingAccounts.length > 0) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: '新用户名已存在' })
+        };
+      }
+
+      // 2. 更新用户名
+      const updateResponse = await fetch(`${supabaseUrl}/rest/v1/admin_accounts?username=eq.${encodeURIComponent(currentUsername)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ username: newUsername })
+      });
+
+      if (updateResponse.ok) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ success: true })
+        };
+      } else {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ success: false, error: '数据库更新失败' })
+        };
+      }
     } else {
       return {
         statusCode: 400,
