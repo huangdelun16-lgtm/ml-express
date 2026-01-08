@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import * as FileSystem from 'expo-file-system';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
@@ -116,6 +117,31 @@ export interface UserNotification {
   is_read: boolean;
   related_id?: string;
   created_at: string;
+}
+
+// 商品接口
+export interface Product {
+  id: string;
+  store_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  original_price?: number;
+  image_url?: string;
+  stock: number;
+  is_available: boolean;
+  sales_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 商品分类接口
+export interface ProductCategory {
+  id: string;
+  store_id: string;
+  name: string;
+  display_order: number;
 }
 
 // 客户服务（使用users表）
@@ -349,17 +375,21 @@ export const customerService = {
   },
 
   // 修改密码
-  async changePassword(customerId: string, oldPassword: string, newPassword: string) {
+  async changePassword(userId: string, oldPassword: string, newPassword: string, userType: string = 'customer') {
     try {
+      const table = userType === 'partner' ? 'delivery_stores' : 'users';
+      
       // 1. 验证旧密码
       const { data: user, error: findError } = await supabase
-        .from('users')
+        .from(table)
         .select('password')
-        .eq('id', customerId)
-        .eq('user_type', 'customer')
+        .eq('id', userId)
         .single();
 
-      if (findError) throw findError;
+      if (findError) {
+        LoggerService.error(`[changePassword] 查找用户失败 (${table}):`, findError);
+        throw findError;
+      }
 
       if (user.password !== oldPassword) {
         return { 
@@ -370,15 +400,18 @@ export const customerService = {
 
       // 2. 更新密码
       const { error: updateError } = await supabase
-        .from('users')
+        .from(table)
         .update({ password: newPassword })
-        .eq('id', customerId);
+        .eq('id', userId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        LoggerService.error(`[changePassword] 更新密码失败 (${table}):`, updateError);
+        throw updateError;
+      }
 
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('修改密码失败:', error);
+      LoggerService.error('修改密码异常:', error);
       return { 
         success: false, 
         error: { message: error.message || '修改密码失败' }
@@ -1405,4 +1438,145 @@ export const systemSettingsService = {
       };
     });
   },
+};
+
+// 商家服务 (外卖/零售)
+export const merchantService = {
+  // 获取商店的所有商品
+  async getStoreProducts(storeId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店商品失败:', error);
+      return [];
+    }
+  },
+
+  // 获取商店分类
+  async getStoreCategories(storeId: string): Promise<ProductCategory[]> {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店分类失败:', error);
+      return [];
+    }
+  },
+
+  // 添加商品
+  async addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([product])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('添加商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 更新商品
+  async updateProduct(productId: string, updates: Partial<Product>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update(updates)
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 删除商品
+  async deleteProduct(productId: string) {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      LoggerService.error('删除商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 更新库存
+  async updateStock(productId: string, newStock: number) {
+    return this.updateProduct(productId, { stock: newStock });
+  },
+
+  // 上下架切换
+  async toggleAvailability(productId: string, isAvailable: boolean) {
+    return this.updateProduct(productId, { is_available: isAvailable });
+  },
+
+  // 上传商品图片
+  async uploadProductImage(storeId: string, imageUri: string): Promise<string | null> {
+    try {
+      const fileName = `${storeId}/${Date.now()}.jpg`;
+      
+      // 🚀 最终修复方案：使用 expo-file-system 读取为 base64，然后转换为 Uint8Array
+      // 直接使用 'base64' 字符串，避免某些环境下 EncodingType 枚举未定义的问题
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
+      });
+
+      // 将 base64 转换为 Uint8Array (Supabase 完美支持)
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, bytes, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Supabase Storage Error:', error);
+        throw error;
+      }
+
+      // 获取公共 URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传商品图片失败:', error?.message || '未知错误');
+      return null;
+    }
+  }
 };
