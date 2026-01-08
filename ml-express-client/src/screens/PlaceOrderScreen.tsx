@@ -1374,8 +1374,22 @@ export default function PlaceOrderScreen({ navigation }: any) {
   // 处理商品选择变化
   const handleProductQuantityChange = (productId: string, delta: number) => {
     setSelectedProducts(prev => {
+      const product = merchantProducts.find(p => p.id === productId);
+      if (!product) return prev;
+
       const currentQty = prev[productId] || 0;
-      const newQty = Math.max(0, currentQty + delta);
+      let newQty = currentQty + delta;
+
+      // 🚀 核心优化：增加库存校验逻辑
+      if (delta > 0) {
+        // 如果库存不是无限(-1)且当前数量已达到库存上限
+        if (product.stock !== -1 && currentQty >= product.stock) {
+          showToast(language === 'zh' ? `库存不足 (剩余: ${product.stock})` : `Out of stock (Left: ${product.stock})`, 'warning');
+          return prev;
+        }
+      }
+
+      newQty = Math.max(0, newQty);
       
       const newSelected = { ...prev };
       if (newQty === 0) {
@@ -1922,18 +1936,48 @@ export default function PlaceOrderScreen({ navigation }: any) {
                         <Ionicons name="image-outline" size={24} color="#cbd5e1" />
                       )}
                     </View>
-                    <View style={styles.selectorInfo}>
-                      <Text style={styles.selectorName}>{item.name}</Text>
-                      <Text style={styles.selectorPrice}>{item.price.toLocaleString()} MMK</Text>
-                    </View>
-                    <View style={styles.qtyControl}>
-                      <TouchableOpacity onPress={() => handleProductQuantityChange(item.id, -1)}>
-                        <Ionicons name="remove-circle-outline" size={24} color={selectedProducts[item.id] ? "#64748b" : "#e2e8f0"} />
-                      </TouchableOpacity>
-                      <Text style={styles.qtyText}>{selectedProducts[item.id] || 0}</Text>
-                      <TouchableOpacity onPress={() => handleProductQuantityChange(item.id, 1)}>
-                        <Ionicons name="add-circle-outline" size={24} color="#3b82f6" />
-                      </TouchableOpacity>
+                    
+                    <View style={styles.selectorRightContent}>
+                      <View style={styles.selectorTopRow}>
+                        <Text style={styles.selectorName} numberOfLines={1}>{item.name}</Text>
+                        <Text style={styles.selectorPrice} numberOfLines={1}>{item.price.toLocaleString()} MMK</Text>
+                      </View>
+                      
+                      <View style={styles.selectorBottomRow}>
+                        <View style={styles.selectorStockRow}>
+                          <Ionicons name="cube-outline" size={12} color="#94a3b8" />
+                          <Text style={[
+                            styles.selectorStockText,
+                            item.stock === 0 && { color: '#ef4444' }
+                          ]}>
+                            {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.selectorQtyControl}>
+                          <TouchableOpacity 
+                            onPress={() => handleProductQuantityChange(item.id, -1)}
+                            disabled={!selectedProducts[item.id]}
+                          >
+                            <Ionicons 
+                              name="remove-circle-outline" 
+                              size={28} 
+                              color={selectedProducts[item.id] ? "#64748b" : "#e2e8f0"} 
+                            />
+                          </TouchableOpacity>
+                          <Text style={styles.qtyText}>{selectedProducts[item.id] || 0}</Text>
+                          <TouchableOpacity 
+                            onPress={() => handleProductQuantityChange(item.id, 1)}
+                            disabled={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock}
+                          >
+                            <Ionicons 
+                              name="add-circle-outline" 
+                              size={28} 
+                              color={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock ? "#e2e8f0" : "#3b82f6"} 
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     </View>
                   </View>
                 ))
@@ -3092,20 +3136,49 @@ const baseStyles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  selectorInfo: {
+  selectorRightContent: {
     flex: 1,
     marginLeft: 12,
+    justifyContent: 'space-between',
+  },
+  selectorTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  selectorBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
   },
   selectorName: {
+    flex: 1,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 2,
   },
   selectorPrice: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#10b981',
-    fontWeight: '700',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  selectorStockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  selectorStockText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  selectorQtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   modalConfirmBtn: {
     borderRadius: 12,
