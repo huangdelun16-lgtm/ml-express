@@ -196,7 +196,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const handleSaveProduct = async () => {
     if (!productForm.name || !productForm.price) {
-      showToast('请填写名称和价格', 'warning');
+      showToast(language === 'zh' ? '请填写名称和价格' : 'Please fill name and price', 'warning');
       return;
     }
 
@@ -210,7 +210,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         if (uploadedUrl) {
           finalImageUrl = uploadedUrl;
         } else {
-          // 如果上传失败，提示用户并中止保存
           Alert.alert('错误', '图片上传失败，请检查网络或重试');
           setFormLoading(false);
           return;
@@ -238,13 +237,43 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         setShowProductModal(false);
         loadProducts();
       } else {
-        showToast('保存失败', 'error');
+        showToast(language === 'zh' ? '保存失败' : 'Save failed', 'error');
       }
     } catch (error) {
-      showToast('保存异常', 'error');
+      showToast(language === 'zh' ? '保存异常' : 'Save exception', 'error');
     } finally {
       setFormLoading(false);
     }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    Alert.alert(
+      language === 'zh' ? '删除商品' : 'Delete Product',
+      currentT.deleteConfirm,
+      [
+        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+        { 
+          text: language === 'zh' ? '确定删除' : 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const result = await merchantService.deleteProduct(productId);
+              if (result.success) {
+                showToast(currentT.deleteSuccess, 'success');
+                loadProducts();
+              } else {
+                showToast('删除失败', 'error');
+              }
+            } catch (error) {
+              showToast('删除异常', 'error');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const toggleProductStatus = async (product: Product) => {
@@ -431,11 +460,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               </View>
 
               <View style={styles.modalFooter}>
+                {editingProduct && (
+                  <TouchableOpacity 
+                    style={styles.deleteBtn} 
+                    onPress={() => handleDeleteProduct(editingProduct.id)}
+                  >
+                    <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity 
                   style={styles.cancelBtn} 
                   onPress={() => setShowProductModal(false)}
                 >
-                  <Text style={styles.cancelBtnText}>{currentT.title === '商品管理' ? '取消' : 'Cancel'}</Text>
+                  <Text style={styles.cancelBtnText}>{language === 'zh' ? '取消' : 'Cancel'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -450,7 +488,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                     {formLoading ? (
                       <ActivityIndicator color="white" />
                     ) : (
-                      <Text style={styles.saveBtnText}>{currentT.title === '商品管理' ? '保存' : 'Save'}</Text>
+                      <Text style={styles.saveBtnText}>{language === 'zh' ? '保存' : 'Save'}</Text>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -688,6 +726,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginBottom: 20,
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#fee2e2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
   cancelBtn: {
     flex: 1,
