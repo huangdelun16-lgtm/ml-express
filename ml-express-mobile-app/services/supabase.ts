@@ -151,6 +151,23 @@ export interface RouteOptimization {
   priority_score: number;
 }
 
+// 商品接口
+export interface Product {
+  id: string;
+  store_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  original_price?: number;
+  image_url?: string;
+  stock: number;
+  is_available: boolean;
+  sales_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 快递店数据类型
 export interface DeliveryStore {
   id: string;
@@ -326,7 +343,7 @@ export const adminAccountService = {
     }
   },
 
-  async updatePassword(username: string, newPassword: string): Promise<boolean> {
+  async updatePassword(username: string, currentPassword: string, newPassword: string): Promise<boolean> {
     try {
       const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
         method: 'POST',
@@ -336,6 +353,7 @@ export const adminAccountService = {
         body: JSON.stringify({
           action: 'updatePassword',
           username: username,
+          currentPassword: currentPassword,
           newPassword: newPassword
         })
       });
@@ -509,14 +527,50 @@ export const packageService = {
     // 如果是送达状态且有骑手位置信息，进行违规检测
     if (status === '已送达') {
       try {
-        // 获取包裹信息以进行违规检测和发送通知
+        // 获取包裹信息以进行违规检测、发送通知和扣减库存
         const { data: packageData } = await supabase
           .from('packages')
-          .select('receiver_latitude, receiver_longitude, courier, customer_id')
+          .select('receiver_latitude, receiver_longitude, courier, customer_id, description')
           .eq('id', id)
           .single();
 
         if (packageData) {
+          // 🚀 核心优化：在“已送达”后，扣减商品库存
+          if (packageData.description) {
+            // 解析描述中的商品信息，例如：[已选商品: 商品A x1, 商品B x2]
+            const match = packageData.description.match(/\[(?:已选商品|Selected|ကုန်ပစ္စည်းများ): (.*?)\]/);
+            if (match && match[1]) {
+              console.log('📦 发现订单包含商品，准备扣减库存:', match[1]);
+              const productItems = match[1].split(', ');
+              
+              // 获取当前店铺的所有商品以便查找 ID（或者我们需要在描述中存储 ID）
+              // 这里的策略是根据商品名称查找并扣减
+              for (const item of productItems) {
+                const itemMatch = item.match(/(.*?) x(\d+)/);
+                if (itemMatch) {
+                  const productName = itemMatch[1].trim();
+                  const quantity = parseInt(itemMatch[2]);
+                  
+                  // 查找商品并更新库存
+                  const { data: products } = await supabase
+                    .from('products')
+                    .select('id, stock, name')
+                    .eq('name', productName)
+                    .limit(1);
+                  
+                  if (products && products.length > 0) {
+                    const product = products[0];
+                    if (product.stock !== -1) {
+                      const newStock = Math.max(0, product.stock - quantity);
+                      await merchantService.updateStock(product.id, newStock);
+                      console.log(`✅ 商品 ${product.name} 库存已扣减: ${product.stock} -> ${newStock}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           // 1. 调用违规检测函数
           if (courierLocation && courierName) {
             await detectViolationsAsync(id, courierName, courierLocation.latitude, courierLocation.longitude);
@@ -837,6 +891,44 @@ export const deliveryStoreService = {
       return data;
     } catch (err) {
       console.error('获取快递店详情异常:', err);
+      return null;
+    }
+  }
+};
+
+// 商家服务 (外卖/零售)
+export const merchantService = {
+  // 更新库存
+  async updateStock(productId: string, newStock: number) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({ stock: newStock })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('更新商品库存失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 获取商品信息
+  async getProductById(productId: string): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('获取商品详情失败:', error);
       return null;
     }
   }

@@ -12,14 +12,16 @@ import {
   Switch,
   Modal,
   Dimensions,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { packageService, systemSettingsService, supabase } from '../services/supabase';
+import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
@@ -42,7 +44,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
 export default function PlaceOrderScreen({ navigation }: any) {
@@ -249,6 +251,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash');
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
   
+  // 商品选择相关状态
+  const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({}); // id -> quantity
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [hasCOD, setHasCOD] = useState(true); // 新增：是否代收状态
+  
   // 计费规则
   const [pricingSettings, setPricingSettings] = useState({
     base_fee: 1000,
@@ -282,6 +290,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
       weight: '重量（kg）',
       description: '物品描述（选填）',
       codAmount: '代收款 (COD)',
+      hasCOD: '代收状态',
+      collect: '有代收',
+      noCollect: '无代收',
+      selectProduct: '选择商品',
+      selectedProducts: '已选商品',
+      totalProductPrice: '商品总价',
       deliveryOptions: '配送选项',
       deliverySpeed: '配送速度',
       speedStandard: '准时达（1小时内）',
@@ -379,6 +393,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
       weight: 'Weight (kg)',
       description: 'Description (Optional)',
       codAmount: 'COD Amount',
+      hasCOD: 'COD Status',
+      collect: 'Collect',
+      noCollect: 'No Collect',
+      selectProduct: 'Select Products',
+      selectedProducts: 'Selected',
+      totalProductPrice: 'Total Price',
       deliveryOptions: 'Delivery Options',
       deliverySpeed: 'Delivery Speed',
       speedStandard: 'Standard (within 1 hour)',
@@ -476,6 +496,9 @@ export default function PlaceOrderScreen({ navigation }: any) {
       weight: 'အလေးချိန် (kg)',
       description: 'ပစ္စည်းဖော်ပြချက် (ရွေးချယ်)',
       codAmount: '代收款 (COD)',
+      hasCOD: '代收状态',
+      collect: 'ငွေကောက်ခံမည်',
+      noCollect: 'ငွေမကောက်ခံပါ',
       deliveryOptions: 'ပို့ဆောင်ရေးရွေးချယ်မှု',
       deliverySpeed: 'ပို့ဆောင်မြန်နှုန်း',
       speedStandard: 'စံချိန် (၁နာရီအတွင်း)',
@@ -667,6 +690,15 @@ export default function PlaceOrderScreen({ navigation }: any) {
               lng: store.longitude
             });
             LoggerService.debug('✅ 已自动填充店铺信息和坐标');
+
+            // 加载店铺商品
+            try {
+              const products = await merchantService.getStoreProducts(store.id);
+              setMerchantProducts(products.filter(p => p.is_available));
+              LoggerService.debug('✅ 已加载店铺商品:', products.length);
+            } catch (err) {
+              LoggerService.error('加载店铺商品失败:', err);
+            }
           }
         } catch (error) {
           LoggerService.error('加载合伙店铺失败:', error);
@@ -1276,7 +1308,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
-        cod_amount: currentUser?.user_type === 'partner' ? parseFloat(codAmount || '0') : 0,
+        cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : 0,
         description: description || '',
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
@@ -1339,6 +1371,52 @@ export default function PlaceOrderScreen({ navigation }: any) {
     }
   };
 
+  // 处理商品选择变化
+  const handleProductQuantityChange = (productId: string, delta: number) => {
+    setSelectedProducts(prev => {
+      const currentQty = prev[productId] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      
+      const newSelected = { ...prev };
+      if (newQty === 0) {
+        delete newSelected[productId];
+      } else {
+        newSelected[productId] = newQty;
+      }
+      
+      // 更新 COD 金额和描述
+      updateCODAndDescription(newSelected);
+      
+      return newSelected;
+    });
+  };
+
+  const updateCODAndDescription = (selected: Record<string, number>) => {
+    let totalCOD = 0;
+    let productDetails: string[] = [];
+
+    Object.entries(selected).forEach(([id, qty]) => {
+      const product = merchantProducts.find(p => p.id === id);
+      if (product) {
+        totalCOD += product.price * qty;
+        productDetails.push(`${product.name} x${qty}`);
+      }
+    });
+
+    if (totalCOD > 0) {
+      // 只有在开启代收时才设置金额，否则设为 0
+      setCodAmount(hasCOD ? totalCOD.toString() : '0');
+      
+      // 自动把选中的商品添加到物品描述中 (无论是否代收都要添加)
+      const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
+      // 如果原先有描述，保留它（避免重复添加）
+      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]/g, '').trim();
+      setDescription(`${productsText} ${cleanDesc}`.trim());
+    } else {
+      setCodAmount('0');
+    }
+  };
+
   // 重置表单
   const resetForm = () => {
     setReceiverName('');
@@ -1357,6 +1435,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
     setCalculatedDistance(0);
     setPrice('0');
     setDistance(0);
+    setSelectedProducts({}); // 同时重置选中的商品
+    setHasCOD(true); // 重置为默认有代收
   };
 
   // 处理包裹类型点击
@@ -1402,6 +1482,19 @@ export default function PlaceOrderScreen({ navigation }: any) {
     });
   };
 
+  // 处理代收切换
+  const handleToggleCOD = (val: boolean) => {
+    setHasCOD(val);
+    if (!val) {
+      // 切换到无代收时，金额归零，但保留已选商品和描述
+      setCodAmount('0');
+    } else {
+      // 切换回有代收时，根据已选商品重新计算金额
+      updateCODAndDescription(selectedProducts);
+    }
+  };
+
+  // Force re-bundle
   return (
     <View style={styles.container}>
       {/* 优化背景视觉效果 */}
@@ -1514,24 +1607,81 @@ export default function PlaceOrderScreen({ navigation }: any) {
           {currentUser?.user_type === 'partner' && (
             <FadeInView delay={320}>
               <View style={styles.section}>
-                <View style={styles.sectionTitleContainer}>
-                  <MoneyIcon size={18} color="#1e293b" />
-                  <Text style={styles.sectionTitle}> {currentT.codAmount}</Text>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionTitleContainer}>
+                    <MoneyIcon size={18} color="#1e293b" />
+                    <Text style={styles.sectionTitle}> {currentT.codAmount}</Text>
+                  </View>
+                  <View style={styles.codToggleContainer}>
+                    <Text style={[styles.codToggleLabel, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
+                    <Switch
+                      value={hasCOD}
+                      onValueChange={handleToggleCOD}
+                      trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
+                      thumbColor="#ffffff"
+                    />
+                    <Text style={[styles.codToggleLabel, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
+                  </View>
                 </View>
+
+                {/* 商品选择部分 (无论是否代收都显示，方便老板选货) */}
                 <View style={[styles.inputGroup, { marginTop: 15 }]}>
-                  <Text style={styles.label}>{currentT.codAmount} *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={codAmount}
-                    onChangeText={setCodAmount}
-                    placeholder={currentT.placeholders.codAmount}
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="decimal-pad"
-                  />
-                  <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
-                    💡 {language === 'zh' ? '该金额将由骑手在取件时代收' : language === 'en' ? 'This amount will be collected by the courier upon pickup' : 'ဤပမာဏကို ကူရီယာမှ ပစ္စည်းယူစဉ် ကောက်ခံမည်ဖြစ်သည်'}
-                  </Text>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>{currentT.selectedProducts}</Text>
+                    <TouchableOpacity 
+                      style={styles.selectProductBtn}
+                      onPress={() => setShowProductSelector(true)}
+                    >
+                      <Ionicons name="basket-outline" size={16} color="#3b82f6" />
+                      <Text style={styles.selectProductBtnText}>{currentT.selectProduct}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 已选商品列表 */}
+                  {Object.keys(selectedProducts).length > 0 && (
+                    <View style={styles.selectedProductsList}>
+                      {Object.entries(selectedProducts).map(([id, qty]) => {
+                        const product = merchantProducts.find(p => p.id === id);
+                        if (!product) return null;
+                        return (
+                          <View key={id} style={styles.selectedProductItem}>
+                            <Text style={styles.selectedProductName} numberOfLines={1}>{product.name}</Text>
+                            <View style={styles.qtyControl}>
+                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, -1)}>
+                                <Ionicons name="remove-circle-outline" size={20} color="#64748b" />
+                              </TouchableOpacity>
+                              <Text style={styles.qtyText}>{qty}</Text>
+                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, 1)}>
+                                <Ionicons name="add-circle-outline" size={20} color="#3b82f6" />
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={styles.selectedProductPrice}>{(product.price * qty).toLocaleString()} MMK</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
+
+                {/* 代收金额输入框 (仅在开启代收时显示) */}
+                {hasCOD && (
+                  <FadeInView>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>{currentT.codAmount} *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={codAmount}
+                        onChangeText={setCodAmount}
+                        placeholder={currentT.placeholders.codAmount}
+                        placeholderTextColor="#9ca3af"
+                        keyboardType="decimal-pad"
+                      />
+                      <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+                        💡 {language === 'zh' ? '该金额将由骑手在取件时代收' : language === 'en' ? 'This amount will be collected by the courier upon pickup' : 'ဤပမာဏကို ကူရီယာမှ ပစ္စည်းယူစဉ် ကောက်ခံမည်ဖြစ်သည်'}
+                      </Text>
+                    </View>
+                  </FadeInView>
+                )}
               </View>
             </FadeInView>
           )}
@@ -1736,6 +1886,68 @@ export default function PlaceOrderScreen({ navigation }: any) {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 商品选择模态框 */}
+      <Modal
+        visible={showProductSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowProductSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{currentT.selectProduct}</Text>
+              <TouchableOpacity onPress={() => setShowProductSelector(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 10 }}>
+              {merchantProducts.length === 0 ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <Ionicons name="basket-outline" size={48} color="#cbd5e1" />
+                  <Text style={{ marginTop: 12, color: '#94a3b8' }}>暂无上架商品</Text>
+                </View>
+              ) : (
+                merchantProducts.map((item) => (
+                  <View key={item.id} style={styles.selectorItem}>
+                    <View style={styles.selectorImageContainer}>
+                      {item.image_url ? (
+                        <Image source={{ uri: item.image_url }} style={styles.selectorImage} />
+                      ) : (
+                        <Ionicons name="image-outline" size={24} color="#cbd5e1" />
+                      )}
+                    </View>
+                    <View style={styles.selectorInfo}>
+                      <Text style={styles.selectorName}>{item.name}</Text>
+                      <Text style={styles.selectorPrice}>{item.price.toLocaleString()} MMK</Text>
+                    </View>
+                    <View style={styles.qtyControl}>
+                      <TouchableOpacity onPress={() => handleProductQuantityChange(item.id, -1)}>
+                        <Ionicons name="remove-circle-outline" size={24} color={selectedProducts[item.id] ? "#64748b" : "#e2e8f0"} />
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{selectedProducts[item.id] || 0}</Text>
+                      <TouchableOpacity onPress={() => handleProductQuantityChange(item.id, 1)}>
+                        <Ionicons name="add-circle-outline" size={24} color="#3b82f6" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={styles.modalConfirmBtn}
+              onPress={() => setShowProductSelector(false)}
+            >
+              <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.modalConfirmGradient}>
+                <Text style={styles.modalConfirmText}>{currentT.timePicker.confirm}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2779,5 +2991,151 @@ const baseStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  // 商家商品选择样式
+  selectProductBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
+  selectProductBtnText: {
+    fontSize: 12,
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  selectedProductsList: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  selectedProductItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  selectedProductName: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+  qtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 12,
+  },
+  qtyText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    minWidth: 20,
+    textAlign: 'center',
+  },
+  selectedProductPrice: {
+    fontSize: 13,
+    color: '#10b981',
+    fontWeight: '700',
+    minWidth: 80,
+    textAlign: 'right',
+  },
+  productTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 8,
+  },
+  productTotalLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  productTotalValue: {
+    fontSize: 16,
+    color: '#3b82f6',
+    fontWeight: 'bold',
+  },
+  selectorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  selectorImageContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  selectorImage: {
+    width: '100%',
+    height: '100%',
+  },
+  selectorInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  selectorName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  selectorPrice: {
+    fontSize: 13,
+    color: '#10b981',
+    fontWeight: '700',
+  },
+  modalConfirmBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  modalConfirmGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  // 代收切换样式
+  codToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  codToggleLabel: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  codToggleLabelActive: {
+    color: '#3b82f6',
   },
 });
