@@ -261,6 +261,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               const result = await merchantService.deleteProduct(productId);
               if (result.success) {
                 showToast(currentT.deleteSuccess, 'success');
+                setShowProductModal(false); // 🚀 自动关闭弹窗
+                setEditingProduct(null); // 🚀 重置编辑状态
                 loadProducts();
               } else {
                 showToast('删除失败', 'error');
