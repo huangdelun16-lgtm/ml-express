@@ -1938,10 +1938,8 @@ export default function PlaceOrderScreen({ navigation }: any) {
                     </View>
                     
                     <View style={styles.selectorRightContent}>
-                      <View style={styles.selectorTopRow}>
-                        <Text style={styles.selectorName} numberOfLines={1}>{item.name}</Text>
-                        <Text style={styles.selectorPrice} numberOfLines={1}>{item.price.toLocaleString()} MMK</Text>
-                      </View>
+                      <Text style={styles.selectorName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.selectorPrice} numberOfLines={1}>{item.price.toLocaleString()} MMK</Text>
                       
                       <View style={styles.selectorBottomRow}>
                         <View style={styles.selectorStockRow}>
@@ -3140,30 +3138,25 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     justifyContent: 'space-between',
+    paddingVertical: 2,
   },
-  selectorTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  selectorName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  selectorPrice: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   selectorBottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-  },
-  selectorName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  selectorPrice: {
-    fontSize: 14,
-    color: '#10b981',
-    fontWeight: 'bold',
-    marginLeft: 8,
+    marginTop: 2,
   },
   selectorStockRow: {
     flexDirection: 'row',
