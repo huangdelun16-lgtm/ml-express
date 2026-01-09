@@ -74,6 +74,23 @@ export interface Banner {
   updated_at?: string;
 }
 
+// 商品接口
+export interface Product {
+  id: string;
+  store_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  original_price?: number;
+  image_url?: string;
+  stock: number;
+  is_available: boolean;
+  sales_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
   // 获取所有包裹（用于跟踪页面）
@@ -710,6 +727,103 @@ export const pendingOrderService = {
     } catch (err) {
       LoggerService.error('删除临时订单异常:', err);
       return false;
+    }
+  }
+};
+
+// 商家服务 (外卖/零售)
+export const merchantService = {
+  // 获取商店的所有商品
+  async getStoreProducts(storeId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店商品失败:', error);
+      return [];
+    }
+  },
+
+  // 添加商品
+  async addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([product])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('添加商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 更新商品
+  async updateProduct(productId: string, updates: Partial<Product>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update(updates)
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 删除商品
+  async deleteProduct(productId: string) {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      LoggerService.error('删除商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 上传商品图片 (Web版使用 Base64 或 File 直接上传)
+  async uploadProductImage(storeId: string, file: File): Promise<string | null> {
+    try {
+      const fileName = `${storeId}/${Date.now()}-${file.name}`;
+      
+      const { data, error } = await supabase.storage
+        .from('product_images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // 获取公共 URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product_images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传商品图片失败:', error);
+      return null;
     }
   }
 };

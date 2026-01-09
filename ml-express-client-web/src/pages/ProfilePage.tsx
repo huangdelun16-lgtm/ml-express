@@ -1,9 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase } from '../services/supabase';
+import { packageService, supabase, merchantService, Product } from '../services/supabase';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
+
+// 注入样式
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -45,6 +60,22 @@ const ProfilePage: React.FC = () => {
   const [codModalTitle, setCodModalTitle] = useState('');
   const dateInputRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 新增：店铺商品管理状态
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [showAddEditProductModal, setShowAddEditProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    price: '',
+    stock: '-1',
+    image_url: '',
+    is_available: true
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handlePrevMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     let newYear = year;
@@ -65,6 +96,131 @@ const ProfilePage: React.FC = () => {
       newYear += 1;
     }
     setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+  };
+
+  // 🚀 新增：店铺商品管理逻辑
+  const loadProducts = async () => {
+    if (!currentUser?.id) return;
+    try {
+      setLoadingProducts(true);
+      const data = await merchantService.getStoreProducts(currentUser.id);
+      setProducts(data);
+    } catch (error) {
+      LoggerService.error('加载商品失败:', error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const handleOpenAddProduct = () => {
+    setEditingProduct(null);
+    setProductForm({
+      name: '',
+      price: '',
+      stock: '-1',
+      image_url: '',
+      is_available: true
+    });
+    setShowAddEditProductModal(true);
+  };
+
+  const handleOpenEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      price: product.price.toString(),
+      stock: product.stock.toString(),
+      image_url: product.image_url || '',
+      is_available: product.is_available
+    });
+    setShowAddEditProductModal(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser?.id) return;
+
+    try {
+      setIsUploading(true);
+      const url = await merchantService.uploadProductImage(currentUser.id, file);
+      if (url) {
+        setProductForm(prev => ({ ...prev, image_url: url }));
+      }
+    } catch (error) {
+      LoggerService.error('图片上传失败:', error);
+      alert('图片上传失败，请重试');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSaveProduct = async () => {
+    if (!productForm.name || !productForm.price || !currentUser?.id) {
+      alert('请填写必要信息');
+      return;
+    }
+
+    try {
+      setLoadingProducts(true);
+      const productData = {
+        store_id: currentUser.id,
+        name: productForm.name,
+        price: parseFloat(productForm.price),
+        stock: parseInt(productForm.stock),
+        image_url: productForm.image_url,
+        is_available: productForm.is_available,
+        description: ''
+      };
+
+      let result;
+      if (editingProduct) {
+        result = await merchantService.updateProduct(editingProduct.id, productData);
+      } else {
+        result = await merchantService.addProduct(productData);
+      }
+
+      if (result.success) {
+        setShowAddEditProductModal(false);
+        await loadProducts();
+      } else {
+        alert('保存失败，请重试');
+      }
+    } catch (error) {
+      LoggerService.error('保存商品失败:', error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!window.confirm('确定要删除这个商品吗？')) return;
+
+    try {
+      setLoadingProducts(true);
+      const result = await merchantService.deleteProduct(productId);
+      if (result.success) {
+        await loadProducts();
+      } else {
+        alert('删除失败，请重试');
+      }
+    } catch (error) {
+      LoggerService.error('删除商品失败:', error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const toggleProductStatus = async (product: Product) => {
+    try {
+      const result = await merchantService.updateProduct(product.id, { 
+        is_available: !product.is_available 
+      });
+      if (result.success) {
+        await loadProducts();
+      }
+    } catch (error) {
+      LoggerService.error('更新状态失败:', error);
+    }
   };
 
   // 检查用户是否是合伙店铺账户
@@ -225,6 +381,7 @@ const ProfilePage: React.FC = () => {
     loadUserPackages();
     if (isPartnerStore) {
       loadPartnerCODStats();
+      loadProducts(); // 🚀 新增：加载店铺商品
     }
   }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
 
@@ -432,6 +589,21 @@ const ProfilePage: React.FC = () => {
       view: '查看',
       codOrders: '代收款订单',
       codAmount: '代收金额',
+      myProducts: '我的商品',
+      addProduct: '添加商品',
+      editProduct: '编辑商品',
+      productName: '商品名称',
+      productPrice: '商品价格',
+      productStock: '商品库存',
+      stockInfinite: '无限',
+      isAvailable: '是否上架',
+      onSale: '已上架',
+      offShelf: '已下架',
+      save: '保存',
+      delete: '删除',
+      deleteConfirm: '确定要删除这个商品吗？',
+      uploadImage: '上传图片',
+      uploading: '正在上传...',
     },
     en: {
       nav: {
@@ -486,6 +658,21 @@ const ProfilePage: React.FC = () => {
       view: 'View',
       codOrders: 'COD Orders',
       codAmount: 'COD Amount',
+      myProducts: 'My Products',
+      addProduct: 'Add Product',
+      editProduct: 'Edit Product',
+      productName: 'Product Name',
+      productPrice: 'Price',
+      productStock: 'Stock',
+      stockInfinite: 'Infinite',
+      isAvailable: 'Available',
+      onSale: 'On Sale',
+      offShelf: 'Off Shelf',
+      save: 'Save',
+      delete: 'Delete',
+      deleteConfirm: 'Are you sure you want to delete this product?',
+      uploadImage: 'Upload Image',
+      uploading: 'Uploading...',
     },
     my: {
       nav: {
@@ -540,6 +727,21 @@ const ProfilePage: React.FC = () => {
       view: 'ကြည့်ရန်',
       codOrders: 'ငွေကောက်ခံရန်အော်ဒါများ',
       codAmount: 'ငွေကောက်ခံရန်ပမာဏ',
+      myProducts: 'ကျွန်ုပ်၏ကုန်ပစ္စည်းများ',
+      addProduct: 'ကုန်ပစ္စည်းအသစ်ထည့်ရန်',
+      editProduct: 'ပြင်ဆင်ရန်',
+      productName: 'အမည်',
+      productPrice: 'စျေးနှုန်း',
+      productStock: 'လက်ကျန်',
+      stockInfinite: 'အကန့်အသတ်မရှိ',
+      isAvailable: 'ရောင်းချရန်ရှိသည်',
+      onSale: 'ရောင်းချနေသည်',
+      offShelf: 'ခေတ္တရပ်နားထားသည်',
+      save: 'သိမ်းရန်',
+      delete: 'ဖျက်မည်',
+      deleteConfirm: 'ဤကုန်ပစ္စည်းကို ဖျက်ရန် သေချาပါသလား?',
+      uploadImage: 'ဓာတ်ပုံတင်ရန်',
+      uploading: 'တင်နေသည်...',
     }
   };
 
@@ -847,6 +1049,45 @@ const ProfilePage: React.FC = () => {
                     {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
                   </button>
                 )}
+
+                {/* 🚀 新增：我的商品管理按钮 */}
+                {isPartnerStore && (
+                  <button
+                    onClick={() => setShowProductsModal(true)}
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      fontSize: '0.95rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      whiteSpace: 'nowrap',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>🛍️</span>
+                    {t.myProducts}
+                  </button>
+                )}
               </div>
               
               {isPartnerStore && storeInfo ? (
@@ -1098,6 +1339,118 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* 🚀 新增：店铺商品管理 - 仅合伙店铺显示 */}
+          {isPartnerStore && (
+            <div style={{ 
+              marginBottom: '3rem',
+              background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '32px',
+              padding: '2.5rem',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '2.5rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                paddingBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    borderRadius: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.8rem',
+                    boxShadow: '0 10px 20px rgba(5, 150, 105, 0.4)'
+                  }}>🏪</div>
+                  <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: 0 }}>{t.myProducts}</h3>
+                </div>
+                <button 
+                  onClick={handleOpenAddProduct}
+                  style={{
+                    padding: '12px 28px',
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    color: 'white',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 25px rgba(5, 150, 105, 0.4)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0) scale(1)'}
+                >
+                  + {t.addProduct}
+                </button>
+              </div>
+
+              {loadingProducts ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <div className="spinner" style={{ border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #10b981', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+                </div>
+              ) : products.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.4)', fontSize: '1.1rem' }}>
+                  {t.noProducts}
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '1.5rem'
+                }}>
+                  {products.map(product => (
+                    <div 
+                      key={product.id}
+                      onClick={() => handleOpenEditProduct(product)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '24px',
+                        padding: '1.25rem',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(-5px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <div style={{ width: '100%', aspectRatio: '1', borderRadius: '16px', background: '#0f172a', marginBottom: '1rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '2rem' }}>🖼️</span>
+                        )}
+                      </div>
+                      <h4 style={{ color: 'white', fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.5rem 0' }}>{product.name}</h4>
+                      <div style={{ color: '#10b981', fontWeight: '900', fontSize: '1.25rem' }}>{product.price.toLocaleString()} MMK</div>
+                      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.5rem' }}>
+                        {t.productStock}: {product.stock === -1 ? t.stockInfinite : product.stock}
+                      </div>
+                      {!product.is_available && (
+                        <div style={{ position: 'absolute', top: '15px', right: '15px', background: '#ef4444', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)' }}>{t.offShelf}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && (
@@ -2981,6 +3334,295 @@ const ProfilePage: React.FC = () => {
             >
               {t.close}
             </button>
+          </div>
+        </div>
+      )}
+
+        </div>
+      )}
+
+      {/* 🚀 新增：店铺商品管理大模态框 */}
+      {showProductsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(15px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1500,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#0f172a',
+            borderRadius: '32px',
+            padding: '2.5rem',
+            width: '95%',
+            maxWidth: '1000px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 30px 70px rgba(0, 0, 0, 0.5)',
+            position: 'relative'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              paddingBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  boxShadow: '0 10px 20px rgba(5, 150, 105, 0.4)'
+                }}>🏪</div>
+                <h3 style={{ color: 'white', fontSize: '2rem', fontWeight: '900', margin: 0 }}>{t.myProducts}</h3>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button 
+                  onClick={handleOpenAddProduct}
+                  style={{
+                    padding: '12px 28px',
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    color: 'white',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 25px rgba(5, 150, 105, 0.4)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  + {t.addProduct}
+                </button>
+                <button 
+                  onClick={() => setShowProductsModal(false)}
+                  style={{ position: 'relative', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '48px', height: '48px', borderRadius: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}
+                >✕</button>
+              </div>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0.5rem' }}>
+              {loadingProducts ? (
+                <div style={{ textAlign: 'center', padding: '5rem' }}>
+                  <div className="spinner" style={{ border: '5px solid rgba(255,255,255,0.1)', borderTop: '5px solid #10b981', borderRadius: '50%', width: '50px', height: '50px', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+                </div>
+              ) : products.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '5rem', color: 'rgba(255,255,255,0.3)' }}>
+                  <div style={{ fontSize: '5rem', marginBottom: '1.5rem' }}>📦</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{t.noProducts}</div>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '2rem'
+                }}>
+                  {products.map(product => (
+                    <div 
+                      key={product.id}
+                      onClick={() => handleOpenEditProduct(product)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '28px',
+                        padding: '1.5rem',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.transform = 'translateY(-10px)';
+                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+                      }}
+                    >
+                      <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '3rem' }}>🖼️</span>
+                        )}
+                      </div>
+                      <h4 style={{ color: 'white', fontSize: '1.2rem', fontWeight: '800', margin: '0 0 0.75rem 0' }}>{product.name}</h4>
+                      <div style={{ color: '#10b981', fontWeight: '900', fontSize: '1.5rem' }}>{product.price.toLocaleString()} MMK</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
+                          {t.productStock}: {product.stock === -1 ? t.stockInfinite : product.stock}
+                        </div>
+                        <div style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '10px', 
+                          fontSize: '0.75rem', 
+                          fontWeight: '800',
+                          backgroundColor: product.is_available ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: product.is_available ? '#10b981' : '#ef4444'
+                        }}>
+                          {product.is_available ? t.onSale : t.offShelf}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：添加/编辑商品模态框 */}
+      {showAddEditProductModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '32px',
+            padding: '2.5rem',
+            width: '100%',
+            maxWidth: '550px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowAddEditProductModal(false)}
+              style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >✕</button>
+
+            <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: '0 0 2rem 0', textAlign: 'center' }}>
+              {editingProduct ? t.editProduct : t.addProduct}
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* 图片上传区域 */}
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: '100%',
+                  aspectRatio: '16/9',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderRadius: '20px',
+                  border: '2px dashed rgba(255,255,255,0.1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+              >
+                {productForm.image_url ? (
+                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>
+                      {isUploading ? t.uploading : t.uploadImage}
+                    </div>
+                  </>
+                )}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload} 
+                  style={{ display: 'none' }} 
+                  accept="image/*"
+                />
+              </div>
+
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productName} *</label>
+                <input 
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                  placeholder="如：冰镇可乐 330ml"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productPrice} (MMK) *</label>
+                  <input 
+                    type="number"
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({...productForm, price: e.target.value})}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productStock} (-1={t.stockInfinite})</label>
+                  <input 
+                    type="number"
+                    value={productForm.stock}
+                    onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px' }}>
+                <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '700' }}>{t.isAvailable}</span>
+                <input 
+                  type="checkbox"
+                  checked={productForm.is_available}
+                  onChange={(e) => setProductForm({...productForm, is_available: e.target.checked})}
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                {editingProduct && (
+                  <button 
+                    onClick={() => handleDeleteProduct(editingProduct.id)}
+                    style={{ flex: 1, padding: '14px', borderRadius: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: '800', cursor: 'pointer' }}
+                  >🗑️ {t.delete}</button>
+                )}
+                <button 
+                  onClick={handleSaveProduct}
+                  style={{ flex: 2, padding: '14px', borderRadius: '16px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)' }}
+                >💾 {t.save}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
