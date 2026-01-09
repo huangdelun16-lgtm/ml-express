@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
+import { supabase, deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 
