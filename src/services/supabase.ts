@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { notificationService } from './notificationService';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -1173,6 +1172,82 @@ export interface Notification {
 
 // 通知服务
 export const notificationService = {
+  /**
+   * 发送推送通知给骑手
+   * @param courierName 骑手姓名
+   * @param title 通知标题
+   * @param body 通知内容
+   * @param data 附加数据
+   */
+  async sendPushNotificationToCourier(courierName: string, title: string, body: string, data?: any): Promise<boolean> {
+    try {
+      console.log(`📡 准备向骑手 ${courierName} 发送通知:`, { title, body });
+
+      // 1. 获取骑手的推送令牌
+      let pushToken = null;
+
+      // 查 couriers 表
+      const { data: courierData } = await supabase
+        .from('couriers')
+        .select('push_token')
+        .eq('name', courierName)
+        .maybeSingle();
+
+      if (courierData?.push_token) {
+        pushToken = courierData.push_token;
+      } else {
+        // 查 admin_accounts 表
+        const { data: adminData } = await supabase
+          .from('admin_accounts')
+          .select('push_token')
+          .eq('employee_name', courierName)
+          .maybeSingle();
+        
+        if (adminData?.push_token) {
+          pushToken = adminData.push_token;
+        }
+      }
+
+      if (!pushToken) {
+        console.warn(`⚠️ 无法发送推送：找不到骑手 ${courierName} 的有效推送令牌`);
+        return false;
+      }
+
+      // 2. 调用 Expo 推送服务
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title: title,
+        body: body,
+        data: {
+          ...data,
+          type: 'new_order',
+          timestamp: new Date().toISOString()
+        },
+        channelId: 'new-task-channel',
+        priority: 'high',
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log('📤 Expo 推送发送结果:', result);
+      
+      return response.ok;
+    } catch (error) {
+      console.error('❌ 发送推送通知失败:', error);
+      return false;
+    }
+  },
+
   /**
    * 发送包裹分配通知给快递员
    */
