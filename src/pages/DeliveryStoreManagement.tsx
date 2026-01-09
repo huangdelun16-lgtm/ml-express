@@ -596,7 +596,24 @@ const DeliveryStoreManagement: React.FC = () => {
   }, []);
 
   const loadStores = async (isRetry = false) => {
-    // ... 原有逻辑
+    try {
+      setLoading(true);
+      if (!isRetry) {
+        setErrorMessage(null); // 清除之前的错误信息
+      }
+      const data = await deliveryStoreService.getAllStores();
+      setAllStores(data); // 存储所有合伙店铺
+      setRetryCount(0); // 重置重试计数
+    } catch (error) {
+      console.error('加载合伙店铺列表失败:', error);
+      setErrorMessage('加载合伙店铺列表失败，请刷新页面重试');
+      setAllStores([]); // 设置空数组避免undefined
+      if (!isRetry) {
+        setRetryCount(prev => prev + 1);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 🚀 新增：加载店铺商品逻辑
@@ -651,7 +668,7 @@ const DeliveryStoreManagement: React.FC = () => {
         return newData;
       });
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -992,7 +1009,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 name="region"
                 value={formData.region}
                 onChange={handleInputChange}
-                style={{
+          style={{
                   padding: '8px 12px',
                   borderRadius: '8px',
                   border: 'none',
@@ -1018,15 +1035,15 @@ const DeliveryStoreManagement: React.FC = () => {
               <div>
                 <label style={labelStyle}>店铺名称 *</label>
                 <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    name="store_name"
-                    value={formData.store_name}
-                    onChange={handleInputChange}
-                    placeholder="例: 缅甸中心店"
-                    style={inputStyle}
-                    required
-                  />
+                <input
+                  type="text"
+                  name="store_name"
+                  value={formData.store_name}
+                  onChange={handleInputChange}
+                  placeholder="例: 缅甸中心店"
+                  style={inputStyle}
+                  required
+                />
                 </div>
               </div>
               <div>
@@ -1217,9 +1234,9 @@ const DeliveryStoreManagement: React.FC = () => {
                 />
               </div>
               {!isEditing && (
-                <div>
+              <div>
                   <label style={labelStyle}>创建合伙时间</label>
-                  <input
+                <input
                     type="text"
                     value={new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                     readOnly
@@ -1229,8 +1246,8 @@ const DeliveryStoreManagement: React.FC = () => {
                       cursor: 'not-allowed',
                       opacity: 0.7
                     }}
-                  />
-                </div>
+                />
+              </div>
               )}
               <div>
                 <label style={labelStyle}>纬度 *</label>
@@ -1423,7 +1440,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
                       {store.region && (
                         <span style={{ 
                           background: 'rgba(72, 187, 120, 0.2)', 
@@ -1752,7 +1769,7 @@ const DeliveryStoreManagement: React.FC = () => {
               </select>
             </div>
 
-            <ErrorBoundary>
+          <ErrorBoundary>
               {!isMapLoaded ? (
                 <div style={{
                   width: '100%',
@@ -1797,11 +1814,11 @@ const DeliveryStoreManagement: React.FC = () => {
                   <p style={{ margin: '0', opacity: 0.8 }}>{getMapErrorMessage()}</p>
                 </div>
               ) : (
-                <GoogleMap
+              <GoogleMap
                   key={selectedCity}
                   mapContainerStyle={{ width: '100%', height: '100%', borderRadius: '12px' }}
-                  center={mapCenter}
-                  zoom={12}
+                center={mapCenter}
+                zoom={12}
                   options={{
                     disableDefaultUI: false,
                     zoomControl: true,
@@ -1809,31 +1826,31 @@ const DeliveryStoreManagement: React.FC = () => {
                     mapTypeControl: false,
                     fullscreenControl: true,
                   }}
-                >
-                  {stores.map((store) => (
-                    <Marker
-                      key={store.id}
-                      position={{ lat: store.latitude, lng: store.longitude }}
-                      onClick={() => setSelectedStore(store)}
-                      icon={{
-                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
-                            <circle cx="20" cy="16" r="6" fill="white"/>
-                            <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#e74c3c">店</text>
-                          </svg>
-                        `),
-                        scaledSize: new window.google.maps.Size(40, 40),
-                        anchor: new window.google.maps.Point(20, 40)
-                      }}
-                    />
-                  ))}
-                  {selectedStore && (
-                    <InfoWindow
-                      position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
-                      onCloseClick={() => setSelectedStore(null)}
-                    >
-                      <div style={{
+              >
+                {stores.map((store) => (
+                  <Marker
+                    key={store.id}
+                    position={{ lat: store.latitude, lng: store.longitude }}
+                    onClick={() => setSelectedStore(store)}
+                    icon={{
+                      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+                          <circle cx="20" cy="16" r="6" fill="white"/>
+                          <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#e74c3c">店</text>
+                        </svg>
+                      `),
+                      scaledSize: new window.google.maps.Size(40, 40),
+                      anchor: new window.google.maps.Point(20, 40)
+                    }}
+                  />
+                ))}
+                {selectedStore && (
+                  <InfoWindow
+                    position={{ lat: selectedStore.latitude, lng: selectedStore.longitude }}
+                    onCloseClick={() => setSelectedStore(null)}
+                  >
+                    <div style={{ 
                         padding: '0',
                         minWidth: '280px',
                         maxWidth: '320px',
@@ -1849,25 +1866,25 @@ const DeliveryStoreManagement: React.FC = () => {
                           padding: '16px',
                           color: 'white',
                           position: 'relative'
-                        }}>
-                          <h3 style={{
+                    }}>
+                      <h3 style={{ 
                             margin: 0,
                             fontSize: '18px',
-                            fontWeight: 'bold',
+                        fontWeight: 'bold',
                             letterSpacing: '0.5px',
                             lineHeight: '1.4'
-                          }}>
-                            {selectedStore.store_name}
-                          </h3>
+                      }}>
+                        {selectedStore.store_name}
+                      </h3>
                           <div style={{
                             fontSize: '12px',
                             opacity: 0.9,
                             marginTop: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
                             flexWrap: 'wrap',
-                            gap: '6px'
-                          }}>
+                        gap: '6px'
+                      }}>
                             <span style={{ 
                               background: 'rgba(255,255,255,0.2)', 
                               padding: '2px 8px', 
@@ -1928,18 +1945,18 @@ const DeliveryStoreManagement: React.FC = () => {
 
                           {/* 状态和按钮区域 */}
                           <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                        display: 'flex',
+                        alignItems: 'center',
                             justifyContent: 'space-between', 
                             marginTop: '16px', 
                             paddingTop: '16px', 
                             borderTop: '1px solid #e2e8f0' 
-                          }}>
+                      }}>
                             {/* 状态标签 */}
-                            <div style={{
+                      <div style={{
                               padding: '4px 10px',
                               borderRadius: '20px',
-                              fontSize: '12px',
+                        fontSize: '12px',
                               fontWeight: '600',
                               display: 'flex',
                               alignItems: 'center',
@@ -2001,15 +2018,15 @@ const DeliveryStoreManagement: React.FC = () => {
                               进店查看 →
                             </button>
                           </div>
-                        </div>
                       </div>
-                    </InfoWindow>
-                  )}
-                </GoogleMap>
+                    </div>
+                  </InfoWindow>
+                )}
+              </GoogleMap>
               )}
           </ErrorBoundary>
         </div>
-      </div>
+        </div>
       </div>
 
       {/* 店长收件码二维码模态框 */}
@@ -2768,33 +2785,33 @@ const DeliveryStoreManagement: React.FC = () => {
                 </div>
               ) : (
                 <ErrorBoundary>
-                  <GoogleMap
-                    mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={mapCenter}
-                    zoom={12}
-                    onClick={handleMapClick}
-                    onLoad={onMapLoad}
-                  >
+                    <GoogleMap
+                      mapContainerStyle={{ width: '100%', height: '100%' }}
+                      center={mapCenter}
+                      zoom={12}
+                      onClick={handleMapClick}
+                      onLoad={onMapLoad}
+                    >
                     {formData.latitude && formData.longitude && isMapLoaded && window.google && (
-                      <Marker
-                        position={{
-                          lat: Number(formData.latitude),
-                          lng: Number(formData.longitude)
-                        }}
-                        icon={{
-                          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
-                              <circle cx="20" cy="16" r="6" fill="white"/>
-                              <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
-                            </svg>
-                          `),
-                          scaledSize: new window.google.maps.Size(40, 40),
-                          anchor: new window.google.maps.Point(20, 40)
-                        }}
-                      />
-                    )}
-                  </GoogleMap>
+                        <Marker
+                          position={{
+                            lat: Number(formData.latitude),
+                            lng: Number(formData.longitude)
+                          }}
+                          icon={{
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                              <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 2C12.27 2 6 8.27 6 16c0 10.5 14 22 14 22s14-11.5 14-22c0-7.73-6.27-14-14-14z" fill="#27ae60" stroke="#229954" stroke-width="2"/>
+                                <circle cx="20" cy="16" r="6" fill="white"/>
+                                <text x="20" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#27ae60">新</text>
+                              </svg>
+                            `),
+                            scaledSize: new window.google.maps.Size(40, 40),
+                            anchor: new window.google.maps.Point(20, 40)
+                          }}
+                        />
+                      )}
+                    </GoogleMap>
                 </ErrorBoundary>
               )}
             </div>
