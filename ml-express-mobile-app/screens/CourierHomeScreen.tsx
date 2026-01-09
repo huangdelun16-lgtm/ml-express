@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Vibration,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { packageService, Package } from '../services/supabase';
+import * as Speech from 'expo-speech';
+import { packageService, Package, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
@@ -28,6 +30,64 @@ export default function CourierHomeScreen({ navigation }: any) {
   useEffect(() => {
     loadUserInfo();
     loadMyPackages();
+  }, []);
+
+  // 🚀 新增：实时监听订单分配
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtimeListener = async () => {
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      if (!userName) return;
+
+      channel = supabase
+        .channel('home-tasks-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'packages',
+            filter: `courier=eq.${userName}`
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && (payload.new.status === '已分配' || (payload.old.courier !== payload.new.courier && payload.new.courier === userName)))) {
+              // 1. 震动提醒
+              Vibration.vibrate([0, 500, 200, 500]);
+              
+              // 2. 语音播报
+              try {
+                AsyncStorage.getItem('ml-express-language').then(lang => {
+                  const language = lang || 'zh';
+                  const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
+                                   language === 'en' ? 'You have a new order.' : 
+                                   '您有新的订单';
+                  
+                  Speech.speak(speakText, {
+                    language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+                    pitch: 1.0,
+                    rate: 1.0,
+                  });
+                });
+              } catch (speechError) {
+                console.warn('实时监听语音播报失败:', speechError);
+              }
+              
+              // 3. 自动刷新
+              loadMyPackages();
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeListener();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const loadUserInfo = async () => {

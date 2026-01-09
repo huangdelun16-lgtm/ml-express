@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
+import * as Speech from 'expo-speech';
 import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -70,7 +71,7 @@ export const notificationService = {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
-          sound: 'new-task.wav',
+          sound: 'default', // 恢复使用默认声音
           enableVibrate: true,
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
@@ -229,8 +230,30 @@ export const notificationService = {
 
     try {
       // 监听通知进入前台
-      const notificationListener = Notifications.addNotificationReceivedListener((notification: any) => {
+      const notificationListener = Notifications.addNotificationReceivedListener(async (notification: any) => {
         console.log('🔔 收到前台通知:', notification);
+        
+        // 🚀 新增：自动语音播报“你有新的订单”
+        const title = notification.request.content.title;
+        const data = notification.request.content.data;
+
+        if (title?.includes('新包裹') || title?.includes('新订单') || data?.type === 'new_order') {
+          try {
+            // 从存储中获取当前语言设置
+            const language = await AsyncStorage.getItem('ml-express-language') || 'zh';
+            const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
+                             language === 'en' ? 'You have a new order.' : 
+                             '您有新的订单';
+            
+            Speech.speak(speakText, {
+              language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+              pitch: 1.0,
+              rate: 1.0,
+            });
+          } catch (speechError) {
+            console.warn('语音播报失败:', speechError);
+          }
+        }
       });
 
       // 监听用户点击通知

@@ -29,6 +29,8 @@ export default function ProfileScreen({ navigation }: any) {
     inProgress: 0,
     totalPayToMerchant: 0,
     todayPayToMerchant: 0,
+    todayDeliveryFee: 0,
+    todayCOD: 0,
   });
 
   useEffect(() => {
@@ -70,6 +72,13 @@ export default function ProfileScreen({ navigation }: any) {
         todayPayToMerchant: todayDelivered.reduce((sum, p) => {
           const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
+        }, 0),
+        todayDeliveryFee: todayDelivered.reduce((sum, p) => {
+          const fee = parseFloat(p.price?.toString().replace(/[^\d.]/g, '') || '0');
+          return sum + fee;
+        }, 0),
+        todayCOD: todayDelivered.reduce((sum, p) => {
+          return sum + (p.cod_amount || 0);
         }, 0),
       });
     } catch (error) {
@@ -240,20 +249,25 @@ export default function ProfileScreen({ navigation }: any) {
           </LinearGradient>
         </View>
 
-        {/* 🚀 新增：付给商家金额统计 */}
+        {/* 🚀 优化：今日核心金额统计 (一行一个，防止金额过长) */}
         <View style={[styles.statsContainer, { marginTop: -10 }]}>
           <LinearGradient
-            colors={['rgba(16, 185, 129, 0.12)', 'rgba(16, 185, 129, 0.03)']}
-            style={styles.statsGlassCard}
+            colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.03)']}
+            style={[styles.statsGlassCard, { flexDirection: 'column', padding: 16, gap: 12 }]}
           >
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: '#10b981' }]}>{stats.todayPayToMerchant.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '今日货款' : language === 'my' ? 'ယနေ့ကုန်ဖိုး' : 'Today Pay'}</Text>
+            <View style={styles.statRowVertical}>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日跑腿费' : language === 'my' ? 'ယနေ့ပို့ခ' : 'Today Fee'}</Text>
+              <Text style={[styles.statNumberVertical, { color: '#60a5fa' }]}>{stats.todayDeliveryFee.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
             </View>
-            <View style={styles.statDivider} />
-            <View style={[styles.statItem, { flex: 1.5 }]}>
-              <Text style={[styles.statNumber, { color: '#10b981' }]}>{stats.totalPayToMerchant.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '累计货款' : language === 'my' ? 'စုစုပေါင်းကုန်ဖိုး' : 'Total Pay'}</Text>
+            <View style={styles.statDividerHorizontal} />
+            <View style={styles.statRowVertical}>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日代收 (COD)' : language === 'my' ? 'ယနေ့ COD' : 'Today COD'}</Text>
+              <Text style={[styles.statNumberVertical, { color: '#fbbf24' }]}>{stats.todayCOD.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
+            </View>
+            <View style={styles.statDividerHorizontal} />
+            <View style={styles.statRowVertical}>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日付商家' : language === 'my' ? 'ယနေ့ဆိုင်ပေး' : 'Today Pay'}</Text>
+              <Text style={[styles.statNumberVertical, { color: '#10b981' }]}>{stats.todayPayToMerchant.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
             </View>
           </LinearGradient>
         </View>
@@ -429,6 +443,32 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statDividerHorizontal: {
+    height: 1,
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  statRowVertical: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 4,
+  },
+  statLabelVertical: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '600',
+  },
+  statNumberVertical: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  unitText: {
+    fontSize: 12,
+    opacity: 0.6,
+    fontWeight: '600',
   },
   menuContainer: {
     paddingHorizontal: 20,

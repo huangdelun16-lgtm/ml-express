@@ -15,9 +15,11 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  Vibration,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
 import { packageService, deliveryStoreService, supabase } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
@@ -266,11 +268,29 @@ const MyTasksScreen: React.FC = () => {
           (payload) => {
             console.log('🔔 任务页面收到变更:', payload.eventType);
             
-            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === '已分配')) {
-              // 震动提醒
+            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && (payload.new.status === '已分配' || (payload.old.courier !== payload.new.courier && payload.new.courier === userName)))) {
+              // 1. 震动提醒
               Vibration.vibrate([0, 500, 200, 500]);
               
-              // 自动刷新
+              // 2. 🚀 新增：通过实时监听触发语音播报
+              try {
+                AsyncStorage.getItem('ml-express-language').then(lang => {
+                  const language = lang || 'zh';
+                  const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
+                                   language === 'en' ? 'You have a new order.' : 
+                                   '您有新的订单';
+                  
+                  Speech.speak(speakText, {
+                    language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+                    pitch: 1.0,
+                    rate: 1.0,
+                  });
+                });
+              } catch (speechError) {
+                console.warn('实时监听语音播报失败:', speechError);
+              }
+              
+              // 3. 自动刷新
               loadMyPackages();
             } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new.status === '已取消')) {
               loadMyPackages();

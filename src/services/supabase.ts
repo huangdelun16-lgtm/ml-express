@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { notificationService } from './notificationService';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -402,6 +403,20 @@ export const packageService = {
     }
     
     console.log('✅ 包裹状态更新成功');
+
+    // 🚀 新增：发送推送通知给骑手（如果分配了骑手）
+    if (courierName) {
+      try {
+        notificationService.sendPushNotificationToCourier(
+          courierName,
+          '📦 您有新的订单分配',
+          `订单号: ${id} 已分配给您，请及时处理。`,
+          { packageId: id }
+        ).catch(err => console.warn('后台发送通知失败:', err));
+      } catch (notifyError) {
+        console.warn('触发布送通知异常:', notifyError);
+      }
+    }
 
     // 🚀 新增：自动记录审计日志 (Admin Web)
     try {
@@ -950,6 +965,18 @@ export const trackingService = {
 
       // 开始模拟骑手移动
       await this.simulateCourierMovement(courierId, packageId);
+
+      // 🚀 新增：发送推送通知给骑手
+      try {
+        await notificationService.sendPushNotificationToCourier(
+          courierId, // 这里传的是骑手姓名
+          '📦 您有新的订单分配',
+          `订单号: ${packageId} 已分配给您，请及时处理。`,
+          { packageId }
+        );
+      } catch (notifyError) {
+        console.warn('发送骑手通知失败:', notifyError);
+      }
 
       return true;
     } catch (error) {
