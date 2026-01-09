@@ -1529,7 +1529,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 2px 6px rgba(39, 174, 96, 0.3)';
                       }}
                     >
-                      📱 店长收件码
+                      店长收件码
                     </button>
                     <button
                       onClick={(e) => {
@@ -1560,7 +1560,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 2px 6px rgba(245, 158, 11, 0.3)';
                       }}
                     >
-                      🛍️ 进入店铺
+                      进入店铺
                     </button>
                     <button
                       onClick={(e) => {
@@ -1591,7 +1591,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 2px 6px rgba(44, 82, 130, 0.3)';
                       }}
                     >
-                      ✏️ 编辑
+                      编辑
                     </button>
                     <button
                       onClick={(e) => {
@@ -1630,7 +1630,7 @@ const DeliveryStoreManagement: React.FC = () => {
                           : '0 2px 6px rgba(230, 126, 34, 0.3)';
                       }}
                     >
-                      {store.store_type === 'transit_station' ? '🏪 中转包裹' : '📦 入库'}
+                      {store.store_type === 'transit_station' ? '中转包裹' : '入库'}
                     </button>
                     <button
                       onClick={(e) => {
@@ -1669,7 +1669,7 @@ const DeliveryStoreManagement: React.FC = () => {
                           : '0 2px 6px rgba(39, 174, 96, 0.3)';
                       }}
                     >
-                      {store.status === 'active' ? '⏸️ 暂停' : '▶️ 恢复'}
+                      {store.status === 'active' ? '暂停' : '恢复'}
                     </button>
                     <button
                       onClick={(e) => {
@@ -1700,7 +1700,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 2px 6px rgba(231, 76, 60, 0.3)';
                       }}
                     >
-                      🗑️ 删除
+                      删除
                     </button>
                   </div>
                 </div>
