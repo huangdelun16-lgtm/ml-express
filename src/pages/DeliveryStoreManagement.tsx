@@ -15,6 +15,21 @@ const REGIONS = [
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
 
+const STORE_TYPES = [
+  { value: 'restaurant', label: '餐厅' },
+  { value: 'drinks_snacks', label: '饮料和小吃' },
+  { value: 'breakfast', label: '早点铺' },
+  { value: 'cake_shop', label: '蛋糕店' },
+  { value: 'tea_shop', label: '茶铺' },
+  { value: 'flower_shop', label: '鲜花店' },
+  { value: 'clothing_store', label: '服装店' },
+  { value: 'grocery', label: '杂货店' },
+  { value: 'hardware_store', label: '五金店' },
+  { value: 'supermarket', label: '超市' },
+  { value: 'transit_station', label: '中转站' },
+  { value: 'other', label: '其它' }
+];
+
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -35,6 +50,10 @@ if (typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `
     ${spinAnimation}
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     select option {
       background-color: #1e293b;
       color: white;
@@ -113,6 +132,21 @@ const DeliveryStoreManagement: React.FC = () => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
   
+  // 🚀 新增：店铺类型下拉框状态
+  const [showStoreTypeDropdown, setShowStoreTypeDropdown] = useState(false);
+  const storeTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // 处理点击外部关闭下拉框
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (storeTypeDropdownRef.current && !storeTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowStoreTypeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Google Maps API 加载 - 使用 useJsApiLoader hook（与其他页面保持一致）
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -1003,26 +1037,89 @@ const DeliveryStoreManagement: React.FC = () => {
               </div>
               <div>
                 <label style={labelStyle}>店铺类型 *</label>
-                <select
-                  name="store_type"
-                  value={formData.store_type}
-                  onChange={handleInputChange}
-                  style={inputStyle}
-                  required
-                >
-                  <option value="restaurant">餐厅</option>
-                  <option value="drinks_snacks">饮料和小吃</option>
-                  <option value="breakfast">早点铺</option>
-                  <option value="cake_shop">蛋糕店</option>
-                  <option value="tea_shop">茶铺</option>
-                  <option value="flower_shop">鲜花店</option>
-                  <option value="clothing_store">服装店</option>
-                  <option value="grocery">杂货店</option>
-                  <option value="hardware_store">五金店</option>
-                  <option value="supermarket">超市</option>
-                  <option value="transit_station">中转站</option>
-                  <option value="other">其它</option>
-                </select>
+                <div style={{ position: 'relative' }} ref={storeTypeDropdownRef}>
+                  <div
+                    onClick={() => setShowStoreTypeDropdown(!showStoreTypeDropdown)}
+                    style={{
+                      ...inputStyle,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      background: showStoreTypeDropdown ? 'rgba(255, 255, 255, 0.12)' : inputStyle.background,
+                      boxShadow: showStoreTypeDropdown ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
+                      borderColor: showStoreTypeDropdown ? '#3b82f6' : 'rgba(255,255,255,0.2)'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!showStoreTypeDropdown) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!showStoreTypeDropdown) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                      }
+                    }}
+                  >
+                    <span>{STORE_TYPES.find(t => t.value === formData.store_type)?.label || '选择店铺类型'}</span>
+                    <span style={{ 
+                      transform: showStoreTypeDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.3s ease',
+                      fontSize: '0.8rem',
+                      opacity: 0.7
+                    }}>▼</span>
+                  </div>
+                  
+                  {showStoreTypeDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 5px)',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: '#1e293b',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      zIndex: 1000,
+                      maxHeight: '240px', // 约 6 条数据的高度
+                      overflowY: 'auto',
+                      animation: 'fadeIn 0.3s ease'
+                    }}>
+                      {STORE_TYPES.map((type) => (
+                        <div
+                          key={type.value}
+                          onClick={() => {
+                            handleInputChange({ target: { name: 'store_type', value: type.value } } as any);
+                            setShowStoreTypeDropdown(false);
+                          }}
+                          style={{
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            color: formData.store_type === type.value ? '#48bb78' : 'white',
+                            backgroundColor: formData.store_type === type.value ? 'rgba(72, 187, 120, 0.1)' : 'transparent',
+                            fontSize: '0.9rem',
+                            transition: 'all 0.2s ease',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                          }}
+                          onMouseOver={(e) => {
+                            if (formData.store_type !== type.value) {
+                              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (formData.store_type !== type.value) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {type.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>密码 *</label>
