@@ -44,7 +44,7 @@ export default function CourierHomeScreen({ navigation }: any) {
       // 筛选分配给当前快递员的包裹，且未完成的
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === currentUser && 
-        !['已送达', '已取消'].includes(pkg.status)
+        !['已送达', '已取消', '配送失败'].includes(pkg.status)
       );
       
       setPackages(myPackages);
@@ -63,7 +63,8 @@ export default function CourierHomeScreen({ navigation }: any) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '待取件': return '#f59e0b';
+      case '待取件': 
+      case '待收款': return '#f59e0b';
       case '已取件': return '#3b82f6';
       case '配送中': return '#8b5cf6';
       default: return '#64748b';
@@ -72,7 +73,8 @@ export default function CourierHomeScreen({ navigation }: any) {
 
   const getNextStatus = (currentStatus: string) => {
     switch (currentStatus) {
-      case '待取件': return language === 'zh' ? '去取件' : 'Pickup';
+      case '待取件': 
+      case '待收款': return language === 'zh' ? '去取件' : 'Pickup';
       case '已取件': return language === 'zh' ? '去配送' : 'Deliver';
       case '配送中': return language === 'zh' ? '签收' : 'Complete';
       default: return '';
@@ -90,8 +92,25 @@ export default function CourierHomeScreen({ navigation }: any) {
         style={styles.packageGlassCard}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.idBadge}>
-            <Text style={styles.packageId}>{item.id}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={styles.idBadge}>
+              <Text style={styles.packageId}>{item.id}</Text>
+            </View>
+            
+            {/* 🚀 新增：在顶部显示下单身份 */}
+            {(() => {
+              const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+              if (identityMatch && identityMatch[1]) {
+                const identity = identityMatch[1];
+                const isPartner = identity === '合伙人' || identity === 'Partner';
+                return (
+                  <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                    <Text style={styles.identityText}>{identity}</Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
             <Text style={styles.statusText}>{item.status}</Text>
@@ -105,6 +124,21 @@ export default function CourierHomeScreen({ navigation }: any) {
           </View>
           <Text style={styles.addressText} numberOfLines={2}>{item.receiver_address}</Text>
         </View>
+
+        {/* 🚀 新增：首页列表展示付给商家金额 */}
+        {(() => {
+          const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+          if (payMatch && payMatch[1]) {
+            return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginLeft: 16 }}>
+                <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                  💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                </Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
 
         <View style={styles.cardFooter}>
           <View style={styles.tagGroup}>
@@ -137,9 +171,9 @@ export default function CourierHomeScreen({ navigation }: any) {
   );
 
   // 统计
-  const todoCount = packages.filter(p => p.status === '待取件').length;
+  const todoCount = packages.filter(p => p.status === '待取件' || p.status === '待收款').length;
   const pickedCount = packages.filter(p => p.status === '已取件').length;
-  const deliveringCount = packages.filter(p => p.status === '配送中').length;
+  const deliveringCount = packages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
 
   return (
     <View style={styles.container}>
@@ -448,5 +482,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: 'rgba(255,255,255,0.4)',
     fontWeight: '600',
+  },
+  identityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  identityText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

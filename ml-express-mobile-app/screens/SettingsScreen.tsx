@@ -36,7 +36,8 @@ export default function SettingsScreen({ navigation }: any) {
     language: 'zh',
     theme: 'light',
   });
-  const [currentUser, setCurrentUser] = useState('');
+  const [currentUser, setCurrentUser] = useState(''); // 登录用户名 (ID)
+  const [currentUserName, setCurrentUserName] = useState(''); // 员工姓名 (显示用)
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -94,8 +95,10 @@ export default function SettingsScreen({ navigation }: any) {
 
   const loadUserInfo = async () => {
     try {
+      const loginUser = await AsyncStorage.getItem('currentUser') || '';
       const userName = await AsyncStorage.getItem('currentUserName') || '用户';
-      setCurrentUser(userName);
+      setCurrentUser(loginUser);
+      setCurrentUserName(userName);
     } catch (error) {
       console.error('加载用户信息失败:', error);
     }
@@ -130,42 +133,52 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const handleChangePassword = async () => {
-    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
-      Alert.alert('提示', '请填写当前密码和新密码');
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      Alert.alert('提示', language === 'zh' ? '请填写当前密码和新密码' : 'Please fill current, new and confirm password');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      Alert.alert('错误', '新密码和确认密码不匹配');
+      Alert.alert('错误', language === 'zh' ? '新密码和确认密码不匹配' : 'Passwords do not match');
       return;
     }
     try {
-      const success = await adminAccountService.updatePassword(currentUser, passwordForm.newPassword);
+      // 这里的 currentUser 应该是登录名 (如 mdy-rider-001)
+      const success = await adminAccountService.updatePassword(
+        currentUser, 
+        passwordForm.currentPassword, 
+        passwordForm.newPassword
+      );
       if (success) {
-        Alert.alert('成功', '密码修改成功');
+        Alert.alert('成功', language === 'zh' ? '密码修改成功' : 'Password updated');
         setShowPasswordModal(false);
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        Alert.alert('错误', language === 'zh' ? '修改失败，请重试' : 'Update failed');
       }
     } catch (error) {
-      Alert.alert('错误', '修改失败');
+      Alert.alert('错误', language === 'zh' ? '网络错误' : 'Network error');
     }
   };
 
   const handleChangeUsername = async () => {
     if (!usernameForm.newUsername || usernameForm.newUsername.length < 3) {
-      Alert.alert('错误', '用户名至少3位');
+      Alert.alert('错误', language === 'zh' ? '用户名至少3位' : 'Username must be at least 3 chars');
       return;
     }
     try {
+      // currentUser 是旧用户名，usernameForm.newUsername 是新用户名
       const success = await adminAccountService.updateUsername(currentUser, usernameForm.newUsername);
       if (success) {
-        Alert.alert('成功', '用户名已修改');
-        await AsyncStorage.setItem('currentUserName', usernameForm.newUsername);
+        Alert.alert('成功', language === 'zh' ? '用户名已修改' : 'Username updated');
+        await AsyncStorage.setItem('currentUser', usernameForm.newUsername);
         setShowUsernameModal(false);
         setUsernameForm({ currentUsername: '', newUsername: '' });
         loadUserInfo();
+      } else {
+        Alert.alert('错误', language === 'zh' ? '修改失败，可能用户名已存在' : 'Update failed');
       }
     } catch (error) {
-      Alert.alert('错误', '修改失败');
+      Alert.alert('错误', language === 'zh' ? '网络错误' : 'Network error');
     }
   };
 
@@ -254,6 +267,47 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
+      {/* 修改用户名模态框 */}
+      <Modal visible={showUsernameModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.glassModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>👤 {language === 'zh' ? '修改用户名' : 'Change Username'}</Text>
+              <TouchableOpacity onPress={() => setShowUsernameModal(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '当前用户名' : 'Current'}</Text>
+                <TextInput
+                  style={[styles.textInput, { opacity: 0.6 }]}
+                  value={currentUser}
+                  editable={false}
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                />
+              </View>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '新用户名' : 'New Username'}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={usernameForm.newUsername}
+                  onChangeText={(text) => setUsernameForm({...usernameForm, newUsername: text})}
+                  placeholder={language === 'zh' ? '请输入新用户名' : 'Enter new username'}
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleChangeUsername}>
+                <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.btnGradient}>
+                  <Text style={styles.btnText}>{language === 'zh' ? '保存修改' : 'Save Changes'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 修改密码模态框 */}
       <Modal visible={showPasswordModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -266,12 +320,13 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
             <View style={styles.modalBody}>
               <View style={styles.inputWrapper}>
-                <Text style={styles.inputLabel}>{language === 'zh' ? '当前密码' : 'Current'}</Text>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '当前密码' : 'Current Password'}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={passwordForm.currentPassword}
                   onChangeText={(text) => setPasswordForm({...passwordForm, currentPassword: text})}
                   secureTextEntry
+                  placeholder={language === 'zh' ? '请输入当前密码' : 'Current password'}
                   placeholderTextColor="rgba(255,255,255,0.2)"
                 />
               </View>
@@ -282,12 +337,24 @@ export default function SettingsScreen({ navigation }: any) {
                   value={passwordForm.newPassword}
                   onChangeText={(text) => setPasswordForm({...passwordForm, newPassword: text})}
                   secureTextEntry
+                  placeholder={language === 'zh' ? '设置新密码' : 'New password'}
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                />
+              </View>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '确认新密码' : 'Confirm'}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={passwordForm.confirmPassword}
+                  onChangeText={(text) => setPasswordForm({...passwordForm, confirmPassword: text})}
+                  secureTextEntry
+                  placeholder={language === 'zh' ? '再次输入新密码' : 'Confirm password'}
                   placeholderTextColor="rgba(255,255,255,0.2)"
                 />
               </View>
               <TouchableOpacity style={styles.submitBtn} onPress={handleChangePassword}>
                 <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>{language === 'zh' ? '保存修改' : 'Save'}</Text>
+                  <Text style={styles.btnText}>{language === 'zh' ? '保存修改' : 'Save Changes'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

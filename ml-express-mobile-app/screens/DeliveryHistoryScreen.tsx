@@ -44,7 +44,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       
       const history = allPackages.filter(pkg => 
         pkg.courier === currentUser && 
-        ['已送达', '已取消'].includes(pkg.status)
+        ['已送达', '已取消', '配送失败'].includes(pkg.status)
       );
       
       setPackages(history);
@@ -111,7 +111,24 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
       >
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.packageId}>{item.id}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.packageId}>{item.id}</Text>
+              
+              {/* 🚀 新增：在顶部显示下单身份 */}
+              {(() => {
+                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                if (identityMatch && identityMatch[1]) {
+                  const identity = identityMatch[1];
+                  const isPartner = identity === '合伙人' || identity === 'Partner';
+                  return (
+                    <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                      <Text style={styles.identityText}>{identity}</Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
+            </View>
             <Text style={styles.dateText}>
               <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.4)" /> {item.status === '已送达' ? item.delivery_time : item.create_time}
             </Text>
@@ -142,6 +159,21 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
             <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.5)" />
             <Text style={styles.addressText} numberOfLines={1}>{item.receiver_address}</Text>
           </View>
+          
+          {/* 🚀 新增：历史列表展示付给商家金额 */}
+          {(() => {
+            const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+            if (payMatch && payMatch[1]) {
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                    💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                  </Text>
+                </View>
+              );
+            }
+            return null;
+          })()}
         </View>
 
                 <View style={styles.cardFooter}>
@@ -593,6 +625,16 @@ const styles = StyleSheet.create({
   modalCloseBtnText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '800',
+  },
+  identityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  identityText: {
+    color: '#fff',
+    fontSize: 10,
     fontWeight: '800',
   },
 });

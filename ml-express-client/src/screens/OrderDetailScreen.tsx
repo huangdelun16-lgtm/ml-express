@@ -136,6 +136,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       orderInfo: '订单信息',
       orderNumber: '订单号',
       orderStatus: '订单状态',
+      ordererIdentity: '下单人身份',
       orderTime: '下单时间',
       pickupTime: '取件时间',
       deliveryTime: '送达时间',
@@ -193,6 +194,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       orderInfo: 'Order Information',
       orderNumber: 'Order No.',
       orderStatus: 'Status',
+      ordererIdentity: 'Orderer Identity',
       orderTime: 'Order Time',
       pickupTime: 'Pickup Time',
       deliveryTime: 'Delivery Time',
@@ -250,6 +252,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       orderInfo: 'အော်ဒါအချက်အလက်',
       orderNumber: 'အော်ဒါနံပါတ်',
       orderStatus: 'အခြေအနေ',
+      ordererIdentity: 'အော်ဒါတင်သူ အမျိုးအစား',
       orderTime: 'အော်ဒါအချိန်',
       pickupTime: 'ထုပ်ယူချိန်',
       deliveryTime: 'ပို့ဆောင်ချိန်',
@@ -600,6 +603,24 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         {/* 订单信息卡片 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📋 {t.orderInfo}</Text>
+          
+          {/* 🚀 新增：从描述中解析下单身份并显示 */}
+          {(() => {
+            const identityMatch = order.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+            if (identityMatch && identityMatch[1]) {
+              const identity = identityMatch[1];
+              return (
+                <View style={[styles.infoRow, { borderBottomColor: '#f1f5f9' }]}>
+                  <Text style={[styles.infoLabel, { fontWeight: 'bold' }]}>{t.ordererIdentity}:</Text>
+                  <View style={{ backgroundColor: identity === '合伙人' || identity === 'Partner' ? '#3b82f6' : '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                    <Text style={{ color: 'white', fontSize: 13, fontWeight: '800' }}>{identity}</Text>
+                  </View>
+                </View>
+              );
+            }
+            return null;
+          })()}
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t.orderTime}:</Text>
             <Text style={styles.infoValue}>{formatDate(order.created_at)}</Text>
@@ -697,6 +718,24 @@ export default function OrderDetailScreen({ route, navigation }: any) {
               <Text style={styles.infoValue}>{order.description}</Text>
             </View>
           )}
+          
+          {/* 🚀 新增：从描述中解析“付给商家”并显示 */}
+          {(() => {
+            const payMatch = order.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+            if (payMatch && payMatch[1]) {
+              return (
+                <View style={[styles.infoRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', marginTop: 5, paddingTop: 15 }]}>
+                  <Text style={[styles.infoLabel, { fontWeight: 'bold', color: '#10b981' }]}>
+                    {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}:
+                  </Text>
+                  <Text style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981' }]}>
+                    {payMatch[1]} MMK
+                  </Text>
+                </View>
+              );
+            }
+            return null;
+          })()}
         </View>
 
         {/* 价格信息 */}

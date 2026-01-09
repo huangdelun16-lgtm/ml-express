@@ -21,6 +21,7 @@ import * as Location from 'expo-location';
 import QRCode from 'react-native-qrcode-svg';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
+import { useCart } from '../contexts/CartContext';
 import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
@@ -47,13 +48,72 @@ import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时exp
 import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
-export default function PlaceOrderScreen({ navigation }: any) {
+export default function PlaceOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
+  const { clearCart } = useCart();
   const styles = useLanguageStyles(baseStyles);
   
   // QR码保存引用
   const viewShotRef = useRef<any>(null);
+
+  // 处理从其他页面（如商品详情/购物车）传来的预选商品
+  useEffect(() => {
+    const handleIncomingProducts = async () => {
+      if (route.params?.selectedProducts) {
+        const incomingProducts = route.params.selectedProducts;
+        const productMap: Record<string, number> = {};
+        
+        // 1. 先把这些商品加入到 merchantProducts 列表中，这样后续逻辑能找到它们
+        // 过滤掉已经在列表中的商品，避免重复
+        setMerchantProducts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newProducts = incomingProducts.filter((p: any) => !existingIds.has(p.id));
+          return [...prev, ...newProducts];
+        });
+
+        // 2. 设置选中状态
+        incomingProducts.forEach((p: any) => {
+          productMap[p.id] = p.quantity;
+        });
+        setSelectedProducts(productMap);
+        
+        // 3. 开启代收
+        setHasCOD(true);
+        
+        // 4. 自动填充店铺信息 (如果是从某个店铺直接购买)
+        if (incomingProducts.length > 0 && incomingProducts[0].store_id) {
+          try {
+            const storeId = incomingProducts[0].store_id;
+            const { data: store, error } = await supabase
+              .from('delivery_stores')
+              .select('*')
+              .eq('id', storeId)
+              .single();
+            
+            if (store && !error) {
+              setSenderName(store.store_name);
+              setSenderPhone(store.phone || store.manager_phone);
+              setSenderAddress(store.address);
+              setSenderCoordinates({
+                lat: store.latitude,
+                lng: store.longitude
+              });
+            }
+          } catch (err) {
+            LoggerService.error('自动填充店铺信息失败:', err);
+          }
+        }
+
+        // 延迟一下调用，确保 merchantProducts 已更新（或者直接传入商品列表）
+        setTimeout(() => {
+          updateCODAndDescription(productMap, incomingProducts);
+        }, 100);
+      }
+    };
+
+    handleIncomingProducts();
+  }, [route.params?.selectedProducts]);
 
   // 保存二维码到相册
   const handleSaveQRCode = async () => {
@@ -135,6 +195,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPrice, setCalculatedPrice] = useState('0');
   const [calculatedDistance, setCalculatedDistance] = useState(0);
+  const [cartTotal, setCartTotal] = useState(0);
   
   // 地图相关
   const [showMapModal, setShowMapModal] = useState(false);
@@ -742,10 +803,20 @@ export default function PlaceOrderScreen({ navigation }: any) {
       if (name) {
         setUserName(name);
         if (useMyInfo) setSenderName(name);
+        
+        // 🚀 新增：如果是会员账号且来自购物车/店铺，自动填写收件人信息
+        if (route.params?.selectedProducts && (currentUser?.user_type === 'customer' || currentUser?.user_type === 'member' || !currentUser?.user_type)) {
+          setReceiverName(name);
+        }
       }
       if (phone) {
         setUserPhone(phone);
         if (useMyInfo) setSenderPhone(phone);
+        
+        // 🚀 新增：自动填写收件人电话
+        if (route.params?.selectedProducts && (currentUser?.user_type === 'customer' || currentUser?.user_type === 'member' || !currentUser?.user_type)) {
+          setReceiverPhone(phone);
+        }
       }
     } catch (error) {
       errorService.handleError(error, { context: 'PlaceOrderScreen.loadUserInfo', silent: true });
@@ -1256,6 +1327,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
       const orderId = generateOrderId(senderAddress);
       const now = new Date();
       
+      // 🚀 优化：记录下单人身份
+      const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
+      const typeTag = language === 'zh' ? `[下单身份: ${ordererType}]` : 
+                     language === 'en' ? `[Orderer: ${currentUser?.user_type === 'partner' ? 'Partner' : 'Member'}]` : 
+                     `[အော်ဒါတင်သူ: ${currentUser?.user_type === 'partner' ? 'Partner' : 'Member'}]`;
+
       const createTime = now.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -1309,7 +1386,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
         package_type: packageType,
         weight: weight,
         cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : 0,
-        description: description || '',
+        description: `${typeTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
@@ -1330,6 +1407,12 @@ export default function PlaceOrderScreen({ navigation }: any) {
       hideLoading();
 
       if (result?.success) {
+        // 🚀 核心优化：订单创建成功后清空购物车
+        if (route.params?.selectedProducts) {
+          clearCart();
+          LoggerService.debug('✅ 订单创建成功，购物车已清空');
+        }
+        
         await persistOrderLocally(offlinePayload, 'synced');
         syncPendingOrders();
         // 显示包裹二维码（无论支付方式，快递员需要扫描取件）
@@ -1405,12 +1488,13 @@ export default function PlaceOrderScreen({ navigation }: any) {
     });
   };
 
-  const updateCODAndDescription = (selected: Record<string, number>) => {
+  const updateCODAndDescription = (selected: Record<string, number>, productsToUse?: Product[]) => {
     let totalCOD = 0;
     let productDetails: string[] = [];
+    const sourceProducts = productsToUse || merchantProducts;
 
     Object.entries(selected).forEach(([id, qty]) => {
-      const product = merchantProducts.find(p => p.id === id);
+      const product = sourceProducts.find(p => p.id === id);
       if (product) {
         totalCOD += product.price * qty;
         productDetails.push(`${product.name} x${qty}`);
@@ -1418,15 +1502,25 @@ export default function PlaceOrderScreen({ navigation }: any) {
     });
 
     if (totalCOD > 0) {
+      setCartTotal(totalCOD);
       // 只有在开启代收时才设置金额，否则设为 0
       setCodAmount(hasCOD ? totalCOD.toString() : '0');
       
-      // 自动把选中的商品添加到物品描述中 (无论是否代收都要添加)
+      // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
+      
+      // 🚀 优化：仅当非 Partner 账号时，才添加“付给商家”金额到描述中
+      let payToMerchantTag = '';
+      if (currentUser?.user_type !== 'partner') {
+        const payToMerchantText = language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်';
+        payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
+      }
+
       // 如果原先有描述，保留它（避免重复添加）
-      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]/g, '').trim();
-      setDescription(`${productsText} ${cleanDesc}`.trim());
+      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]/g, '').trim();
+      setDescription(`${productsText}${payToMerchantTag} ${cleanDesc}`.trim());
     } else {
+      setCartTotal(0);
       setCodAmount('0');
     }
   };
@@ -1615,6 +1709,7 @@ export default function PlaceOrderScreen({ navigation }: any) {
               setSelectedPackageTypeInfo(type);
               setShowPackageTypeInfo(true);
             }}
+            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
           />
 
           {/* 代收款 (仅限 Partner 账号) */}

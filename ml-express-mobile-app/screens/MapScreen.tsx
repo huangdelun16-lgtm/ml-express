@@ -655,6 +655,66 @@ export default function MapScreen({ navigation }: any) {
     setRefreshing(false);
   }, [loadPackages, loadCurrentDeliveringPackage]);
 
+  // 🔔 新增：实时订单监听功能
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtimeListener = async () => {
+      const currentUser = await AsyncStorage.getItem('currentUserName') || '';
+      if (!currentUser) return;
+
+      console.log('📡 正在开启新订单实时监听...', currentUser);
+
+      channel = supabase
+        .channel('rider-new-orders')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // 监听所有变化（包括新指派和取消）
+            schema: 'public',
+            table: 'packages',
+            filter: `courier=eq.${currentUser}`
+          },
+          async (payload) => {
+            console.log('🔔 收到订单变更通知:', payload.eventType);
+            
+            // 如果是新增订单或状态变更为“已分配”
+            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === '已分配')) {
+              // 1. 触发震动
+              Vibration.vibrate([0, 500, 200, 500]); // 震动模式：等待0ms，震500ms，停200ms，震500ms
+              
+              // 2. 触觉反馈 (iOS/高级安卓)
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+              // 3. 弹窗提醒
+              Alert.alert(
+                language === 'zh' ? '新任务提醒' : 'New Task',
+                language === 'zh' ? `您有一单新的配送任务: #${payload.new.id.slice(-6)}` : `New task assigned: #${payload.new.id.slice(-6)}`,
+                [{ text: 'OK', onPress: () => loadPackages(true) }]
+              );
+
+              // 4. 自动刷新列表
+              loadPackages(true);
+            } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new.status === '已取消')) {
+              // 订单取消提醒
+              Vibration.vibrate(300);
+              loadPackages(true);
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeListener();
+
+    return () => {
+      if (channel) {
+        console.log('📴 正在关闭实时监听...');
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [language, loadPackages]);
+
   // 当弹窗打开时，自动调整地图缩放以显示所有点
   useEffect(() => {
     if (showMapPreview && optimizedPackagesWithCoords.length > 0 && mapRef.current) {
@@ -691,7 +751,7 @@ export default function MapScreen({ navigation }: any) {
           styles.packageCard, 
           isCurrent && styles.currentDeliveringCard
         ]} 
-        onPress={() => navigation.navigate('PackageDetail', { package: item })}
+        onPress={() => navigation.navigate('PackageDetail', { package: item, coords: item.coords })}
       >
         <View style={styles.packageInfo}>
           <View style={styles.cardHeader}>
@@ -703,6 +763,21 @@ export default function MapScreen({ navigation }: any) {
                   <Text style={styles.speedText}>{item.delivery_speed}</Text>
                 </View>
               )}
+              
+              {/* 🚀 新增：在顶部显示下单身份 */}
+              {(() => {
+                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                if (identityMatch && identityMatch[1]) {
+                  const identity = identityMatch[1];
+                  const isPartner = identity === '合伙人' || identity === 'Partner';
+                  return (
+                    <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                      <Text style={styles.identityText}>{identity}</Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
             </View>
             {isCurrent && (
               <View style={styles.deliveringBadge}>
@@ -746,6 +821,22 @@ export default function MapScreen({ navigation }: any) {
                 </Text>
                 <Text style={styles.receiverName}>{item.receiver_name}</Text>
                 <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
+                
+                {/* 🚀 新增：地图展示付给商家金额 */}
+                {(() => {
+                  const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                  if (payMatch && payMatch[1]) {
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                          💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {item.deliveryCoords && (
                   <TouchableOpacity 
                     style={styles.pointNavAction} 
@@ -1436,4 +1527,14 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '800', color: '#475569', marginBottom: 12 },
   refreshButton: { backgroundColor: '#3b82f6', paddingHorizontal: 30, paddingVertical: 14, borderRadius: 16, shadowColor: '#3b82f6', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
   refreshButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  identityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  identityText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
 });

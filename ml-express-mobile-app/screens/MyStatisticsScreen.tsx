@@ -57,7 +57,7 @@ export default function MyStatisticsScreen({ navigation }: any) {
         today: {
           delivered: todayPackages.filter(p => p.status === '已送达').length,
           picked: todayPackages.filter(p => p.status === '已取件').length,
-          delivering: todayPackages.filter(p => p.status === '配送中').length,
+          delivering: todayPackages.filter(p => p.status === '配送中' || p.status === '配送进行中').length,
         },
         week: {
           delivered: myPackages.filter(p => p.status === '已送达').length,

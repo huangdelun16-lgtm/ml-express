@@ -220,13 +220,13 @@ const styles = StyleSheet.create({
     height: 130,
     borderRadius: 65,
     backgroundColor: '#ffffff',
-    padding: 20,
+    padding: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logo: {
-    width: '90%',
-    height: '90%',
+    width: '100%',
+    height: '100%',
   },
   textContainer: {
     alignItems: 'center',

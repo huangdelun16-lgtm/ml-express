@@ -13,7 +13,8 @@ import {
   Dimensions,
   Linking,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -82,6 +83,14 @@ export default function ProfileScreen({ navigation }: any) {
     address: '',
   });
 
+  // 修改密码模态框
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
   // 关于我们模态框
   const [showAboutModal, setShowAboutModal] = useState(false);
 
@@ -129,6 +138,10 @@ export default function ProfileScreen({ navigation }: any) {
       cancel: '取消',
       confirm: '确定',
       editProfile: '编辑资料',
+      changePassword: '修改密码',
+      currentPassword: '当前密码',
+      newPassword: '新密码',
+      confirmPassword: '确认密码',
       save: '保存',
       name: '姓名',
       email: '邮箱',
@@ -189,6 +202,20 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: '账号已注销',
       deleteFailed: '注销账号失败',
       deleteProcessing: '正在注销...',
+      // 身份标识
+      partner: '合伙人',
+      vipMember: 'VIP 会员',
+      admin: '管理员',
+      courier: '快递员',
+      member: '会员',
+      // 商家管理
+      merchantService: '商家管理',
+      myProducts: '我的商品',
+      productManageDesc: '管理店内商品、价格及库存',
+      cityMall: '同城商场',
+      shoppingCart: '购物车',
+      mallDesc: '浏览并购买同城优质商品',
+      cartDesc: '查看已选择的商品并结算',
     },
     en: {
       title: 'Profile',
@@ -213,6 +240,10 @@ export default function ProfileScreen({ navigation }: any) {
       cancel: 'Cancel',
       confirm: 'Confirm',
       editProfile: 'Edit Profile',
+      changePassword: 'Change Password',
+      currentPassword: 'Current Password',
+      newPassword: 'New Password',
+      confirmPassword: 'Confirm Password',
       save: 'Save',
       name: 'Name',
       email: 'Email',
@@ -274,6 +305,20 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: 'Account deleted successfully',
       deleteFailed: 'Failed to delete account',
       deleteProcessing: 'Deleting...',
+      // Badges
+      partner: 'Partner',
+      vipMember: 'VIP Member',
+      admin: 'Admin',
+      courier: 'Courier',
+      member: 'Member',
+      // Merchant management
+      merchantService: 'Merchant',
+      myProducts: 'My Products',
+      productManageDesc: 'Manage your items, prices and stock',
+      cityMall: 'City Mall',
+      shoppingCart: 'Cart',
+      mallDesc: 'Browse and buy local products',
+      cartDesc: 'View and checkout your items',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -298,6 +343,10 @@ export default function ProfileScreen({ navigation }: any) {
       cancel: 'မလုပ်တော့',
       confirm: 'သေချာပါတယ်',
       editProfile: 'အချက်အလက်ပြင်ဆင်ရန်',
+      changePassword: 'စကားဝှက်ပြောင်းရန်',
+      currentPassword: 'လက်ရှိစကားဝှက်',
+      newPassword: 'စကားဝှက်အသစ်',
+      confirmPassword: 'စကားဝှက်အတည်ပြုပါ',
       save: 'သိမ်းရန်',
       name: 'အမည်',
       email: 'အီးမေးလ်',
@@ -359,6 +408,20 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: 'အကောင့်ဖျက်သိမ်းပြီးပါပြီ',
       deleteFailed: 'အကောင့်ဖျက်သိမ်းမှုမအောင်မြင်ပါ',
       deleteProcessing: 'ဖျက်သိမ်းနေဆဲ...',
+      // အဆင့်အတန်းများ
+      partner: 'မိတ်ဖက်',
+      vipMember: 'VIP အဖွဲ့၀င်',
+      admin: 'စီမံခန့်ခွဲသူ',
+      courier: 'ပို့ဆောင်သူ',
+      member: 'အဖွဲ့၀င်',
+      // ဆိုင်စီမံခန့်ခွဲမှု
+      merchantService: 'ဆိုင်စီမံခန့်ခွဲမှု',
+      myProducts: 'ကျွန်ုပ်၏ကုန်ပစ္စည်းများ',
+      productManageDesc: 'ကုန်ပစ္စည်းများ၊ စျေးနှုန်းနှင့် လက်ကျန်စာရင်းကို စီမံခန့်ခွဲပါ',
+      cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
+      shoppingCart: 'ဈေးဝယ်လှည်း',
+      mallDesc: 'ဒေသတွင်း ကုန်ပစ္စည်းများကို ကြည့်ရှုဝယ်ယူပါ',
+      cartDesc: 'ရွေးချယ်ထားသောပစ္စည်းများကို ကြည့်ရှုစစ်ဆေးပါ',
     },
   };
 
@@ -704,6 +767,38 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      showToast(language === 'zh' ? '请填写所有密码字段' : 'Please fill all password fields', 'warning');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showToast(language === 'zh' ? '新密码和确认密码不匹配' : 'Passwords do not match', 'error');
+      return;
+    }
+
+    try {
+      const result = await customerService.changePassword(
+        userId, 
+        passwordForm.currentPassword, 
+        passwordForm.newPassword,
+        userType // 传入用户类型 (customer 或 partner)
+      );
+
+      if (result.success) {
+        showToast(language === 'zh' ? '密码修改成功' : 'Password updated', 'success');
+        setShowPasswordModal(false);
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        showToast(result.error?.message || (language === 'zh' ? '修改失败' : 'Update failed'), 'error');
+      }
+    } catch (error) {
+      LoggerService.error('修改密码失败:', error);
+      showToast(language === 'zh' ? '修改失败，请重试' : 'Update failed, please try again', 'error');
+    }
+  };
+
   const handleQuickAction = (action: string) => {
     if (isGuest && action !== 'help') {
       Alert.alert(t.pleaseLogin, '', [
@@ -816,9 +911,9 @@ export default function ProfileScreen({ navigation }: any) {
                   userType === 'courier' && styles.courierBadgeText,
                   (!userType || userType === 'customer') && !isPartnerStore && styles.memberBadgeText
                 ]}>
-                  {userType === 'partner' ? 'Partner' : (
-                    userType === 'vip' ? (language === 'zh' ? 'VIP 会员' : 'VIP Member') : (
-                      userType === 'admin' ? 'Admin' : (userType === 'courier' ? 'Courier' : 'Member')
+                  {userType === 'partner' ? t.partner : (
+                    userType === 'vip' ? t.vipMember : (
+                      userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : t.member)
                     )
                   )}
                 </Text>
@@ -974,6 +1069,32 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 
+  const renderMerchantServices = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t.merchantService}</Text>
+      <View style={{ gap: 12 }}>
+        <TouchableOpacity 
+          style={styles.merchantCard}
+          onPress={() => navigation.navigate('MerchantProducts', { storeId: userId })}
+        >
+          <LinearGradient
+            colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']}
+            style={styles.merchantGradient}
+          >
+            <View style={styles.merchantIconContainer}>
+              <Text style={styles.merchantIcon}>🛍️</Text>
+            </View>
+            <View style={styles.merchantInfo}>
+              <Text style={styles.merchantTitle}>{t.myProducts}</Text>
+              <Text style={styles.merchantDesc}>{t.productManageDesc}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#10b981" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const renderQuickActions = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t.quickActions}</Text>
@@ -1078,6 +1199,19 @@ export default function ProfileScreen({ navigation }: any) {
         {!isGuest && (
           <TouchableOpacity 
             style={styles.settingItem}
+            onPress={() => setShowPasswordModal(true)}
+          >
+            <View style={styles.settingLeft}>
+              <Text style={styles.settingIcon}>🔒</Text>
+              <Text style={styles.settingLabel}>{t.changePassword}</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
+        )}
+
+        {!isGuest && (
+          <TouchableOpacity 
+            style={styles.settingItem}
             onPress={handleDeleteAccount}
           >
             <View style={styles.settingLeft}>
@@ -1138,6 +1272,7 @@ export default function ProfileScreen({ navigation }: any) {
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
         {!isGuest && userType === 'partner' && renderPartnerCODStats()}
+        {!isGuest && userType === 'partner' && renderMerchantServices()}
         {renderQuickActions()}
         {renderSettings()}
 
@@ -1213,6 +1348,64 @@ export default function ProfileScreen({ navigation }: any) {
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonConfirm]}
                 onPress={handleSaveProfile}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                  {t.save}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 修改密码模态框 */}
+      <Modal
+        visible={showPasswordModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t.changePassword}</Text>
+            
+            <TextInput
+              style={styles.input}
+              placeholder={t.currentPassword}
+              placeholderTextColor="#9ca3af"
+              value={passwordForm.currentPassword}
+              onChangeText={(text) => setPasswordForm({ ...passwordForm, currentPassword: text })}
+              secureTextEntry
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder={t.newPassword}
+              placeholderTextColor="#9ca3af"
+              value={passwordForm.newPassword}
+              onChangeText={(text) => setPasswordForm({ ...passwordForm, newPassword: text })}
+              secureTextEntry
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder={t.confirmPassword}
+              placeholderTextColor="#9ca3af"
+              value={passwordForm.confirmPassword}
+              onChangeText={(text) => setPasswordForm({ ...passwordForm, confirmPassword: text })}
+              secureTextEntry
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowPasswordModal(false)}
+              >
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={handleChangePassword}
               >
                 <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
                   {t.save}
@@ -1689,7 +1882,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.default,
   },
   header: {
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
@@ -2193,6 +2386,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  merchantCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.background.paper,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    ...theme.shadows.small,
+  },
+  merchantGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  merchantIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  merchantIcon: {
+    fontSize: 24,
+  },
+  merchantInfo: {
+    flex: 1,
+  },
+  merchantTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  merchantDesc: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
   },
 });
 

@@ -207,7 +207,7 @@ const MyTasksScreen: React.FC = () => {
       
       const myPackages = allPackages.filter(pkg => 
         pkg.courier === userName && 
-        (pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
+        (pkg.status === '待取件' || pkg.status === '待收款' || pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
       );
       
       setPackages(myPackages);
@@ -243,8 +243,56 @@ const MyTasksScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  // 🔔 新增：实时订单监听功能
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtimeListener = async () => {
+      const userName = await AsyncStorage.getItem('currentUserName') || '';
+      if (!userName) return;
+
+      console.log('📡 任务页面：正在开启实时监听...', userName);
+
+      channel = supabase
+        .channel('tasks-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'packages',
+            filter: `courier=eq.${userName}`
+          },
+          (payload) => {
+            console.log('🔔 任务页面收到变更:', payload.eventType);
+            
+            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === '已分配')) {
+              // 震动提醒
+              Vibration.vibrate([0, 500, 200, 500]);
+              
+              // 自动刷新
+              loadMyPackages();
+            } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new.status === '已取消')) {
+              loadMyPackages();
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeListener();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, []);
+
   const getStatusColor = (status: string) => {
     switch (status) {
+      case '待取件':
+      case '待收款': return '#f59e0b';
       case '已取件': return '#27ae60';
       case '配送中':
       case '配送进行中': return '#f39c12';
@@ -256,6 +304,8 @@ const MyTasksScreen: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case '待取件': return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
+      case '待收款': return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
       case '已取件': return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
       case '配送中':
       case '配送进行中': return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
@@ -446,6 +496,11 @@ const MyTasksScreen: React.FC = () => {
 
   const renderDetailModal = () => {
     if (!selectedPackage) return null;
+
+    // 🚀 解析“付给商家”金额
+    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+    const payToMerchantAmount = payMatch ? payMatch[1] : null;
+
     return (
       <Modal visible={showDetailModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -463,6 +518,22 @@ const MyTasksScreen: React.FC = () => {
               <View style={styles.glassInfoCard}>
                 <View style={styles.infoSection}>
                   <Text style={styles.infoSectionTitle}>📦 {language === 'zh' ? '包裹信息' : 'Package'}</Text>
+                  
+                  {/* 🚀 新增：展示下单身份 */}
+                  {(() => {
+                    const identityMatch = selectedPackage.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                    if (identityMatch && identityMatch[1]) {
+                      const identity = identityMatch[1];
+                      return (
+                        <View style={[styles.infoLine, { backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: 10, borderRadius: 10, marginBottom: 12 }]}>
+                          <Text style={[styles.infoLineLabel, { color: '#fff' }]}>👤 {language === 'zh' ? '下单身份' : 'Orderer'}</Text>
+                          <Text style={[styles.infoLineValue, { color: '#3b82f6', fontWeight: '900' }]}>{identity}</Text>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <View style={styles.infoLine}>
                     <Text style={styles.infoLineLabel}>{language === 'zh' ? '类型' : 'Type'}</Text>
                     <Text style={styles.infoLineValue}>{selectedPackage.package_type}</Text>
@@ -471,6 +542,18 @@ const MyTasksScreen: React.FC = () => {
                     <Text style={styles.infoLineLabel}>{language === 'zh' ? '重量' : 'Weight'}</Text>
                     <Text style={styles.infoLineValue}>{selectedPackage.weight}kg</Text>
                   </View>
+                  
+                  {/* 🚀 新增：显示付给商家金额 */}
+                  {payToMerchantAmount && (
+                    <View style={[styles.infoLine, { marginTop: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
+                      <Text style={[styles.infoLineLabel, { color: '#10b981', fontWeight: 'bold' }]}>
+                        {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}
+                      </Text>
+                      <Text style={[styles.infoLineValue, { color: '#10b981', fontWeight: 'bold', fontSize: 16 }]}>
+                        {payToMerchantAmount} MMK
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <View style={styles.glassDivider} />
                 <View style={styles.infoSection}>
@@ -543,7 +626,24 @@ const MyTasksScreen: React.FC = () => {
               {groupedPackages[date]?.map(item => (
                 <TouchableOpacity key={item.id} style={styles.packageCard} onPress={() => handlePackagePress(item)} activeOpacity={0.8}>
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardId}>{item.id}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.cardId}>{item.id}</Text>
+                      
+                      {/* 🚀 新增：在顶部显示下单身份 */}
+                      {(() => {
+                        const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        if (identityMatch && identityMatch[1]) {
+                          const identity = identityMatch[1];
+                          const isPartner = identity === '合伙人' || identity === 'Partner';
+                          return (
+                            <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                              <Text style={styles.identityText}>{identity}</Text>
+                            </View>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </View>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                       <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
                     </View>
@@ -552,6 +652,22 @@ const MyTasksScreen: React.FC = () => {
                     <View style={styles.cardRow}><Ionicons name="person" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue}>{item.receiver_name}</Text></View>
                     <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>
                   </View>
+                  
+                  {/* 🚀 新增：列表展示付给商家金额 */}
+                  {(() => {
+                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                    if (payMatch && payMatch[1]) {
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
+                          <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                            💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <View style={styles.cardFooter}>
                     <View style={styles.tag}><Text style={styles.tagText}>{item.package_type}</Text></View>
                     <View style={styles.tag}><Text style={styles.tagText}>{item.weight}kg</Text></View>
@@ -887,6 +1003,16 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.5,
+  },
+  identityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  identityText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });
 

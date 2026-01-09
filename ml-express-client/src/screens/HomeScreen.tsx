@@ -94,6 +94,7 @@ export default function HomeScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
+  const [userType, setUserType] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
   const [orderStats, setOrderStats] = useState<OrderStats>({
     total: 0,
@@ -182,6 +183,9 @@ export default function HomeScreen({ navigation }: any) {
       feature4: '智能路线优化',
       loginToSeeOrders: '登录后查看订单',
       loginNow: '立即登录',
+      cityMall: '同城商场',
+      shoppingCart: '购物车',
+      comingSoon: '敬请期待',
     },
     en: {
       title: 'MARKET LINK EXPRESS',
@@ -231,6 +235,9 @@ export default function HomeScreen({ navigation }: any) {
       feature4: 'Smart Route Optimization',
       loginToSeeOrders: 'Login to see orders',
       loginNow: 'Login Now',
+      cityMall: 'City Mall',
+      shoppingCart: 'Cart',
+      comingSoon: 'Coming Soon',
     },
     my: {
       title: 'MARKET LINK EXPRESS',
@@ -280,6 +287,9 @@ export default function HomeScreen({ navigation }: any) {
       feature4: 'စမတ်လမ်းကြောင်း',
       loginToSeeOrders: 'အမှာစာများကြည့်ရန် ဝင်ရောက်ပါ',
       loginNow: 'ယခုဝင်ရောက်',
+      cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
+      shoppingCart: 'ဈေးဝယ်လှည်း',
+      comingSoon: 'မကြာမီလာမည်',
     },
   };
 
@@ -324,6 +334,7 @@ export default function HomeScreen({ navigation }: any) {
       
       setUserId(storedUserId);
       setUserName(storedUserName || '');
+      setUserType(storedUserType);
       setIsGuest(guestMode === 'true');
 
       // 如果是已登录用户（非访客），加载订单数据
@@ -721,10 +732,10 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Quick Action Cards - 4 Cards in Grid */}
+        {/* Quick Action Cards - 6 Cards in Grid */}
         <View style={styles.quickActionsContainer}>
           <View style={styles.quickActionsGrid}>
-            {/* Place Order */}
+            {/* 1. Place Order */}
             <TouchableOpacity
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('PlaceOrder', currentT.placeOrder + '...')}
@@ -746,29 +757,30 @@ export default function HomeScreen({ navigation }: any) {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Track Order */}
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('TrackOrder', currentT.trackOrder + '...')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={currentT.trackOrder}
-              accessibilityHint="跳转到订单追踪页面"
-            >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionGradient}
+            {/* 2. City Mall */}
+            {userType !== 'partner' && (
+              <TouchableOpacity
+                style={styles.quickActionCard}
+                onPress={() => navigation.navigate('CityMall')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={currentT.cityMall}
               >
-                <View style={styles.quickActionIconContainer}>
-                  <Text style={styles.quickActionIcon}>🔍</Text>
-                </View>
-                <Text style={styles.quickActionText}>{currentT.trackOrder}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#3b82f6', '#1d4ed8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.quickActionGradient}
+                >
+                  <View style={styles.quickActionIconContainer}>
+                    <Text style={styles.quickActionIcon}>🏪</Text>
+                  </View>
+                  <Text style={styles.quickActionText}>{currentT.cityMall}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
 
-            {/* My Orders */}
+            {/* 3. My Orders */}
             <TouchableOpacity
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('MyOrders', currentT.myOrders + '...')}
@@ -790,7 +802,52 @@ export default function HomeScreen({ navigation }: any) {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Profile */}
+            {/* 4. Shopping Cart */}
+            {userType !== 'partner' && (
+              <TouchableOpacity
+                style={styles.quickActionCard}
+                onPress={() => navigation.navigate('Cart')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={currentT.shoppingCart}
+              >
+                <LinearGradient
+                  colors={['#fbbf24', '#f59e0b']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.quickActionGradient}
+                >
+                  <View style={styles.quickActionIconContainer}>
+                    <Text style={styles.quickActionIcon}>🛒</Text>
+                  </View>
+                  <Text style={styles.quickActionText}>{currentT.shoppingCart}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {/* 5. Track Order */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => handleNavigateWithLoading('TrackOrder', currentT.trackOrder + '...')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.trackOrder}
+              accessibilityHint="跳转到订单追踪页面"
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <Text style={styles.quickActionIcon}>🔍</Text>
+                </View>
+                <Text style={styles.quickActionText}>{currentT.trackOrder}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* 6. Profile */}
             <TouchableOpacity
               style={styles.quickActionCard}
               onPress={() => handleNavigateWithLoading('Profile', currentT.profile + '...')}
@@ -1066,7 +1123,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerBackground: {
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 30,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -1076,7 +1133,7 @@ const styles = StyleSheet.create({
     height: 68,
     borderRadius: 34,
     backgroundColor: '#ffffff',
-    padding: 8,
+    padding: 2,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

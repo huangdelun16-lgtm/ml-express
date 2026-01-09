@@ -33,7 +33,29 @@ const spinAnimation = `
 // 注入CSS样式
 if (typeof document !== 'undefined') {
   const style = document.createElement('style');
-  style.textContent = spinAnimation;
+  style.textContent = `
+    ${spinAnimation}
+    select option {
+      background-color: #1e293b;
+      color: white;
+      padding: 10px;
+    }
+    /* 优化滚动条样式 */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  `;
   document.head.appendChild(style);
 }
 
@@ -310,7 +332,7 @@ const DeliveryStoreManagement: React.FC = () => {
     email: '',
     manager_name: '',
     manager_phone: '',
-    store_type: 'restaurant' as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
+    store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
     operating_hours: '08:00-22:00',
     service_area_radius: 5, // 保留默认值，但不在表单中显示
     capacity: 1000, // 保留默认值，但不在表单中显示
@@ -425,7 +447,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: store.email || '',
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
-      store_type: store.store_type as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
+      store_type: store.store_type as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
       operating_hours: store.operating_hours,
       service_area_radius: store.service_area_radius,
       capacity: store.capacity,
@@ -725,7 +747,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: '',
       manager_name: '',
       manager_phone: '',
-      store_type: 'restaurant' as 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station',
+      store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
       operating_hours: '08:00-22:00',
       service_area_radius: 5,
       capacity: 1000,
@@ -745,6 +767,7 @@ const DeliveryStoreManagement: React.FC = () => {
     color: 'white',
     fontSize: '0.95rem',
     outline: 'none',
+    cursor: 'pointer',
     transition: 'all 0.3s ease'
   };
 
@@ -988,9 +1011,15 @@ const DeliveryStoreManagement: React.FC = () => {
                   required
                 >
                   <option value="restaurant">餐厅</option>
-                  <option value="tea_shop">茶铺</option>
                   <option value="drinks_snacks">饮料和小吃</option>
+                  <option value="breakfast">早点铺</option>
+                  <option value="cake_shop">蛋糕店</option>
+                  <option value="tea_shop">茶铺</option>
+                  <option value="flower_shop">鲜花店</option>
+                  <option value="clothing_store">服装店</option>
                   <option value="grocery">杂货店</option>
+                  <option value="hardware_store">五金店</option>
+                  <option value="supermarket">超市</option>
                   <option value="transit_station">中转站</option>
                   <option value="other">其它</option>
                 </select>
@@ -1326,12 +1355,20 @@ const DeliveryStoreManagement: React.FC = () => {
                   </div>
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', opacity: 0.6 }}>
                     <span>类型: {
-                      store.store_type === 'restaurant' ? '餐厅' : 
-                      store.store_type === 'tea_shop' ? '茶铺' : 
-                      store.store_type === 'drinks_snacks' ? '饮料和小吃' : 
-                      store.store_type === 'grocery' ? '杂货店' : 
-                      store.store_type === 'transit_station' ? '中转站' : 
-                      store.store_type
+                      {
+                        restaurant: '餐厅',
+                        drinks_snacks: '饮料和小吃',
+                        breakfast: '早点铺',
+                        cake_shop: '蛋糕店',
+                        tea_shop: '茶铺',
+                        flower_shop: '鲜花店',
+                        clothing_store: '服装店',
+                        grocery: '杂货店',
+                        hardware_store: '五金店',
+                        supermarket: '超市',
+                        transit_station: '中转站',
+                        other: '其它'
+                      }[store.store_type] || store.store_type
                     }</span>
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
@@ -1708,10 +1745,17 @@ const DeliveryStoreManagement: React.FC = () => {
                               }}>
                                 {{
                                   restaurant: '餐厅',
-                                  tea_shop: '茶馆',
-                                  drinks_snacks: '饮料小吃',
+                                  drinks_snacks: '饮料和小吃',
+                                  breakfast: '早点铺',
+                                  cake_shop: '蛋糕店',
+                                  tea_shop: '茶铺',
+                                  flower_shop: '鲜花店',
+                                  clothing_store: '服装店',
                                   grocery: '杂货店',
-                                  transit_station: '中转站'
+                                  hardware_store: '五金店',
+                                  supermarket: '超市',
+                                  transit_station: '中转站',
+                                  other: '其它'
                                 }[selectedStore.store_type] || selectedStore.store_type}
                               </span>
                             )}

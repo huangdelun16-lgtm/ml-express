@@ -14,26 +14,32 @@ import {
   Dimensions,
   RefreshControl,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../contexts/AppContext';
+import { useCart } from '../contexts/CartContext';
 import { merchantService, Product, ProductCategory } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 
 const { width } = Dimensions.get('window');
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
-  const { storeId } = route.params;
+  const { storeId, storeName } = route.params;
   const { language } = useApp();
+  const { addToCart, cartCount, cartItems } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(true);
   
   // 商品表单状态
   const [showProductModal, setShowProductModal] = useState(false);
+  
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [productForm, setProductForm] = useState({
@@ -70,6 +76,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: '保存成功',
       noProducts: '暂无商品，点击右上角添加',
       infinite: '无限',
+      addToCart: '加入购物车',
+      buyNow: '立即下单',
+      quantity: '数量',
+      addedToCart: '已加入购物车',
     },
     en: {
       title: 'Products',
@@ -85,6 +95,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: 'Saved successfully',
       noProducts: 'No products yet, tap + to add',
       infinite: 'Infinite',
+      addToCart: 'Add to Cart',
+      buyNow: 'Buy Now',
+      quantity: 'Quantity',
+      addedToCart: 'Added to cart',
     },
     my: {
       title: 'ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
@@ -100,14 +114,30 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: 'သိမ်းဆည်းပြီးပါပြီ',
       noProducts: 'ကုန်ပစ္စည်းမရှိသေးပါ။ အသစ်ထည့်ရန် + ကိုနှိပ်ပါ',
       infinite: 'အကန့်အသတ်မရှိ',
+      addToCart: 'ခြင်းထဲသို့ထည့်ရန်',
+      buyNow: 'ယခုဝယ်မည်',
+      quantity: 'အရေအတွက်',
+      addedToCart: 'ခြင်းထဲသို့ထည့်ပြီးပါပြီ',
     }
   };
 
   const currentT = t[language as keyof typeof t] || t.zh;
 
   useEffect(() => {
+    checkViewMode();
     loadProducts();
   }, []);
+
+  const checkViewMode = async () => {
+    const currentUserId = await AsyncStorage.getItem('userId');
+    const userType = await AsyncStorage.getItem('userType');
+    // 如果是合伙人查看自己的店铺，则非只读模式
+    if (userType === 'partner' && currentUserId === storeId) {
+      setIsReadOnly(false);
+    } else {
+      setIsReadOnly(true);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -292,50 +322,133 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
-      onPress={() => handleOpenEditProduct(item)}
-    >
-      <View style={styles.productImageContainer}>
-        {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.productImage} />
-        ) : (
-          <View style={styles.productImagePlaceholder}>
-            <Ionicons name="image-outline" size={32} color="#cbd5e1" />
-          </View>
-        )}
-        {!item.is_available && (
-          <View style={styles.unavailableOverlay}>
-            <Text style={styles.unavailableText}>{currentT.unavailable}</Text>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
-        <View style={styles.stockRow}>
-          <Ionicons name="cube-outline" size={14} color="#64748b" />
-          <Text style={styles.productStock}>
-            {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
-          </Text>
-        </View>
-      </View>
+  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
 
-      <View style={styles.productActions}>
-        <Switch
-          value={item.is_available}
-          onValueChange={() => toggleProductStatus(item)}
-          trackColor={{ false: '#cbd5e1', true: '#10b981' }}
-          thumbColor="#ffffff"
-        />
-        <View style={styles.editBtn}>
-          <Ionicons name="create-outline" size={20} color="#3b82f6" />
+  const updateItemQuantity = (id: string, delta: number) => {
+    setItemQuantities(prev => ({
+      ...prev,
+      [id]: Math.max(0, (prev[id] || 0) + delta)
+    }));
+  };
+
+  const getSelectedItems = () => {
+    return products.filter(p => (itemQuantities[p.id] || 0) > 0).map(p => ({
+      ...p,
+      quantity: itemQuantities[p.id]
+    }));
+  };
+
+  const handleBulkAddToCart = () => {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length === 0) {
+      Alert.alert(language === 'zh' ? '提示' : 'Notice', language === 'zh' ? '请先选择商品数量' : 'Please select item quantity');
+      return;
+    }
+
+    // 🚀 核心逻辑优化：检查是否属于不同店铺
+    if (cartItems.length > 0 && cartItems[0].store_id !== storeId) {
+      Alert.alert(
+        language === 'zh' ? '清空购物车提示' : 'Clear Cart Notice',
+        language === 'zh' 
+          ? '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？' 
+          : 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
+        [
+          { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+          { 
+            text: language === 'zh' ? '确定' : 'Continue', 
+            onPress: () => {
+              selectedItems.forEach(item => {
+                addToCart(item, item.quantity);
+              });
+              showToast(currentT.addedToCart, 'success');
+              setItemQuantities({});
+            } 
+          }
+        ]
+      );
+      return;
+    }
+
+    selectedItems.forEach(item => {
+      addToCart(item, item.quantity);
+    });
+    showToast(currentT.addedToCart, 'success');
+    // 可选：清空当前选择
+    setItemQuantities({});
+  };
+
+  const renderProductItem = ({ item }: { item: Product }) => {
+    const quantity = itemQuantities[item.id] || 0;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.productCard}
+        onPress={() => !isReadOnly && handleOpenEditProduct(item)}
+        activeOpacity={isReadOnly ? 1 : 0.7}
+      >
+        <View style={styles.productImageContainer}>
+          {item.image_url ? (
+            <Image source={{ uri: item.image_url }} style={styles.productImage} />
+          ) : (
+            <View style={styles.productImagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color="#cbd5e1" />
+            </View>
+          )}
+          {!item.is_available && (
+            <View style={styles.unavailableOverlay}>
+              <Text style={styles.unavailableText}>{currentT.unavailable}</Text>
+            </View>
+          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+        
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
+          <View style={styles.stockRow}>
+            <Ionicons name="cube-outline" size={14} color="#64748b" />
+            <Text style={styles.productStock}>
+              {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
+            </Text>
+          </View>
+
+          {isReadOnly && item.is_available && (
+            <View style={styles.customerActionContainer}>
+              <View style={styles.smallQuantitySelector}>
+                <TouchableOpacity 
+                  onPress={() => updateItemQuantity(item.id, -1)}
+                  style={[styles.smallQtyBtn, quantity === 0 && styles.disabledQtyBtn]}
+                  disabled={quantity === 0}
+                >
+                  <Ionicons name="remove" size={16} color={quantity === 0 ? "#cbd5e1" : "#3b82f6"} />
+                </TouchableOpacity>
+                <Text style={[styles.smallQtyValue, quantity === 0 && { color: '#cbd5e1' }]}>{quantity}</Text>
+                <TouchableOpacity 
+                  onPress={() => updateItemQuantity(item.id, 1)}
+                  style={styles.smallQtyBtn}
+                >
+                  <Ionicons name="add" size={16} color="#3b82f6" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {!isReadOnly && (
+          <View style={styles.productActions}>
+            <Switch
+              value={item.is_available}
+              onValueChange={() => toggleProductStatus(item)}
+              trackColor={{ false: '#cbd5e1', true: '#10b981' }}
+              thumbColor="#ffffff"
+            />
+            <View style={styles.editBtn}>
+              <Ionicons name="create-outline" size={20} color="#3b82f6" />
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -347,37 +460,73 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{currentT.title}</Text>
-          <TouchableOpacity 
-            onPress={handleOpenAddProduct}
-            style={styles.addBtn}
-          >
-            <Ionicons name="add" size={28} color="white" />
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{storeName || currentT.title}</Text>
+          <View style={styles.headerRight}>
+            {!isReadOnly ? (
+              <TouchableOpacity 
+                onPress={handleOpenAddProduct}
+                style={styles.addBtn}
+              >
+                <Ionicons name="add" size={28} color="white" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('Cart')}
+                style={styles.cartBtn}
+              >
+                <Ionicons name="cart-outline" size={24} color="white" />
+                {cartCount > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </LinearGradient>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-        </View>
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          renderItem={renderProductItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="basket-outline" size={64} color="#cbd5e1" />
-              <Text style={styles.emptyText}>{currentT.noProducts}</Text>
-            </View>
-          }
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3b82f6" />
+          </View>
+        ) : (
+          <FlatList
+            data={products}
+            keyExtractor={(item) => item.id}
+            renderItem={renderProductItem}
+            contentContainerStyle={[styles.listContent, isReadOnly && { paddingBottom: 100 }]}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="basket-outline" size={64} color="#cbd5e1" />
+                <Text style={styles.emptyText}>{currentT.noProducts}</Text>
+              </View>
+            }
+          />
+        )}
+
+        {/* 客户模式下的底部操作栏 */}
+        {isReadOnly && products.length > 0 && (
+          <View style={styles.stickyFooter}>
+            <TouchableOpacity 
+              style={styles.bulkAddToCartBtn}
+              onPress={handleBulkAddToCart}
+            >
+              <LinearGradient
+                colors={['#fbbf24', '#f59e0b']}
+                style={styles.bulkBtnGradient}
+              >
+                <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                <Text style={styles.bulkBtnText}>{currentT.addToCart}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {/* 添加/编辑商品模态框 */}
       <Modal
@@ -538,6 +687,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
+  headerRight: {
+    width: 40,
+    alignItems: 'center',
+  },
   addBtn: {
     width: 40,
     height: 40,
@@ -545,6 +698,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cartBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#3b82f6',
+  },
+  cartBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   listContent: {
     padding: 16,
@@ -773,6 +954,74 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.6,
+  },
+  // 客户操作样式（直接在卡片上）
+  customerActionContainer: {
+    marginTop: 10,
+    gap: 8,
+  },
+  smallQuantitySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    padding: 2,
+    alignSelf: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  smallQtyBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  smallQtyValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    minWidth: 15,
+    textAlign: 'center',
+  },
+  disabledQtyBtn: {
+    backgroundColor: '#f1f5f9',
+  },
+  // 底部操作栏样式
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    gap: 12,
+    ...theme.shadows.large,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  bulkAddToCartBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  bulkBtnGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bulkBtnText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });
 

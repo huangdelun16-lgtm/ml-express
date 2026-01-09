@@ -17,6 +17,7 @@ interface PackageInfoProps {
   onWeightChange: (text: string) => void;
   onDescriptionChange: (text: string) => void;
   onPackageTypeInfoClick: (type: string) => void;
+  cartTotal?: number;
 }
 
 const PackageInfo = memo<PackageInfoProps>(({
@@ -32,6 +33,7 @@ const PackageInfo = memo<PackageInfoProps>(({
   onWeightChange,
   onDescriptionChange,
   onPackageTypeInfoClick,
+  cartTotal,
 }) => {
   const handlePackageTypeClick = (typeValue: string) => {
     onPackageTypeChange(typeValue);
@@ -90,6 +92,20 @@ const PackageInfo = memo<PackageInfoProps>(({
             numberOfLines={3}
           />
         </View>
+
+        {/* 付给商家 (从购物车结算时显示) */}
+        {cartTotal !== undefined && cartTotal > 0 && (
+          <View style={[styles.inputGroup, { marginTop: 10 }]}>
+            <Text style={styles.label}>
+              {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}
+            </Text>
+            <View style={[styles.input, { backgroundColor: '#f1f5f9', justifyContent: 'center' }]}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10b981' }}>
+                {cartTotal.toLocaleString()} MMK
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
     </FadeInView>
   );

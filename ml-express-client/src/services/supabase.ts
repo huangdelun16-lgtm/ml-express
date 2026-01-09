@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
@@ -579,6 +579,41 @@ export const addressService = {
     } catch (error: any) {
       LoggerService.error('删除地址失败:', error);
       return { success: false, error };
+    }
+  }
+};
+
+// 配送店/合伙商户服务
+export const deliveryStoreService = {
+  async getActiveStores() {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('status', 'active')
+        .order('store_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取配送店列表失败:', error);
+      return [];
+    }
+  },
+
+  async getStoreById(storeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('id', storeId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      LoggerService.error('获取店铺详情失败:', error);
+      return null;
     }
   }
 };
@@ -1557,7 +1592,7 @@ export const merchantService = {
       }
 
       const { data, error } = await supabase.storage
-        .from('product-images')
+        .from('product_images')
         .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: true
@@ -1570,7 +1605,7 @@ export const merchantService = {
 
       // 获取公共 URL
       const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
+        .from('product_images')
         .getPublicUrl(fileName);
 
       return publicUrl;

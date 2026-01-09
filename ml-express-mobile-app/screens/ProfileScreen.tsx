@@ -27,6 +27,8 @@ export default function ProfileScreen({ navigation }: any) {
     totalDelivered: 0,
     todayDelivered: 0,
     inProgress: 0,
+    totalPayToMerchant: 0,
+    todayPayToMerchant: 0,
   });
 
   useEffect(() => {
@@ -61,6 +63,14 @@ export default function ProfileScreen({ navigation }: any) {
         totalDelivered: deliveredPackages.length,
         todayDelivered: todayDelivered.length,
         inProgress: myPackages.filter(p => ['已取件', '配送中'].includes(p.status)).length,
+        totalPayToMerchant: deliveredPackages.reduce((sum, p) => {
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+          return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
+        }, 0),
+        todayPayToMerchant: todayDelivered.reduce((sum, p) => {
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+          return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
+        }, 0),
       });
     } catch (error) {
       console.error('加载统计失败:', error);
@@ -226,6 +236,24 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{stats.totalDelivered}</Text>
               <Text style={styles.statLabel}>{language === 'zh' ? '累计完成' : language === 'my' ? 'စုစုပေါင်းပြီးမြောက်' : 'Total'}</Text>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* 🚀 新增：付给商家金额统计 */}
+        <View style={[styles.statsContainer, { marginTop: -10 }]}>
+          <LinearGradient
+            colors={['rgba(16, 185, 129, 0.12)', 'rgba(16, 185, 129, 0.03)']}
+            style={styles.statsGlassCard}
+          >
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: '#10b981' }]}>{stats.todayPayToMerchant.toLocaleString()}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '今日货款' : language === 'my' ? 'ယနေ့ကုန်ဖိုး' : 'Today Pay'}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={[styles.statItem, { flex: 1.5 }]}>
+              <Text style={[styles.statNumber, { color: '#10b981' }]}>{stats.totalPayToMerchant.toLocaleString()}</Text>
+              <Text style={styles.statLabel}>{language === 'zh' ? '累计货款' : language === 'my' ? 'စုစုပေါင်းကုန်ဖိုး' : 'Total Pay'}</Text>
             </View>
           </LinearGradient>
         </View>

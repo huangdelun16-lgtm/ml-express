@@ -293,8 +293,8 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
   },
   logoImage: {
-    width: 60,
-    height: 60,
+    width: '80%',
+    height: '80%',
   },
   title: {
     fontSize: 24,

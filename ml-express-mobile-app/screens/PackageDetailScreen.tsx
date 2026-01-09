@@ -29,8 +29,9 @@ const { width } = Dimensions.get('window');
 
 export default function PackageDetailScreen({ route, navigation }: any) {
   const { language } = useApp();
-  const { packageId, package: initialPackage } = route.params || {};
+  const { packageId, package: initialPackage, coords: initialCoords } = route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
+  const [coords, setCoords] = useState<any>(initialCoords || null);
   const [loading, setLoading] = useState(!initialPackage);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -89,7 +90,22 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   };
 
   const handleNavigate = (address: string) => {
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
+    if (coords && coords.lat && coords.lng) {
+      // 如果有坐标，使用精确导航
+      const origin = 'current_location';
+      const destination = `${coords.lat},${coords.lng}`;
+      const url = Platform.select({
+        ios: `maps:0,0?q=${destination}`,
+        android: `geo:0,0?q=${destination}(${encodeURIComponent(address)})`,
+      });
+      
+      if (url) {
+        Linking.openURL(url);
+      }
+    } else {
+      // 否则使用地址搜索
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
+    }
   };
 
   const handleOpenCamera = async () => {
@@ -218,6 +234,26 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
         <View style={styles.glassCard}>
           <Text style={styles.sectionTitle}>📦 {language === 'zh' ? '包裹详情' : 'Information'}</Text>
+          
+          {/* 🚀 新增：展示下单身份 */}
+          {(() => {
+            const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+            if (identityMatch && identityMatch[1]) {
+              const identity = identityMatch[1];
+              return (
+                <View style={[styles.infoLine, { backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 10, borderRadius: 10, marginBottom: 15 }]}>
+                  <Text style={[styles.infoLabel, { color: '#fff', fontWeight: 'bold' }]}>
+                    👤 {language === 'zh' ? '下单身份' : 'Orderer'}:
+                  </Text>
+                  <Text style={[styles.infoValue, { color: '#3b82f6', fontWeight: 'bold', fontSize: 15 }]}>
+                    {identity}
+                  </Text>
+                </View>
+              );
+            }
+            return null;
+          })()}
+
           <View style={styles.infoLine}>
             <Text style={styles.infoLabel}>{language === 'zh' ? '类型' : 'Type'}</Text>
             <Text style={styles.infoValue}>{pkg.package_type}</Text>
@@ -235,7 +271,26 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           <View style={styles.infoLine}>
             <Text style={styles.infoLabel}>{language === 'zh' ? '代收款 (COD)' : 'COD Amount'}</Text>
             <Text style={[styles.infoValue, { color: '#f59e0b' }]}>{Number(pkg.cod_amount || 0).toLocaleString()} MMK</Text>
-        </View>
+          </View>
+
+          {/* 🚀 新增：解析并显示“付给商家”金额 */}
+          {(() => {
+            const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+            if (payMatch && payMatch[1]) {
+              return (
+                <View style={[styles.infoLine, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: 10, paddingTop: 15 }]}>
+                  <Text style={[styles.infoLabel, { fontWeight: 'bold', color: '#10b981' }]}>
+                    {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}:
+                  </Text>
+                  <Text style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981', fontSize: 18 }]}>
+                    {payMatch[1]} MMK
+                  </Text>
+                </View>
+              );
+            }
+            return null;
+          })()}
+
           <View style={styles.glassDivider} />
           <Text style={styles.sectionTitle}>👥 {language === 'zh' ? '联系人' : 'Contacts'}</Text>
           <View style={styles.contactItem}>
