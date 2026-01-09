@@ -2245,6 +2245,24 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
+              {/* 🚀 新增：从描述中解析“付给商家”并显示 */}
+              {(() => {
+                const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                if (payMatch && payMatch[1]) {
+                  return (
+                    <div>
+                      <label style={{ color: '#10b981', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}
+                      </label>
+                      <div style={{ color: '#10b981', fontSize: '1.5rem', fontWeight: '900' }}>
+                        {payMatch[1]} MMK
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* 寄件人信息 */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
