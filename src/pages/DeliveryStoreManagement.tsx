@@ -176,6 +176,12 @@ const DeliveryStoreManagement: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse'>('mandalay'); // 默认曼德勒
   const [allStores, setAllStores] = useState<DeliveryStore[]>([]); // 存储所有合伙店铺
   
+  // 🚀 新增：店铺商品查看状态
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [viewingStoreName, setViewingStoreName] = useState('');
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
   // Google Places API 相关状态
   const [placeSearchInput, setPlaceSearchInput] = useState('');
   const [placeSuggestions, setPlaceSuggestions] = useState<any[]>([]);
@@ -590,23 +596,29 @@ const DeliveryStoreManagement: React.FC = () => {
   }, []);
 
   const loadStores = async (isRetry = false) => {
+    // ... 原有逻辑
+  };
+
+  // 🚀 新增：加载店铺商品逻辑
+  const viewStoreProducts = async (store: DeliveryStore) => {
     try {
-      setLoading(true);
-      if (!isRetry) {
-        setErrorMessage(null); // 清除之前的错误信息
-      }
-      const data = await deliveryStoreService.getAllStores();
-      setAllStores(data); // 存储所有合伙店铺
-      setRetryCount(0); // 重置重试计数
+      setLoadingProducts(true);
+      setViewingStoreName(store.store_name);
+      setShowProductsModal(true);
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', store.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStoreProducts(data || []);
     } catch (error) {
-      console.error('加载合伙店铺列表失败:', error);
-      setErrorMessage('加载合伙店铺列表失败，请刷新页面重试');
-      setAllStores([]); // 设置空数组避免undefined
-      if (!isRetry) {
-        setRetryCount(prev => prev + 1);
-      }
+      console.error('加载店铺商品失败:', error);
+      alert('加载商品失败，请重试');
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
     }
   };
 
@@ -1501,6 +1513,37 @@ const DeliveryStoreManagement: React.FC = () => {
                       }}
                     >
                       📱 店长收件码
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        viewStoreProducts(store);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(245, 158, 11, 0.3)';
+                      }}
+                    >
+                      🛍️ 进入店铺
                     </button>
                     <button
                       onClick={(e) => {
@@ -3835,6 +3878,138 @@ const DeliveryStoreManagement: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：店铺商品详情弹窗 */}
+      {showProductsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 3000,
+          backdropFilter: 'blur(8px)'
+        }}>
+          <div style={{
+            width: '90%',
+            maxWidth: '800px',
+            background: '#1e293b',
+            borderRadius: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            overflow: 'hidden',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div style={{
+              padding: '24px',
+              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.5rem' }}>🛍️ {viewingStoreName} - 商品列表</h2>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.8, fontSize: '0.9rem' }}>共 {storeProducts.length} 件在售商品</p>
+              </div>
+              <button 
+                onClick={() => setShowProductsModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  color: 'white',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >✕</button>
+            </div>
+
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              {loadingProducts ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '4px solid rgba(255,255,255,0.1)',
+                    borderTop: '4px solid #3b82f6',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 16px'
+                  }} />
+                  <p style={{ color: 'white' }}>正在加载店铺商品...</p>
+                </div>
+              ) : storeProducts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.4)' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📦</div>
+                  <p style={{ fontSize: '1.2rem' }}>该店铺暂未添加任何商品</p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '20px'
+                }}>
+                  {storeProducts.map((product) => (
+                    <div key={product.id} style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      transition: 'transform 0.3s ease'
+                    }}>
+                      <div style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        background: '#0f172a',
+                        marginBottom: '12px',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '2rem' }}>🖼️</span>
+                        )}
+                      </div>
+                      <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'white' }}>{product.name}</h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{product.price.toLocaleString()} MMK</span>
+                        <span style={{ 
+                          fontSize: '0.8rem', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px',
+                          background: product.is_available ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: product.is_available ? '#10b981' : '#ef4444'
+                        }}>
+                          {product.is_available ? '在售' : '下架'}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
+                        库存: {product.stock === -1 ? '无限' : product.stock}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
