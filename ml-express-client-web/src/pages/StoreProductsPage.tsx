@@ -128,11 +128,20 @@ const StoreProductsPage: React.FC = () => {
     }
   };
 
+  // 🚀 首页同款背景渐变
+  const homeBackground = 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: homeBackground,
+      backgroundAttachment: 'fixed'
+    }}>
       <div style={{ 
         padding: '1rem 2rem 0',
-        background: 'linear-gradient(to bottom, #1e3a8a 0%, #1e40af 100%)',
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
         paddingBottom: '3rem'
       }}>
         <NavigationBar 
@@ -152,7 +161,7 @@ const StoreProductsPage: React.FC = () => {
               <button 
                 onClick={() => navigate('/mall')}
                 style={{ 
-                  background: 'rgba(255,255,255,0.15)', 
+                  background: 'rgba(255,255,255,0.2)', 
                   border: '1px solid rgba(255,255,255,0.3)', 
                   color: 'white', 
                   padding: '0.6rem 1.2rem', 
@@ -237,7 +246,7 @@ const StoreProductsPage: React.FC = () => {
 
       <div style={{ maxWidth: '1200px', margin: '-2rem auto 4rem', padding: '0 1rem', position: 'relative', zIndex: 20 }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '8rem 0', background: 'white', borderRadius: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          <div style={{ textAlign: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', borderRadius: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
             <div className="spinner" style={{ 
               width: '40px', 
               height: '40px', 
@@ -247,16 +256,16 @@ const StoreProductsPage: React.FC = () => {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
-            <p style={{ color: '#64748b' }}>{t.loading}</p>
+            <p style={{ color: '#64748b', fontWeight: 'bold' }}>{t.loading}</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem', alignItems: 'start' }}>
             {/* 商品列表 */}
             <div>
               <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
-                gap: '1.5rem' 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                gap: '2rem' 
               }}>
                 {products.map(product => {
                   const qty = itemQuantities[product.id] || 0;
@@ -264,63 +273,66 @@ const StoreProductsPage: React.FC = () => {
                     <div 
                       key={product.id}
                       style={{
-                        background: 'white',
-                        borderRadius: '24px',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '30px',
                         overflow: 'hidden',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-                        border: '1px solid #f1f5f9',
+                        boxShadow: '0 10px 20px rgba(0,0,0,0.03)',
+                        border: '1px solid rgba(255,255,255,0.8)',
                         display: 'flex',
                         flexDirection: 'column',
                         transition: 'all 0.3s ease'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-5px)';
-                        e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.08)';
+                        e.currentTarget.style.transform = 'translateY(-8px)';
+                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
+                        e.currentTarget.style.background = '#ffffff';
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)';
+                        e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.03)';
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
                       }}
                     >
-                      <div style={{ height: '220px', background: '#f8fafc', position: 'relative' }}>
+                      <div style={{ height: '240px', background: '#f8fafc', position: 'relative' }}>
                         {product.image_url ? (
                           <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '4rem', background: '#eff6ff' }}>
+                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '4.5rem', background: '#eff6ff' }}>
                             📦
                           </div>
                         )}
                         <div style={{ 
                           position: 'absolute', 
-                          bottom: '1rem', 
-                          right: '1rem', 
-                          background: 'rgba(255,255,255,0.9)', 
-                          padding: '0.4rem 0.8rem', 
-                          borderRadius: '10px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          color: '#64748b',
+                          bottom: '1.2rem', 
+                          right: '1.2rem', 
+                          background: 'rgba(255,255,255,0.95)', 
+                          padding: '0.5rem 1rem', 
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          fontWeight: '900',
+                          color: '#1e40af',
                           backdropFilter: 'blur(4px)',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                          border: '1px solid #e0e7ff'
                         }}>
                           {t.stock}: {product.stock === -1 ? t.infinite : product.stock}
                         </div>
                       </div>
                       
-                      <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b', marginBottom: '0.5rem' }}>{product.name}</h3>
-                        <p style={{ color: '#10b981', fontSize: '1.4rem', fontWeight: '900', marginBottom: '1.5rem' }}>{product.price.toLocaleString()} MMK</p>
+                      <div style={{ padding: '1.8rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ fontSize: '1.3rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.6rem' }}>{product.name}</h3>
+                        <p style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: '900', marginBottom: '1.8rem' }}>{product.price.toLocaleString()} MMK</p>
 
                         <div style={{ marginTop: 'auto' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', justifyContent: 'center', background: '#f8fafc', padding: '0.5rem', borderRadius: '15px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', marginBottom: '1.2rem', justifyContent: 'center', background: '#f1f5f9', padding: '0.6rem', borderRadius: '18px' }}>
                             <button 
                               onClick={() => updateQuantity(product.id, -1)}
-                              style={{ width: '36px', height: '36px', borderRadius: '12px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontSize: '1.2rem', fontWeight: 'bold' }}
+                              style={{ width: '40px', height: '40px', borderRadius: '14px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', fontSize: '1.4rem', fontWeight: 'bold', color: '#1e40af' }}
                             >-</button>
-                            <span style={{ fontWeight: '900', minWidth: '30px', textAlign: 'center', fontSize: '1.2rem', color: '#1e293b' }}>{qty}</span>
+                            <span style={{ fontWeight: '900', minWidth: '35px', textAlign: 'center', fontSize: '1.4rem', color: '#0f172a' }}>{qty}</span>
                             <button 
                               onClick={() => updateQuantity(product.id, 1)}
-                              style={{ width: '36px', height: '36px', borderRadius: '12px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontSize: '1.2rem', fontWeight: 'bold' }}
+                              style={{ width: '40px', height: '40px', borderRadius: '14px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', fontSize: '1.4rem', fontWeight: 'bold', color: '#1e40af' }}
                             >+</button>
                           </div>
                           <button 
@@ -328,15 +340,15 @@ const StoreProductsPage: React.FC = () => {
                             onClick={() => handleAddToCart(product)}
                             style={{ 
                               width: '100%', 
-                              padding: '1rem', 
-                              borderRadius: '16px', 
+                              padding: '1.2rem', 
+                              borderRadius: '20px', 
                               border: 'none', 
-                              background: qty > 0 ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#e2e8f0', 
+                              background: qty > 0 ? 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)' : '#e2e8f0', 
                               color: 'white', 
-                              fontWeight: 'bold', 
-                              fontSize: '1rem',
+                              fontWeight: '900', 
+                              fontSize: '1.1rem',
                               cursor: qty > 0 ? 'pointer' : 'default',
-                              boxShadow: qty > 0 ? '0 10px 20px rgba(37, 99, 235, 0.2)' : 'none',
+                              boxShadow: qty > 0 ? '0 12px 24px rgba(30, 64, 175, 0.2)' : 'none',
                               transition: 'all 0.3s ease'
                             }}
                           >
@@ -349,32 +361,39 @@ const StoreProductsPage: React.FC = () => {
                 })}
               </div>
               {products.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '8rem 0', background: 'white', borderRadius: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                  <div style={{ fontSize: '5rem', marginBottom: '1.5rem' }}>🧺</div>
-                  <h3 style={{ fontSize: '1.5rem', color: '#64748b', fontWeight: 'bold' }}>{t.noProducts}</h3>
+                <div style={{ textAlign: 'center', padding: '10rem 0', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '40px', border: '2px dashed rgba(255,255,255,0.3)' }}>
+                  <div style={{ fontSize: '6rem', marginBottom: '1.5rem', opacity: 0.8 }}>🧺</div>
+                  <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.noProducts}</h3>
                 </div>
               )}
             </div>
 
             {/* 商家信息侧边栏 */}
             <div style={{ position: 'sticky', top: '2rem' }}>
-              <div style={{ background: 'white', borderRadius: '24px', padding: '1.8rem', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '900', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '1.5rem' }}>ℹ️</span> {t.merchantInfo}
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.95)', 
+                borderRadius: '30px', 
+                padding: '2.5rem', 
+                boxShadow: '0 20px 40px rgba(0,0,0,0.1)', 
+                border: '1px solid rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: '900', color: '#0f172a', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span style={{ fontSize: '1.8rem' }}>ℹ️</span> {t.merchantInfo}
                 </h2>
                 {store && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                    <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
-                      <p style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.4rem' }}>{t.address}</p>
-                      <p style={{ color: '#1e293b', fontSize: '0.95rem', lineHeight: '1.5' }}>{store.address}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
+                    <div style={{ borderBottom: '1px solid rgba(30, 64, 175, 0.05)', paddingBottom: '1.5rem' }}>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.address}</p>
+                      <p style={{ color: '#334155', fontSize: '1rem', lineHeight: '1.6', fontWeight: '500' }}>{store.address}</p>
                     </div>
-                    <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
-                      <p style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.4rem' }}>{t.contact}</p>
-                      <p style={{ color: '#1e293b', fontSize: '1.1rem', fontWeight: 'bold' }}>{store.phone}</p>
+                    <div style={{ borderBottom: '1px solid rgba(30, 64, 175, 0.05)', paddingBottom: '1.5rem' }}>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.contact}</p>
+                      <p style={{ color: '#0f172a', fontSize: '1.3rem', fontWeight: '900' }}>{store.phone}</p>
                     </div>
                     <div>
-                      <p style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.4rem' }}>{t.hours}</p>
-                      <p style={{ color: '#1e293b', fontSize: '0.95rem' }}>{store.operating_hours || '09:00 - 21:00'}</p>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.hours}</p>
+                      <p style={{ color: '#334155', fontSize: '1.1rem', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</p>
                     </div>
                   </div>
                 )}

@@ -81,7 +81,6 @@ const CityMallPage: React.FC = () => {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
         
-        // 🚀 自动根据用户地址检测区域
         if (user.address) {
           const addr = user.address.toUpperCase();
           if (addr.includes('YANGON') || addr.includes('YGN')) setSelectedRegion('YGN');
@@ -90,7 +89,7 @@ const CityMallPage: React.FC = () => {
           else if (addr.includes('TAUNGGYI') || addr.includes('TGI')) setSelectedRegion('TGI');
           else if (addr.includes('LASHIO') || addr.includes('LSO')) setSelectedRegion('LSO');
           else if (addr.includes('MUSE') || addr.includes('MSE')) setSelectedRegion('MSE');
-          else setSelectedRegion('MDY'); // 默认曼德勒
+          else setSelectedRegion('MDY');
         }
       } catch (error) {
         console.error('Failed to load user info:', error);
@@ -118,23 +117,22 @@ const CityMallPage: React.FC = () => {
   };
 
   const filteredStores = stores.filter(store => {
-    // 匹配搜索文本
     const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
       (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase())) ||
-      store.store_type.toLowerCase().includes(searchText.toLowerCase());
+      (store.store_type && store.store_type.toLowerCase().includes(searchText.toLowerCase()));
     
-    // 匹配地区 (如果 store.address 包含地区标识)
     const storeAddr = (store.address || '').toUpperCase();
-    const matchesRegion = 
-      (selectedRegion === 'YGN' && (storeAddr.includes('YANGON') || storeAddr.includes('YGN'))) ||
-      (selectedRegion === 'MDY' && (storeAddr.includes('MANDALAY') || storeAddr.includes('MDY'))) ||
-      (selectedRegion === 'POL' && (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL'))) ||
-      (selectedRegion === 'NPW' && (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW'))) ||
-      (selectedRegion === 'TGI' && (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI'))) ||
-      (selectedRegion === 'LSO' && (storeAddr.includes('LASHIO') || storeAddr.includes('LSO'))) ||
-      (selectedRegion === 'MSE' && (storeAddr.includes('MUSE') || storeAddr.includes('MSE')));
+    let storeRegion = 'MDY';
+    
+    if (storeAddr.includes('YANGON') || storeAddr.includes('YGN')) storeRegion = 'YGN';
+    else if (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL')) storeRegion = 'POL';
+    else if (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW')) storeRegion = 'NPW';
+    else if (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI')) storeRegion = 'TGI';
+    else if (storeAddr.includes('LASHIO') || storeAddr.includes('LSO')) storeRegion = 'LSO';
+    else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
+    else storeRegion = 'MDY';
 
-    return matchesSearch && matchesRegion;
+    return matchesSearch && storeRegion === selectedRegion;
   });
 
   const getStoreIcon = (type: string) => {
@@ -148,12 +146,22 @@ const CityMallPage: React.FC = () => {
     }
   };
 
+  // 🚀 首页同款背景渐变
+  const homeBackground = 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: homeBackground,
+      backgroundAttachment: 'fixed'
+    }}>
+      {/* 顶部导航与 Header 区域 */}
       <div style={{ 
         padding: '1rem 2rem 0',
-        background: 'linear-gradient(to bottom, #1e3a8a 0%, #1e40af 100%)',
-        paddingBottom: '2rem'
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+        paddingBottom: '3rem'
       }}>
         <NavigationBar 
           language={language}
@@ -166,7 +174,6 @@ const CityMallPage: React.FC = () => {
           translations={translations}
         />
         
-        {/* 🚀 优化后的 Header */}
         <div style={{ 
           maxWidth: '1200px', 
           margin: '2rem auto 0',
@@ -174,17 +181,18 @@ const CityMallPage: React.FC = () => {
           color: 'white'
         }}>
           <h1 style={{ 
-            fontSize: '3rem', 
+            fontSize: '3.5rem', 
             marginBottom: '0.5rem', 
             fontWeight: '900',
-            textShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            textShadow: '2px 4px 8px rgba(0,0,0,0.2)',
             letterSpacing: '2px'
           }}>{t.title}</h1>
           <p style={{ 
             fontSize: '1.2rem', 
             opacity: 0.9, 
             marginBottom: '2.5rem',
-            fontWeight: '500'
+            fontWeight: '600',
+            textShadow: '1px 2px 4px rgba(0,0,0,0.1)'
           }}>{t.subtitle}</p>
           
           <div style={{ 
@@ -195,17 +203,17 @@ const CityMallPage: React.FC = () => {
           }}>
             <div style={{
               display: 'flex',
-              background: 'white',
-              borderRadius: '16px',
-              padding: '4px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              border: '1px solid rgba(255,255,255,0.2)'
+              background: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '20px',
+              padding: '6px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(255,255,255,0.5)'
             }}>
               <div style={{
                 padding: '0 1.5rem',
                 display: 'flex',
                 alignItems: 'center',
-                color: '#94a3b8',
+                color: '#64748b',
                 fontSize: '1.5rem'
               }}>🔍</div>
               <input
@@ -220,7 +228,8 @@ const CityMallPage: React.FC = () => {
                   fontSize: '1.1rem',
                   outline: 'none',
                   color: '#1e293b',
-                  background: 'transparent'
+                  background: 'transparent',
+                  fontWeight: '500'
                 }}
               />
             </div>
@@ -228,30 +237,32 @@ const CityMallPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 🚀 地区选择栏 */}
+      {/* 🚀 地区选择栏 - 优化为毛玻璃效果 */}
       <div style={{ 
-        background: 'white', 
-        borderBottom: '1px solid #e2e8f0',
+        background: 'rgba(255, 255, 255, 0.8)', 
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
       }}>
         <div style={{ 
           maxWidth: '1200px', 
           margin: '0 auto', 
           display: 'flex', 
           alignItems: 'center',
-          padding: '0 1rem',
+          padding: '0.5rem 1rem',
           overflowX: 'auto'
         }}>
           <div style={{ 
             padding: '1rem', 
-            fontWeight: 'bold', 
-            color: '#64748b', 
+            fontWeight: '900', 
+            color: '#1e40af', 
             whiteSpace: 'nowrap',
-            borderRight: '1px solid #f1f5f9',
-            marginRight: '1rem'
+            borderRight: '2px solid rgba(30, 64, 175, 0.1)',
+            marginRight: '1rem',
+            fontSize: '1rem'
           }}>
             📍 {t.region}
           </div>
@@ -261,15 +272,16 @@ const CityMallPage: React.FC = () => {
                 key={r.id}
                 onClick={() => setSelectedRegion(r.id)}
                 style={{
-                  padding: '0.8rem 1.5rem',
+                  padding: '0.8rem 1.8rem',
                   border: 'none',
-                  background: selectedRegion === r.id ? '#eff6ff' : 'transparent',
-                  color: selectedRegion === r.id ? '#2563eb' : '#64748b',
-                  fontWeight: selectedRegion === r.id ? 'bold' : '500',
-                  borderRadius: '12px',
+                  background: selectedRegion === r.id ? '#1e40af' : 'transparent',
+                  color: selectedRegion === r.id ? 'white' : '#475569',
+                  fontWeight: '800',
+                  borderRadius: '15px',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontSize: '0.95rem'
                 }}
               >
                 {r[language as 'zh' | 'en' | 'my'] || r.en}
@@ -279,95 +291,96 @@ const CityMallPage: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1200px', margin: '2.5rem auto', padding: '0 1rem' }}>
+      <div style={{ maxWidth: '1200px', margin: '3rem auto', padding: '0 1rem' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '8rem 0' }}>
             <div className="spinner" style={{ 
               width: '50px', 
               height: '50px', 
-              border: '5px solid #e2e8f0', 
-              borderTop: '5px solid #2563eb', 
+              border: '5px solid rgba(255,255,255,0.3)', 
+              borderTop: '5px solid #1e40af', 
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1.5rem'
             }}></div>
-            <p style={{ color: '#64748b', fontSize: '1.1rem', fontWeight: '500' }}>{t.loading}</p>
+            <p style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.loading}</p>
           </div>
         ) : (
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
-            gap: '2rem' 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
+            gap: '2.5rem' 
           }}>
             {filteredStores.map(store => (
               <div 
                 key={store.id}
                 onClick={() => navigate(`/mall/${store.id}`)}
                 style={{
-                  background: 'white',
-                  borderRadius: '24px',
-                  padding: '1.8rem',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: '30px',
+                  padding: '2rem',
                   cursor: 'pointer',
                   transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
+                  boxShadow: '0 10px 20px rgba(0,0,0,0.05)',
                   position: 'relative',
-                  border: '1px solid #f1f5f9',
+                  border: '1px solid rgba(255,255,255,0.8)',
                   display: 'flex',
                   flexDirection: 'column'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(0,0,0,0.1)';
-                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.transform = 'translateY(-12px)';
+                  e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
+                  e.currentTarget.style.background = '#ffffff';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
-                  e.currentTarget.style.borderColor = '#f1f5f9';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.8rem' }}>
                   <div style={{ 
-                    width: '70px', 
-                    height: '70px', 
-                    borderRadius: '20px', 
-                    background: '#f0f7ff', 
+                    width: '80px', 
+                    height: '80px', 
+                    borderRadius: '24px', 
+                    background: homeBackground, 
                     display: 'flex', 
                     justifyContent: 'center', 
                     alignItems: 'center',
-                    fontSize: '2.5rem',
-                    marginRight: '1.2rem',
-                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                    fontSize: '2.8rem',
+                    marginRight: '1.5rem',
+                    boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                    color: 'white'
                   }}>
                     {getStoreIcon(store.store_type)}
                   </div>
                   <div style={{ flex: 1 }}>
                     <h3 style={{ 
-                      fontSize: '1.3rem', 
-                      fontWeight: '800', 
+                      fontSize: '1.4rem', 
+                      fontWeight: '900', 
                       color: '#0f172a', 
-                      marginBottom: '0.5rem',
+                      marginBottom: '0.6rem',
                       lineHeight: '1.2'
                     }}>{store.store_name}</h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
                       <span style={{ 
-                        background: '#f1f5f9', 
-                        color: '#475569', 
-                        fontSize: '0.75rem', 
-                        padding: '0.25rem 0.75rem', 
-                        borderRadius: '8px',
-                        fontWeight: '700',
+                        background: '#eff6ff', 
+                        color: '#1e40af', 
+                        fontSize: '0.8rem', 
+                        padding: '0.3rem 0.8rem', 
+                        borderRadius: '10px',
+                        fontWeight: '800',
                         textTransform: 'uppercase'
                       }}>
                         {store.store_type}
                       </span>
                       <span style={{ 
                         background: '#dcfce7', 
-                        color: '#166534', 
-                        fontSize: '0.75rem', 
-                        padding: '0.25rem 0.75rem', 
-                        borderRadius: '8px',
-                        fontWeight: '700'
+                        color: '#15803d', 
+                        fontSize: '0.8rem', 
+                        padding: '0.3rem 0.8rem', 
+                        borderRadius: '10px',
+                        fontWeight: '800'
                       }}>
                         ● Open
                       </span>
@@ -377,30 +390,33 @@ const CityMallPage: React.FC = () => {
 
                 <div style={{ 
                   background: '#f8fafc', 
-                  borderRadius: '16px', 
-                  padding: '1.2rem', 
-                  gap: '0.8rem', 
+                  borderRadius: '20px', 
+                  padding: '1.5rem', 
+                  gap: '1rem', 
                   display: 'flex', 
                   flexDirection: 'column',
-                  marginBottom: '1.5rem'
+                  marginBottom: '1.8rem',
+                  border: '1px solid #f1f5f9'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '0.95rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '0.8rem' }}>⏰</span>
-                    <span style={{ fontWeight: '500' }}>{t.operatingHours}:</span>
-                    <span style={{ marginLeft: 'auto', color: '#1e293b' }}>{store.operating_hours || '09:00 - 21:00'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
+                    <span style={{ fontWeight: '600' }}>{t.operatingHours}:</span>
+                    <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '0.95rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '0.8rem' }}>📞</span>
-                    <span style={{ fontWeight: '500' }}>{t.contact}:</span>
-                    <span style={{ marginLeft: 'auto', color: '#1e293b' }}>{store.phone}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
+                    <span style={{ fontWeight: '600' }}>{t.contact}:</span>
+                    <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '0.95rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '0.8rem' }}>📍</span>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
                     <span style={{ 
                       whiteSpace: 'nowrap', 
                       overflow: 'hidden', 
                       textOverflow: 'ellipsis',
-                      color: '#1e293b'
+                      color: '#1e293b',
+                      fontWeight: '500',
+                      maxWidth: '180px'
                     }}>{store.address}</span>
                   </div>
                 </div>
@@ -408,15 +424,15 @@ const CityMallPage: React.FC = () => {
                 <div style={{ 
                   textAlign: 'right', 
                   marginTop: 'auto', 
-                  fontWeight: '800', 
-                  color: '#2563eb',
-                  fontSize: '1.1rem',
+                  fontWeight: '900', 
+                  color: '#1e40af',
+                  fontSize: '1.2rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'flex-end',
-                  gap: '0.5rem'
+                  gap: '0.6rem'
                 }}>
-                  {t.visitStore} <span style={{ fontSize: '1.4rem' }}>→</span>
+                  {t.visitStore} <span style={{ fontSize: '1.6rem' }}>→</span>
                 </div>
               </div>
             ))}
@@ -427,14 +443,15 @@ const CityMallPage: React.FC = () => {
           <div style={{ 
             textAlign: 'center', 
             padding: '10rem 0', 
-            color: '#94a3b8',
-            background: 'white',
-            borderRadius: '32px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
+            color: 'white',
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '40px',
+            border: '2px dashed rgba(255, 255, 255, 0.3)'
           }}>
-            <div style={{ fontSize: '6rem', marginBottom: '1.5rem' }}>🏢</div>
-            <h3 style={{ fontSize: '1.5rem', color: '#64748b', fontWeight: 'bold' }}>{t.noStores}</h3>
-            <p style={{ marginTop: '0.5rem' }}>请尝试切换其他地区或搜索关键词</p>
+            <div style={{ fontSize: '7rem', marginBottom: '1.5rem', opacity: 0.8 }}>🏢</div>
+            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.noStores}</h3>
+            <p style={{ marginTop: '0.8rem', fontSize: '1.1rem', opacity: 0.9 }}>请尝试切换其他地区或搜索关键词</p>
           </div>
         )}
       </div>
@@ -445,11 +462,14 @@ const CityMallPage: React.FC = () => {
           100% { transform: rotate(360deg); }
         }
         ::-webkit-scrollbar {
-          height: 6px;
+          height: 8px;
         }
         ::-webkit-scrollbar-thumb {
-          background: #e2e8f0;
+          background: rgba(255, 255, 255, 0.3);
           border-radius: 10px;
+        }
+        ::-webkit-scrollbar-track {
+          background: transparent;
         }
       `}</style>
     </div>
