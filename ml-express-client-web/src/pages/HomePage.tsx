@@ -170,6 +170,7 @@ const HomePage: React.FC = () => {
   const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
   const [cartTotal, setCartTotal] = useState(0);
+  const [hasCOD, setHasCOD] = useState(true); // 🚀 新增：是否需要代收款状态
   
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // const [orderData, setOrderData] = useState<any>(null);
@@ -298,9 +299,16 @@ const HomePage: React.FC = () => {
       }).filter(Boolean).join(', ');
       productDescription = `[已选商品: ${details}]`;
     }
+
+    // 🚀 核心优化：如果非 Partner 且开启了代收，在描述中添加货款金额
+    let payToMerchantTag = '';
+    if (currentUser?.user_type !== 'partner' && hasCOD && cartTotal > 0) {
+      const payToMerchantText = language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်';
+      payToMerchantTag = ` [${payToMerchantText}: ${cartTotal.toLocaleString()} MMK]`;
+    }
     
-    return `${typeTag} ${productDescription}`.trim();
-  }, [currentUser, selectedProducts, merchantProducts]);
+    return `${typeTag} ${productDescription}${payToMerchantTag}`.trim();
+  }, [currentUser, selectedProducts, merchantProducts, hasCOD, cartTotal, language]);
 
   // 🚀 新增：处理商品数量变化逻辑
   const handleProductQuantityChange = (productId: string, delta: number) => {
@@ -347,12 +355,13 @@ const HomePage: React.FC = () => {
 
     setCartTotal(total);
 
-    // 如果选了商品，自动填充代收金额（仅Partner/VIP开启代收时生效，这里仅作计算建议）
-    if (total > 0 && currentUser?.user_type === 'partner') {
-      // 自动设置代收金额
+    // 🚀 如果开启了代收，且当前是合伙人，自动填充金额
+    if (total > 0 && currentUser?.user_type === 'partner' && hasCOD) {
       setCodAmount(total.toString());
+    } else if (!hasCOD) {
+      setCodAmount('0');
     }
-  }, [selectedProducts, merchantProducts, currentUser]);
+  }, [selectedProducts, merchantProducts, currentUser, hasCOD]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
   const loadPricingSettings = async (region?: string) => {
@@ -1918,7 +1927,7 @@ const HomePage: React.FC = () => {
       senderLongitude: selectedSenderLocation?.lng || null,
       receiverLatitude: selectedReceiverLocation?.lat || null,
       receiverLongitude: selectedReceiverLocation?.lng || null,
-      codAmount: codAmount ? parseFloat(codAmount) : 0,
+      codAmount: hasCOD ? (codAmount ? parseFloat(codAmount) : 0) : 0,
     };
 
     // 🚀 核心优化：使用统一逻辑构建商品描述和身份标识
@@ -2587,6 +2596,8 @@ const HomePage: React.FC = () => {
         selectedProducts={selectedProducts}
         handleProductQuantityChange={handleProductQuantityChange}
         cartTotal={cartTotal}
+        hasCOD={hasCOD}
+        setHasCOD={setHasCOD}
       />
 
       {/* 支付二维码模态窗口 */}
