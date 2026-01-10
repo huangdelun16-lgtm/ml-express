@@ -1692,62 +1692,29 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onBlur={handleFieldBlur}
           />
 
-          {/* 包裹信息 */}
-          <PackageInfo
-            language={language as any}
-            styles={styles}
-            currentT={currentT}
-            packageType={packageType}
-            weight={weight}
-            description={description}
-            showWeightInput={showWeightInput}
-            packageTypes={packageTypes}
-            onPackageTypeChange={setPackageType}
-            onWeightChange={setWeight}
-            onDescriptionChange={setDescription}
-            onPackageTypeInfoClick={(type) => {
-              setSelectedPackageTypeInfo(type);
-              setShowPackageTypeInfo(true);
-            }}
-            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
-          />
-
-          {/* 代收款 (仅限 Partner 账号) */}
+          {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
           {currentUser?.user_type === 'partner' && (
-            <FadeInView delay={320}>
+            <FadeInView delay={250}>
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionTitleContainer}>
-                    <MoneyIcon size={18} color="#1e293b" />
-                    <Text style={styles.sectionTitle}> {currentT.codAmount}</Text>
-                  </View>
-                  <View style={styles.codToggleContainer}>
-                    <Text style={[styles.codToggleLabel, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
-                    <Switch
-                      value={hasCOD}
-                      onValueChange={handleToggleCOD}
-                      trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
-                      thumbColor="#ffffff"
-                    />
-                    <Text style={[styles.codToggleLabel, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
-                  </View>
+                <View style={styles.sectionTitleContainer}>
+                  <Ionicons name="basket-outline" size={18} color="#1e293b" />
+                  <Text style={styles.sectionTitle}> {currentT.selectedProducts}</Text>
                 </View>
 
-                {/* 商品选择部分 (无论是否代收都显示，方便老板选货) */}
-                <View style={[styles.inputGroup, { marginTop: 15 }]}>
+                <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.label}>{currentT.selectedProducts}</Text>
+                    <Text style={styles.label}>{language === 'zh' ? '从我的店铺选货' : 'Select from my store'}</Text>
                     <TouchableOpacity 
                       style={styles.selectProductBtn}
                       onPress={() => setShowProductSelector(true)}
                     >
-                      <Ionicons name="basket-outline" size={16} color="#3b82f6" />
+                      <Ionicons name="add-circle-outline" size={16} color="#3b82f6" />
                       <Text style={styles.selectProductBtnText}>{currentT.selectProduct}</Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* 已选商品列表 */}
-                  {Object.keys(selectedProducts).length > 0 && (
+                  {Object.keys(selectedProducts).length > 0 ? (
                     <View style={styles.selectedProductsList}>
                       {Object.entries(selectedProducts).map(([id, qty]) => {
                         const product = merchantProducts.find(p => p.id === id);
@@ -1768,11 +1735,103 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                           </View>
                         );
                       })}
+                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>{currentT.totalPrice}</Text>
+                        <Text style={{ fontWeight: '900', color: '#10b981', fontSize: 16 }}>{cartTotal.toLocaleString()} MMK</Text>
+                      </View>
+
+                      {/* 🚀 优化：代收款控制现在放在“总计”下面 */}
+                      <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                        <View style={styles.sectionHeader}>
+                          <View style={styles.sectionTitleContainer}>
+                            <MoneyIcon size={16} color="#475569" />
+                            <Text style={[styles.sectionTitle, { fontSize: 14, color: '#475569' }]}> {currentT.codAmount}</Text>
+                          </View>
+                          <View style={styles.codToggleContainer}>
+                            <Text style={[styles.codToggleLabel, { fontSize: 11 }, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
+                            <Switch
+                              value={hasCOD}
+                              onValueChange={handleToggleCOD}
+                              trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
+                              thumbColor="#ffffff"
+                              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                            />
+                            <Text style={[styles.codToggleLabel, { fontSize: 11 }, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
+                          </View>
+                        </View>
+
+                        {hasCOD && (
+                          <View style={{ marginTop: 10 }}>
+                            <TextInput
+                              style={[styles.input, { height: 40, paddingVertical: 8, background: '#fff' }]}
+                              value={codAmount}
+                              onChangeText={setCodAmount}
+                              placeholder={currentT.placeholders.codAmount}
+                              placeholderTextColor="#9ca3af"
+                              keyboardType="decimal-pad"
+                            />
+                            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                              💡 {language === 'zh' ? '该金额将由骑手代收' : language === 'en' ? 'Courier will collect this' : 'ကူရီယာမှ ကောက်ခံမည်'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
+                  ) : (
+                    <TouchableOpacity 
+                      onPress={() => setShowProductSelector(true)}
+                      style={{ padding: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                    >
+                      <Text style={{ color: '#94a3b8' }}>{language === 'zh' ? '暂未选择商品，点击添加' : 'No items selected, tap to add'}</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
+              </View>
+            </FadeInView>
+          )}
 
-                {/* 代收金额输入框 (仅在开启代收时显示) */}
+          {/* 包裹信息 */}
+          <PackageInfo
+            language={language as any}
+            styles={styles}
+            currentT={currentT}
+            packageType={packageType}
+            weight={weight}
+            description={description}
+            showWeightInput={showWeightInput}
+            packageTypes={packageTypes}
+            onPackageTypeChange={setPackageType}
+            onWeightChange={setWeight}
+            onDescriptionChange={setDescription}
+            onPackageTypeInfoClick={(type) => {
+              setSelectedPackageTypeInfo(type);
+              setShowPackageTypeInfo(true);
+            }}
+            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
+          />
+
+          {/* 代收款 (仅限 VIP 账号，Partner 已移入商品卡片) */}
+          {currentUser?.user_type === 'vip' && (
+            <FadeInView delay={320}>
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionTitleContainer}>
+                    <MoneyIcon size={18} color="#1e293b" />
+                    <Text style={styles.sectionTitle}> {currentT.codAmount}</Text>
+                  </View>
+                  <View style={styles.codToggleContainer}>
+                    <Text style={[styles.codToggleLabel, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
+                    <Switch
+                      value={hasCOD}
+                      onValueChange={handleToggleCOD}
+                      trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
+                      thumbColor="#ffffff"
+                    />
+                    <Text style={[styles.codToggleLabel, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
+                  </View>
+                </View>
+
+                {/* 代收金额输入框 */}
                 {hasCOD && (
                   <FadeInView>
                     <View style={styles.inputGroup}>
@@ -1785,9 +1844,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                         placeholderTextColor="#9ca3af"
                         keyboardType="decimal-pad"
                       />
-                      <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
-                        💡 {language === 'zh' ? '该金额将由骑手在取件时代收' : language === 'en' ? 'This amount will be collected by the courier upon pickup' : 'ဤပမာဏကို ကူရီယာမှ ပစ္စည်းယူစဉ် ကောက်ခံမည်ဖြစ်သည်'}
-                      </Text>
                     </View>
                   </FadeInView>
                 )}

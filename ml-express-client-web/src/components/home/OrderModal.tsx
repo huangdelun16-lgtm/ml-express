@@ -455,6 +455,53 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '选货合计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
                     <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
                   </div>
+
+                  {/* 🚀 优化：Web端代收款移动到“总计”下面 */}
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      marginBottom: '0.5rem', 
+                      fontWeight: 'bold', 
+                      color: 'white',
+                      fontSize: '0.9rem'
+                    }}>
+                      💰 {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collection Amount (COD)' : 'ငွေကောက်ခံရန် (COD)'}
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="number"
+                        name="codAmount"
+                        value={codAmount}
+                        onChange={(e) => setCodAmount(e.target.value)}
+                        placeholder={language === 'zh' ? '请输入代收金额' : language === 'en' ? 'Enter amount' : 'ပမာဏထည့်ပါ'}
+                        style={{
+                          width: '100%',
+                          padding: '10px 15px',
+                          paddingRight: '3.5rem',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '10px',
+                          fontSize: '0.95rem',
+                          background: 'white',
+                          color: '#1e293b',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        right: '1rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#64748b',
+                        fontWeight: 'bold',
+                        fontSize: '0.8rem'
+                      }}>
+                        MMK
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '8px' }}>
+                      💡 {language === 'zh' ? '该金额将由骑手代收' : language === 'en' ? 'Courier will collect this' : 'ကူရီယာမှ ကောက်ခံမည်'}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '1rem', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
@@ -702,8 +749,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
               )}
             </div>
 
-            {/* 代收款 (仅Partner或VIP可见) */}
-            {((currentUser && currentUser.user_type === 'partner') || (currentUser && currentUser.user_type === 'vip')) && (
+            {/* 代收款 (仅VIP可见，Partner已移入商品卡片) */}
+            {currentUser?.user_type === 'vip' && (
               <div style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
                 <label style={{ 
                   display: 'block', 

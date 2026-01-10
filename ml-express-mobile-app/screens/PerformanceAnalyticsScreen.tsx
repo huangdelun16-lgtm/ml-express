@@ -52,14 +52,14 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
     try {
       setLoading(true);
       
-      // 获取当前骑手ID
-      const currentCourierId = await AsyncStorage.getItem('currentUserId');
-      if (!currentCourierId) {
+      // 🚀 优化：使用骑手姓名进行查询
+      const currentUserName = await AsyncStorage.getItem('currentUserName');
+      if (!currentUserName) {
         Alert.alert('错误', '未找到骑手信息');
         return;
       }
       
-      setCourierId(currentCourierId);
+      setCourierId(currentUserName);
       
       // 计算日期范围
       const now = new Date();
@@ -77,17 +77,17 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
           break;
       }
 
-      // 获取包裹数据
+      // 获取所有相关包裹数据以进行精准分析
       const { data: packages, error } = await supabase
         .from('packages')
         .select('*')
-        .eq('courier', currentCourierId)
+        .eq('courier', currentUserName)
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('获取包裹数据失败:', error);
-        return;
+        console.error('获取业绩数据失败:', error);
+        throw error;
       }
 
       // 计算统计数据
@@ -96,7 +96,7 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
 
     } catch (error) {
       console.error('加载业绩数据失败:', error);
-      Alert.alert('错误', '加载数据失败');
+      Alert.alert('错误', '加载数据失败，请重试');
     } finally {
       setLoading(false);
     }

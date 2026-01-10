@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 const { width } = Dimensions.get('window');
 
@@ -34,9 +36,11 @@ export default function MyStatisticsScreen({ navigation }: any) {
     efficiency: 95,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const loadData = async () => {
     try {
@@ -44,36 +48,74 @@ export default function MyStatisticsScreen({ navigation }: any) {
       const userName = await AsyncStorage.getItem('currentUserName') || '';
       setCurrentUserName(userName);
       
-      const packages = await packageService.getAllPackages();
-      const myPackages = packages.filter(pkg => pkg.courier === userName);
+      // 🚀 强制从数据库获取最新数据，确保实时性
+      const { data: allPackages, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('courier', userName);
       
-      const today = new Date().toLocaleDateString('zh-CN');
+      if (error) throw error;
+
+      const myPackages = allPackages || [];
+      
+      // 精准匹配今日日期
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
+      
       const todayPackages = myPackages.filter(pkg => {
-        const createDate = new Date(pkg.create_time).toLocaleDateString('zh-CN');
-        return createDate === today;
+        const createDate = pkg.create_time || pkg.created_at || '';
+        return createDate.includes(todayStr);
       });
+
+      // 计算平均配送时间 (单位: 分钟)
+      const completedPackages = myPackages.filter(p => p.status === '已送达' && p.delivery_time && p.create_time);
+      const avgTime = completedPackages.length > 0 
+        ? completedPackages.reduce((sum, p) => {
+            const start = new Date(p.create_time).getTime();
+            const end = new Date(p.delivery_time).getTime();
+            return sum + (end - start) / (1000 * 60);
+          }, 0) / completedPackages.length
+        : 0;
+
+      // 获取评分
+      const ratings = myPackages.filter(p => p.customer_rating).map(p => p.customer_rating);
+      const avgRating = ratings.length > 0 
+        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+        : 5.0;
 
       const stats = {
         today: {
           delivered: todayPackages.filter(p => p.status === '已送达').length,
           picked: todayPackages.filter(p => p.status === '已取件').length,
-          delivering: todayPackages.filter(p => p.status === '配送中' || p.status === '配送进行中').length,
+          delivering: todayPackages.filter(p => ['配送中', '配送进行中'].includes(p.status)).length,
         },
         week: {
-          delivered: myPackages.filter(p => p.status === '已送达').length,
+          delivered: myPackages.filter(p => {
+            const d = new Date(p.delivery_time || p.updated_at || '');
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return p.status === '已送达' && d >= weekAgo;
+          }).length,
           total: myPackages.length,
         },
         month: {
-          delivered: myPackages.filter(p => p.status === '已送达').length,
+          delivered: myPackages.filter(p => {
+            const d = new Date(p.delivery_time || p.updated_at || '');
+            const monthAgo = new Date();
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            return p.status === '已送达' && d >= monthAgo;
+          }).length,
           total: myPackages.length,
         },
         total: {
           delivered: myPackages.filter(p => p.status === '已送达').length,
           totalPackages: myPackages.length,
         },
-        avgDeliveryTime: 25,
-        rating: 4.8,
-        efficiency: 92,
+        avgDeliveryTime: Math.round(avgTime) || 25,
+        rating: avgRating,
+        efficiency: myPackages.length > 0 
+          ? Math.round((myPackages.filter(p => p.status === '已送达').length / myPackages.length) * 100) 
+          : 100,
       };
 
       setStatistics(stats);
@@ -130,38 +172,6 @@ export default function MyStatisticsScreen({ navigation }: any) {
           </View>
           <Text style={styles.userName}>{currentUserName}</Text>
           <Text style={styles.userRole}>{language === 'zh' ? '官方认证骑手' : 'Certified Courier'}</Text>
-          
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            style={styles.analyticsButton}
-            onPress={() => navigation.navigate('PerformanceAnalytics')}
-          >
-            <LinearGradient colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']} style={styles.analyticsGradient}>
-              <Ionicons name="analytics" size={18} color="#60a5fa" style={{marginRight: 8}} />
-              <Text style={styles.analyticsButtonText}>
-                {language === 'zh' ? '查看详细业绩分析' : 'Detailed Analytics'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* 今日数据网格 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 {language === 'zh' ? '今日实时数据' : "Today's Live Data"}</Text>
-          <View style={styles.statsGrid}>
-            <LinearGradient colors={['rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.05)']} style={styles.statCard}>
-              <Text style={[styles.statNumber, {color: '#10b981'}]}>{statistics.today.delivered}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '已完成' : 'Delivered'}</Text>
-            </LinearGradient>
-            <LinearGradient colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCard}>
-              <Text style={[styles.statNumber, {color: '#a78bfa'}]}>{statistics.today.delivering}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : 'Active'}</Text>
-            </LinearGradient>
-            <LinearGradient colors={['rgba(59, 130, 246, 0.2)', 'rgba(59, 130, 246, 0.05)']} style={styles.statCard}>
-              <Text style={[styles.statNumber, {color: '#60a5fa'}]}>{statistics.today.picked}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '已取件' : 'Picked'}</Text>
-            </LinearGradient>
-          </View>
         </View>
 
         {/* 累计数据 */}
@@ -354,59 +364,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.5)',
     fontWeight: '600',
-    marginBottom: 20,
-  },
-  analyticsButton: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  analyticsGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  analyticsButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+    marginBottom: 10,
   },
   section: {
     marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: 16,
-    marginLeft: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '700',
-    textAlign: 'center',
   },
   totalStatsGlassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

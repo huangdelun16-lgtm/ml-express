@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Linking,
   Dimensions,
 } from 'react-native';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,10 +33,12 @@ export default function ProfileScreen({ navigation }: any) {
     todayCOD: 0,
   });
 
-  useEffect(() => {
-    loadUserInfo();
-    loadStats();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadUserInfo();
+      loadStats();
+    }, [])
+  );
 
   const loadUserInfo = async () => {
     const userName = await AsyncStorage.getItem('currentUserName') || '用户';
@@ -50,21 +52,31 @@ export default function ProfileScreen({ navigation }: any) {
   const loadStats = async () => {
     try {
       const currentUserName = await AsyncStorage.getItem('currentUserName') || '';
-      const packages = await packageService.getAllPackages();
+      // 🚀 强制从数据库获取最新数据，避免缓存干扰
+      const { data: allPackages, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('courier', currentUserName);
       
-      const myPackages = packages.filter(pkg => pkg.courier === currentUserName);
+      if (error) throw error;
+
+      const myPackages = allPackages || [];
       const deliveredPackages = myPackages.filter(p => p.status === '已送达');
       
-      // 今日送达（简化：检查 delivery_time 是否是今天）
-      const today = new Date().toLocaleDateString('zh-CN');
-      const todayDelivered = deliveredPackages.filter(p => 
-        p.delivery_time?.includes(today)
-      );
+      // 🚀 优化：更稳健的“今日”日期获取逻辑 (支持 YYYY-MM-DD 匹配)
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0]; // 格式: "2026-01-09"
+      
+      const todayDelivered = deliveredPackages.filter(p => {
+        const dTime = p.delivery_time || p.updated_at || '';
+        return dTime.includes(todayStr);
+      });
 
       setStats({
         totalDelivered: deliveredPackages.length,
         todayDelivered: todayDelivered.length,
-        inProgress: myPackages.filter(p => ['已取件', '配送中'].includes(p.status)).length,
+        // 🚀 优化：包含所有配送中的中间状态
+        inProgress: myPackages.filter(p => ['已取件', '配送中', '配送进行中'].includes(p.status)).length,
         totalPayToMerchant: deliveredPackages.reduce((sum, p) => {
           const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
