@@ -285,6 +285,23 @@ const HomePage: React.FC = () => {
     }
   }, [currentUser]);
 
+  // 🚀 新增：统一生成带身份标识和商品清单的描述逻辑
+  const getFullDescription = useCallback(() => {
+    let productDescription = '';
+    const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
+    const typeTag = `[下单身份: ${ordererType}]`;
+    
+    if (Object.keys(selectedProducts).length > 0) {
+      const details = Object.entries(selectedProducts).map(([id, qty]) => {
+        const p = merchantProducts.find(prod => prod.id === id);
+        return p ? `${p.name} x${qty}` : '';
+      }).filter(Boolean).join(', ');
+      productDescription = `[已选商品: ${details}]`;
+    }
+    
+    return `${typeTag} ${productDescription}`.trim();
+  }, [currentUser, selectedProducts, merchantProducts]);
+
   // 🚀 新增：处理商品数量变化逻辑
   const handleProductQuantityChange = (productId: string, delta: number) => {
     setSelectedProducts(prev => {
@@ -1904,20 +1921,8 @@ const HomePage: React.FC = () => {
       codAmount: codAmount ? parseFloat(codAmount) : 0,
     };
 
-    // 🚀 核心优化：构建商品描述和身份标识
-    let productDescription = '';
-    const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
-    const typeTag = `[下单身份: ${ordererType}]`;
-    
-    if (Object.keys(selectedProducts).length > 0) {
-      const details = Object.entries(selectedProducts).map(([id, qty]) => {
-        const p = merchantProducts.find(prod => prod.id === id);
-        return p ? `${p.name} x${qty}` : '';
-      }).filter(Boolean).join(', ');
-      productDescription = `[已选商品: ${details}]`;
-    }
-    
-    const finalFullDescription = `${typeTag} ${productDescription}`.trim();
+    // 🚀 核心优化：使用统一逻辑构建商品描述和身份标识
+    const finalFullDescription = getFullDescription();
     
     // 验证必填字段
     if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
@@ -2853,7 +2858,7 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
-                      description: finalFullDescription || (dbPendingOrder?.description) || '', // 🚀 记录商品详情和身份
+                      description: getFullDescription() || (dbPendingOrder?.description) || '', // 🚀 记录商品详情和身份
                       payment_method: currentPaymentMethod, // 添加支付方式字段
                       cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
