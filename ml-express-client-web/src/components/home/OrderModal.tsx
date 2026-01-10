@@ -34,6 +34,11 @@ interface OrderModalProps {
   handleOpenMapModal: (type: 'sender' | 'receiver') => void;
   calculatePriceEstimate: () => void;
   handleOrderSubmit: (e: React.FormEvent) => void;
+  // 🚀 新增：商家选货相关
+  merchantProducts?: any[];
+  selectedProducts?: Record<string, number>;
+  handleProductQuantityChange?: (productId: string, delta: number) => void;
+  cartTotal?: number;
 }
 
 const OrderModal: React.FC<OrderModalProps> = ({
@@ -68,11 +73,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
   pricingSettings,
   handleOpenMapModal,
   calculatePriceEstimate,
-  handleOrderSubmit
+  handleOrderSubmit,
+  merchantProducts = [],
+  selectedProducts = {},
+  handleProductQuantityChange = () => {},
+  cartTotal = 0
 }) => {
   const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+  const [showProductSelector, setShowProductSelector] = useState(false); // 🚀 新增：商品选择器显示状态
 
   if (!showOrderForm) return null;
 
@@ -375,6 +385,84 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </button>
             </div>
           </div>
+
+          {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
+          {currentUser?.user_type === 'partner' && (
+            <div style={{ 
+              marginBottom: '1.5rem',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>🛒 {language === 'zh' ? '已选商品' : language === 'en' ? 'Selected Products' : 'ရွေးချယ်ထားသောပစ္စည်း'}</h3>
+                <button 
+                  type="button"
+                  onClick={() => setShowProductSelector(true)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                  }}
+                >
+                  {language === 'zh' ? '+ 选择商品' : language === 'en' ? '+ Select Product' : '+ ပစ္စည်းရွေးရန်'}
+                </button>
+              </div>
+
+              {/* 已选商品列表 */}
+              {Object.keys(selectedProducts).length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {Object.entries(selectedProducts).map(([id, qty]) => {
+                    const product = merchantProducts.find(p => p.id === id);
+                    if (!product) return null;
+                    return (
+                      <div key={id} style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '10px'
+                      }}>
+                        <div style={{ flex: 1, marginRight: '10px' }}>
+                          <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{product.name}</div>
+                          <div style={{ color: '#10b981', fontSize: '0.8rem' }}>{product.price.toLocaleString()} MMK</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => handleProductQuantityChange(id, -1)}
+                            style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
+                          >-</button>
+                          <span style={{ color: 'white', fontWeight: 'bold' }}>{qty}</span>
+                          <button 
+                            type="button"
+                            onClick={() => handleProductQuantityChange(id, 1)}
+                            style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
+                          >+</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', color: 'white' }}>
+                    <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '选货合计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
+                    <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1rem', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
+                  {language === 'zh' ? '暂未选择任何商品' : language === 'en' ? 'No items selected' : 'ပစ္စည်းမရွေးချယ်ရသေးပါ'}
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.packageInfo}</h3>
@@ -923,6 +1011,115 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* 🚀 新增：商家商品选择模态框 */}
+      {showProductSelector && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            background: '#1e293b',
+            padding: '2rem',
+            borderRadius: '24px',
+            maxWidth: '600px',
+            width: '95%',
+            maxHeight: '80vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'white', margin: 0 }}>🛍️ {language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ပစ္စည်းရွေးရန်'}</h2>
+              <button 
+                onClick={() => setShowProductSelector(false)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '18px', cursor: 'pointer' }}
+              >✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }} className="custom-scrollbar">
+              {merchantProducts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.4)' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
+                  <div>{language === 'zh' ? '该店铺暂无商品' : language === 'en' ? 'No products in this store' : 'ပစ္စည်းမရှိသေးပါ'}</div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {merchantProducts.map((item) => (
+                    <div key={item.id} style={{
+                      display: 'flex',
+                      gap: '1rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      padding: '1rem',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#0f172a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '1.5rem' }}>📦</span>
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: 'white', fontWeight: 'bold', marginBottom: '4px' }}>{item.name}</div>
+                        <div style={{ color: '#10b981', fontWeight: 'bold' }}>{item.price.toLocaleString()} MMK</div>
+                        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+                          {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {item.stock === -1 ? (language === 'zh' ? '无限' : 'Infinite') : item.stock}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                          type="button"
+                          onClick={() => handleProductQuantityChange(item.id, -1)}
+                          disabled={!selectedProducts[item.id]}
+                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: selectedProducts[item.id] ? '#3b82f6' : 'rgba(255,255,255,0.1)', color: 'white', cursor: selectedProducts[item.id] ? 'pointer' : 'default' }}
+                        >-</button>
+                        <span style={{ color: 'white', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{selectedProducts[item.id] || 0}</span>
+                        <button 
+                          type="button"
+                          onClick={() => handleProductQuantityChange(item.id, 1)}
+                          disabled={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock}
+                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: '#3b82f6', color: 'white', cursor: 'pointer' }}
+                        >+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => setShowProductSelector(false)}
+              style={{
+                width: '100%',
+                marginTop: '1.5rem',
+                padding: '1rem',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                border: 'none',
+                color: 'white',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)'
+              }}
+            >
+              {language === 'zh' ? '确 定' : language === 'en' ? 'Confirm' : 'အတည်ပြုသည်'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

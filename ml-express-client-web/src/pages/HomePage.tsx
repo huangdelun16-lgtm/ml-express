@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
+import { 
+  packageService, 
+  supabase, 
+  userService, 
+  testConnection, 
+  systemSettingsService, 
+  pendingOrderService,
+  merchantService,
+  Product 
+} from '../services/supabase';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import TrackingSection from '../components/home/TrackingSection';
@@ -156,6 +165,13 @@ const HomePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
+  
+  // 🚀 新增：商家选货相关状态
+  const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  const [cartTotal, setCartTotal] = useState(0);
+  
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // const [orderData, setOrderData] = useState<any>(null);
   
   // 用户认证相关状态
@@ -241,7 +257,7 @@ const HomePage: React.FC = () => {
   // 加载合伙店铺信息（当currentUser变化时）
   useEffect(() => {
     if (currentUser?.user_type === 'partner') {
-      const loadPartnerStore = async () => {
+      const loadPartnerStoreAndProducts = async () => {
         try {
           const { data: store } = await supabase
             .from('delivery_stores')
@@ -253,16 +269,73 @@ const HomePage: React.FC = () => {
           if (store) {
             console.log('✅ 已加载合伙店铺信息:', store.store_name);
             setPartnerStore(store);
+            
+            // 🚀 加载该店铺的商品
+            const products = await merchantService.getStoreProducts(store.id);
+            setMerchantProducts(products.filter(p => p.is_available));
           }
         } catch (error) {
-          console.error('加载合伙店铺失败:', error);
+          console.error('加载合伙店铺或商品失败:', error);
         }
       };
-      loadPartnerStore();
+      loadPartnerStoreAndProducts();
     } else {
       setPartnerStore(null);
+      setMerchantProducts([]);
     }
   }, [currentUser]);
+
+  // 🚀 新增：处理商品数量变化逻辑
+  const handleProductQuantityChange = (productId: string, delta: number) => {
+    setSelectedProducts(prev => {
+      const product = merchantProducts.find(p => p.id === productId);
+      if (!product) return prev;
+
+      const currentQty = prev[productId] || 0;
+      let newQty = currentQty + delta;
+
+      // 库存校验
+      if (delta > 0) {
+        if (product.stock !== -1 && currentQty >= product.stock) {
+          alert(`库存不足 (剩余: ${product.stock})`);
+          return prev;
+        }
+      }
+
+      newQty = Math.max(0, newQty);
+      
+      const newSelected = { ...prev };
+      if (newQty === 0) {
+        delete newSelected[productId];
+      } else {
+        newSelected[productId] = newQty;
+      }
+      
+      return newSelected;
+    });
+  };
+
+  // 🚀 新增：监听选中商品变化，自动更新代收款和描述
+  useEffect(() => {
+    let total = 0;
+    let productDetails: string[] = [];
+
+    Object.entries(selectedProducts).forEach(([id, qty]) => {
+      const product = merchantProducts.find(p => p.id === id);
+      if (product) {
+        total += product.price * qty;
+        productDetails.push(`${product.name} x${qty}`);
+      }
+    });
+
+    setCartTotal(total);
+
+    // 如果选了商品，自动填充代收金额（仅Partner/VIP开启代收时生效，这里仅作计算建议）
+    if (total > 0 && currentUser?.user_type === 'partner') {
+      // 自动设置代收金额
+      setCodAmount(total.toString());
+    }
+  }, [selectedProducts, merchantProducts, currentUser]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
   const loadPricingSettings = async (region?: string) => {
@@ -1830,6 +1903,21 @@ const HomePage: React.FC = () => {
       receiverLongitude: selectedReceiverLocation?.lng || null,
       codAmount: codAmount ? parseFloat(codAmount) : 0,
     };
+
+    // 🚀 核心优化：构建商品描述和身份标识
+    let productDescription = '';
+    const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
+    const typeTag = `[下单身份: ${ordererType}]`;
+    
+    if (Object.keys(selectedProducts).length > 0) {
+      const details = Object.entries(selectedProducts).map(([id, qty]) => {
+        const p = merchantProducts.find(prod => prod.id === id);
+        return p ? `${p.name} x${qty}` : '';
+      }).filter(Boolean).join(', ');
+      productDescription = `[已选商品: ${details}]`;
+    }
+    
+    const finalFullDescription = `${typeTag} ${productDescription}`.trim();
     
     // 验证必填字段
     if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
@@ -1939,6 +2027,7 @@ const HomePage: React.FC = () => {
         distance: distance,
         payment_method: paymentMethod,
         cod_amount: orderInfo.codAmount, // 添加代收款金额
+        description: finalFullDescription, // 🚀 记录商品详情和身份
         customer_email: currentUser?.email || null,
         customer_name: currentUser?.name || orderInfo.senderName || null
       };
@@ -2488,6 +2577,11 @@ const HomePage: React.FC = () => {
         handleOpenMapModal={handleOpenMapModal}
         calculatePriceEstimate={calculatePriceEstimate}
         handleOrderSubmit={handleOrderSubmit}
+        // 🚀 新增：传递商家选货相关 Props
+        merchantProducts={merchantProducts}
+        selectedProducts={selectedProducts}
+        handleProductQuantityChange={handleProductQuantityChange}
+        cartTotal={cartTotal}
       />
 
       {/* 支付二维码模态窗口 */}
@@ -2759,6 +2853,7 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
+                      description: finalFullDescription || (dbPendingOrder?.description) || '', // 🚀 记录商品详情和身份
                       payment_method: currentPaymentMethod, // 添加支付方式字段
                       cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
@@ -2809,6 +2904,10 @@ const HomePage: React.FC = () => {
                     const result = await packageService.createPackage(packageData);
                     
                     if (result) {
+                      // 🚀 核心优化：订单成功后清空商品选择
+                      setSelectedProducts({});
+                      setCartTotal(0);
+                      
                       // 自动保存客户信息到用户管理
                       await saveCustomerToUsers(orderInfo);
 
