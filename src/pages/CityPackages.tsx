@@ -1379,6 +1379,41 @@ const CityPackages: React.FC = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {/* 🚀 新增：展示下单身份 (从描述中解析) */}
+                    {(() => {
+                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                      let isPartner = false;
+                      let hasIdentity = false;
+                      
+                      if (identityMatch) {
+                        const identityText = identityMatch[1];
+                        isPartner = identityText.includes('合伙人') || identityText.includes('Partner');
+                        hasIdentity = true;
+                      } else if (pkg.delivery_store_id) {
+                        isPartner = true;
+                        hasIdentity = true;
+                      }
+
+                      if (!hasIdentity) return null;
+
+                      return (
+                        <div style={{
+                          background: isPartner ? '#3b82f6' : '#f97316', // 合伙人蓝色，会员橙色
+                          color: 'white',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>👤</span>
+                          <span>{isPartner ? (language === 'zh' ? '合伙人' : 'Partner') : (language === 'zh' ? '会员' : 'Member')}</span>
+                        </div>
+                      );
+                    })()}
+
                     <div style={{
                       background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
                       color: 'white',
@@ -2983,6 +3018,29 @@ const CityPackages: React.FC = () => {
                       fontSize: '0.9rem'
                     }}>
                       {getStatusText(selectedPackage.status)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>下单身份:</span>
+                    <span style={{ 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      background: (() => {
+                        const identityMatch = selectedPackage.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        const identityText = identityMatch ? identityMatch[1] : '';
+                        const isPartner = identityText.includes('合伙人') || identityText.includes('Partner') || !!selectedPackage.delivery_store_id;
+                        return isPartner ? '#3b82f6' : '#f97316';
+                      })(),
+                      padding: '2px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
+                    }}>
+                      {(() => {
+                        const identityMatch = selectedPackage.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        if (identityMatch) return identityMatch[1];
+                        if (selectedPackage.delivery_store_id) return language === 'zh' ? '合伙人' : 'Partner';
+                        return language === 'zh' ? '会员' : 'Member';
+                      })()}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>

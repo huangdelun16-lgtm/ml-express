@@ -1481,14 +1481,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         newSelected[productId] = newQty;
       }
       
-      // 更新 COD 金额和描述
-      updateCODAndDescription(newSelected);
-      
       return newSelected;
     });
   };
 
-  const updateCODAndDescription = (selected: Record<string, number>, productsToUse?: Product[]) => {
+  // 🚀 新增：统一监听选中商品或代收状态的变化，实时更新金额和描述
+  useEffect(() => {
+    updateCODAndDescription(selectedProducts);
+  }, [selectedProducts, hasCOD, merchantProducts]);
+
+  const updateCODAndDescription = (selected: Record<string, number>, productsToUse?: Product[], overrideHasCOD?: boolean) => {
     let totalCOD = 0;
     let productDetails: string[] = [];
     const sourceProducts = productsToUse || merchantProducts;
@@ -1501,10 +1503,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       }
     });
 
+    const isCODEnabled = overrideHasCOD !== undefined ? overrideHasCOD : hasCOD;
+
     if (totalCOD > 0) {
       setCartTotal(totalCOD);
       // 只有在开启代收时才设置金额，否则设为 0
-      setCodAmount(hasCOD ? totalCOD.toString() : '0');
+      setCodAmount(isCODEnabled ? totalCOD.toString() : '0');
       
       // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
@@ -1596,10 +1600,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     if (!val) {
       // 切换到无代收时，金额归零，但保留已选商品和描述
       setCodAmount('0');
-    } else {
-      // 切换回有代收时，根据已选商品重新计算金额
-      updateCODAndDescription(selectedProducts);
     }
+    // 注意：切换回开启时，useEffect 会自动触发 updateCODAndDescription 重新计算金额
   };
 
   // Force re-bundle
