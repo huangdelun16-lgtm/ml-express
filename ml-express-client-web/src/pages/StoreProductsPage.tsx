@@ -77,7 +77,7 @@ const StoreProductsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('ml-express-user');
+    const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser));
@@ -91,7 +91,7 @@ const StoreProductsPage: React.FC = () => {
   }, [storeId]);
 
   const handleLogout = () => {
-    localStorage.removeItem('ml-express-user');
+    localStorage.removeItem('ml-express-customer');
     setCurrentUser(null);
     navigate('/');
   };
