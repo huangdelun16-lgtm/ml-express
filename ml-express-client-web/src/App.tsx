@@ -8,7 +8,11 @@ import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProfilePage from './pages/ProfilePage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
+import CityMallPage from './pages/CityMallPage';
+import StoreProductsPage from './pages/StoreProductsPage';
+import CartPage from './pages/CartPage';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { CartProvider } from './contexts/CartContext';
 import './App.css';
 
 // 错误边界组件
@@ -71,20 +75,25 @@ function App() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-        <Router>
-          <div className="App" style={{ minHeight: '100vh' }}>
-            <Routes>
-              {/* 客户端路由 - 不包含任何后台管理功能 */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/services" element={<ServicesPage />} />
-              <Route path="/tracking" element={<TrackingPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/delete-account" element={<DeleteAccountPage />} />
-            </Routes>
-          </div>
-        </Router>
+        <CartProvider>
+          <Router>
+            <div className="App" style={{ minHeight: '100vh' }}>
+              <Routes>
+                {/* 客户端路由 - 不包含任何后台管理功能 */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/services" element={<ServicesPage />} />
+                <Route path="/tracking" element={<TrackingPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/delete-account" element={<DeleteAccountPage />} />
+                <Route path="/mall" element={<CityMallPage />} />
+                <Route path="/mall/:storeId" element={<StoreProductsPage />} />
+                <Route path="/cart" element={<CartPage />} />
+              </Routes>
+            </div>
+          </Router>
+        </CartProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

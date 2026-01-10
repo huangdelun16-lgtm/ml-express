@@ -89,7 +89,52 @@ const HomePage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
-  
+
+  // 🚀 新增：处理从购物车跳转过来的订单请求
+  useEffect(() => {
+    if (location.state && (location.state as any).selectedProducts) {
+      const incomingProducts = (location.state as any).selectedProducts as Product[];
+      const productMap: Record<string, number> = {};
+      
+      incomingProducts.forEach(p => {
+        productMap[p.id] = (p as any).quantity || 1;
+      });
+      
+      setSelectedProducts(productMap);
+      setMerchantProducts(incomingProducts);
+      setHasCOD(true);
+      setShowOrderForm(true);
+      
+      // 如果有店铺信息，自动填充寄件人
+      if (incomingProducts.length > 0 && incomingProducts[0].store_id) {
+        const fillSenderFromStore = async () => {
+          try {
+            const { data: store } = await supabase
+              .from('delivery_stores')
+              .select('*')
+              .eq('id', incomingProducts[0].store_id)
+              .single();
+            
+            if (store) {
+              setSenderName(store.store_name);
+              setSenderPhone(store.phone || store.manager_phone);
+              setSenderAddressText(store.address);
+              if (store.latitude && store.longitude) {
+                setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
+              }
+            }
+          } catch (error) {
+            console.error('自动填充寄件人信息失败:', error);
+          }
+        };
+        fillSenderFromStore();
+      }
+      
+      // 清除 state，防止刷新时再次弹出
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, supabase]);
+
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -1245,6 +1290,8 @@ const HomePage: React.FC = () => {
         packageTracking: '包裹跟踪',
         lightningDelivery: '极速配送',
         secureReliable: '安全可靠',
+        cityMall: '同城商场',
+        cart: '购物车',
         smartService: '智能服务',
         transparentPricing: '透明定价',
         prepaidDeliveryFee: '预付配送费',
@@ -1389,6 +1436,8 @@ const HomePage: React.FC = () => {
         packageTracking: 'Package Tracking',
         lightningDelivery: 'Lightning Delivery',
         secureReliable: 'Secure & Reliable',
+        cityMall: 'City Mall',
+        cart: 'Cart',
         smartService: 'Smart Service',
         transparentPricing: 'Transparent Pricing',
         prepaidDeliveryFee: 'Prepaid Delivery Fee',
@@ -1533,6 +1582,8 @@ const HomePage: React.FC = () => {
         packageTracking: 'ထုပ်ပိုးခြင်း စောင့်ကြည့်ခြင်း',
         lightningDelivery: 'မြန်ဆန်သော ပို့ဆောင်မှု',
         secureReliable: 'လုံခြုံ ယုံကြည်စိတ်ချရသော',
+        cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
+        cart: 'ခြင်း',
         smartService: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
         transparentPricing: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
         prepaidDeliveryFee: 'ကြိုတင်ပေးချေသော ပို့ဆောင်ခြင်း ကုန်ကျစရိတ်',
@@ -2482,6 +2533,66 @@ const HomePage: React.FC = () => {
             >
               📦 {t.ui.packageTracking}
             </button>
+
+            {/* 🚀 新增：同城商场和购物车按钮 (仅针对会员显示) */}
+            {currentUser?.user_type === 'customer' && (
+              <>
+                <button
+                  onClick={() => handleNavigation('/mall')}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: '2px solid rgba(255,255,255,0.2)',
+                    padding: window.innerWidth < 768 ? '1.2rem 2rem' : '1.5rem 2.5rem',
+                    borderRadius: '60px',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
+                    boxShadow: '0 15px 35px rgba(0,0,0,0.2)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2)';
+                  }}
+                >
+                  🏙️ {t.ui.cityMall}
+                </button>
+                <button
+                  onClick={() => handleNavigation('/cart')}
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: '2px solid rgba(255,255,255,0.2)',
+                    padding: window.innerWidth < 768 ? '1.2rem 2rem' : '1.5rem 2.5rem',
+                    borderRadius: '60px',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
+                    boxShadow: '0 15px 35px rgba(0,0,0,0.2)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2)';
+                  }}
+                >
+                  🛒 {t.ui.cart}
+                </button>
+              </>
+            )}
             </div>
 
           {/* 特色标签 */}

@@ -731,6 +731,59 @@ export const pendingOrderService = {
   }
 };
 
+// 商店/商户接口
+export interface DeliveryStore {
+  id: string;
+  store_name: string;
+  store_code?: string;
+  address: string;
+  phone: string;
+  manager_phone?: string;
+  store_type: string;
+  status: string;
+  operating_hours?: string;
+  latitude?: number;
+  longitude?: number;
+  created_at?: string;
+}
+
+// 快递网点/商店服务
+export const deliveryStoreService = {
+  // 获取所有启用的商店
+  async getActiveStores(): Promise<DeliveryStore[]> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('status', 'active')
+        .order('store_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店列表失败:', error);
+      return [];
+    }
+  },
+
+  // 根据ID获取商店
+  async getStoreById(id: string): Promise<DeliveryStore | null> {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      LoggerService.error('获取商店详情失败:', error);
+      return null;
+    }
+  }
+};
+
 // 商家服务 (外卖/零售)
 export const merchantService = {
   // 获取商店的所有商品
@@ -740,6 +793,7 @@ export const merchantService = {
         .from('products')
         .select('*')
         .eq('store_id', storeId)
+        .eq('is_available', true) // 只显示上架商品
         .order('created_at', { ascending: false });
 
       if (error) throw error;
