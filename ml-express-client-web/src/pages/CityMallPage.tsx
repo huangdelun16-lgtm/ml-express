@@ -7,10 +7,11 @@ import LoggerService from '../services/LoggerService';
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, setLanguage, t: translations } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const t = {
     zh: {
@@ -55,8 +56,22 @@ const CityMallPage: React.FC = () => {
   };
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('ml-express-user');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
+    }
     loadStores();
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('ml-express-user');
+    setCurrentUser(null);
+    navigate('/');
+  };
 
   const loadStores = async () => {
     setLoading(true);
@@ -87,7 +102,18 @@ const CityMallPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <NavigationBar />
+      <div style={{ padding: '1rem 2rem 0' }}>
+        <NavigationBar 
+          language={language}
+          onLanguageChange={setLanguage}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onShowRegisterModal={(isLoginMode) => {
+            navigate('/', { state: { showModal: true, isLoginMode } });
+          }}
+          translations={translations}
+        />
+      </div>
       
       {/* 顶部标题栏 */}
       <div style={{ 

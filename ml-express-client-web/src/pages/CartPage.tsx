@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -7,7 +7,25 @@ import NavigationBar from '../components/home/NavigationBar';
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, updateQuantity, removeFromCart, cartTotal, clearCart } = useCart();
-  const { language } = useLanguage();
+  const { language, setLanguage, t: translations } = useLanguage();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('ml-express-user');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('ml-express-user');
+    setCurrentUser(null);
+    navigate('/');
+  };
 
   const t = {
     zh: {
@@ -58,7 +76,18 @@ const CartPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <NavigationBar />
+      <div style={{ padding: '1rem 2rem 0' }}>
+        <NavigationBar 
+          language={language}
+          onLanguageChange={setLanguage}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onShowRegisterModal={(isLoginMode) => {
+            navigate('/', { state: { showModal: true, isLoginMode } });
+          }}
+          translations={translations}
+        />
+      </div>
       
       <div style={{ maxWidth: '1000px', margin: '3rem auto', padding: '0 1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>

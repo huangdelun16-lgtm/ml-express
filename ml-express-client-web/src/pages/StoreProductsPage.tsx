@@ -9,13 +9,14 @@ import LoggerService from '../services/LoggerService';
 const StoreProductsPage: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, setLanguage, t: translations } = useLanguage();
   const { addToCart, cartCount } = useCart();
   
   const [loading, setLoading] = useState(true);
   const [store, setStore] = useState<DeliveryStore | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const t = {
     zh: {
@@ -60,10 +61,24 @@ const StoreProductsPage: React.FC = () => {
   };
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('ml-express-user');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
+    }
     if (storeId) {
       loadStoreData();
     }
   }, [storeId]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('ml-express-user');
+    setCurrentUser(null);
+    navigate('/');
+  };
 
   const loadStoreData = async () => {
     setLoading(true);
@@ -99,7 +114,18 @@ const StoreProductsPage: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <NavigationBar />
+      <div style={{ padding: '1rem 2rem 0' }}>
+        <NavigationBar 
+          language={language}
+          onLanguageChange={setLanguage}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onShowRegisterModal={(isLoginMode) => {
+            navigate('/', { state: { showModal: true, isLoginMode } });
+          }}
+          translations={translations}
+        />
+      </div>
       
       {/* 商店头部 */}
       <div style={{ 
