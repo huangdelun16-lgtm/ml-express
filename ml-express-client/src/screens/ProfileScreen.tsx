@@ -122,6 +122,23 @@ export default function ProfileScreen({ navigation }: any) {
 
   const isPartnerStore = userType === 'partner';
 
+  // 🚀 新增：格式化函数（React Native 中 toLocaleString 可能不兼容）
+  const formatMoney = (amount: number | string) => {
+    const num = Number(amount) || 0;
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '-';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } catch (e) {
+      return '-';
+    }
+  };
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
@@ -528,7 +545,12 @@ export default function ProfileScreen({ navigation }: any) {
           // 加载合伙店铺代收款统计
           try {
             const codStats = await packageService.getPartnerStats(user.id, storeName, selectedMonth);
-            setPartnerCODStats(codStats);
+            if (codStats) {
+              setPartnerCODStats(prev => ({
+                ...prev,
+                ...codStats
+              }));
+            }
           } catch (error) {
             LoggerService.error('加载代收款统计失败:', error);
           }
@@ -710,7 +732,8 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 计算总金额
   const calculateTotalAmount = () => {
-    return codOrders.reduce((sum, order) => sum + order.codAmount, 0);
+    if (!codOrders || !Array.isArray(codOrders)) return 0;
+    return codOrders.reduce((sum, order) => sum + (order.codAmount || 0), 0);
   };
 
   // 加载更多代收款订单
@@ -1120,7 +1143,7 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#60a5fa' }]}>{t.totalCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#3b82f6' }]}>
-              {partnerCODStats.settledCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
+              {formatMoney(partnerCODStats.settledCOD)} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
               onPress={() => handleViewCODOrders(true)}
@@ -1143,7 +1166,7 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#f87171' }]}>{t.unclearedCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
-              {partnerCODStats.unclearedCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
+              {formatMoney(partnerCODStats.unclearedCOD)} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
               onPress={() => handleViewCODOrders(false)}
@@ -1172,13 +1195,7 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.codInfoRow}>
               <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
               <Text style={styles.codInfoValue}>
-                {new Date(partnerCODStats.lastSettledAt).toLocaleString('zh-CN', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {formatDateTime(partnerCODStats.lastSettledAt)}
               </Text>
             </View>
           )}
@@ -1951,7 +1968,7 @@ export default function ProfileScreen({ navigation }: any) {
                       {language === 'zh' ? '显示' : 'Showing'} {codOrders.length} / {codOrdersTotal}
                     </Text>
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
-                      {t.totalAmount}: {calculateTotalAmount().toLocaleString()} MMK
+                      {t.totalAmount}: {formatMoney(calculateTotalAmount())} MMK
                     </Text>
                   </View>
                   <TouchableOpacity 
@@ -2053,7 +2070,7 @@ export default function ProfileScreen({ navigation }: any) {
                                 {t.codAmount}
                               </Text>
                               <Text style={{ color: '#3b82f6', fontSize: 20, fontWeight: 'bold', lineHeight: 24 }}>
-                                {item.codAmount.toLocaleString()}
+                                {formatMoney(item.codAmount)}
                               </Text>
                               <Text style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>
                                 MMK

@@ -1067,15 +1067,15 @@ export const packageService = {
       let lastSettledAt = null;
       if (settledWithDatePackages.length > 0) {
         settledWithDatePackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
-        lastSettledAt = settledWithDatePackages[0].cod_settled_at;
+        lastSettledAt = settledWithDatePackages[0].cod_settled_at || null;
       }
 
       return {
-        totalCOD,
-        settledCOD,
-        unclearedCOD,
-        unclearedCount,
-        lastSettledAt
+        totalCOD: totalCOD || 0,
+        settledCOD: settledCOD || 0,
+        unclearedCOD: unclearedCOD || 0,
+        unclearedCount: unclearedCount || 0,
+        lastSettledAt: lastSettledAt
       };
     } catch (error) {
       LoggerService.error('获取合伙人统计失败:', error);
