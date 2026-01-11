@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase, merchantService, Product } from '../services/supabase';
+import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService } from '../services/supabase';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
