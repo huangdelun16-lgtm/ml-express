@@ -46,6 +46,7 @@ export default function ProfileScreen({ navigation }: any) {
   });
   const [partnerCODStats, setPartnerCODStats] = useState({
     totalCOD: 0,
+    settledCOD: 0,
     unclearedCOD: 0,
     unclearedCount: 0,
     lastSettledAt: null as string | null,
@@ -55,6 +56,7 @@ export default function ProfileScreen({ navigation }: any) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
+  const [codModalSettled, setCodModalSettled] = useState<boolean | undefined>(undefined);
   const [codOrders, setCodOrders] = useState<Array<{orderId: string, codAmount: number, deliveryTime?: string}>>([]);
   const [codOrdersPage, setCodOrdersPage] = useState(1);
   const [codOrdersTotal, setCodOrdersTotal] = useState(0);
@@ -190,7 +192,7 @@ export default function ProfileScreen({ navigation }: any) {
       settingsSaveFailed: '设置保存失败',
       // 代收款相关翻译
       codStats: '代收款统计',
-      totalCOD: '本月代收款',
+      totalCOD: '本月已结清代收款',
       unclearedCOD: '待结清金额',
       unclearedCount: '待结清订单数',
       lastSettledAt: '上次结清',
@@ -304,7 +306,7 @@ export default function ProfileScreen({ navigation }: any) {
       settingsSaveFailed: 'Failed to save settings',
       // COD related translations
       codStats: 'COD Statistics',
-      totalCOD: 'Monthly COD',
+      totalCOD: 'Monthly Settled COD',
       unclearedCOD: 'Uncleared Amount',
       unclearedCount: 'Uncleared Orders',
       lastSettledAt: 'Last Settled',
@@ -418,7 +420,7 @@ export default function ProfileScreen({ navigation }: any) {
       settingsSaveFailed: 'ဆက်တင်များသိမ်းမှုမအောင်မြင်ပါ',
       // ငွေကောက်ခံရန်ဆက်စပ်ဘာသာပြန်များ
       codStats: 'ငွေကောက်ခံရန်စာရင်းအင်း',
-      totalCOD: 'လတစ်လငွေကောက်ခံရန်',
+      totalCOD: 'လအလိုက် ငွေရှင်းပြီးသော ငွေကောက်ခံမှု',
       unclearedCOD: 'မရှင်းလင်းသေးသောငွေ',
       unclearedCount: 'မရှင်းလင်းသေးသောအော်ဒါများ',
       lastSettledAt: 'နောက်ဆုံးရှင်းလင်းချိန်',
@@ -648,7 +650,7 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   // 查看代收款订单
-  const handleViewCODOrders = async (isRefresh = false) => {
+  const handleViewCODOrders = async (settled?: boolean, isRefresh = false) => {
     try {
       const currentUser = await AsyncStorage.getItem('currentUser');
       if (!currentUser) return;
@@ -661,12 +663,13 @@ export default function ProfileScreen({ navigation }: any) {
       
       if (!isRefresh) {
         setCodOrdersLoading(true);
+        setCodModalSettled(settled);
         setShowCODOrdersModal(true);
       }
       setCodOrdersPage(1);
       
       // 注意：getPartnerCODOrders 现在返回 { orders, total }
-      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, 1, 20);
+      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, settled, 1, 20);
       LoggerService.debug('COD Orders result:', result);
       setAllCodOrders(result.orders);
       setCodOrders(result.orders);
@@ -699,7 +702,7 @@ export default function ProfileScreen({ navigation }: any) {
   const refreshCODOrders = async () => {
     try {
       setCodOrdersRefreshing(true);
-      await handleViewCODOrders(true);
+      await handleViewCODOrders(codModalSettled, true);
     } finally {
       setCodOrdersRefreshing(false);
     }
@@ -727,7 +730,7 @@ export default function ProfileScreen({ navigation }: any) {
       setCodOrdersLoadingMore(true);
       const nextPage = codOrdersPage + 1;
       
-      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, nextPage, 20);
+      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, codModalSettled, nextPage, 20);
       
       if (result.orders.length > 0) {
         const newOrders = [...allCodOrders, ...result.orders];
@@ -1117,10 +1120,10 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#60a5fa' }]}>{t.totalCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#3b82f6' }]}>
-              {partnerCODStats.totalCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
+              {partnerCODStats.settledCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
-              onPress={() => handleViewCODOrders(false)}
+              onPress={() => handleViewCODOrders(true)}
               style={{
                 marginTop: 8,
                 paddingVertical: 6,
@@ -1142,6 +1145,20 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
               {partnerCODStats.unclearedCOD.toLocaleString()} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
+            <TouchableOpacity
+              onPress={() => handleViewCODOrders(false)}
+              style={{
+                marginTop: 8,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                backgroundColor: 'rgba(239, 68, 68, 0.3)',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: 'rgba(239, 68, 68, 0.5)',
+              }}
+            >
+              <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '600' }}>{t.view}</Text>
+            </TouchableOpacity>
           </LinearGradient>
         </View>
         <View style={styles.codInfoContainer}>

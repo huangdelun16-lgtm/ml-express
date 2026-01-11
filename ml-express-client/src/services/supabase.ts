@@ -1055,20 +1055,24 @@ export const packageService = {
       const totalCOD = data?.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
       
       // 如果没有 cod_settled 字段，data 中该属性为 undefined，!undefined 为 true，即默认未结清
+      const settledPackages = data?.filter(pkg => pkg.cod_settled) || [];
+      const settledCOD = settledPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      
       const unclearedPackages = data?.filter(pkg => !pkg.cod_settled) || [];
       const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
       const unclearedCount = unclearedPackages.length;
       
       // 计算最后结清日期
-      const settledPackages = data?.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
+      const settledWithDatePackages = data?.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
       let lastSettledAt = null;
-      if (settledPackages.length > 0) {
-        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
-        lastSettledAt = settledPackages[0].cod_settled_at;
+      if (settledWithDatePackages.length > 0) {
+        settledWithDatePackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledWithDatePackages[0].cod_settled_at;
       }
 
       return {
         totalCOD,
+        settledCOD,
         unclearedCOD,
         unclearedCount,
         lastSettledAt
@@ -1077,6 +1081,7 @@ export const packageService = {
       LoggerService.error('获取合伙人统计失败:', error);
       return {
         totalCOD: 0,
+        settledCOD: 0,
         unclearedCOD: 0,
         unclearedCount: 0,
         lastSettledAt: null
@@ -1085,11 +1090,11 @@ export const packageService = {
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, page: number = 1, pageSize: number = 20) {
+  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
-        .select('id, cod_amount, delivery_time', { count: 'exact' })
+        .select('id, cod_amount, delivery_time, cod_settled', { count: 'exact' })
         .eq('status', '已送达')
         .gt('cod_amount', 0);
 
@@ -1099,6 +1104,15 @@ export const packageService = {
       }
       
       q = q.or(conditions.join(','));
+
+      // 如果指定了结算状态
+      if (settled !== undefined) {
+        if (settled) {
+          q = q.eq('cod_settled', true);
+        } else {
+          q = q.or('cod_settled.eq.false,cod_settled.is.null');
+        }
+      }
       
       // 如果指定了月份，添加日期过滤
       if (month) {
