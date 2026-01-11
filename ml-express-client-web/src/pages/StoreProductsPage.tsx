@@ -18,29 +18,6 @@ const StoreProductsPage: React.FC = () => {
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // 🚀 新增：批量加入购物车逻辑
-  const handleBulkAddToCart = () => {
-    const status = checkStoreOpenStatus();
-    if (!status.isOpen) {
-      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : (language === 'en' ? 'Merchant is currently closed' : 'ယခုအချိန်တွင် ဆိုင်ပိတ်ထားပါသည်'));
-      return;
-    }
-
-    const selectedItems = products.filter(p => (itemQuantities[p.id] || 0) > 0);
-    if (selectedItems.length === 0) {
-      alert(language === 'zh' ? '请先选择商品数量' : (language === 'en' ? 'Please select quantity first' : 'ပစ္စည်းအရည်အအတွက် အရင်ရွေးချယ်ပါ'));
-      return;
-    }
-
-    selectedItems.forEach(product => {
-      addToCart(product, itemQuantities[product.id]);
-    });
-
-    // 清空本地选择数量
-    setItemQuantities({});
-    alert(t.addedToCart);
-  };
-
   const t = {
     zh: {
       loading: '正在加载商品...',
@@ -165,28 +142,6 @@ const StoreProductsPage: React.FC = () => {
     }
   };
 
-  // 🚀 新增：批量加入购物车
-  const handleBulkAddToCart = () => {
-    const status = checkStoreOpenStatus();
-    if (!status.isOpen) {
-      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
-      return;
-    }
-
-    const selectedItems = products.filter(p => (itemQuantities[p.id] || 0) > 0);
-    if (selectedItems.length === 0) {
-      alert(language === 'zh' ? '请先选择商品数量' : language === 'en' ? 'Please select quantity first' : 'အရေအတွက် အရင်ရွေးချယ်ပါ');
-      return;
-    }
-
-    selectedItems.forEach(product => {
-      addToCart(product, itemQuantities[product.id]);
-    });
-
-    setItemQuantities({});
-    alert(t.addedToCart);
-  };
-
   // 🚀 新增：判断店铺是否正在营业
   const checkStoreOpenStatus = () => {
     if (!store) return { isOpen: true }; // 加载中默认允许
@@ -212,6 +167,28 @@ const StoreProductsPage: React.FC = () => {
     } catch (e) {
       return { isOpen: true }; // 出错默认营业
     }
+  };
+
+  // 🚀 新增：批量加入购物车
+  const handleBulkAddToCart = () => {
+    const status = checkStoreOpenStatus();
+    if (!status.isOpen) {
+      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+      return;
+    }
+
+    const selectedItems = products.filter(p => (itemQuantities[p.id] || 0) > 0);
+    if (selectedItems.length === 0) {
+      alert(language === 'zh' ? '请先选择商品数量' : language === 'en' ? 'Please select quantity first' : 'အရေအတွက် အရင်ရွေးချယ်ပါ');
+      return;
+    }
+
+    selectedItems.forEach(product => {
+      addToCart(product, itemQuantities[product.id]);
+    });
+
+    setItemQuantities({});
+    alert(t.addedToCart);
   };
 
   // 🚀 首页同款背景渐变
