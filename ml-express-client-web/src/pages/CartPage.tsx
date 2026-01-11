@@ -184,7 +184,7 @@ const CartPage: React.FC = () => {
                     }}
                   >
                     <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden', marginRight: '1rem', border: '1px solid #f1f5f9' }}>
-                      {item.image_url ? (
+                      {item.image_url && !item.image_url.startsWith('file://') ? (
                         <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', background: '#eff6ff' }}>📦</div>
