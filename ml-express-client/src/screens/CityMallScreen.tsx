@@ -117,7 +117,11 @@ export default function CityMallScreen({ navigation }: any) {
     
     try {
       const hours = store.operating_hours || '09:00 - 21:00';
-      const [start, end] = hours.split(' - ');
+      // 使用正则兼容 "09:00 - 21:00" 和 "09:00-21:00"
+      const parts = hours.split(/\s*-\s*/);
+      if (parts.length < 2) return { isOpen: true, reason: 'parse_error' };
+      
+      const [start, end] = parts;
       
       const now = new Date();
       const currentTime = now.getHours() * 60 + now.getMinutes();

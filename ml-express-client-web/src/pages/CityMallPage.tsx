@@ -128,6 +128,47 @@ const CityMallPage: React.FC = () => {
     }
   };
 
+  const getStoreIcon = (type: string) => {
+    const t = (type || '').toLowerCase();
+    switch (t) {
+      case '餐厅': case 'restaurant': return '🍽️';
+      case '茶铺': case 'tea_shop': return '🍵';
+      case '饮料和小吃': case 'drinks_snacks': return '🥤';
+      case '杂货店': case 'grocery': return '🛒';
+      default: return '🏪';
+    }
+  };
+
+  // 🚀 新增：判断店铺是否正在营业
+  const checkStoreOpenStatus = (store: DeliveryStore) => {
+    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    
+    try {
+      const hours = store.operating_hours || '09:00 - 21:00';
+      // 使用正则兼容 "09:00 - 21:00" 和 "09:00-21:00"
+      const parts = hours.split(/\s*-\s*/);
+      if (parts.length < 2) return { isOpen: true, reason: 'parse_error' };
+      
+      const [start, end] = parts;
+      
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+      
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return { isOpen: true, reason: 'open' };
+      }
+      return { isOpen: false, reason: 'outside_hours' };
+    } catch (e) {
+      return { isOpen: true, reason: 'parse_error' }; // 出错默认营业
+    }
+  };
+
   // 🚀 核心逻辑：过滤并排序店铺（营业中的排在前面，休息中的排在最后）
   const filteredStores = stores
     .filter(store => {
@@ -154,43 +195,6 @@ const CityMallPage: React.FC = () => {
       if (statusA.isOpen === statusB.isOpen) return 0;
       return statusA.isOpen ? -1 : 1; // 营业中的排前面
     });
-
-  const getStoreIcon = (type: string) => {
-    const t = (type || '').toLowerCase();
-    switch (t) {
-      case '餐厅': case 'restaurant': return '🍽️';
-      case '茶铺': case 'tea_shop': return '🍵';
-      case '饮料和小吃': case 'drinks_snacks': return '🥤';
-      case '杂货店': case 'grocery': return '🛒';
-      default: return '🏪';
-    }
-  };
-
-  // 🚀 新增：判断店铺是否正在营业
-  const checkStoreOpenStatus = (store: DeliveryStore) => {
-    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
-    
-    try {
-      const hours = store.operating_hours || '09:00 - 21:00';
-      const [start, end] = hours.split(' - ');
-      
-      const now = new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes();
-      
-      const [startHour, startMin] = start.split(':').map(Number);
-      const [endHour, endMin] = end.split(':').map(Number);
-      
-      const startTime = startHour * 60 + startMin;
-      const endTime = endHour * 60 + endMin;
-      
-      if (currentTime >= startTime && currentTime <= endTime) {
-        return { isOpen: true, reason: 'open' };
-      }
-      return { isOpen: false, reason: 'outside_hours' };
-    } catch (e) {
-      return { isOpen: true, reason: 'parse_error' }; // 出错默认营业
-    }
-  };
 
   // 🚀 首页同款背景渐变
   const homeBackground = 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
