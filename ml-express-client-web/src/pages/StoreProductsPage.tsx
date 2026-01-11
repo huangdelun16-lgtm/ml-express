@@ -31,7 +31,10 @@ const StoreProductsPage: React.FC = () => {
       merchantInfo: '商家信息',
       address: '详细地址',
       contact: '联系电话',
-      hours: '营业时间'
+      hours: '营业时间',
+      openNow: '正在营业',
+      closedNow: '休息中',
+      closedToday: '今日打烊'
     },
     en: {
       loading: 'Loading products...',
@@ -45,7 +48,10 @@ const StoreProductsPage: React.FC = () => {
       merchantInfo: 'Merchant Info',
       address: 'Address',
       contact: 'Phone',
-      hours: 'Hours'
+      hours: 'Hours',
+      openNow: 'Open Now',
+      closedNow: 'Closed',
+      closedToday: 'Closed Today'
     },
     my: {
       loading: 'ကုန်ပစ္စည်းများရှာဖွေနေပါသည်...',
@@ -59,7 +65,10 @@ const StoreProductsPage: React.FC = () => {
       merchantInfo: 'ဆိုင်အချက်အလက်',
       address: 'လိပ်စာ',
       contact: 'ဖုန်းနံပါတ်',
-      hours: 'ဖွင့်ချိန်'
+      hours: 'ဖွင့်ချိန်',
+      openNow: 'ဆိုင်ဖွင့်ထားသည်',
+      closedNow: 'ဆိုင်ပိတ်ထားသည်',
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
     }
   }[language as 'zh' | 'en' | 'my'] || {
     loading: 'Loading...',
@@ -120,11 +129,43 @@ const StoreProductsPage: React.FC = () => {
   };
 
   const handleAddToCart = (product: Product) => {
+    const status = checkStoreOpenStatus();
+    if (!status.isOpen) {
+      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+      return;
+    }
     const qty = itemQuantities[product.id] || 0;
     if (qty > 0) {
       addToCart(product, qty);
       setItemQuantities(prev => ({ ...prev, [product.id]: 0 }));
       alert(t.addedToCart);
+    }
+  };
+
+  // 🚀 新增：判断店铺是否正在营业
+  const checkStoreOpenStatus = () => {
+    if (!store) return { isOpen: true }; // 加载中默认允许
+    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    
+    try {
+      const hours = store.operating_hours || '09:00 - 21:00';
+      const [start, end] = hours.split(' - ');
+      
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+      
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return { isOpen: true, reason: 'open' };
+      }
+      return { isOpen: false, reason: 'outside_hours' };
+    } catch (e) {
+      return { isOpen: true }; // 出错默认营业
     }
   };
 
@@ -202,9 +243,21 @@ const StoreProductsPage: React.FC = () => {
                       <span style={{ background: '#fbbf24', color: '#92400e', padding: '0.2rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>
                         {store.store_type}
                       </span>
-                      <span style={{ background: '#10b981', color: 'white', padding: '0.2rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                        ● Open
-                      </span>
+                      {(() => {
+                        const status = checkStoreOpenStatus();
+                        return (
+                          <span style={{ 
+                            background: status.isOpen ? '#10b981' : '#ef4444', 
+                            color: 'white', 
+                            padding: '0.2rem 0.8rem', 
+                            borderRadius: '8px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 'bold' 
+                          }}>
+                            ● {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

@@ -742,6 +742,7 @@ export interface DeliveryStore {
   store_type: string;
   status: string;
   operating_hours?: string;
+  is_closed_today?: boolean; // 🚀 新增：今日是否不营业
   latitude?: number;
   longitude?: number;
   created_at?: string;
@@ -780,6 +781,24 @@ export const deliveryStoreService = {
     } catch (error) {
       LoggerService.error('获取商店详情失败:', error);
       return null;
+    }
+  },
+
+  // 更新商店营业信息
+  async updateStoreInfo(id: string, updates: Partial<DeliveryStore>) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商店信息失败:', error);
+      return { success: false, error };
     }
   }
 };

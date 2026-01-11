@@ -223,6 +223,20 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：更新店铺营业状态
+  const handleUpdateStoreStatus = async (updates: Partial<DeliveryStore>) => {
+    if (!storeInfo?.id) return;
+    try {
+      const result = await deliveryStoreService.updateStoreInfo(storeInfo.id, updates);
+      if (result.success) {
+        setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
+        alert(t.statusUpdated);
+      }
+    } catch (error) {
+      LoggerService.error('更新营业状态失败:', error);
+    }
+  };
+
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
   // 判断逻辑：
@@ -605,6 +619,14 @@ const ProfilePage: React.FC = () => {
       deleteConfirm: '确定要删除这个商品吗？',
       uploadImage: '上传图片',
       uploading: '正在上传...',
+      businessManagement: '营业状态管理',
+      operatingHours: '营业时间设置',
+      closedToday: '今日暂停营业',
+      openNow: '正在营业',
+      closedNow: '休息中',
+      openingTime: '开门时间',
+      closingTime: '打烊时间',
+      statusUpdated: '营业状态已更新',
     },
     en: {
       nav: {
@@ -675,6 +697,14 @@ const ProfilePage: React.FC = () => {
       deleteConfirm: 'Are you sure you want to delete this product?',
       uploadImage: 'Upload Image',
       uploading: 'Uploading...',
+      businessManagement: 'Business Management',
+      operatingHours: 'Business Hours Setting',
+      closedToday: 'Closed Today',
+      openNow: 'Open Now',
+      closedNow: 'Closed',
+      openingTime: 'Opening Time',
+      closingTime: 'Closing Time',
+      statusUpdated: 'Business status updated',
     },
     my: {
       nav: {
@@ -745,6 +775,14 @@ const ProfilePage: React.FC = () => {
       deleteConfirm: 'ဤကုန်ပစ္စည်းကို ဖျက်ရန် သေချาပါသလား?',
       uploadImage: 'ဓာတ်ပုံတင်ရန်',
       uploading: 'တင်နေသည်...',
+      businessManagement: 'ဆိုင်ဖွင့်/ပိတ် စီမံခန့်ခွဲမှု',
+      operatingHours: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်ချက်',
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
+      openNow: 'ဆိုင်ဖွင့်ထားသည်',
+      closedNow: 'ဆိုင်ပိတ်ထားသည်',
+      openingTime: 'ဆိုင်ဖွင့်ချိန်',
+      closingTime: 'ဆိုင်ပိတ်ချိန်',
+      statusUpdated: 'ဆိုင်အခြေအနေ ပြောင်းလဲပြီးပါပြီ',
     }
   };
 
@@ -1346,288 +1384,404 @@ const ProfilePage: React.FC = () => {
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && (
             <div style={{
-              marginBottom: '3rem',
-              background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '32px',
-              padding: '2.5rem',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 350px',
+              gap: '2rem',
+              marginBottom: '3rem'
             }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                marginBottom: '2.5rem', 
-                flexWrap: 'wrap', 
-                gap: '1.5rem',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                paddingBottom: '1.5rem'
+              {/* 左侧：代收款统计 */}
+              <div style={{
+                background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '32px',
+                padding: '2.5rem',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginBottom: '2.5rem', 
+                  flexWrap: 'wrap', 
+                  gap: '1.5rem',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  paddingBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                    <div style={{ 
+                      width: '56px', 
+                      height: '56px', 
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                      borderRadius: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.8rem',
+                      boxShadow: '0 10px 20px rgba(217, 119, 6, 0.4)'
+                    }}>💰</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <h3 style={{
+                        color: 'white',
+                        fontSize: '1.8rem',
+                        fontWeight: '900',
+                        margin: 0,
+                        letterSpacing: '-0.5px'
+                      }}>
+                        {t.codStats}
+                      </h3>
+                      <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
+                        财务收益与结算概览
+                      </span>
+                    </div>
+                  </div>
+
                   <div style={{ 
-                    width: '56px', 
-                    height: '56px', 
-                    background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                    borderRadius: '18px',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    padding: '10px 20px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
+                  }}>
+                    <button 
+                      onClick={handlePrevMonth}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        width: '36px',
+                        height: '36px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.4rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.transform = 'translateX(-3px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >‹</button>
+                    
+                    <div 
+                      onClick={() => dateInputRef.current?.showPicker()}
+                      style={{ 
+                        color: 'white', 
+                        fontSize: '1.2rem', 
+                        fontWeight: '800', 
+                        cursor: 'pointer',
+                        minWidth: '130px',
+                        textAlign: 'center',
+                        fontFamily: 'monospace',
+                        letterSpacing: '1px'
+                      }}
+                    >
+                      {selectedMonth}
+                      <input
+                        ref={dateInputRef}
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0 }}
+                      />
+                    </div>
+
+                    <button 
+                      onClick={handleNextMonth}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        width: '36px',
+                        height: '36px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.4rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.transform = 'translateX(3px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >›</button>
+                  </div>
+                </div>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                  gap: '2rem'
+                }}>
+                  {/* 本月代收款 */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.05) 100%)',
+                    padding: '2rem',
+                    borderRadius: '28px',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 10px 30px rgba(59, 130, 246, 0.1)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.1)';
+                  }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.totalCOD}</div>
+                      {partnerCODStats.settledCOD > 0 && (
+                        <button 
+                          onClick={() => handleViewCODOrders(true)}
+                          style={{ 
+                            padding: '6px 16px', 
+                            borderRadius: '12px', 
+                            background: '#3b82f6', 
+                            border: 'none', 
+                            color: 'white', 
+                            fontSize: '0.85rem', 
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            boxShadow: '0 6px 15px rgba(59, 130, 246, 0.4)',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          {t.view}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                      {partnerCODStats.settledCOD.toLocaleString()}
+                      <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
+                    </div>
+                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>📈</div>
+                  </div>
+
+                  {/* 待结清金额 */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.05) 100%)',
+                    padding: '2rem',
+                    borderRadius: '28px',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 10px 30px rgba(245, 158, 11, 0.1)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(245, 158, 11, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(245, 158, 11, 0.1)';
+                  }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.unclearedCOD}</div>
+                      {partnerCODStats.unclearedCount > 0 && (
+                        <button 
+                          onClick={() => handleViewCODOrders(false)}
+                          style={{ 
+                            padding: '6px 16px', 
+                            borderRadius: '12px', 
+                            background: '#f59e0b', 
+                            border: 'none', 
+                            color: 'white', 
+                            fontSize: '0.85rem', 
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            boxShadow: '0 6px 15px rgba(245, 158, 11, 0.4)',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          {t.view}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#fbbf24', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                      {partnerCODStats.unclearedCOD.toLocaleString()}
+                      <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
+                    </div>
+                    <div style={{ fontSize: '1rem', color: 'rgba(251, 191, 36, 0.9)', fontWeight: '700', background: 'rgba(251, 191, 36, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px' }}>
+                      {partnerCODStats.unclearedCount} 笔订单待结算
+                    </div>
+                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>⏳</div>
+                  </div>
+
+                  {/* 上次结算 */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.05) 100%)',
+                    padding: '2rem',
+                    borderRadius: '28px',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 10px 30px rgba(16, 185, 129, 0.1)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(16, 185, 129, 0.1)';
+                  }}
+                  >
+                    <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.lastSettledAt}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white', marginTop: '0.5rem', lineHeight: '1.4' }}>
+                      {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : (
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.2rem' }}>{t.noSettlement}</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: 'rgba(16, 185, 129, 0.8)', fontWeight: '700', background: 'rgba(16, 185, 129, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px', marginTop: 'auto' }}>
+                      结算完成将自动更新
+                    </div>
+                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>✅</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 右侧：营业状态管理 */}
+              <div style={{
+                background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '32px',
+                padding: '2.5rem',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '1.5rem' }}>
+                  <div style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    borderRadius: '14px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '1.8rem',
-                    boxShadow: '0 10px 20px rgba(217, 119, 6, 0.4)'
-                  }}>💰</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{
-                      color: 'white',
-                      fontSize: '1.8rem',
-                      fontWeight: '900',
-                      margin: 0,
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {t.codStats}
-                    </h3>
-                    <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
-                      财务收益与结算概览
+                    fontSize: '1.5rem'
+                  }}>⏰</div>
+                  <h3 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '900', margin: 0 }}>{t.businessManagement}</h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* 今日营业开关 */}
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <span style={{ color: 'white', fontWeight: '700', fontSize: '1.1rem' }}>{t.closedToday}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>开启后用户将看到“休息中”</span>
+                    </div>
+                    <div 
+                      onClick={() => handleUpdateStoreStatus({ is_closed_today: !storeInfo.is_closed_today })}
+                      style={{
+                        width: '56px',
+                        height: '28px',
+                        borderRadius: '14px',
+                        backgroundColor: storeInfo.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      <div style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '11px',
+                        backgroundColor: 'white',
+                        position: 'absolute',
+                        top: '3px',
+                        left: storeInfo.is_closed_today ? '31px' : '3px',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </div>
+                  </div>
+
+                  {/* 营业时间设置 */}
+                  <div style={{ 
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '1.25rem',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}>
+                    <span style={{ color: 'white', fontWeight: '700', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      📝 {t.operatingHours}
                     </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>{t.openingTime}</label>
+                        <input 
+                          type="time"
+                          value={(storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[0]}
+                          onChange={(e) => {
+                            const end = (storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[1];
+                            handleUpdateStoreStatus({ operating_hours: `${e.target.value} - ${end}` });
+                          }}
+                          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '8px', color: 'white', outline: 'none' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>{t.closingTime}</label>
+                        <input 
+                          type="time"
+                          value={(storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[1]}
+                          onChange={(e) => {
+                            const start = (storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[0];
+                            handleUpdateStoreStatus({ operating_hours: `${start} - ${e.target.value}` });
+                          }}
+                          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '8px', color: 'white', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px',
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  padding: '10px 20px',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
-                }}>
-                  <button 
-                    onClick={handlePrevMonth}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      borderRadius: '10px',
-                      width: '36px',
-                      height: '36px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1.4rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.transform = 'translateX(-3px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                    }}
-                  >‹</button>
-                  
-                  <div 
-                    onClick={() => dateInputRef.current?.showPicker()}
-                    style={{ 
-                      color: 'white', 
-                      fontSize: '1.2rem', 
-                      fontWeight: '800', 
-                      cursor: 'pointer',
-                      minWidth: '130px',
-                      textAlign: 'center',
-                      fontFamily: 'monospace',
-                      letterSpacing: '1px'
-                    }}
-                  >
-                    {selectedMonth}
-                    <input
-                      ref={dateInputRef}
-                      type="month"
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0 }}
-                    />
-                  </div>
-
-                  <button 
-                    onClick={handleNextMonth}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      borderRadius: '10px',
-                      width: '36px',
-                      height: '36px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1.4rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.transform = 'translateX(3px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                    }}
-                  >›</button>
-                </div>
-              </div>
-              
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
-                gap: '2rem'
-              }}>
-                {/* 本月代收款 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.05) 100%)',
-                  padding: '2rem',
-                  borderRadius: '28px',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 10px 30px rgba(59, 130, 246, 0.1)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(59, 130, 246, 0.1)';
-                }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.totalCOD}</div>
-                    {partnerCODStats.settledCOD > 0 && (
-                      <button 
-                        onClick={() => handleViewCODOrders(true)}
-                        style={{ 
-                          padding: '6px 16px', 
-                          borderRadius: '12px', 
-                          background: '#3b82f6', 
-                          border: 'none', 
-                          color: 'white', 
-                          fontSize: '0.85rem', 
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          boxShadow: '0 6px 15px rgba(59, 130, 246, 0.4)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                      >
-                        {t.view}
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                    {partnerCODStats.settledCOD.toLocaleString()}
-                    <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
-                  </div>
-                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>📈</div>
-                </div>
-
-                {/* 待结清金额 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.05) 100%)',
-                  padding: '2rem',
-                  borderRadius: '28px',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 10px 30px rgba(245, 158, 11, 0.1)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(245, 158, 11, 0.2)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(245, 158, 11, 0.1)';
-                }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.unclearedCOD}</div>
-                    {partnerCODStats.unclearedCount > 0 && (
-                      <button 
-                        onClick={() => handleViewCODOrders(false)}
-                        style={{ 
-                          padding: '6px 16px', 
-                          borderRadius: '12px', 
-                          background: '#f59e0b', 
-                          border: 'none', 
-                          color: 'white', 
-                          fontSize: '0.85rem', 
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          boxShadow: '0 6px 15px rgba(245, 158, 11, 0.4)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                      >
-                        {t.view}
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#fbbf24', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                    {partnerCODStats.unclearedCOD.toLocaleString()}
-                    <span style={{ fontSize: '1.1rem', opacity: 0.5, fontWeight: '600' }}>MMK</span>
-                  </div>
-                  <div style={{ fontSize: '1rem', color: 'rgba(251, 191, 36, 0.9)', fontWeight: '700', background: 'rgba(251, 191, 36, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px' }}>
-                    {partnerCODStats.unclearedCount} 笔订单待结算
-                  </div>
-                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>⏳</div>
-                </div>
-
-                {/* 上次结算 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.05) 100%)',
-                  padding: '2rem',
-                  borderRadius: '28px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 10px 30px rgba(16, 185, 129, 0.1)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.2)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(16, 185, 129, 0.1)';
-                }}
-                >
-                  <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.lastSettledAt}</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'white', marginTop: '0.5rem', lineHeight: '1.4' }}>
-                    {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : (
-                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.2rem' }}>{t.noSettlement}</span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.9rem', color: 'rgba(16, 185, 129, 0.8)', fontWeight: '700', background: 'rgba(16, 185, 129, 0.1)', alignSelf: 'flex-start', padding: '4px 12px', borderRadius: '10px', marginTop: 'auto' }}>
-                    结算完成将自动更新
-                  </div>
-                  <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '5rem', opacity: 0.08, transform: 'rotate(-15deg)' }}>✅</div>
                 </div>
               </div>
             </div>

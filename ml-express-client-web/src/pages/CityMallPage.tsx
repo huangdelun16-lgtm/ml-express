@@ -35,7 +35,10 @@ const CityMallPage: React.FC = () => {
       visitStore: '进入店铺',
       loading: '正在为您加载...',
       all: '全部',
-      region: '所在地区'
+      region: '所在地区',
+      openNow: '正在营业',
+      closedNow: '休息中',
+      closedToday: '今日打烊'
     },
     en: {
       title: 'City Mall',
@@ -47,7 +50,10 @@ const CityMallPage: React.FC = () => {
       visitStore: 'Visit Store',
       loading: 'Loading for you...',
       all: 'All',
-      region: 'Region'
+      region: 'Region',
+      openNow: 'Open Now',
+      closedNow: 'Closed',
+      closedToday: 'Closed Today'
     },
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
@@ -59,7 +65,10 @@ const CityMallPage: React.FC = () => {
       visitStore: 'ဆိုင်သို့ဝင်ရန်',
       loading: 'ခေတ္တစောင့်ဆိုင်းပါ...',
       all: 'အားလုံး',
-      region: 'ဒေသ'
+      region: 'ဒေသ',
+      openNow: 'ဆိုင်ဖွင့်ထားသည်',
+      closedNow: 'ဆိုင်ပိတ်ထားသည်',
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
     }
   }[language as 'zh' | 'en' | 'my'] || {
     title: 'City Mall',
@@ -71,7 +80,10 @@ const CityMallPage: React.FC = () => {
     visitStore: 'Visit Store',
     loading: 'Loading...',
     all: 'All',
-    region: 'Region'
+    region: 'Region',
+    openNow: 'Open Now',
+    closedNow: 'Closed',
+    closedToday: 'Closed Today'
   };
 
   useEffect(() => {
@@ -143,6 +155,32 @@ const CityMallPage: React.FC = () => {
       case '饮料和小吃': case 'drinks_snacks': return '🥤';
       case '杂货店': case 'grocery': return '🛒';
       default: return '🏪';
+    }
+  };
+
+  // 🚀 新增：判断店铺是否正在营业
+  const checkStoreOpenStatus = (store: DeliveryStore) => {
+    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    
+    try {
+      const hours = store.operating_hours || '09:00 - 21:00';
+      const [start, end] = hours.split(' - ');
+      
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+      
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return { isOpen: true, reason: 'open' };
+      }
+      return { isOpen: false, reason: 'outside_hours' };
+    } catch (e) {
+      return { isOpen: true, reason: 'parse_error' }; // 出错默认营业
     }
   };
 
@@ -374,16 +412,21 @@ const CityMallPage: React.FC = () => {
                       }}>
                         {store.store_type}
                       </span>
-                      <span style={{ 
-                        background: '#dcfce7', 
-                        color: '#15803d', 
-                        fontSize: '0.8rem', 
-                        padding: '0.3rem 0.8rem', 
-                        borderRadius: '10px',
-                        fontWeight: '800'
-                      }}>
-                        ● Open
-                      </span>
+                      {(() => {
+                        const status = checkStoreOpenStatus(store);
+                        return (
+                          <span style={{ 
+                            background: status.isOpen ? '#dcfce7' : '#fee2e2', 
+                            color: status.isOpen ? '#15803d' : '#ef4444', 
+                            fontSize: '0.8rem', 
+                            padding: '0.3rem 0.8rem', 
+                            borderRadius: '10px',
+                            fontWeight: '800'
+                          }}>
+                            ● {status.isOpen ? 'Open' : (status.reason === 'closed_today' ? 'Closed Today' : 'Closed')}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -396,7 +439,8 @@ const CityMallPage: React.FC = () => {
                   display: 'flex', 
                   flexDirection: 'column',
                   marginBottom: '1.8rem',
-                  border: '1px solid #f1f5f9'
+                  border: '1px solid #f1f5f9',
+                  opacity: checkStoreOpenStatus(store).isOpen ? 1 : 0.6 // 🚀 休息中店铺半透明
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
                     <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
