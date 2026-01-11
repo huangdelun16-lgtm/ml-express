@@ -286,30 +286,6 @@ const StoreProductsPage: React.FC = () => {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <button 
-                onClick={handleBulkAddToCart}
-                style={{ 
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                  border: 'none', 
-                  color: 'white', 
-                  padding: '1rem 2rem', 
-                  borderRadius: '20px', 
-                  cursor: 'pointer',
-                  fontWeight: '900',
-                  fontSize: '1.1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.8rem',
-                  boxShadow: '0 15px 30px rgba(16, 185, 129, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <span style={{ fontSize: '1.5rem' }}>➕</span> {t.addToCart}
-              </button>
-
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <button 
                 onClick={handleBulkAddToCart}
@@ -363,7 +339,6 @@ const StoreProductsPage: React.FC = () => {
                   fontSize: '0.9rem' 
                 }}>{cartCount}</span>
               </button>
-            </div>
             </div>
           </div>
         </div>
