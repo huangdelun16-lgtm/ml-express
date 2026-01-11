@@ -76,6 +76,12 @@ const ProfilePage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 新增：店铺营业状态临时状态（用于保存前修改）
+  const [businessStatus, setBusinessStatus] = useState({
+    is_closed_today: false,
+    operating_hours: '09:00 - 21:00'
+  });
+
   const handlePrevMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     let newYear = year;
@@ -316,6 +322,10 @@ const ProfilePage: React.FC = () => {
             
             if (!error && store) {
               setStoreInfo(store);
+              setBusinessStatus({
+                is_closed_today: store.is_closed_today || false,
+                operating_hours: store.operating_hours || '09:00 - 21:00'
+              });
             }
           } catch (error) {
             LoggerService.error('加载店铺信息失败:', error);
@@ -1433,9 +1443,20 @@ const ProfilePage: React.FC = () => {
                       }}>
                         {t.codStats}
                       </h3>
-                      <span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
-                        财务收益与结算实时动态
-                      </span>
+                      {/* 🚀 修正：上次结算日期 - 非卡片样式 */}
+                      <div style={{ 
+                        fontSize: '1rem', 
+                        color: 'rgba(255,255,255,0.6)', 
+                        fontWeight: '700',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <span>📅 {t.lastSettledAt}:</span>
+                        <span style={{ color: '#10b981' }}>
+                          {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : t.noSettlement}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1518,15 +1539,15 @@ const ProfilePage: React.FC = () => {
                 
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                  gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
                   gap: '2.5rem'
                 }}>
                   {/* 本月已结清 */}
                   <div style={{
-                    background: 'rgba(59, 130, 246, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
                     padding: '2.5rem 2rem',
                     borderRadius: '35px',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1.2rem',
@@ -1551,10 +1572,10 @@ const ProfilePage: React.FC = () => {
 
                   {/* 待结清金额 */}
                   <div style={{
-                    background: 'rgba(245, 158, 11, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
                     padding: '2.5rem 2rem',
                     borderRadius: '35px',
-                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1.2rem',
@@ -1580,28 +1601,6 @@ const ProfilePage: React.FC = () => {
                     <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '6rem', opacity: 0.12, transform: 'rotate(-15deg)' }}>⏳</div>
                   </div>
 
-                  {/* 上次结算 */}
-                  <div style={{
-                    background: 'rgba(16, 185, 129, 0.2)',
-                    padding: '2.5rem 2rem',
-                    borderRadius: '35px',
-                    border: '1px solid rgba(16, 185, 129, 0.4)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1.2rem',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    transition: 'all 0.4s ease'
-                  }}>
-                    <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.lastSettledAt}</span>
-                    <div style={{ fontSize: '1.6rem', fontWeight: '950', color: 'white', marginTop: '0.5rem', lineHeight: '1.2' }}>
-                      {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : t.noSettlement}
-                    </div>
-                    <div style={{ fontSize: '0.95rem', color: '#10b981', fontWeight: '900', background: 'rgba(16, 185, 129, 0.2)', alignSelf: 'flex-start', padding: '4px 14px', borderRadius: '12px', marginTop: 'auto' }}>
-                      ✓ 结算已自动同步
-                    </div>
-                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '6rem', opacity: 0.12, transform: 'rotate(-15deg)' }}>✅</div>
-                  </div>
                 </div>
               </div>
 
@@ -1648,27 +1647,26 @@ const ProfilePage: React.FC = () => {
                       <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '500', lineHeight: '1.4' }}>开启后用户将看到“休息中”，无法下单</div>
                     </div>
                     
-                    {/* 🚀 修复开关：增强交互与视觉 */}
+                    {/* 🚀 修正：使用 businessStatus 本地状态，点击后即刻有反应 */}
                     <button 
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('Toggle clicked, current value:', storeInfo.is_closed_today);
-                        handleUpdateStoreStatus({ is_closed_today: !storeInfo.is_closed_today });
+                        setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }));
                       }}
                       style={{
                         width: '68px',
                         height: '36px',
                         borderRadius: '18px',
-                        backgroundColor: storeInfo.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                        backgroundColor: businessStatus.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
                         position: 'relative',
                         cursor: 'pointer',
                         border: '2px solid rgba(255,255,255,0.3)',
                         transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                         padding: 0,
                         zIndex: 100,
-                        boxShadow: storeInfo.is_closed_today ? '0 0 15px rgba(239, 68, 68, 0.5)' : 'none'
+                        boxShadow: businessStatus.is_closed_today ? '0 0 15px rgba(239, 68, 68, 0.5)' : 'none'
                       }}
                     >
                       <div style={{
@@ -1678,7 +1676,7 @@ const ProfilePage: React.FC = () => {
                         backgroundColor: 'white',
                         position: 'absolute',
                         top: '3px',
-                        left: storeInfo.is_closed_today ? '37px' : '3px',
+                        left: businessStatus.is_closed_today ? '37px' : '3px',
                         transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                         boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                       }} />
@@ -1704,10 +1702,10 @@ const ProfilePage: React.FC = () => {
                         <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.openingTime}</label>
                         <input 
                           type="time"
-                          value={(storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[0]}
+                          value={businessStatus.operating_hours.split(' - ')[0]}
                           onChange={(e) => {
-                            const end = (storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[1];
-                            handleUpdateStoreStatus({ operating_hours: `${e.target.value} - ${end}` });
+                            const end = businessStatus.operating_hours.split(' - ')[1];
+                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${e.target.value} - ${end}` }));
                           }}
                           style={{ 
                             background: 'white', 
@@ -1727,10 +1725,10 @@ const ProfilePage: React.FC = () => {
                         <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.closingTime}</label>
                         <input 
                           type="time"
-                          value={(storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[1]}
+                          value={businessStatus.operating_hours.split(' - ')[1]}
                           onChange={(e) => {
-                            const start = (storeInfo.operating_hours || '09:00 - 21:00').split(' - ')[0];
-                            handleUpdateStoreStatus({ operating_hours: `${start} - ${e.target.value}` });
+                            const start = businessStatus.operating_hours.split(' - ')[0];
+                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${e.target.value}` }));
                           }}
                           style={{ 
                             background: 'white', 
@@ -1748,6 +1746,38 @@ const ProfilePage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* 🚀 新增：保存按钮 */}
+                  <button
+                    onClick={() => handleUpdateStoreStatus(businessStatus)}
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '20px',
+                      padding: '1.2rem',
+                      fontSize: '1.2rem',
+                      fontWeight: '900',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.8rem',
+                      marginTop: '1rem'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-3px)';
+                      e.currentTarget.style.boxShadow = '0 15px 30px rgba(16, 185, 129, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(16, 185, 129, 0.3)';
+                    }}
+                  >
+                    <span>💾</span> {t.save}
+                  </button>
                 </div>
               </div>
             </div>
