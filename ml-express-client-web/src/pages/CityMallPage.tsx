@@ -287,56 +287,98 @@ const CityMallPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 🚀 地区选择栏 - 优化为毛玻璃效果 */}
+      {/* 🚀 地区选择栏 - 优化为高级玻璃拟态效果 */}
       <div style={{ 
-        background: 'rgba(255, 255, 255, 0.8)', 
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+        background: 'rgba(255, 255, 255, 0.05)', 
+        backdropFilter: 'blur(30px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        padding: '0.75rem 0'
       }}>
         <div style={{ 
           maxWidth: '1200px', 
           margin: '0 auto', 
           display: 'flex', 
           alignItems: 'center',
-          padding: '0.5rem 1rem',
-          overflowX: 'auto'
+          padding: '0 1.5rem'
         }}>
+          {/* 标签 */}
           <div style={{ 
-            padding: '1rem', 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.8rem',
+            padding: '0.6rem 1.2rem', 
             fontWeight: '900', 
-            color: '#1e40af', 
+            color: 'white', 
             whiteSpace: 'nowrap',
-            borderRight: '2px solid rgba(30, 64, 175, 0.1)',
-            marginRight: '1rem',
-            fontSize: '1rem'
+            marginRight: '1.5rem',
+            fontSize: '1rem',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}>
-            📍 {t.region}
+            <span style={{ fontSize: '1.2rem' }}>📍</span> {t.region}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {regions.map(r => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRegion(r.id)}
-                style={{
-                  padding: '0.8rem 1.8rem',
-                  border: 'none',
-                  background: selectedRegion === r.id ? '#1e40af' : 'transparent',
-                  color: selectedRegion === r.id ? 'white' : '#475569',
-                  fontWeight: '800',
-                  borderRadius: '15px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  fontSize: '0.95rem'
-                }}
-              >
-                {r[language as 'zh' | 'en' | 'my'] || r.en}
-              </button>
-            ))}
+
+          {/* 滚动容器 */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.75rem',
+            overflowX: 'auto',
+            padding: '0.5rem 0',
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // IE
+          }}>
+            <style>{`
+              .region-scroll::-webkit-scrollbar { display: none; }
+            `}</style>
+            <div className="region-scroll" style={{ display: 'flex', gap: '0.75rem' }}>
+              {regions.map(r => {
+                const isActive = selectedRegion === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRegion(r.id)}
+                    style={{
+                      padding: '0.7rem 1.8rem',
+                      border: '1px solid',
+                      borderColor: isActive ? 'transparent' : 'rgba(255, 255, 255, 0.2)',
+                      background: isActive 
+                        ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' 
+                        : 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontWeight: isActive ? '900' : '700',
+                      borderRadius: '18px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      fontSize: '0.95rem',
+                      boxShadow: isActive 
+                        ? '0 8px 20px rgba(30, 64, 175, 0.4)' 
+                        : '0 4px 12px rgba(0,0,0,0.05)',
+                      transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                      }
+                    }}
+                  >
+                    {r[language as 'zh' | 'en' | 'my'] || r.en}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
