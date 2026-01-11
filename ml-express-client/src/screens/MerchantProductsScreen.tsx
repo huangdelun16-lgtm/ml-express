@@ -236,11 +236,13 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
       // 如果是本地图片路径，先上传
       if (productForm.image_url && (productForm.image_url.startsWith('file://') || productForm.image_url.startsWith('content://'))) {
+        console.log('正在上传本地图片:', productForm.image_url);
         const uploadedUrl = await merchantService.uploadProductImage(storeId, productForm.image_url);
         if (uploadedUrl) {
           finalImageUrl = uploadedUrl;
+          console.log('图片上传成功:', uploadedUrl);
         } else {
-          Alert.alert('错误', '图片上传失败，请检查网络或重试');
+          Alert.alert('错误', '图片上传失败，请检查网络或重试。请确保图片已成功上传后再保存商品。');
           setFormLoading(false);
           return;
         }
@@ -382,16 +384,16 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     
     return (
       <TouchableOpacity 
-        style={styles.productCard}
+        style={[styles.productCard, { width: (width - 48) / 2 }]}
         onPress={() => !isReadOnly && handleOpenEditProduct(item)}
         activeOpacity={isReadOnly ? 1 : 0.7}
       >
         <View style={styles.productImageContainer}>
-          {item.image_url ? (
+          {item.image_url && !item.image_url.startsWith('file://') ? (
             <Image source={{ uri: item.image_url }} style={styles.productImage} />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <Ionicons name="image-outline" size={32} color="#cbd5e1" />
+              <Ionicons name="image-outline" size={24} color="#cbd5e1" />
             </View>
           )}
           {!item.is_available && (
@@ -405,9 +407,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
           <View style={styles.stockRow}>
-            <Ionicons name="cube-outline" size={14} color="#64748b" />
+            <Ionicons name="cube-outline" size={12} color="#64748b" />
             <Text style={styles.productStock}>
-              {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
+              {item.stock === -1 ? currentT.infinite : item.stock}
             </Text>
           </View>
 
@@ -419,14 +421,14 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   style={[styles.smallQtyBtn, quantity === 0 && styles.disabledQtyBtn]}
                   disabled={quantity === 0}
                 >
-                  <Ionicons name="remove" size={16} color={quantity === 0 ? "#cbd5e1" : "#3b82f6"} />
+                  <Ionicons name="remove" size={14} color={quantity === 0 ? "#cbd5e1" : "#3b82f6"} />
                 </TouchableOpacity>
                 <Text style={[styles.smallQtyValue, quantity === 0 && { color: '#cbd5e1' }]}>{quantity}</Text>
                 <TouchableOpacity 
                   onPress={() => updateItemQuantity(item.id, 1)}
                   style={styles.smallQtyBtn}
                 >
-                  <Ionicons name="add" size={16} color="#3b82f6" />
+                  <Ionicons name="add" size={14} color="#3b82f6" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -440,10 +442,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               onValueChange={() => toggleProductStatus(item)}
               trackColor={{ false: '#cbd5e1', true: '#10b981' }}
               thumbColor="#ffffff"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
-            <View style={styles.editBtn}>
-              <Ionicons name="create-outline" size={20} color="#3b82f6" />
-            </View>
           </View>
         )}
       </TouchableOpacity>

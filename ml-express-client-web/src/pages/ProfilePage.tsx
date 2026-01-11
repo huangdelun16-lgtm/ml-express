@@ -3170,7 +3170,7 @@ const ProfilePage: React.FC = () => {
                       }}
                     >
                       <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {product.image_url ? (
+                        {product.image_url && !product.image_url.startsWith('file://') ? (
                           <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: '3rem' }}>🖼️</span>

@@ -317,8 +317,8 @@ const StoreProductsPage: React.FC = () => {
             <div>
               <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-                gap: '2rem' 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
+                gap: '1.5rem' 
               }}>
                 {products.map(product => {
                   const qty = itemQuantities[product.id] || 0;
@@ -327,65 +327,65 @@ const StoreProductsPage: React.FC = () => {
                       key={product.id}
                       style={{
                         background: 'rgba(255, 255, 255, 0.95)',
-                        borderRadius: '30px',
+                        borderRadius: '24px',
                         overflow: 'hidden',
-                        boxShadow: '0 10px 20px rgba(0,0,0,0.03)',
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.03)',
                         border: '1px solid rgba(255,255,255,0.8)',
                         display: 'flex',
                         flexDirection: 'column',
                         transition: 'all 0.3s ease'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-8px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.1)';
+                        e.currentTarget.style.transform = 'translateY(-6px)';
+                        e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.08)';
                         e.currentTarget.style.background = '#ffffff';
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.03)';
+                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.03)';
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
                       }}
                     >
-                      <div style={{ height: '240px', background: '#f8fafc', position: 'relative' }}>
-                        {product.image_url ? (
+                      <div style={{ height: '180px', background: '#f8fafc', position: 'relative' }}>
+                        {product.image_url && !product.image_url.startsWith('file://') ? (
                           <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '4.5rem', background: '#eff6ff' }}>
+                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '3rem', background: '#eff6ff' }}>
                             📦
                           </div>
                         )}
                         <div style={{ 
                           position: 'absolute', 
-                          bottom: '1.2rem', 
-                          right: '1.2rem', 
-                          background: 'rgba(255,255,255,0.95)', 
-                          padding: '0.5rem 1rem', 
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
+                          bottom: '0.8rem', 
+                          right: '0.8rem', 
+                          background: 'rgba(255,255,255,0.9)', 
+                          padding: '0.4rem 0.8rem', 
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
                           fontWeight: '900',
                           color: '#1e40af',
                           backdropFilter: 'blur(4px)',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                           border: '1px solid #e0e7ff'
                         }}>
                           {t.stock}: {product.stock === -1 ? t.infinite : product.stock}
                         </div>
                       </div>
                       
-                      <div style={{ padding: '1.8rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ fontSize: '1.3rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.6rem' }}>{product.name}</h3>
-                        <p style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: '900', marginBottom: '1.8rem' }}>{product.price.toLocaleString()} MMK</p>
+                      <div style={{ padding: '1.2rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>
+                        <p style={{ color: '#10b981', fontSize: '1.3rem', fontWeight: '900', marginBottom: '1.2rem' }}>{product.price.toLocaleString()} MMK</p>
 
                         <div style={{ marginTop: 'auto' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', marginBottom: '1.2rem', justifyContent: 'center', background: '#f1f5f9', padding: '0.6rem', borderRadius: '18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', justifyContent: 'center', background: '#f1f5f9', padding: '0.4rem', borderRadius: '14px' }}>
                             <button 
                               onClick={() => updateQuantity(product.id, -1)}
-                              style={{ width: '40px', height: '40px', borderRadius: '14px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', fontSize: '1.4rem', fontWeight: 'bold', color: '#1e40af' }}
+                              style={{ width: '32px', height: '32px', borderRadius: '10px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '1.2rem', fontWeight: 'bold', color: '#1e40af' }}
                             >-</button>
-                            <span style={{ fontWeight: '900', minWidth: '35px', textAlign: 'center', fontSize: '1.4rem', color: '#0f172a' }}>{qty}</span>
+                            <span style={{ fontWeight: '900', minWidth: '25px', textAlign: 'center', fontSize: '1.1rem', color: '#0f172a' }}>{qty}</span>
                             <button 
                               onClick={() => updateQuantity(product.id, 1)}
-                              style={{ width: '40px', height: '40px', borderRadius: '14px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', fontSize: '1.4rem', fontWeight: 'bold', color: '#1e40af' }}
+                              style={{ width: '32px', height: '32px', borderRadius: '10px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '1.2rem', fontWeight: 'bold', color: '#1e40af' }}
                             >+</button>
                           </div>
                           <button 
@@ -393,15 +393,15 @@ const StoreProductsPage: React.FC = () => {
                             onClick={() => handleAddToCart(product)}
                             style={{ 
                               width: '100%', 
-                              padding: '1.2rem', 
-                              borderRadius: '20px', 
+                              padding: '0.8rem', 
+                              borderRadius: '14px', 
                               border: 'none', 
-                              background: qty > 0 ? 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)' : '#e2e8f0', 
+                              background: qty > 0 ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' : '#e2e8f0', 
                               color: 'white', 
                               fontWeight: '900', 
-                              fontSize: '1.1rem',
+                              fontSize: '1rem',
                               cursor: qty > 0 ? 'pointer' : 'default',
-                              boxShadow: qty > 0 ? '0 12px 24px rgba(30, 64, 175, 0.2)' : 'none',
+                              boxShadow: qty > 0 ? '0 8px 16px rgba(30, 64, 175, 0.2)' : 'none',
                               transition: 'all 0.3s ease'
                             }}
                           >
