@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useCart } from '../contexts/CartContext';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { 
   packageService, 
@@ -78,6 +79,7 @@ class ErrorBoundary extends React.Component<
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { clearCart } = useCart();
 
   // 处理从其他页面跳转过来的登录/注册请求
   useEffect(() => {
@@ -104,6 +106,7 @@ const HomePage: React.FC = () => {
       setMerchantProducts(incomingProducts);
       setHasCOD(true);
       setShowOrderForm(true);
+      setIsFromCart(true); // 💡 新增：标记是从购物车过来的
       
       // 如果有店铺信息，自动填充寄件人
       if (incomingProducts.length > 0 && incomingProducts[0].store_id) {
@@ -196,6 +199,7 @@ const HomePage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState<CityKey>(DEFAULT_CITY_KEY);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isFromCart, setIsFromCart] = useState(false); // 🚀 新增：是否从购物车跳转过来的
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
@@ -2709,6 +2713,7 @@ const HomePage: React.FC = () => {
         cartTotal={cartTotal}
         hasCOD={hasCOD}
         setHasCOD={setHasCOD}
+        isFromCart={isFromCart}
       />
 
       {/* 支付二维码模态窗口 */}
@@ -3031,9 +3036,10 @@ const HomePage: React.FC = () => {
                     const result = await packageService.createPackage(packageData);
                     
                     if (result) {
-                      // 🚀 核心优化：订单成功后清空商品选择
+                      // 🚀 核心优化：订单成功后清空商品选择和购物车
                       setSelectedProducts({});
                       setCartTotal(0);
+                      clearCart(); // 💡 新增：清空 Context 中的购物车
                       
                       // 自动保存客户信息到用户管理
                       await saveCustomerToUsers(orderInfo);

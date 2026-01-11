@@ -41,6 +41,7 @@ interface OrderModalProps {
   cartTotal?: number;
   hasCOD?: boolean;
   setHasCOD?: (val: boolean) => void;
+  isFromCart?: boolean;
 }
 
 const OrderModal: React.FC<OrderModalProps> = ({
@@ -81,7 +82,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleProductQuantityChange = () => {},
   cartTotal = 0,
   hasCOD = true,
-  setHasCOD = () => {}
+  setHasCOD = () => {},
+  isFromCart = false
 }) => {
   const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
@@ -401,23 +403,25 @@ const OrderModal: React.FC<OrderModalProps> = ({
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>🛒 {language === 'zh' ? '已选商品' : language === 'en' ? 'Selected Products' : 'ရွေးချယ်ထားသောပစ္စည်း'}</h3>
-                <button 
-                  type="button"
-                  onClick={() => setShowProductSelector(true)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
-                  }}
-                >
-                  {language === 'zh' ? '+ 选择商品' : language === 'en' ? '+ Select Product' : '+ ပစ္စည်းရွေးရန်'}
-                </button>
+                {!isFromCart && (
+                  <button 
+                    type="button"
+                    onClick={() => setShowProductSelector(true)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                    }}
+                  >
+                    {language === 'zh' ? '+ 选择商品' : language === 'en' ? '+ Select Product' : '+ ပစ္စည်းရွေးရန်'}
+                  </button>
+                )}
               </div>
 
               {/* 已选商品列表 */}

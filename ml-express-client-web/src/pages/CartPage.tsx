@@ -147,21 +147,21 @@ const CartPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '2.5rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
             {/* 商品列表 */}
             <div style={{ 
               background: 'rgba(255, 255, 255, 0.95)', 
-              borderRadius: '35px', 
-              padding: '2.5rem', 
+              borderRadius: '28px', 
+              padding: '1.5rem', 
               boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
               border: '1px solid white',
               backdropFilter: 'blur(10px)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a' }}>商品清单</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>商品清单</h2>
                 <button 
                   onClick={clearCart}
-                  style={{ background: '#fee2e2', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '800', padding: '0.6rem 1.2rem', borderRadius: '12px', transition: 'all 0.2s ease' }}
+                  style={{ background: '#fee2e2', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '800', padding: '0.5rem 1rem', borderRadius: '10px', transition: 'all 0.2s ease' }}
                   onMouseOver={(e) => e.currentTarget.style.background = '#fecaca'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#fee2e2'}
                 >
@@ -169,48 +169,48 @@ const CartPage: React.FC = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {cartItems.map(item => (
                   <div 
                     key={item.id}
                     style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      padding: '1.5rem', 
+                      padding: '0.8rem', 
                       background: 'white',
-                      borderRadius: '24px',
+                      borderRadius: '18px',
                       border: '1px solid #f1f5f9',
                       boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
                     }}
                   >
-                    <div style={{ width: '100px', height: '100px', borderRadius: '18px', background: '#f8fafc', overflow: 'hidden', marginRight: '1.8rem', border: '1px solid #f1f5f9' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden', marginRight: '1rem', border: '1px solid #f1f5f9' }}>
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '3rem', background: '#eff6ff' }}>📦</div>
+                        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', background: '#eff6ff' }}>📦</div>
                       )}
                     </div>
                     
                     <div style={{ flex: 1 }}>
-                      <h3 style={{ fontWeight: '900', fontSize: '1.25rem', marginBottom: '0.6rem', color: '#0f172a' }}>{item.name}</h3>
-                      <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: '800' }}>{item.price.toLocaleString()} MMK</p>
+                      <h3 style={{ fontWeight: '900', fontSize: '1rem', marginBottom: '0.2rem', color: '#0f172a' }}>{item.name}</h3>
+                      <p style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: '800' }}>{item.price.toLocaleString()} MMK</p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '18px', padding: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '12px', padding: '0.2rem' }}>
                         <button 
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          style={{ width: '32px', height: '32px', borderRadius: '12px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af' }}
+                          style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
                         >-</button>
-                        <span style={{ margin: '0 1.2rem', fontWeight: '900', width: '25px', textAlign: 'center', fontSize: '1.1rem', color: '#0f172a' }}>{item.quantity}</span>
+                        <span style={{ margin: '0 0.6rem', fontWeight: '900', width: '18px', textAlign: 'center', fontSize: '0.9rem', color: '#0f172a' }}>{item.quantity}</span>
                         <button 
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          style={{ width: '32px', height: '32px', borderRadius: '12px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af' }}
+                          style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
                         >+</button>
                       </div>
                       <button 
                         onClick={() => removeFromCart(item.id)}
-                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.8rem', transition: 'all 0.2s ease', padding: '0.5rem' }}
+                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', transition: 'all 0.2s ease', padding: '0.3rem' }}
                         onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
                         onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
                       >×</button>
@@ -221,27 +221,27 @@ const CartPage: React.FC = () => {
             </div>
 
             {/* 结算卡片 */}
-            <div style={{ height: 'fit-content', position: 'sticky', top: '2rem' }}>
+            <div style={{ height: 'fit-content', position: window.innerWidth < 1024 ? 'static' : 'sticky', top: '2rem' }}>
               <div style={{ 
                 background: 'rgba(255, 255, 255, 0.95)', 
-                borderRadius: '35px', 
-                padding: '2.5rem', 
+                borderRadius: '28px', 
+                padding: '1.8rem', 
                 boxShadow: '0 25px 50px rgba(0,0,0,0.1)',
                 backdropFilter: 'blur(10px)',
                 border: '1px solid white'
               }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '900', marginBottom: '2rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <span style={{ fontSize: '1.8rem' }}>📋</span> 结算详情
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '900', marginBottom: '1.5rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '1.5rem' }}>📋</span> 结算详情
                 </h2>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '2.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', color: '#64748b', fontWeight: '600' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#64748b', fontWeight: '600' }}>
                     <span>商品总数</span>
                     <span>{cartItems.length} 件</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1.5rem 0', borderTop: '2px dashed #e2e8f0', borderBottom: '2px dashed #e2e8f0' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: '900', color: '#0f172a' }}>{t.total}</span>
-                    <span style={{ fontWeight: '900', color: '#10b981', fontSize: '1.8rem' }}>{cartTotal.toLocaleString()} MMK</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0', borderTop: '2px dashed #e2e8f0', borderBottom: '2px dashed #e2e8f0' }}>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a' }}>{t.total}</span>
+                    <span style={{ fontWeight: '900', color: '#10b981', fontSize: '1.5rem' }}>{cartTotal.toLocaleString()} MMK</span>
                   </div>
                 </div>
 
@@ -249,19 +249,19 @@ const CartPage: React.FC = () => {
                   onClick={handleCheckout}
                   style={{ 
                     width: '100%', 
-                    padding: '1.5rem', 
-                    borderRadius: '24px', 
+                    padding: '1.2rem', 
+                    borderRadius: '18px', 
                     border: 'none', 
                     background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', 
                     color: 'white', 
                     fontWeight: '900', 
-                    fontSize: '1.25rem',
+                    fontSize: '1.1rem',
                     cursor: 'pointer',
-                    boxShadow: '0 15px 30px rgba(37, 99, 235, 0.3)',
+                    boxShadow: '0 12px 24px rgba(37, 99, 235, 0.3)',
                     transition: 'all 0.3s ease',
-                    marginBottom: '1.2rem'
+                    marginBottom: '1rem'
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
                   onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                 >
                   🚀 {t.checkout}
@@ -271,14 +271,14 @@ const CartPage: React.FC = () => {
                   onClick={() => navigate('/mall')}
                   style={{ 
                     width: '100%', 
-                    padding: '1.2rem', 
-                    borderRadius: '20px', 
+                    padding: '1rem', 
+                    borderRadius: '16px', 
                     border: '2px solid #e2e8f0', 
                     background: 'white', 
                     color: '#475569', 
                     fontWeight: '800',
                     cursor: 'pointer',
-                    fontSize: '1rem',
+                    fontSize: '0.9rem',
                     transition: 'all 0.2s ease'
                   }}
                   onMouseOver={(e) => {
