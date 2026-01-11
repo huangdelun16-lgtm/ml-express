@@ -29,6 +29,7 @@ interface DeliveryStore {
   store_type: string;
   status: string;
   operating_hours: string;
+  is_closed_today?: boolean; // 🚀 新增
 }
 
 export default function CityMallScreen({ navigation }: any) {
@@ -47,6 +48,9 @@ export default function CityMallScreen({ navigation }: any) {
       operatingHours: '营业时间',
       contact: '联系电话',
       visitStore: '进入店铺',
+      openNow: '正在营业',
+      closedNow: '休息中',
+      closedToday: '今日暂停营业'
     },
     en: {
       title: 'City Mall',
@@ -56,6 +60,9 @@ export default function CityMallScreen({ navigation }: any) {
       operatingHours: 'Hours',
       contact: 'Phone',
       visitStore: 'Visit Store',
+      openNow: 'Open Now',
+      closedNow: 'Closed',
+      closedToday: 'Closed Today'
     },
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
@@ -65,6 +72,9 @@ export default function CityMallScreen({ navigation }: any) {
       operatingHours: 'ဖွင့်ချိန်',
       contact: 'ဖုန်းနံပါတ်',
       visitStore: 'ဆိုင်သို့ဝင်ရန်',
+      openNow: 'ဆိုင်ဖွင့်ထားသည်',
+      closedNow: 'ဆိုင်ပိတ်ထားသည်',
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
     },
   }[language] || {
     title: 'City Mall',
@@ -74,6 +84,9 @@ export default function CityMallScreen({ navigation }: any) {
     operatingHours: 'Hours',
     contact: 'Phone',
     visitStore: 'Visit Store',
+    openNow: 'Open Now',
+    closedNow: 'Closed',
+    closedToday: 'Closed Today'
   };
 
   useEffect(() => {
@@ -98,10 +111,43 @@ export default function CityMallScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
-  const filteredStores = stores.filter(store =>
-    store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
-    (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase()))
-  );
+  // 🚀 核心逻辑：判断店铺是否正在营业
+  const checkStoreOpenStatus = (store: DeliveryStore) => {
+    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    
+    try {
+      const hours = store.operating_hours || '09:00 - 21:00';
+      const [start, end] = hours.split(' - ');
+      
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+      
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return { isOpen: true, reason: 'open' };
+      }
+      return { isOpen: false, reason: 'outside_hours' };
+    } catch (e) {
+      return { isOpen: true, reason: 'parse_error' };
+    }
+  };
+
+  const filteredStores = stores
+    .filter(store =>
+      store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
+      (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase()))
+    )
+    .sort((a, b) => {
+      const statusA = checkStoreOpenStatus(a);
+      const statusB = checkStoreOpenStatus(b);
+      if (statusA.isOpen === statusB.isOpen) return 0;
+      return statusA.isOpen ? -1 : 1; // 营业中的排前面
+    });
 
   const getStoreIcon = (type: string) => {
     switch (type) {
@@ -113,49 +159,88 @@ export default function CityMallScreen({ navigation }: any) {
     }
   };
 
-  const renderStoreItem = ({ item }: { item: DeliveryStore }) => (
-    <TouchableOpacity
-      style={styles.storeCard}
-      onPress={() => navigation.navigate('MerchantProducts', { storeId: item.id, storeName: item.store_name })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.storeHeader}>
-        <View style={styles.storeIconContainer}>
-          <Text style={styles.storeIcon}>{getStoreIcon(item.store_type)}</Text>
-        </View>
-        <View style={styles.storeMainInfo}>
-          <Text style={styles.storeName}>{item.store_name}</Text>
-          <View style={styles.tagContainer}>
-            <View style={styles.typeTag}>
-              <Text style={styles.typeTagText}>{item.store_type}</Text>
-            </View>
-            <View style={styles.statusTag}>
-              <Text style={styles.statusTagText}>Open</Text>
+  const renderStoreItem = ({ item }: { item: DeliveryStore }) => {
+    const status = checkStoreOpenStatus(item);
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.storeCard,
+          !status.isOpen && { opacity: 0.7 } // 休息中透明度
+        ]}
+        onPress={() => {
+          if (!status.isOpen) {
+            alert(t.closedToday);
+            return;
+          }
+          navigation.navigate('MerchantProducts', { storeId: item.id, storeName: item.store_name });
+        }}
+        activeOpacity={status.isOpen ? 0.7 : 1}
+      >
+        <View style={styles.storeHeader}>
+          <View style={[
+            styles.storeIconContainer,
+            !status.isOpen && { backgroundColor: '#f1f5f9' }
+          ]}>
+            <Text style={[
+              styles.storeIcon,
+              !status.isOpen && { opacity: 0.5 }
+            ]}>
+              {getStoreIcon(item.store_type)}
+            </Text>
+          </View>
+          <View style={styles.storeMainInfo}>
+            <Text style={[
+              styles.storeName,
+              !status.isOpen && { color: '#64748b' }
+            ]}>
+              {item.store_name}
+            </Text>
+            <View style={styles.tagContainer}>
+              <View style={styles.typeTag}>
+                <Text style={styles.typeTagText}>{item.store_type}</Text>
+              </View>
+              <View style={[
+                styles.statusTag,
+                { backgroundColor: status.isOpen ? '#dcfce7' : '#fee2e2' }
+              ]}>
+                <Text style={[
+                  styles.statusTagText,
+                  { color: status.isOpen ? '#15803d' : '#ef4444' }
+                ]}>
+                  {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.storeDetails}>
-        <View style={styles.detailItem}>
-          <Ionicons name="time-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText}>{t.operatingHours}: {item.operating_hours}</Text>
+        <View style={[styles.storeDetails, !status.isOpen && { opacity: 0.6 }]}>
+          <View style={styles.detailItem}>
+            <Ionicons name="time-outline" size={16} color="#64748b" />
+            <Text style={styles.detailText}>{t.operatingHours}: {item.operating_hours || '09:00 - 21:00'}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="location-outline" size={16} color="#64748b" />
+            <Text style={styles.detailText} numberOfLines={1}>{item.address}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="call-outline" size={16} color="#64748b" />
+            <Text style={styles.detailText}>{t.contact}: {item.phone}</Text>
+          </View>
         </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="location-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText} numberOfLines={1}>{item.address}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="call-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText}>{t.contact}: {item.phone}</Text>
-        </View>
-      </View>
 
-      <View style={styles.cardFooter}>
-        <Text style={styles.visitText}>{t.visitStore} →</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.cardFooter}>
+          <Text style={[
+            styles.visitText,
+            { color: status.isOpen ? '#2563eb' : '#94a3b8' }
+          ]}>
+            {status.isOpen ? t.visitStore : t.closedToday} {status.isOpen ? '→' : '🔒'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>

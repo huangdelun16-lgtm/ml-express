@@ -38,7 +38,7 @@ const CityMallPage: React.FC = () => {
       region: '所在地区',
       openNow: '正在营业',
       closedNow: '休息中',
-      closedToday: '今日打烊'
+      closedToday: '今日暂停营业'
     },
     en: {
       title: 'City Mall',
@@ -128,24 +128,32 @@ const CityMallPage: React.FC = () => {
     }
   };
 
-  const filteredStores = stores.filter(store => {
-    const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
-      (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase())) ||
-      (store.store_type && store.store_type.toLowerCase().includes(searchText.toLowerCase()));
-    
-    const storeAddr = (store.address || '').toUpperCase();
-    let storeRegion = 'MDY';
-    
-    if (storeAddr.includes('YANGON') || storeAddr.includes('YGN')) storeRegion = 'YGN';
-    else if (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL')) storeRegion = 'POL';
-    else if (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW')) storeRegion = 'NPW';
-    else if (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI')) storeRegion = 'TGI';
-    else if (storeAddr.includes('LASHIO') || storeAddr.includes('LSO')) storeRegion = 'LSO';
-    else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
-    else storeRegion = 'MDY';
+  // 🚀 核心逻辑：过滤并排序店铺（营业中的排在前面，休息中的排在最后）
+  const filteredStores = stores
+    .filter(store => {
+      const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
+        (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase())) ||
+        (store.store_type && store.store_type.toLowerCase().includes(searchText.toLowerCase()));
+      
+      const storeAddr = (store.address || '').toUpperCase();
+      let storeRegion = 'MDY';
+      
+      if (storeAddr.includes('YANGON') || storeAddr.includes('YGN')) storeRegion = 'YGN';
+      else if (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL')) storeRegion = 'POL';
+      else if (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW')) storeRegion = 'NPW';
+      else if (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI')) storeRegion = 'TGI';
+      else if (storeAddr.includes('LASHIO') || storeAddr.includes('LSO')) storeRegion = 'LSO';
+      else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
+      else storeRegion = 'MDY';
 
-    return matchesSearch && storeRegion === selectedRegion;
-  });
+      return matchesSearch && storeRegion === selectedRegion;
+    })
+    .sort((a, b) => {
+      const statusA = checkStoreOpenStatus(a);
+      const statusB = checkStoreOpenStatus(b);
+      if (statusA.isOpen === statusB.isOpen) return 0;
+      return statusA.isOpen ? -1 : 1; // 营业中的排前面
+    });
 
   const getStoreIcon = (type: string) => {
     const t = (type || '').toLowerCase();
@@ -349,137 +357,147 @@ const CityMallPage: React.FC = () => {
             gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
             gap: '2.5rem' 
           }}>
-            {filteredStores.map(store => (
-              <div 
-                key={store.id}
-                onClick={() => navigate(`/mall/${store.id}`)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderRadius: '30px',
-                  padding: '2rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                  boxShadow: '0 10px 20px rgba(0,0,0,0.05)',
-                  position: 'relative',
-                  border: '1px solid rgba(255,255,255,0.8)',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-12px)';
-                  e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
-                  e.currentTarget.style.background = '#ffffff';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.8rem' }}>
-                  <div style={{ 
-                    width: '80px', 
-                    height: '80px', 
-                    borderRadius: '24px', 
-                    background: homeBackground, 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    fontSize: '2.8rem',
-                    marginRight: '1.5rem',
-                    boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                    color: 'white'
-                  }}>
-                    {getStoreIcon(store.store_type)}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ 
-                      fontSize: '1.4rem', 
-                      fontWeight: '900', 
-                      color: '#0f172a', 
-                      marginBottom: '0.6rem',
-                      lineHeight: '1.2'
-                    }}>{store.store_name}</h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                      <span style={{ 
-                        background: '#eff6ff', 
-                        color: '#1e40af', 
-                        fontSize: '0.8rem', 
-                        padding: '0.3rem 0.8rem', 
-                        borderRadius: '10px',
-                        fontWeight: '800',
-                        textTransform: 'uppercase'
-                      }}>
-                        {store.store_type}
-                      </span>
-                      {(() => {
-                        const status = checkStoreOpenStatus(store);
-                        return (
-                          <span style={{ 
-                            background: status.isOpen ? '#dcfce7' : '#fee2e2', 
-                            color: status.isOpen ? '#15803d' : '#ef4444', 
-                            fontSize: '0.8rem', 
-                            padding: '0.3rem 0.8rem', 
-                            borderRadius: '10px',
-                            fontWeight: '800'
-                          }}>
-                            ● {status.isOpen ? 'Open' : (status.reason === 'closed_today' ? 'Closed Today' : 'Closed')}
-                          </span>
-                        );
-                      })()}
+            {filteredStores.map(store => {
+              const status = checkStoreOpenStatus(store);
+              return (
+                <div 
+                  key={store.id}
+                  onClick={() => {
+                    if (!status.isOpen) {
+                      alert(t.closedToday);
+                      return;
+                    }
+                    navigate(`/mall/${store.id}`);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    borderRadius: '30px',
+                    padding: '2rem',
+                    cursor: status.isOpen ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    boxShadow: '0 10px 20px rgba(0,0,0,0.05)',
+                    position: 'relative',
+                    border: '1px solid rgba(255,255,255,0.8)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    opacity: status.isOpen ? 1 : 0.8 // 休息中店铺半透明
+                  }}
+                  onMouseOver={(e) => {
+                    if (status.isOpen) {
+                      e.currentTarget.style.transform = 'translateY(-12px)';
+                      e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
+                      e.currentTarget.style.background = '#ffffff';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (status.isOpen) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.8rem' }}>
+                    <div style={{ 
+                      width: '80px', 
+                      height: '80px', 
+                      borderRadius: '24px', 
+                      background: homeBackground, 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      fontSize: '2.8rem',
+                      marginRight: '1.5rem',
+                      boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                      color: 'white',
+                      filter: status.isOpen ? 'none' : 'grayscale(1)' // 休息中图标变灰
+                    }}>
+                      {getStoreIcon(store.store_type)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ 
+                        fontSize: '1.4rem', 
+                        fontWeight: '900', 
+                        color: status.isOpen ? '#0f172a' : '#64748b', 
+                        marginBottom: '0.6rem',
+                        lineHeight: '1.2'
+                      }}>{store.store_name}</h3>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                        <span style={{ 
+                          background: '#eff6ff', 
+                          color: '#1e40af', 
+                          fontSize: '0.8rem', 
+                          padding: '0.3rem 0.8rem', 
+                          borderRadius: '10px',
+                          fontWeight: '800',
+                          textTransform: 'uppercase'
+                        }}>
+                          {store.store_type}
+                        </span>
+                        <span style={{ 
+                          background: status.isOpen ? '#dcfce7' : '#fee2e2', 
+                          color: status.isOpen ? '#15803d' : '#ef4444', 
+                          fontSize: '0.8rem', 
+                          padding: '0.3rem 0.8rem', 
+                          borderRadius: '10px',
+                          fontWeight: '800'
+                        }}>
+                          ● {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div style={{ 
-                  background: '#f8fafc', 
-                  borderRadius: '20px', 
-                  padding: '1.5rem', 
-                  gap: '1rem', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  marginBottom: '1.8rem',
-                  border: '1px solid #f1f5f9',
-                  opacity: checkStoreOpenStatus(store).isOpen ? 1 : 0.6 // 🚀 休息中店铺半透明
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
-                    <span style={{ fontWeight: '600' }}>{t.operatingHours}:</span>
-                    <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
+                  <div style={{ 
+                    background: '#f8fafc', 
+                    borderRadius: '20px', 
+                    padding: '1.5rem', 
+                    gap: '1rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    marginBottom: '1.8rem',
+                    border: '1px solid #f1f5f9',
+                    opacity: status.isOpen ? 1 : 0.6
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
+                      <span style={{ fontWeight: '600' }}>{t.operatingHours}:</span>
+                      <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
+                      <span style={{ fontWeight: '600' }}>{t.contact}:</span>
+                      <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
+                      <span style={{ 
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis',
+                        color: '#1e293b',
+                        fontWeight: '500',
+                        maxWidth: '180px'
+                      }}>{store.address}</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
-                    <span style={{ fontWeight: '600' }}>{t.contact}:</span>
-                    <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                    <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
-                    <span style={{ 
-                      whiteSpace: 'nowrap', 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis',
-                      color: '#1e293b',
-                      fontWeight: '500',
-                      maxWidth: '180px'
-                    }}>{store.address}</span>
-                  </div>
-                </div>
 
-                <div style={{ 
-                  textAlign: 'right', 
-                  marginTop: 'auto', 
-                  fontWeight: '900', 
-                  color: '#1e40af',
-                  fontSize: '1.2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '0.6rem'
-                }}>
-                  {t.visitStore} <span style={{ fontSize: '1.6rem' }}>→</span>
+                  <div style={{ 
+                    textAlign: 'right', 
+                    marginTop: 'auto', 
+                    fontWeight: '900', 
+                    color: status.isOpen ? '#1e40af' : '#94a3b8',
+                    fontSize: '1.2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '0.6rem'
+                  }}>
+                    {status.isOpen ? t.visitStore : t.closedToday} <span style={{ fontSize: '1.6rem' }}>{status.isOpen ? '→' : '🔒'}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
