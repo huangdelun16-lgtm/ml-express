@@ -112,6 +112,12 @@ export default function ProfileScreen({ navigation }: any) {
     operating_hours: '09:00 - 21:00'
   });
 
+  // 🚀 新增：时间选择器状态
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickingTimeType, setPickingTimeType] = useState<'open' | 'close' | null>(null);
+  const [tempHour, setTempHour] = useState('09');
+  const [tempMinute, setTempMinute] = useState('00');
+
   const isPartnerStore = userType === 'partner';
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -233,6 +239,7 @@ export default function ProfileScreen({ navigation }: any) {
       businessResumed: '已恢复正常营业',
       serviceSuspended: '今日暂停服务设置成功',
       operatingHoursUpdated: '营业时间设置成功',
+      selectTime: '选择时间',
     },
     en: {
       title: 'Profile',
@@ -346,6 +353,7 @@ export default function ProfileScreen({ navigation }: any) {
       businessResumed: 'Business Resumed',
       serviceSuspended: 'Service Suspended for Today',
       operatingHoursUpdated: 'Operating Hours Updated',
+      selectTime: 'Select Time',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -459,6 +467,7 @@ export default function ProfileScreen({ navigation }: any) {
       businessResumed: 'ပုံမှန်အတိုင်း ပြန်လည်ဖွင့်လှစ်ပါပြီ',
       serviceSuspended: 'ယနေ့ ဆိုင်ပိတ်ရန် သတ်မှတ်ပြီးပါပြီ',
       operatingHoursUpdated: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်',
+      selectTime: 'အချိန်ရွေးချယ်ပါ',
     },
   };
 
@@ -560,6 +569,28 @@ export default function ProfileScreen({ navigation }: any) {
       LoggerService.error('更新营业状态失败:', error);
       showToast(language === 'zh' ? '保存异常' : 'Error saving', 'error');
     }
+  };
+
+  // 🚀 新增：打开时间选择器
+  const openTimePicker = (type: 'open' | 'close') => {
+    const currentTime = businessStatus.operating_hours.split(' - ')[type === 'open' ? 0 : 1] || (type === 'open' ? '09:00' : '21:00');
+    const [h, m] = currentTime.split(':');
+    setTempHour(h || '09');
+    setTempMinute(m || '00');
+    setPickingTimeType(type);
+    setShowTimePicker(true);
+  };
+
+  // 🚀 新增：确认时间选择
+  const handleConfirmTime = () => {
+    const newTime = `${tempHour}:${tempMinute}`;
+    const times = businessStatus.operating_hours.split(' - ');
+    if (pickingTimeType === 'open') {
+      setBusinessStatus(prev => ({ ...prev, operating_hours: `${newTime} - ${times[1] || '21:00'}` }));
+    } else {
+      setBusinessStatus(prev => ({ ...prev, operating_hours: `${times[0] || '09:00'} - ${newTime}` }));
+    }
+    setShowTimePicker(false);
   };
 
   const onRefresh = async () => {
@@ -1208,32 +1239,27 @@ export default function ProfileScreen({ navigation }: any) {
 
           {/* 营业时间设置 */}
           <View style={styles.timeSettingsContainer}>
-            <View style={styles.timeInputGroup}>
+            <TouchableOpacity 
+              style={styles.timeInputGroup}
+              onPress={() => openTimePicker('open')}
+            >
               <Text style={styles.timeLabel}>{t.openingTime}</Text>
-              <TextInput
-                style={styles.timeInput}
-                value={businessStatus.operating_hours.split(' - ')[0]}
-                placeholder="09:00"
-                placeholderTextColor="#94a3b8"
-                onChangeText={(text) => {
-                  const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
-                  setBusinessStatus(prev => ({ ...prev, operating_hours: `${text} - ${end}` }));
-                }}
-              />
-            </View>
-            <View style={styles.timeInputGroup}>
+              <View style={styles.timeDisplayBox}>
+                <Text style={styles.timeDisplayText}>{businessStatus.operating_hours.split(' - ')[0]}</Text>
+                <Ionicons name="time-outline" size={18} color="#3b82f6" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.timeInputGroup}
+              onPress={() => openTimePicker('close')}
+            >
               <Text style={styles.timeLabel}>{t.closingTime}</Text>
-              <TextInput
-                style={styles.timeInput}
-                value={businessStatus.operating_hours.split(' - ')[1] || ''}
-                placeholder="21:00"
-                placeholderTextColor="#94a3b8"
-                onChangeText={(text) => {
-                  const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
-                  setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${text}` }));
-                }}
-              />
-            </View>
+              <View style={styles.timeDisplayBox}>
+                <Text style={styles.timeDisplayText}>{businessStatus.operating_hours.split(' - ')[1] || '21:00'}</Text>
+                <Ionicons name="time-outline" size={18} color="#3b82f6" />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* 保存按钮 */}
@@ -1450,6 +1476,67 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.footerVersion}>v{appVersion}</Text>
         </View>
       </ScrollView>
+
+      {/* 🚀 新增：自定义时间选择器模态框 */}
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 340, padding: 0 }]}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>{t.selectTime}</Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', padding: 20, justifyContent: 'center', alignItems: 'center' }}>
+              {/* 小时选择 */}
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <ScrollView 
+                  showsVerticalScrollIndicator={false} 
+                  style={{ height: 150 }}
+                  contentContainerStyle={{ paddingVertical: 60 }}
+                  snapToInterval={30}
+                >
+                  {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
+                    <TouchableOpacity key={h} onPress={() => setTempHour(h)} style={{ height: 30, justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 20, fontWeight: tempHour === h ? '900' : '400', color: tempHour === h ? '#3b82f6' : '#94a3b8' }}>{h}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <Text style={{ fontSize: 24, fontWeight: 'bold', marginHorizontal: 10 }}>:</Text>
+
+              {/* 分钟选择 */}
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <ScrollView 
+                  showsVerticalScrollIndicator={false} 
+                  style={{ height: 150 }}
+                  contentContainerStyle={{ paddingVertical: 60 }}
+                  snapToInterval={30}
+                >
+                  {['00', '15', '30', '45'].map(m => (
+                    <TouchableOpacity key={m} onPress={() => setTempMinute(m)} style={{ height: 30, justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 20, fontWeight: tempMinute === m ? '900' : '400', color: tempMinute === m ? '#3b82f6' : '#94a3b8' }}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+
+            <View style={[styles.modalButtons, { padding: 16, borderTopWidth: 1, borderTopColor: '#eee' }]}>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => setShowTimePicker(false)}>
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalButtonConfirm]} onPress={handleConfirmTime}>
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>{t.confirm}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 编辑资料模态框 */}
       <Modal
@@ -2675,16 +2762,21 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 4,
   },
-  timeInput: {
+  timeDisplayBox: {
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    padding: 10,
-    fontSize: 15,
-    fontWeight: 'bold',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  timeDisplayText: {
+    fontSize: 16,
+    fontWeight: '900',
     color: theme.colors.text.primary,
-    textAlign: 'center',
   },
   businessSaveButton: {
     marginTop: 8,
