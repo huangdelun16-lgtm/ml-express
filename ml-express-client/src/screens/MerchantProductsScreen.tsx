@@ -384,16 +384,19 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     
     return (
       <TouchableOpacity 
-        style={[styles.productCard, { width: (width - 48) / 2 }]}
+        style={[
+          styles.productCard, 
+          isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' }
+        ]}
         onPress={() => !isReadOnly && handleOpenEditProduct(item)}
         activeOpacity={isReadOnly ? 1 : 0.7}
       >
-        <View style={styles.productImageContainer}>
+        <View style={isReadOnly ? styles.productImageContainerGrid : styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
             <Image source={{ uri: item.image_url }} style={styles.productImage} />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <Ionicons name="image-outline" size={24} color="#cbd5e1" />
+              <Ionicons name="image-outline" size={isReadOnly ? 24 : 32} color="#cbd5e1" />
             </View>
           )}
           {!item.is_available && (
@@ -406,12 +409,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
+          
           <View style={styles.stockRow}>
-            <Ionicons name="cube-outline" size={12} color="#64748b" />
+            <Ionicons name="cube-outline" size={14} color="#64748b" />
             <Text style={styles.productStock}>
-              {item.stock === -1 ? currentT.infinite : item.stock}
+              {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
             </Text>
           </View>
+
+          {/* 管理模式下显示状态文字 */}
+          {!isReadOnly && (
+            <View style={[styles.statusIndicator, { backgroundColor: item.is_available ? '#dcfce7' : '#fee2e2' }]}>
+              <Text style={[styles.statusText, { color: item.is_available ? '#15803d' : '#ef4444' }]}>
+                {item.is_available ? currentT.available : currentT.unavailable}
+              </Text>
+            </View>
+          )}
 
           {isReadOnly && item.is_available && (
             <View style={styles.customerActionContainer}>
@@ -442,8 +455,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               onValueChange={() => toggleProductStatus(item)}
               trackColor={{ false: '#cbd5e1', true: '#10b981' }}
               thumbColor="#ffffff"
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
+            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" style={{ marginTop: 8 }} />
           </View>
         )}
       </TouchableOpacity>
@@ -493,9 +506,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           </View>
         ) : (
           <FlatList
+            key={isReadOnly ? 'grid' : 'list'}
             data={products}
             keyExtractor={(item) => item.id}
             renderItem={renderProductItem}
+            numColumns={isReadOnly ? 2 : 1}
+            columnWrapperStyle={isReadOnly ? { justifyContent: 'space-between' } : null}
             contentContainerStyle={[styles.listContent, isReadOnly && { paddingBottom: 100 }]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
@@ -734,14 +750,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 12,
     ...theme.shadows.small,
   },
-  productImageContainer: {
-    width: 70,
-    height: 70,
+  productImageContainerGrid: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  productImageContainerList: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
     backgroundColor: '#f1f5f9',
     overflow: 'hidden',
@@ -773,16 +796,16 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
   },
   productName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 4,
   },
   productPrice: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#10b981',
     fontWeight: '700',
     marginBottom: 4,
@@ -791,14 +814,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginBottom: 4,
   },
   productStock: {
     fontSize: 12,
     color: '#64748b',
   },
+  statusIndicator: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   productActions: {
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    paddingLeft: 12,
   },
   editBtn: {
     padding: 8,
