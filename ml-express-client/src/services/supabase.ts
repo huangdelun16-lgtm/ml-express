@@ -615,6 +615,23 @@ export const deliveryStoreService = {
       LoggerService.error('获取店铺详情失败:', error);
       return null;
     }
+  },
+
+  async updateStoreInfo(storeId: string, updates: any) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .update(updates)
+        .eq('id', storeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商店信息失败:', error);
+      return { success: false, error };
+    }
   }
 };
 

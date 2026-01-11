@@ -21,7 +21,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
-import { customerService, packageService } from '../services/supabase';
+import { customerService, packageService, deliveryStoreService } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
@@ -103,6 +103,13 @@ export default function ProfileScreen({ navigation }: any) {
     pushNotifications: true,   // 推送通知总开关
     emailNotifications: false, // 邮件通知
     smsNotifications: false,   // 短信通知
+  });
+
+  // 🚀 新增：商家店铺信息和营业状态
+  const [storeInfo, setStoreInfo] = useState<any>(null);
+  const [businessStatus, setBusinessStatus] = useState({
+    is_closed_today: false,
+    operating_hours: '09:00 - 21:00'
   });
 
   const isPartnerStore = userType === 'partner';
@@ -216,6 +223,16 @@ export default function ProfileScreen({ navigation }: any) {
       shoppingCart: '购物车',
       mallDesc: '浏览并购买同城优质商品',
       cartDesc: '查看已选择的商品并结算',
+      // 🚀 营业管理相关
+      businessManagement: '营业状态管理',
+      operatingHours: '营业时间设置',
+      closedToday: '今日暂停营业',
+      openingTime: '开门时间',
+      closingTime: '打烊时间',
+      statusUpdated: '营业状态已更新',
+      businessResumed: '已恢复正常营业',
+      serviceSuspended: '今日暂停服务设置成功',
+      operatingHoursUpdated: '营业时间设置成功',
     },
     en: {
       title: 'Profile',
@@ -319,6 +336,16 @@ export default function ProfileScreen({ navigation }: any) {
       shoppingCart: 'Cart',
       mallDesc: 'Browse and buy local products',
       cartDesc: 'View and checkout your items',
+      // 🚀 Business management related
+      businessManagement: 'Business Status',
+      operatingHours: 'Operating Hours',
+      closedToday: 'Closed Today',
+      openingTime: 'Opening Time',
+      closingTime: 'Closing Time',
+      statusUpdated: 'Status Updated',
+      businessResumed: 'Business Resumed',
+      serviceSuspended: 'Service Suspended for Today',
+      operatingHoursUpdated: 'Operating Hours Updated',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -422,6 +449,16 @@ export default function ProfileScreen({ navigation }: any) {
       shoppingCart: 'ဈေးဝယ်လှည်း',
       mallDesc: 'ဒေသတွင်း ကုန်ပစ္စည်းများကို ကြည့်ရှုဝယ်ယူပါ',
       cartDesc: 'ရွေးချယ်ထားသောပစ္စည်းများကို ကြည့်ရှုစစ်ဆေးပါ',
+      // 🚀 ဆိုင်စီမံခန့်ခွဲမှု ဆက်စပ်ဘာသာပြန်များ
+      businessManagement: 'ဆိုင်ဖွင့်လှစ်မှု အခြေအနေ',
+      operatingHours: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်ချက်',
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
+      openingTime: 'ဆိုင်ဖွင့်ချိန်',
+      closingTime: 'ဆိုင်ပိတ်ချိန်',
+      statusUpdated: 'အခြေအနေ ပြောင်းလဲပြီးပါပြီ',
+      businessResumed: 'ပုံမှန်အတိုင်း ပြန်လည်ဖွင့်လှစ်ပါပြီ',
+      serviceSuspended: 'ယနေ့ ဆိုင်ပိတ်ရန် သတ်မှတ်ပြီးပါပြီ',
+      operatingHoursUpdated: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်',
     },
   };
 
@@ -463,6 +500,20 @@ export default function ProfileScreen({ navigation }: any) {
         if (detectedUserType === 'partner') {
           storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
           
+          // 🚀 加载店铺详细信息
+          try {
+            const { data: store, error } = await deliveryStoreService.getStoreById(user.id);
+            if (!error && store) {
+              setStoreInfo(store);
+              setBusinessStatus({
+                is_closed_today: store.is_closed_today || false,
+                operating_hours: store.operating_hours || '09:00 - 21:00'
+              });
+            }
+          } catch (error) {
+            LoggerService.error('加载店铺详情失败:', error);
+          }
+
           // 加载合伙店铺代收款统计
           try {
             const codStats = await packageService.getPartnerStats(user.id, storeName, selectedMonth);
@@ -483,6 +534,31 @@ export default function ProfileScreen({ navigation }: any) {
       }
     } catch (error) {
       LoggerService.error('加载用户数据失败:', error);
+    }
+  };
+
+  // 🚀 新增：更新店铺营业状态
+  const handleUpdateStoreStatus = async (updates: any) => {
+    if (!userId || !isPartnerStore) return;
+    try {
+      const result = await deliveryStoreService.updateStoreInfo(userId, updates);
+      if (result.success) {
+        setStoreInfo(result.data);
+        
+        // 提示逻辑
+        if (updates.is_closed_today !== undefined && updates.is_closed_today !== storeInfo?.is_closed_today) {
+          showToast(updates.is_closed_today ? t.serviceSuspended : t.businessResumed, 'success');
+        } else if (updates.operating_hours) {
+          showToast(t.operatingHoursUpdated, 'success');
+        } else {
+          showToast(t.statusUpdated, 'success');
+        }
+      } else {
+        showToast(language === 'zh' ? '保存失败' : 'Save failed', 'error');
+      }
+    } catch (error) {
+      LoggerService.error('更新营业状态失败:', error);
+      showToast(language === 'zh' ? '保存异常' : 'Error saving', 'error');
     }
   };
 
@@ -1095,6 +1171,89 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 
+  const renderBusinessManagement = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t.businessManagement}</Text>
+      <View style={styles.businessCard}>
+        <View style={styles.businessHeader}>
+          <View style={styles.businessIconContainer}>
+            <Text style={styles.businessIcon}>⏰</Text>
+          </View>
+          <View style={styles.businessHeaderText}>
+            <Text style={styles.businessTitle}>{t.operatingHours}</Text>
+            <Text style={styles.businessDesc}>设置每日营业时间及今日状态</Text>
+          </View>
+        </View>
+
+        <View style={styles.businessActions}>
+          {/* 今日暂停营业开关 */}
+          <View style={styles.businessRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.businessRowLabel}>{t.closedToday}</Text>
+              <Text style={styles.businessRowDesc}>开启后用户将看到“休息中”</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }))}
+              style={[
+                styles.toggleContainer,
+                { backgroundColor: businessStatus.is_closed_today ? '#ef4444' : '#d1d5db' }
+              ]}
+            >
+              <View style={[
+                styles.toggleCircle,
+                { transform: [{ translateX: businessStatus.is_closed_today ? 24 : 2 }] }
+              ]} />
+            </TouchableOpacity>
+          </View>
+
+          {/* 营业时间设置 */}
+          <View style={styles.timeSettingsContainer}>
+            <View style={styles.timeInputGroup}>
+              <Text style={styles.timeLabel}>{t.openingTime}</Text>
+              <TextInput
+                style={styles.timeInput}
+                value={businessStatus.operating_hours.split(' - ')[0]}
+                placeholder="09:00"
+                placeholderTextColor="#94a3b8"
+                onChangeText={(text) => {
+                  const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                  setBusinessStatus(prev => ({ ...prev, operating_hours: `${text} - ${end}` }));
+                }}
+              />
+            </View>
+            <View style={styles.timeInputGroup}>
+              <Text style={styles.timeLabel}>{t.closingTime}</Text>
+              <TextInput
+                style={styles.timeInput}
+                value={businessStatus.operating_hours.split(' - ')[1] || ''}
+                placeholder="21:00"
+                placeholderTextColor="#94a3b8"
+                onChangeText={(text) => {
+                  const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                  setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${text}` }));
+                }}
+              />
+            </View>
+          </View>
+
+          {/* 保存按钮 */}
+          <TouchableOpacity 
+            style={styles.businessSaveButton}
+            onPress={() => handleUpdateStoreStatus(businessStatus)}
+          >
+            <LinearGradient
+              colors={['#10b981', '#059669']}
+              style={styles.businessSaveGradient}
+            >
+              <Ionicons name="save-outline" size={20} color="white" style={{ marginRight: 8 }} />
+              <Text style={styles.businessSaveText}>{t.save}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
   const renderQuickActions = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t.quickActions}</Text>
@@ -1272,6 +1431,7 @@ export default function ProfileScreen({ navigation }: any) {
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
         {!isGuest && userType === 'partner' && renderPartnerCODStats()}
+        {!isGuest && userType === 'partner' && renderBusinessManagement()}
         {!isGuest && userType === 'partner' && renderMerchantServices()}
         {renderQuickActions()}
         {renderSettings()}
@@ -2424,6 +2584,124 @@ const styles = StyleSheet.create({
   merchantDesc: {
     fontSize: 12,
     color: theme.colors.text.secondary,
+  },
+  // 🚀 营业管理样式
+  businessCard: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    ...theme.shadows.medium,
+  },
+  businessHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 15,
+  },
+  businessIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  businessIcon: {
+    fontSize: 24,
+  },
+  businessHeaderText: {
+    flex: 1,
+  },
+  businessTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  businessDesc: {
+    fontSize: 12,
+    color: theme.colors.text.tertiary,
+  },
+  businessActions: {
+    gap: 16,
+  },
+  businessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 16,
+  },
+  businessRowLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 2,
+  },
+  businessRowDesc: {
+    fontSize: 11,
+    color: theme.colors.text.tertiary,
+  },
+  toggleContainer: {
+    width: 50,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'white',
+    ...theme.shadows.small,
+  },
+  timeSettingsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeInputGroup: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  timeInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 10,
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+  },
+  businessSaveButton: {
+    marginTop: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...theme.shadows.small,
+  },
+  businessSaveGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  businessSaveText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
