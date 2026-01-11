@@ -1382,7 +1382,7 @@ const ProfilePage: React.FC = () => {
           </div>
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
-          {isPartnerStore && (
+          {isPartnerStore && storeInfo && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 350px',
