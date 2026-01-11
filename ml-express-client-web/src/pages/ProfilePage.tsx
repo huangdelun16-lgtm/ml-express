@@ -236,7 +236,15 @@ const ProfilePage: React.FC = () => {
       const result = await deliveryStoreService.updateStoreInfo(storeInfo.id, updates);
       if (result.success) {
         setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
-        alert(t.statusUpdated);
+        // 🚀 优化：根据状态显示不同的通知
+        if (updates.is_closed_today !== undefined) {
+          alert(updates.is_closed_today 
+            ? (language === 'zh' ? '今日暂停服务已开启' : language === 'en' ? 'Service suspended today' : 'ယနေ့ ဝန်ဆောင်မှု ရပ်နားထားပါသည်')
+            : (language === 'zh' ? '营业状态已恢复' : language === 'en' ? 'Business resumed' : 'လုပ်ငန်း ပြန်လည်စတင်ပါပြီ')
+          );
+        } else {
+          alert(language === 'zh' ? '营业时间设置成功' : language === 'en' ? 'Operating hours set successfully' : 'ဖွင့်လှစ်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်');
+        }
       }
     } catch (error) {
       LoggerService.error('更新营业状态失败:', error);
@@ -1107,7 +1115,7 @@ const ProfilePage: React.FC = () => {
                     onClick={() => setShowProductsModal(true)}
                     style={{
                       background: 'rgba(16, 185, 129, 0.1)',
-                      color: '#10b981',
+                      color: 'white',
                       border: '1px solid rgba(16, 185, 129, 0.3)',
                       padding: '0.6rem 1.5rem',
                       borderRadius: '14px',
@@ -1544,10 +1552,10 @@ const ProfilePage: React.FC = () => {
                 }}>
                   {/* 本月已结清 */}
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(0, 0, 0, 0.3)',
                     padding: '2.5rem 2rem',
                     borderRadius: '35px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1.2rem',
@@ -1572,10 +1580,10 @@ const ProfilePage: React.FC = () => {
 
                   {/* 待结清金额 */}
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(0, 0, 0, 0.3)',
                     padding: '2.5rem 2rem',
                     borderRadius: '35px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1.2rem',
