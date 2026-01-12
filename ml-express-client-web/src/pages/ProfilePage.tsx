@@ -645,6 +645,7 @@ const ProfilePage: React.FC = () => {
       openingTime: '开门时间',
       closingTime: '打烊时间',
       statusUpdated: '营业状态已更新',
+      lastUpdated: '最后更改时间',
     },
     en: {
       nav: {
@@ -723,6 +724,7 @@ const ProfilePage: React.FC = () => {
       openingTime: 'Opening Time',
       closingTime: 'Closing Time',
       statusUpdated: 'Business status updated',
+      lastUpdated: 'Last Updated',
     },
     my: {
       nav: {
@@ -801,6 +803,7 @@ const ProfilePage: React.FC = () => {
       openingTime: 'ဆိုင်ဖွင့်ချိန်',
       closingTime: 'ဆိုင်ပိတ်ချိန်',
       statusUpdated: 'ဆိုင်အခြေအနေ ပြောင်းလဲပြီးပါပြီ',
+      lastUpdated: 'နောက်ဆုံးပြင်ဆင်ချိန်',
     }
   };
 
@@ -1661,7 +1664,19 @@ const ProfilePage: React.FC = () => {
                     fontSize: '2rem',
                     boxShadow: '0 10px 20px rgba(239, 68, 68, 0.4)'
                   }}>⏰</div>
-                  <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{t.businessManagement}</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{t.businessManagement}</h3>
+                    {storeInfo?.updated_at && (
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>
+                        ⏱️ {t.lastUpdated}: {new Date(storeInfo.updated_at).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

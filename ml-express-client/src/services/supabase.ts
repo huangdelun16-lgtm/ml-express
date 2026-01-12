@@ -44,6 +44,24 @@ export interface User {
 // 客户接口（兼容旧代码）
 export interface Customer extends User {}
 
+// 商店接口
+export interface DeliveryStore {
+  id: string;
+  store_name: string;
+  store_code?: string;
+  address: string;
+  phone: string;
+  manager_phone?: string;
+  store_type: string;
+  status: string;
+  operating_hours?: string;
+  is_closed_today?: boolean;
+  latitude?: number;
+  longitude?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 包裹接口
 export interface Package {
   id: string;

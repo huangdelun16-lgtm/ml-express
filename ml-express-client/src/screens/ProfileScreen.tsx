@@ -259,6 +259,7 @@ export default function ProfileScreen({ navigation }: any) {
       serviceSuspended: '今日暂停服务设置成功',
       operatingHoursUpdated: '营业时间设置成功',
       selectTime: '选择时间',
+      lastUpdated: '最后更改时间',
     },
     en: {
       title: 'Profile',
@@ -373,6 +374,7 @@ export default function ProfileScreen({ navigation }: any) {
       serviceSuspended: 'Service Suspended for Today',
       operatingHoursUpdated: 'Operating Hours Updated',
       selectTime: 'Select Time',
+      lastUpdated: 'Last Updated',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -487,6 +489,7 @@ export default function ProfileScreen({ navigation }: any) {
       serviceSuspended: 'ယနေ့ ဆိုင်ပိတ်ရန် သတ်မှတ်ပြီးပါပြီ',
       operatingHoursUpdated: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်',
       selectTime: 'အချိန်ရွေးချယ်ပါ',
+      lastUpdated: 'နောက်ဆုံးပြင်ဆင်ချိန်',
     },
   };
 
@@ -1246,7 +1249,11 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
           <View style={styles.businessHeaderText}>
             <Text style={styles.businessTitle}>{t.operatingHours}</Text>
-            <Text style={styles.businessDesc}>设置每日营业时间及今日状态</Text>
+            {storeInfo?.updated_at && (
+              <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                ⏱️ {t.lastUpdated}: {formatDateTime(storeInfo.updated_at)}
+              </Text>
+            )}
           </View>
         </View>
 

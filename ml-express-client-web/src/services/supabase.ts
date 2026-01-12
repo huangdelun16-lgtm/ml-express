@@ -746,6 +746,7 @@ export interface DeliveryStore {
   latitude?: number;
   longitude?: number;
   created_at?: string;
+  updated_at?: string; // 🚀 新增：最后更改时间
 }
 
 // 快递网点/商店服务
