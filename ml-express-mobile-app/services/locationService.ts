@@ -6,6 +6,11 @@ import { Platform, Alert } from 'react-native';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
+// 🚀 坐标平滑处理状态
+let lastLat = 0;
+let lastLng = 0;
+const SMOOTHING_FACTOR = 0.35; // 卡尔曼滤波简易版系数：越小越平滑，越大越实时
+
 /**
  * 定义后台任务
  */
@@ -18,8 +23,25 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
     const { locations } = data;
     const location = locations[0];
     if (location) {
-      // console.log('📍 收到后台位置更新:', location.coords);
-      await saveLocationToSupabase(location.coords.latitude, location.coords.longitude);
+      let { latitude, longitude } = location.coords;
+      const speed = location.coords.speed || 0; // 米/秒
+
+      // 1. 🚀 坐标平滑算法 (Simple Low-pass Filter)
+      if (lastLat === 0) {
+        lastLat = latitude;
+        lastLng = longitude;
+      } else {
+        latitude = lastLat + SMOOTHING_FACTOR * (latitude - lastLat);
+        longitude = lastLng + SMOOTHING_FACTOR * (longitude - lastLng);
+        lastLat = latitude;
+        lastLng = longitude;
+      }
+
+      // 2. 🚀 动态上报频率补偿
+      // 如果速度极低（静止），跳过更新以省电；如果正在移动，执行保存
+      const isMoving = speed > 0.5; // 大约 1.8km/h 以上视为移动
+      
+      await saveLocationToSupabase(latitude, longitude, isMoving);
     }
   }
 });
@@ -27,7 +49,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
 /**
  * 保存位置到 Supabase
  */
-async function saveLocationToSupabase(latitude: number, longitude: number) {
+async function saveLocationToSupabase(latitude: number, longitude: number, isMoving: boolean) {
   try {
     const courierId = await AsyncStorage.getItem('currentCourierId');
     if (!courierId) return;
@@ -37,10 +59,11 @@ async function saveLocationToSupabase(latitude: number, longitude: number) {
     const now = Date.now();
     const lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr) : 0;
 
-    // 至少间隔 30 秒更新一次数据库（前台/后台模式下）
-    if (now - lastUpdate < 30 * 1000) return;
+    // 🚀 动态间隔：高速移动时 10s 更新，静止时 60s 更新
+    const minInterval = isMoving ? 10 * 1000 : 60 * 1000;
+    if (now - lastUpdate < minInterval) return;
 
-    // 🚀 核心修复：更新 courier_locations 表，而不是 couriers 表中的不存在字段
+    // 更新 courier_locations 表
     const { error: locError } = await supabase
       .from('courier_locations')
       .upsert({
@@ -48,7 +71,7 @@ async function saveLocationToSupabase(latitude: number, longitude: number) {
         latitude,
         longitude,
         last_update: new Date().toISOString(),
-        status: 'active'
+        status: isMoving ? 'active' : 'static'
       }, { onConflict: 'courier_id' });
 
     if (locError) {
@@ -64,7 +87,7 @@ async function saveLocationToSupabase(latitude: number, longitude: number) {
       .eq('id', courierId);
 
     await AsyncStorage.setItem('last_location_update_time', now.toString());
-    console.log('📍 位置同步成功:', { latitude, longitude });
+    // console.log(`📍 位置同步成功 (${isMoving ? '移动' : '静止'}):`, { latitude, longitude });
   } catch (err) {
     // console.error('位置同步异常:', err);
   }
@@ -134,17 +157,19 @@ export const locationService = {
     }
 
     await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-      accuracy: Location.Accuracy.Balanced,
-      timeInterval: 60000,
-      distanceInterval: 50,
+      accuracy: Location.Accuracy.BestForNavigation, // 🚀 升级为导航最高精度
+      timeInterval: 5000, // 🚀 缩短至 5 秒采集一次，处理动态频率逻辑
+      distanceInterval: 10, // 🚀 缩短至 10 米位移触发
       foregroundService: {
-        notificationTitle: "ML Express 配送员助手",
-        notificationBody: "正在为您提供实时的位置同步与派单服务",
-        notificationColor: "#2c5282",
+        notificationTitle: "ML Express 配送员助手正在运行",
+        notificationBody: "保持后台运行以接收新订单并记录配送轨迹",
+        notificationColor: "#3b82f6",
       },
       pausesUpdatesAutomatically: false,
+      deferredUpdatesInterval: 5000,
+      deferredUpdatesDistance: 10,
     });
-    console.log('🚀 后台位置追踪已启动');
+    console.log('🚀 后台位置追踪已启动 (最高精度导航模式)');
   },
 
   /**

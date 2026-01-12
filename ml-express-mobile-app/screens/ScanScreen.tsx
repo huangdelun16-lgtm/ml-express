@@ -701,7 +701,10 @@ export default function ScanScreen({ navigation }: any) {
                   console.error('相机挂载错误:', error);
                   setCameraError('相机无法启动，请检查设备权限或重启应用');
                 }}
-              >
+              />
+              
+              {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
+              <View style={styles.overlayContainer}>
                 {/* 遮罩层 */}
                 <View style={styles.maskContainer}>
                   <View style={styles.maskRow}>
@@ -740,7 +743,8 @@ export default function ScanScreen({ navigation }: any) {
                     <View style={styles.maskCell} />
                   </View>
                 </View>
-              </CameraView>
+              </View>
+
               {cameraError && (
                 <View style={styles.cameraErrorOverlay}>
                   <View style={styles.cameraErrorCard}>
@@ -787,23 +791,11 @@ export default function ScanScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* 提示信息 */}
+          {/* 提示信息 - 仅在处理中或扫描成功后显示，移除默认的“对准扫描框”卡片 */}
+          {(scanned || isProcessing) && (
           <View style={styles.instructions}>
             <View style={styles.instructionCard}>
-              {!scanned && !isProcessing ? (
-                <>
-                  <Text style={styles.instructionEmoji}>🎯</Text>
-                  <Text style={styles.instructionTitle}>{t.alignFrame}</Text>
-                  <Text style={styles.instructionText}>
-                    {t.alignFrameDesc}
-                  </Text>
-                  <View style={styles.supportedFormats}>
-                    <Text style={styles.formatBadge}>{t.qrCode}</Text>
-                    <Text style={styles.formatBadge}>{t.barcode}</Text>
-                    <Text style={styles.formatBadge}>{t.transferCode}</Text>
-                  </View>
-                </>
-              ) : isProcessing ? (
+                {isProcessing ? (
                 <>
                   <Text style={styles.instructionEmoji}>⏳</Text>
                   <Text style={styles.instructionTitle}>{t.processing}</Text>
@@ -830,6 +822,7 @@ export default function ScanScreen({ navigation }: any) {
               )}
             </View>
           </View>
+          )}
         </View>
       ) : (
         /* 手动输入界面 */
@@ -909,6 +902,15 @@ const baseStyles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   maskContainer: {
     flex: 1,

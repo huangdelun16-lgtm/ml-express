@@ -29,6 +29,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { geofenceService } from '../services/geofenceService';
 
 interface Package {
   id: string;
@@ -83,6 +84,10 @@ const MyTasksScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+
+  // 🚀 地理围栏与实时距离状态
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [arrivedMerchantId, setArrivedMerchantId] = useState<string | null>(null);
 
   // 按日期分组包裹
   const groupPackagesByDate = (packages: Package[]) => {
@@ -162,7 +167,83 @@ const MyTasksScreen: React.FC = () => {
   useEffect(() => {
     loadMyPackages();
     loadCurrentCourierInfo();
+
+    // 🚀 启动前台高精度定位监听，用于自动签到和送达判定
+    let locationSubscription: any = null;
+    const startLocationWatch = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        (location) => {
+          setCurrentLocation(location);
+        }
+      );
+    };
+
+    startLocationWatch();
+
+    return () => {
+      if (locationSubscription) locationSubscription.remove();
+    };
   }, []);
+
+  // 🚀 自动地理围栏触发逻辑
+  useEffect(() => {
+    if (!currentLocation || packages.length === 0) return;
+
+    packages.forEach(pkg => {
+      // 1. 到达商家自动签到 (100米内)
+      if (pkg.status === '待取件' || pkg.status === '待收款') {
+        const dist = calculateDistance(
+          currentLocation.coords.latitude,
+          currentLocation.coords.longitude,
+          (pkg as any).sender_latitude,
+          (pkg as any).sender_longitude
+        );
+        
+        if (dist <= 100 && arrivedMerchantId !== pkg.id) {
+          setArrivedMerchantId(pkg.id);
+          Vibration.vibrate(400);
+          
+          // 使用语音播报提醒到达
+          const speakText = language === 'my' ? 'ပစ္စည်းယူမည့်နေရာသို့ ရောက်ရှိပါပြီ' : 
+                           language === 'en' ? 'Arrived at pickup location.' : 
+                           '已到达取件地点';
+          Speech.speak(speakText, { language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN' });
+
+          Alert.alert(
+            '📍 到达商家',
+            `您已进入订单 ${pkg.id} 的取件区域（100米内），是否立即进行扫码取件？`,
+            [
+              { text: '稍后', style: 'cancel' },
+              { text: '立即取件', onPress: () => handlePackagePress(pkg) }
+            ]
+          );
+        }
+      }
+    });
+  }, [currentLocation, packages]);
+
+  // 距离计算辅助函数
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+    const R = 6371e3;
+    const p1 = lat1 * Math.PI/180;
+    const p2 = lat2 * Math.PI/180;
+    const dp = (lat2-lat1) * Math.PI/180;
+    const dl = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(dp/2) * Math.sin(dp/2) +
+              Math.cos(p1) * Math.cos(p2) *
+              Math.sin(dl/2) * Math.sin(dl/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
 
   const loadCurrentCourierInfo = async () => {
     try {
@@ -864,23 +945,43 @@ const MyTasksScreen: React.FC = () => {
                   style={[styles.uploadButtonFixed, uploadingPhoto && styles.disabledBtn]}
                   disabled={uploadingPhoto}
                 >
-                  <LinearGradient
-                    colors={uploadingPhoto ? ['#9ca3af', '#6b7280'] : ['#10b981', '#059669']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.uploadButtonGradientFixed}
-                  >
-                    {uploadingPhoto ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    )}
-                    <Text style={styles.uploadButtonTextFixed}>
-                      {uploadingPhoto 
-                        ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
-                        : (language === 'zh' ? '确认送达' : 'Confirm')}
-                    </Text>
-                  </LinearGradient>
+                  {(() => {
+                    const dist = calculateDistance(
+                      currentLocation?.coords.latitude || 0,
+                      currentLocation?.coords.longitude || 0,
+                      (selectedPackage as any).receiver_latitude,
+                      (selectedPackage as any).receiver_longitude
+                    );
+                    const isWithinRange = dist <= 50;
+                    
+                    return (
+                      <LinearGradient
+                        colors={uploadingPhoto 
+                          ? ['#9ca3af', '#6b7280'] 
+                          : (isWithinRange ? ['#22c55e', '#15803d'] : ['#10b981', '#059669'])
+                        }
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[
+                          styles.uploadButtonGradientFixed,
+                          isWithinRange && { borderWidth: 2, borderColor: '#fff' }
+                        ]}
+                      >
+                        {uploadingPhoto ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Ionicons name={isWithinRange ? "location" : "checkmark-circle"} size={20} color="#fff" />
+                        )}
+                        <Text style={[styles.uploadButtonTextFixed, isWithinRange && { fontSize: 18, fontWeight: '900' }]}>
+                          {uploadingPhoto 
+                            ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
+                            : (isWithinRange 
+                                ? (language === 'zh' ? '🎯 在范围内，确认送达' : '🎯 In Range, Confirm')
+                                : (language === 'zh' ? '确认送达' : 'Confirm'))}
+                        </Text>
+                      </LinearGradient>
+                    );
+                  })()}
                 </TouchableOpacity>
               </View>
             </View>

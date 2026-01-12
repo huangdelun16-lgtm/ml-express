@@ -164,7 +164,9 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
             barcodeScannerSettings={{
               barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39'],
             }}
-          >
+          />
+          {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
+          <View style={styles.overlayContainer}>
             <View style={styles.overlay}>
               <View style={styles.unfocusedContainer}></View>
               <View style={styles.middleContainer}>
@@ -181,7 +183,7 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
               </View>
               <View style={styles.unfocusedContainer}></View>
             </View>
-          </CameraView>
+          </View>
         </View>
 
         {/* 底部信息 */}
@@ -311,6 +313,14 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
   },
   overlay: {
     flex: 1,

@@ -380,7 +380,7 @@ const FinanceManagement: React.FC = () => {
     
     return '—';
   };
-
+  
   // 根据时间周期获取天数
   const getDaysFromPeriod = (period: typeof timePeriod): number | null => {
     switch (period) {

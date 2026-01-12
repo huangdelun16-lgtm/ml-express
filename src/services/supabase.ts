@@ -155,7 +155,7 @@ export interface DeliveryStore {
   email?: string;
   manager_name: string;
   manager_phone: string;
-  store_type: 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other';
+  store_type: 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station';
   status: 'active' | 'inactive' | 'maintenance';
   operating_hours: string;
   service_area_radius: number;
@@ -402,21 +402,7 @@ export const packageService = {
     }
     
     console.log('✅ 包裹状态更新成功');
-
-    // 🚀 新增：发送推送通知给骑手（如果分配了骑手）
-    if (courierName) {
-      try {
-        notificationService.sendPushNotificationToCourier(
-          courierName,
-          '📦 您有新的订单分配',
-          `订单号: ${id} 已分配给您，请及时处理。`,
-          { packageId: id }
-        ).catch(err => console.warn('后台发送通知失败:', err));
-      } catch (notifyError) {
-        console.warn('触发布送通知异常:', notifyError);
-      }
-    }
-
+    
     // 🚀 新增：自动记录审计日志 (Admin Web)
     try {
       const currentUserId = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'admin_system';
@@ -965,18 +951,6 @@ export const trackingService = {
       // 开始模拟骑手移动
       await this.simulateCourierMovement(courierId, packageId);
 
-      // 🚀 新增：发送推送通知给骑手
-      try {
-        await notificationService.sendPushNotificationToCourier(
-          courierId, // 这里传的是骑手姓名
-          '📦 您有新的订单分配',
-          `订单号: ${packageId} 已分配给您，请及时处理。`,
-          { packageId }
-        );
-      } catch (notifyError) {
-        console.warn('发送骑手通知失败:', notifyError);
-      }
-
       return true;
     } catch (error) {
       console.error('分配骑手并开始跟踪失败:', error);
@@ -1172,82 +1146,6 @@ export interface Notification {
 
 // 通知服务
 export const notificationService = {
-  /**
-   * 发送推送通知给骑手
-   * @param courierName 骑手姓名
-   * @param title 通知标题
-   * @param body 通知内容
-   * @param data 附加数据
-   */
-  async sendPushNotificationToCourier(courierName: string, title: string, body: string, data?: any): Promise<boolean> {
-    try {
-      console.log(`📡 准备向骑手 ${courierName} 发送通知:`, { title, body });
-
-      // 1. 获取骑手的推送令牌
-      let pushToken = null;
-
-      // 查 couriers 表
-      const { data: courierData } = await supabase
-        .from('couriers')
-        .select('push_token')
-        .eq('name', courierName)
-        .maybeSingle();
-
-      if (courierData?.push_token) {
-        pushToken = courierData.push_token;
-      } else {
-        // 查 admin_accounts 表
-        const { data: adminData } = await supabase
-          .from('admin_accounts')
-          .select('push_token')
-          .eq('employee_name', courierName)
-          .maybeSingle();
-        
-        if (adminData?.push_token) {
-          pushToken = adminData.push_token;
-        }
-      }
-
-      if (!pushToken) {
-        console.warn(`⚠️ 无法发送推送：找不到骑手 ${courierName} 的有效推送令牌`);
-        return false;
-      }
-
-      // 2. 调用 Expo 推送服务
-      const message = {
-        to: pushToken,
-        sound: 'default',
-        title: title,
-        body: body,
-        data: {
-          ...data,
-          type: 'new_order',
-          timestamp: new Date().toISOString()
-        },
-        channelId: 'new-task-channel',
-        priority: 'high',
-      };
-
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Accept-encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-      });
-
-      const result = await response.json();
-      console.log('📤 Expo 推送发送结果:', result);
-      
-      return response.ok;
-    } catch (error) {
-      console.error('❌ 发送推送通知失败:', error);
-      return false;
-    }
-  },
-
   /**
    * 发送包裹分配通知给快递员
    */

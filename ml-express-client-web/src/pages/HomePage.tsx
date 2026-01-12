@@ -1,17 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { 
-  packageService, 
-  supabase, 
-  userService, 
-  testConnection, 
-  systemSettingsService, 
-  pendingOrderService,
-  merchantService,
-  Product 
-} from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import TrackingSection from '../components/home/TrackingSection';
@@ -79,7 +69,6 @@ class ErrorBoundary extends React.Component<
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clearCart } = useCart();
 
   // 处理从其他页面跳转过来的登录/注册请求
   useEffect(() => {
@@ -91,53 +80,7 @@ const HomePage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
-
-  // 🚀 新增：处理从购物车跳转过来的订单请求
-  useEffect(() => {
-    if (location.state && (location.state as any).selectedProducts) {
-      const incomingProducts = (location.state as any).selectedProducts as Product[];
-      const productMap: Record<string, number> = {};
-      
-      incomingProducts.forEach(p => {
-        productMap[p.id] = (p as any).quantity || 1;
-      });
-      
-      setSelectedProducts(productMap);
-      setMerchantProducts(incomingProducts);
-      setHasCOD(true);
-      setShowOrderForm(true);
-      setIsFromCart(true); // 💡 新增：标记是从购物车过来的
-      
-      // 如果有店铺信息，自动填充寄件人
-      if (incomingProducts.length > 0 && incomingProducts[0].store_id) {
-        const fillSenderFromStore = async () => {
-          try {
-            const { data: store } = await supabase
-              .from('delivery_stores')
-              .select('*')
-              .eq('id', incomingProducts[0].store_id)
-              .single();
-            
-            if (store) {
-              setSenderName(store.store_name);
-              setSenderPhone(store.phone || store.manager_phone);
-              setSenderAddressText(store.address);
-              if (store.latitude && store.longitude) {
-                setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
-              }
-            }
-          } catch (error) {
-            console.error('自动填充寄件人信息失败:', error);
-          }
-        };
-        fillSenderFromStore();
-      }
-      
-      // 清除 state，防止刷新时再次弹出
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state, supabase]);
-
+  
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -199,7 +142,6 @@ const HomePage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [selectedCity, setSelectedCity] = useState<CityKey>(DEFAULT_CITY_KEY);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [isFromCart, setIsFromCart] = useState(false); // 🚀 新增：是否从购物车跳转过来的
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
@@ -214,14 +156,6 @@ const HomePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
-  
-  // 🚀 新增：商家选货相关状态
-  const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
-  const [cartTotal, setCartTotal] = useState(0);
-  const [hasCOD, setHasCOD] = useState(true); // 🚀 新增：是否需要代收款状态
-  
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   // const [orderData, setOrderData] = useState<any>(null);
   
   // 用户认证相关状态
@@ -307,7 +241,7 @@ const HomePage: React.FC = () => {
   // 加载合伙店铺信息（当currentUser变化时）
   useEffect(() => {
     if (currentUser?.user_type === 'partner') {
-      const loadPartnerStoreAndProducts = async () => {
+      const loadPartnerStore = async () => {
         try {
           const { data: store } = await supabase
             .from('delivery_stores')
@@ -319,98 +253,16 @@ const HomePage: React.FC = () => {
           if (store) {
             console.log('✅ 已加载合伙店铺信息:', store.store_name);
             setPartnerStore(store);
-            
-            // 🚀 加载该店铺的商品
-            const products = await merchantService.getStoreProducts(store.id);
-            setMerchantProducts(products.filter(p => p.is_available));
           }
         } catch (error) {
-          console.error('加载合伙店铺或商品失败:', error);
+          console.error('加载合伙店铺失败:', error);
         }
       };
-      loadPartnerStoreAndProducts();
+      loadPartnerStore();
     } else {
       setPartnerStore(null);
-      setMerchantProducts([]);
     }
   }, [currentUser]);
-
-  // 🚀 新增：统一生成带身份标识和商品清单的描述逻辑
-  const getFullDescription = useCallback(() => {
-    let productDescription = '';
-    const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
-    const typeTag = `[下单身份: ${ordererType}]`;
-    
-    if (Object.keys(selectedProducts).length > 0) {
-      const details = Object.entries(selectedProducts).map(([id, qty]) => {
-        const p = merchantProducts.find(prod => prod.id === id);
-        return p ? `${p.name} x${qty}` : '';
-      }).filter(Boolean).join(', ');
-      productDescription = `[已选商品: ${details}]`;
-    }
-
-    // 🚀 核心优化：如果非 Partner 且开启了代收，在描述中添加货款金额
-    let payToMerchantTag = '';
-    if (currentUser?.user_type !== 'partner' && hasCOD && cartTotal > 0) {
-      const payToMerchantText = language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်';
-      payToMerchantTag = ` [${payToMerchantText}: ${cartTotal.toLocaleString()} MMK]`;
-    }
-    
-    return `${typeTag} ${productDescription}${payToMerchantTag}`.trim();
-  }, [currentUser, selectedProducts, merchantProducts, hasCOD, cartTotal, language]);
-
-  // 🚀 新增：处理商品数量变化逻辑
-  const handleProductQuantityChange = (productId: string, delta: number) => {
-    setSelectedProducts(prev => {
-      const product = merchantProducts.find(p => p.id === productId);
-      if (!product) return prev;
-
-      const currentQty = prev[productId] || 0;
-      let newQty = currentQty + delta;
-
-      // 库存校验
-      if (delta > 0) {
-        if (product.stock !== -1 && currentQty >= product.stock) {
-          alert(`库存不足 (剩余: ${product.stock})`);
-          return prev;
-        }
-      }
-
-      newQty = Math.max(0, newQty);
-      
-      const newSelected = { ...prev };
-      if (newQty === 0) {
-        delete newSelected[productId];
-      } else {
-        newSelected[productId] = newQty;
-      }
-      
-      return newSelected;
-    });
-  };
-
-  // 🚀 新增：监听选中商品变化，自动更新代收款和描述
-  useEffect(() => {
-    let total = 0;
-    let productDetails: string[] = [];
-
-    Object.entries(selectedProducts).forEach(([id, qty]) => {
-      const product = merchantProducts.find(p => p.id === id);
-      if (product) {
-        total += product.price * qty;
-        productDetails.push(`${product.name} x${qty}`);
-      }
-    });
-
-    setCartTotal(total);
-
-    // 🚀 如果开启了代收，且当前是合伙人，自动填充金额
-    if (total > 0 && currentUser?.user_type === 'partner' && hasCOD) {
-      setCodAmount(total.toString());
-    } else if (!hasCOD) {
-      setCodAmount('0');
-    }
-  }, [selectedProducts, merchantProducts, currentUser, hasCOD]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
   const loadPricingSettings = async (region?: string) => {
@@ -1294,8 +1146,6 @@ const HomePage: React.FC = () => {
         packageTracking: '包裹跟踪',
         lightningDelivery: '极速配送',
         secureReliable: '安全可靠',
-        cityMall: '同城商场',
-        cart: '购物车',
         smartService: '智能服务',
         transparentPricing: '透明定价',
         prepaidDeliveryFee: '预付配送费',
@@ -1440,8 +1290,6 @@ const HomePage: React.FC = () => {
         packageTracking: 'Package Tracking',
         lightningDelivery: 'Lightning Delivery',
         secureReliable: 'Secure & Reliable',
-        cityMall: 'City Mall',
-        cart: 'Cart',
         smartService: 'Smart Service',
         transparentPricing: 'Transparent Pricing',
         prepaidDeliveryFee: 'Prepaid Delivery Fee',
@@ -1586,8 +1434,6 @@ const HomePage: React.FC = () => {
         packageTracking: 'ထုပ်ပိုးခြင်း စောင့်ကြည့်ခြင်း',
         lightningDelivery: 'မြန်ဆန်သော ပို့ဆောင်မှု',
         secureReliable: 'လုံခြုံ ယုံကြည်စိတ်ချရသော',
-        cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
-        cart: 'ခြင်း',
         smartService: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
         transparentPricing: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
         prepaidDeliveryFee: 'ကြိုတင်ပေးချေသော ပို့ဆောင်ခြင်း ကုန်ကျစရိတ်',
@@ -1982,11 +1828,8 @@ const HomePage: React.FC = () => {
       senderLongitude: selectedSenderLocation?.lng || null,
       receiverLatitude: selectedReceiverLocation?.lat || null,
       receiverLongitude: selectedReceiverLocation?.lng || null,
-      codAmount: hasCOD ? (codAmount ? parseFloat(codAmount) : 0) : 0,
+      codAmount: codAmount ? parseFloat(codAmount) : 0,
     };
-
-    // 🚀 核心优化：使用统一逻辑构建商品描述和身份标识
-    const finalFullDescription = getFullDescription();
     
     // 验证必填字段
     if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
@@ -2096,7 +1939,6 @@ const HomePage: React.FC = () => {
         distance: distance,
         payment_method: paymentMethod,
         cod_amount: orderInfo.codAmount, // 添加代收款金额
-        description: finalFullDescription, // 🚀 记录商品详情和身份
         customer_email: currentUser?.email || null,
         customer_name: currentUser?.name || orderInfo.senderName || null
       };
@@ -2537,66 +2379,6 @@ const HomePage: React.FC = () => {
             >
               📦 {t.ui.packageTracking}
             </button>
-
-            {/* 🚀 新增：同城商场和购物车按钮 (仅针对会员显示) */}
-            {currentUser?.user_type === 'customer' && (
-              <>
-                <button
-                  onClick={() => handleNavigation('/mall')}
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.2)',
-                    padding: window.innerWidth < 768 ? '1.2rem 2rem' : '1.5rem 2.5rem',
-                    borderRadius: '60px',
-                    cursor: 'pointer',
-                    fontWeight: '700',
-                    fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
-                    boxShadow: '0 15px 35px rgba(0,0,0,0.2)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2)';
-                  }}
-                >
-                  🏙️ {t.ui.cityMall}
-                </button>
-                <button
-                  onClick={() => handleNavigation('/cart')}
-                  style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.2)',
-                    padding: window.innerWidth < 768 ? '1.2rem 2rem' : '1.5rem 2.5rem',
-                    borderRadius: '60px',
-                    cursor: 'pointer',
-                    fontWeight: '700',
-                    fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
-                    boxShadow: '0 15px 35px rgba(0,0,0,0.2)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2)';
-                  }}
-                >
-                  🛒 {t.ui.cart}
-                </button>
-              </>
-            )}
             </div>
 
           {/* 特色标签 */}
@@ -2706,14 +2488,6 @@ const HomePage: React.FC = () => {
         handleOpenMapModal={handleOpenMapModal}
         calculatePriceEstimate={calculatePriceEstimate}
         handleOrderSubmit={handleOrderSubmit}
-        // 🚀 新增：传递商家选货相关 Props
-        merchantProducts={merchantProducts}
-        selectedProducts={selectedProducts}
-        handleProductQuantityChange={handleProductQuantityChange}
-        cartTotal={cartTotal}
-        hasCOD={hasCOD}
-        setHasCOD={setHasCOD}
-        isFromCart={isFromCart}
       />
 
       {/* 支付二维码模态窗口 */}
@@ -2985,7 +2759,6 @@ const HomePage: React.FC = () => {
                       delivery_time: '',
                       courier: '待分配',
                       price: `${orderInfo.price || calculatedPrice} MMK`,
-                      description: getFullDescription() || (dbPendingOrder?.description) || '', // 🚀 记录商品详情和身份
                       payment_method: currentPaymentMethod, // 添加支付方式字段
                       cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
@@ -3036,11 +2809,6 @@ const HomePage: React.FC = () => {
                     const result = await packageService.createPackage(packageData);
                     
                     if (result) {
-                      // 🚀 核心优化：订单成功后清空商品选择和购物车
-                      setSelectedProducts({});
-                      setCartTotal(0);
-                      clearCart(); // 💡 新增：清空 Context 中的购物车
-                      
                       // 自动保存客户信息到用户管理
                       await saveCustomerToUsers(orderInfo);
 

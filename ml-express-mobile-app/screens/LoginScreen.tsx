@@ -47,17 +47,14 @@ export default function LoginScreen({ navigation }: any) {
       const account = await adminAccountService.login(username, password);
       
       if (account) {
-        await AsyncStorage.setItem('currentUserId', account.id || '');
+        const userId = account.id || '';
+        await AsyncStorage.setItem('currentUserId', userId);
         await AsyncStorage.setItem('currentUser', account.username);
         await AsyncStorage.setItem('currentUserName', account.employee_name);
         await AsyncStorage.setItem('currentUserRole', account.role);
         await AsyncStorage.setItem('currentUserPosition', account.position || '');
         
-        // 注册并保存推送 Token
-        const token = await notificationService.registerForPushNotificationsAsync();
-        if (token) {
-          await notificationService.savePushTokenToSupabase(token);
-        }
+        let courierId = '';
         
         if (account.position === '骑手' || account.position === '骑手队长') {
           try {
@@ -95,6 +92,7 @@ export default function LoginScreen({ navigation }: any) {
             
             // 3. 更新活跃状态和保存 ID
             if (courierData) {
+              courierId = courierData.id;
               await supabase
                 .from('couriers')
                 .update({ 
@@ -102,9 +100,9 @@ export default function LoginScreen({ navigation }: any) {
                   status: 'active',
                   employee_id: account.employee_id // 确保员工编号同步
                 })
-                .eq('id', courierData.id);
+                .eq('id', courierId);
               
-              await AsyncStorage.setItem('currentCourierId', courierData.id);
+              await AsyncStorage.setItem('currentCourierId', courierId);
               await AsyncStorage.setItem('currentUserName', courierData.name);
               
               // 启动后台位置追踪
@@ -113,6 +111,18 @@ export default function LoginScreen({ navigation }: any) {
           } catch (error) {
             console.error('Courier data sync error:', error);
           }
+        }
+
+        // 🚀 核心改进：强制刷新并绑定推送令牌
+        // 放在最后，确保 userId 和 courierId 都已经确定
+        try {
+          const token = await notificationService.registerForPushNotificationsAsync();
+          if (token) {
+            console.log('🔄 正在强制重新绑定推送令牌...');
+            await notificationService.savePushTokenToSupabase(token, userId, courierId);
+          }
+        } catch (nsError) {
+          console.warn('推送注册失败，但不影响登录:', nsError);
         }
         
         navigation.replace('Main');

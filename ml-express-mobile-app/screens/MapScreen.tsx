@@ -163,6 +163,12 @@ export default function MapScreen({ navigation }: any) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
   const [optimizationStrategy, setOptimizationStrategy] = useState<'shortest' | 'fastest' | 'priority'>('shortest');
+  
+  // 🚀 坐标平滑处理状态
+  const [smoothCoords, setSmoothCoords] = useState<{lat: number, lng: number} | null>(null);
+  const lastSmoothCoords = useRef<{lat: number, lng: number} | null>(null);
+  const SMOOTHING_FACTOR = 0.35;
+
   const [originalRouteDistance, setOriginalRouteDistance] = useState<number>(0);
   const [optimizedRouteDistance, setOptimizedRouteDistance] = useState<number>(0);
   const [showOptimizationInfo, setShowOptimizationInfo] = useState(false);
@@ -455,33 +461,95 @@ export default function MapScreen({ navigation }: any) {
     try {
       const courierId = await AsyncStorage.getItem('currentCourierId');
       if (!courierId) return;
-      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
+      
+      // 清除旧的追踪
+      if (locationIntervalRef.current) {
+        if ((locationIntervalRef.current as any).remove) {
+          (locationIntervalRef.current as any).remove();
+        } else {
+          clearInterval(locationIntervalRef.current);
+        }
+      }
+      
       setIsLocationTracking(true);
-      const updateLocation = async () => {
-        try {
-          const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+
+      // 🚀 核心优化：使用 watchPositionAsync 替代定时器，实现更精准和实时的平滑追踪
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        async (currentLocation) => {
           const now = Date.now();
-          const { latitude, longitude } = currentLocation.coords;
+          let { latitude, longitude } = currentLocation.coords;
+          const heading = currentLocation.coords.heading;
+          const speed = currentLocation.coords.speed || 0;
+
+          // 🚀 坐标平滑处理 (Simple Low-pass Filter)
+          if (!lastSmoothCoords.current) {
+            lastSmoothCoords.current = { lat: latitude, lng: longitude };
+          } else {
+            latitude = lastSmoothCoords.current.lat + SMOOTHING_FACTOR * (latitude - lastSmoothCoords.current.lat);
+            longitude = lastSmoothCoords.current.lng + SMOOTHING_FACTOR * (longitude - lastSmoothCoords.current.lng);
+            lastSmoothCoords.current = { lat: latitude, lng: longitude };
+          }
+          
+          setSmoothCoords({ lat: latitude, lng: longitude });
+          setLocation({ latitude, longitude });
+
+          // 🚀 核心：地理围栏自动检测 (到达商家或目的地)
+          if (optimizedPackagesWithCoords.length > 0) {
+            optimizedPackagesWithCoords.forEach(pkg => {
+              if (pkg.status === '待取件' || pkg.status === '待收款') {
+                const dist = calculateDistanceKm(latitude, longitude, pkg.coords?.lat || 0, pkg.coords?.lng || 0);
+                if (dist <= 0.1) { // 100米内
+                  Vibration.vibrate(400);
+                  // 可以在这里弹出提示或更新 UI
+                }
+              }
+            });
+          }
+
+          // 🚀 动态上报逻辑：移动速度快时位移超过10米即上报，静止时保持心跳
           let shouldUpdate = false;
           if (!lastUpdateLocation.current) shouldUpdate = true;
           else {
             const distance = calculateDistanceKm(lastUpdateLocation.current.lat, lastUpdateLocation.current.lng, latitude, longitude);
-            if (distance * 1000 > 20 || (now - lastUpdateLocation.current.time) > 5 * 60 * 1000) shouldUpdate = true;
+            const isMoving = speed > 0.5;
+            if ((isMoving && distance * 1000 > 15) || (now - lastUpdateLocation.current.time) > 2 * 60 * 1000) {
+              shouldUpdate = true;
+            }
           }
+
           if (shouldUpdate) {
-            await supabase.from('courier_locations').upsert({ courier_id: courierId, latitude, longitude, heading: currentLocation.coords.heading, speed: currentLocation.coords.speed, last_update: new Date().toISOString() });
+            await supabase.from('courier_locations').upsert({ 
+              courier_id: courierId, 
+              latitude, 
+              longitude, 
+              heading, 
+              speed, 
+              last_update: new Date().toISOString() 
+            });
             lastUpdateLocation.current = { lat: latitude, lng: longitude, time: now };
           }
-        } catch (e) {}
-      };
-      updateLocation();
-      locationIntervalRef.current = setInterval(updateLocation, 60000);
-    } catch (e) { setIsLocationTracking(false); }
+        }
+      );
+
+      locationIntervalRef.current = subscription as any;
+    } catch (e) { 
+      setIsLocationTracking(false); 
+      console.error('追踪启动异常:', e);
+    }
   }, []);
 
   const stopLocationTracking = useCallback(() => {
     if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
+      if ((locationIntervalRef.current as any).remove) {
+        (locationIntervalRef.current as any).remove();
+      } else {
+        clearInterval(locationIntervalRef.current);
+      }
       locationIntervalRef.current = null;
     }
     setIsLocationTracking(false);

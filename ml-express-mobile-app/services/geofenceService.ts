@@ -38,9 +38,27 @@ export interface DeliveryAlert {
 }
 
 class GeofenceService {
-  private readonly DELIVERY_RADIUS_METERS = 100; // 100米限制
+  private readonly DELIVERY_RADIUS_METERS = 50; // 🚀 送达判定半径缩短至 50 米
+  private readonly MERCHANT_RADIUS_METERS = 100; // 🚀 商家到达判定半径 100 米
   private readonly SUSPICIOUS_DISTANCE_METERS = 500; // 超过500米视为可疑
   private readonly CRITICAL_DISTANCE_METERS = 1000; // 超过1000米视为紧急
+
+  /**
+   * 自动检测是否到达商家（取件点）
+   */
+  async checkArrivedAtMerchant(merchantLat: number, merchantLon: number): Promise<boolean> {
+    const currentLocation = await this.getCurrentLocation();
+    if (!currentLocation) return false;
+
+    const distance = this.calculateDistance(
+      currentLocation.coords.latitude,
+      currentLocation.coords.longitude,
+      merchantLat,
+      merchantLon
+    );
+
+    return distance <= this.MERCHANT_RADIUS_METERS;
+  }
 
   /**
    * 计算两点之间的距离（哈弗辛公式）

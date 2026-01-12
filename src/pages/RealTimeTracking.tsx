@@ -1205,40 +1205,6 @@ const RealTimeTracking: React.FC = () => {
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* 🚀 新增：展示下单身份 (从描述中解析) */}
-                      {(() => {
-                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
-                        let isPartner = false;
-                        let hasIdentity = false;
-                        
-                        if (identityMatch) {
-                          const identityText = identityMatch[1];
-                          isPartner = identityText.includes('合伙人') || identityText.includes('Partner');
-                          hasIdentity = true;
-                        } else if (pkg.delivery_store_id) {
-                          isPartner = true;
-                          hasIdentity = true;
-                        }
-
-                        if (!hasIdentity) return null;
-
-                        return (
-                          <span style={{
-                            background: isPartner ? '#3b82f6' : '#f97316', // 合伙人蓝色，会员橙色
-                            color: 'white',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            👤 {isPartner ? (language === 'zh' ? '合伙人' : 'Partner') : (language === 'zh' ? '会员' : 'Member')}
-                          </span>
-                        );
-                      })()}
-
                       {/* 支付方式标识 */}
                       {(pkg as any).payment_method === 'cash' && (
                         <span style={{
@@ -1543,40 +1509,6 @@ const RealTimeTracking: React.FC = () => {
                     }}>
                       <strong style={{ color: '#166534' }}>{pkg.id}</strong>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {/* 🚀 新增：展示下单身份 (从描述中解析) */}
-                        {(() => {
-                          const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
-                          let isPartner = false;
-                          let hasIdentity = false;
-                          
-                          if (identityMatch) {
-                            const identityText = identityMatch[1];
-                            isPartner = identityText.includes('合伙人') || identityText.includes('Partner');
-                            hasIdentity = true;
-                          } else if (pkg.delivery_store_id) {
-                            isPartner = true;
-                            hasIdentity = true;
-                          }
-
-                          if (!hasIdentity) return null;
-
-                          return (
-                            <span style={{
-                              background: isPartner ? '#3b82f6' : '#f97316', // 合伙人蓝色，会员橙色
-                              color: 'white',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              👤 {isPartner ? (language === 'zh' ? '合伙人' : 'Partner') : (language === 'zh' ? '会员' : 'Member')}
-                            </span>
-                          );
-                        })()}
-
                         {/* 支付方式标识 */}
                         {pkg.payment_method === 'cash' && (
                           <span style={{

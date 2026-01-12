@@ -11,6 +11,8 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { notificationService } from './services/notificationService';
 import { errorService } from './services/errorService';
 import { locationService } from './services/locationService';
+import { packageService } from './services/supabase';
+import NetInfo from '@react-native-community/netinfo';
 
 // 保持启动页可见
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -291,6 +293,9 @@ export default function App() {
         };
         await checkTracking();
 
+        // 🚀 启动时同步一次离线数据
+        await packageService.syncOfflineUpdates();
+
         clearTimeout(safetyTimer);
       } catch (e) {
         console.warn('App preparation error:', e);
@@ -301,6 +306,18 @@ export default function App() {
     }
 
     prepare();
+  }, []);
+
+  // 🚀 离线同步逻辑：监听网络变化并自动同步
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        console.log('📶 网络已恢复，正在尝试同步离线数据...');
+        packageService.syncOfflineUpdates();
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   if (!appIsReady) {

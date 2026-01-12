@@ -175,10 +175,10 @@ export const notificationService = {
   /**
    * 将 Token 保存到 Supabase
    */
-  async savePushTokenToSupabase(token: string): Promise<boolean> {
+  async savePushTokenToSupabase(token: string, userIdArg?: string, courierIdArg?: string): Promise<boolean> {
     try {
-      const userId = await AsyncStorage.getItem('currentUserId');
-      const courierId = await AsyncStorage.getItem('currentCourierId');
+      const userId = userIdArg || await AsyncStorage.getItem('currentUserId');
+      const courierId = courierIdArg || await AsyncStorage.getItem('currentCourierId');
 
       if (!userId && !courierId) {
         console.warn('⚠️ 未找到当前登录用户 ID，无法保存推送令牌');
@@ -241,14 +241,21 @@ export const notificationService = {
           try {
             // 从存储中获取当前语言设置
             const language = await AsyncStorage.getItem('ml-express-language') || 'zh';
-            const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
-                             language === 'en' ? 'You have a new order.' : 
-                             '您有新的订单';
+            
+            // 🚀 强化语音播报内容
+            let speakText = '';
+            if (language === 'my') {
+              speakText = 'သင့်တွင် မြို့တွင်းပို့ဆောင်ရေး အော်ဒါအသစ်တစ်ခုရှိသည်။ ကျေးဇူးပြု၍ အချိန်မီစစ်ဆေးပါ။';
+            } else if (language === 'en') {
+              speakText = 'You have a new local delivery order. Please check it in time.';
+            } else {
+              speakText = '您有新的同城配送订单，请及时查看';
+            }
             
             Speech.speak(speakText, {
               language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
               pitch: 1.0,
-              rate: 1.0,
+              rate: 0.9, // 稍微放慢语速，更清晰
             });
           } catch (speechError) {
             console.warn('语音播报失败:', speechError);

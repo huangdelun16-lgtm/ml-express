@@ -124,22 +124,9 @@ async function verifyLogin(username, password) {
     // 返回账户信息（不包含密码）
     const { password: _, ...accountWithoutPassword } = account;
 
-    // 🚀 新增：登录成功时，自动在数据库中更新最后登录时间
-    try {
-      await fetch(`${supabaseUrl}/rest/v1/admin_accounts?id=eq.${account.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ last_login: new Date().toISOString() })
-      });
-      console.log(`✅ 已更新用户 ${username} 的最后登录时间`);
-    } catch (updateError) {
-      console.warn('⚠️ 更新最后登录时间失败:', updateError.message);
-    }
+    // 🚀 优化：不再在这里阻塞等待 PATCH 更新，通过日志记录即可
+    // 真正的最后登录时间更新交给客户端在登录成功后异步完成
+    console.log(`✅ 用户 ${username} 验证成功`);
 
     return {
       success: true,
