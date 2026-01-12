@@ -1565,12 +1565,10 @@ const ProfilePage: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.totalCOD}</span>
-                      {partnerCODStats.settledCOD > 0 && (
-                        <button 
-                          onClick={() => handleViewCODOrders(true)}
-                          style={{ padding: '6px 16px', borderRadius: '12px', background: '#3b82f6', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)' }}
-                        >{t.view}</button>
-                      )}
+                      <button 
+                        onClick={() => handleViewCODOrders(true)}
+                        style={{ padding: '6px 16px', borderRadius: '12px', background: '#3b82f6', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)' }}
+                      >{t.view}</button>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: 'white' }}>
                       {partnerCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
@@ -1593,12 +1591,10 @@ const ProfilePage: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.unclearedCOD}</span>
-                      {partnerCODStats.unclearedCount > 0 && (
-                        <button 
-                          onClick={() => handleViewCODOrders(false)}
-                          style={{ padding: '6px 16px', borderRadius: '12px', background: '#f59e0b', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}
-                        >{t.view}</button>
-                      )}
+                      <button 
+                        onClick={() => handleViewCODOrders(false)}
+                        style={{ padding: '6px 16px', borderRadius: '12px', background: '#f59e0b', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}
+                      >{t.view}</button>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: '#fbbf24' }}>
                       {partnerCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
