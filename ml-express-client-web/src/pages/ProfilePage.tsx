@@ -1565,15 +1565,30 @@ const ProfilePage: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.totalCOD}</span>
-                      <button 
-                        onClick={() => handleViewCODOrders(true)}
-                        style={{ padding: '6px 16px', borderRadius: '12px', background: '#3b82f6', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)' }}
-                      >{t.view}</button>
                     </div>
-                    <div style={{ fontSize: '2.8rem', fontWeight: '950', color: 'white' }}>
+                    <div style={{ fontSize: '2.8rem', fontWeight: '950', color: 'white', flex: 1 }}>
                       {partnerCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
-                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '6rem', opacity: 0.12, transform: 'rotate(-15deg)' }}>📈</div>
+                    <button 
+                      onClick={() => handleViewCODOrders(true)}
+                      style={{ 
+                        padding: '10px 20px', 
+                        borderRadius: '14px', 
+                        background: '#3b82f6', 
+                        border: 'none', 
+                        color: 'white', 
+                        fontSize: '1rem', 
+                        fontWeight: '900', 
+                        cursor: 'pointer', 
+                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                        alignSelf: 'stretch',
+                        marginTop: '1rem',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >{t.view}</button>
+                    <div style={{ position: 'absolute', right: '-15px', bottom: '40px', fontSize: '6rem', opacity: 0.08, transform: 'rotate(-15deg)', pointerEvents: 'none' }}>📈</div>
                   </div>
 
                   {/* 待结清金额 */}
@@ -1589,20 +1604,35 @@ const ProfilePage: React.FC = () => {
                     overflow: 'hidden',
                     transition: 'all 0.4s ease'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.unclearedCOD}</span>
-                      <button 
-                        onClick={() => handleViewCODOrders(false)}
-                        style={{ padding: '6px 16px', borderRadius: '12px', background: '#f59e0b', border: 'none', color: 'white', fontSize: '0.85rem', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)' }}
-                      >{t.view}</button>
+                      <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '900', background: 'rgba(251, 191, 36, 0.2)', padding: '4px 14px', borderRadius: '12px' }}>
+                        {partnerCODStats.unclearedCount} 笔待结算
+                      </div>
                     </div>
-                    <div style={{ fontSize: '2.8rem', fontWeight: '950', color: '#fbbf24' }}>
+                    <div style={{ fontSize: '2.8rem', fontWeight: '950', color: '#fbbf24', flex: 1 }}>
                       {partnerCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
-                    <div style={{ fontSize: '1rem', color: '#fbbf24', fontWeight: '900', background: 'rgba(251, 191, 36, 0.2)', alignSelf: 'flex-start', padding: '4px 14px', borderRadius: '12px' }}>
-                      {partnerCODStats.unclearedCount} 笔待结算
-                    </div>
-                    <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', fontSize: '6rem', opacity: 0.12, transform: 'rotate(-15deg)' }}>⏳</div>
+                    <button 
+                      onClick={() => handleViewCODOrders(false)}
+                      style={{ 
+                        padding: '10px 20px', 
+                        borderRadius: '14px', 
+                        background: '#f59e0b', 
+                        border: 'none', 
+                        color: 'white', 
+                        fontSize: '1rem', 
+                        fontWeight: '900', 
+                        cursor: 'pointer', 
+                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)',
+                        alignSelf: 'stretch',
+                        marginTop: '1rem',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >{t.view}</button>
+                    <div style={{ position: 'absolute', right: '-15px', bottom: '40px', fontSize: '6rem', opacity: 0.08, transform: 'rotate(-15deg)', pointerEvents: 'none' }}>⏳</div>
                   </div>
 
                 </div>
