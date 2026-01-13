@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import * as Speech from 'expo-speech';
 import { Vibration, Platform } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import * as KeepAwake from 'expo-keep-awake';
 
 type Language = 'zh' | 'en' | 'my';
 interface AppContextType {
@@ -30,11 +30,17 @@ export function AppProvider({ children }: AppProviderProps) {
   const [userType, setUserType] = useState<string | null>(null);
 
   // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
-  // 这样在充电或挂机时不会自动黑屏，从而保证 Realtime 监听不中断
-  if (userType === 'partner') {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useKeepAwake();
-  }
+  // 修复：使用 useEffect 调用 API，而不是在渲染逻辑中条件性使用 Hook
+  useEffect(() => {
+    if (userType === 'partner') {
+      console.log('商家账号登录，激活屏幕常亮');
+      KeepAwake.activateKeepAwakeAsync();
+      return () => {
+        console.log('停用屏幕常亮');
+        KeepAwake.deactivateKeepAwake();
+      };
+    }
+  }, [userType]);
 
   // 从本地存储加载语言设置和用户信息
   useEffect(() => {
