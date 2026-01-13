@@ -82,6 +82,18 @@ const ProfilePage: React.FC = () => {
     operating_hours: '09:00 - 21:00'
   });
 
+  // 🚀 24小时时间解析助手
+  const parseTimeParts = (timeStr: string, defaultTime: string) => {
+    try {
+      if (!timeStr) return defaultTime.split(':');
+      const parts = timeStr.trim().split(':');
+      if (parts.length < 2) return defaultTime.split(':');
+      return [parts[0].padStart(2, '0'), parts[1].padStart(2, '0')];
+    } catch (e) {
+      return defaultTime.split(':');
+    }
+  };
+
   const handlePrevMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     let newYear = year;
@@ -1749,49 +1761,123 @@ const ProfilePage: React.FC = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                         <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.openingTime}</label>
-                        <input 
-                          type="time"
-                          value={businessStatus.operating_hours.split(' - ')[0]}
-                          onChange={(e) => {
-                            const end = businessStatus.operating_hours.split(' - ')[1];
-                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${e.target.value} - ${end}` }));
-                          }}
-                          style={{ 
-                            background: 'white', 
-                            border: 'none', 
-                            borderRadius: '15px', 
-                            padding: '12px', 
-                            color: '#1e293b', 
-                            outline: 'none', 
-                            cursor: 'pointer', 
-                            fontWeight: '900',
-                            fontSize: '1rem',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                          }}
-                        />
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <select 
+                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00')[0]}
+                            onChange={(e) => {
+                              const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '00');
+                              const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${e.target.value}:${oldMin} - ${end}` }));
+                            }}
+                            style={{ 
+                              flex: 1,
+                              background: 'white', 
+                              border: 'none', 
+                              borderRadius: '15px', 
+                              padding: '12px', 
+                              color: '#1e293b', 
+                              outline: 'none', 
+                              cursor: 'pointer', 
+                              fontWeight: '900',
+                              fontSize: '1rem',
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                              appearance: 'none',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {Array.from({ length: 24 }).map((_, i) => (
+                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                          <span style={{ color: 'white', fontWeight: 'bold', alignSelf: 'center' }}>:</span>
+                          <select 
+                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00')[1]}
+                            onChange={(e) => {
+                              const [oldHour, _] = parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00');
+                              const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${oldHour}:${e.target.value} - ${end}` }));
+                            }}
+                            style={{ 
+                              flex: 1,
+                              background: 'white', 
+                              border: 'none', 
+                              borderRadius: '15px', 
+                              padding: '12px', 
+                              color: '#1e293b', 
+                              outline: 'none', 
+                              cursor: 'pointer', 
+                              fontWeight: '900',
+                              fontSize: '1rem',
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                              appearance: 'none',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {Array.from({ length: 60 }).map((_, i) => (
+                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                         <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.closingTime}</label>
-                        <input 
-                          type="time"
-                          value={businessStatus.operating_hours.split(' - ')[1]}
-                          onChange={(e) => {
-                            const start = businessStatus.operating_hours.split(' - ')[0];
-                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${e.target.value}` }));
-                          }}
-                          style={{ 
-                            background: 'white', 
-                            border: 'none', 
-                            borderRadius: '15px', 
-                            padding: '12px', 
-                            color: '#1e293b', 
-                            outline: 'none', 
-                            cursor: 'pointer', 
-                            fontWeight: '900', 
-                            fontSize: '1rem',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                          }}
-                        />
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <select 
+                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00')[0]}
+                            onChange={(e) => {
+                              const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                              const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '00');
+                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${e.target.value}:${oldMin}` }));
+                            }}
+                            style={{ 
+                              flex: 1,
+                              background: 'white', 
+                              border: 'none', 
+                              borderRadius: '15px', 
+                              padding: '12px', 
+                              color: '#1e293b', 
+                              outline: 'none', 
+                              cursor: 'pointer', 
+                              fontWeight: '900',
+                              fontSize: '1rem',
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                              appearance: 'none',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {Array.from({ length: 24 }).map((_, i) => (
+                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                          <span style={{ color: 'white', fontWeight: 'bold', alignSelf: 'center' }}>:</span>
+                          <select 
+                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00')[1]}
+                            onChange={(e) => {
+                              const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                              const [oldHour, _] = parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00');
+                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${oldHour}:${e.target.value}` }));
+                            }}
+                            style={{ 
+                              flex: 1,
+                              background: 'white', 
+                              border: 'none', 
+                              borderRadius: '15px', 
+                              padding: '12px', 
+                              color: '#1e293b', 
+                              outline: 'none', 
+                              cursor: 'pointer', 
+                              fontWeight: '900',
+                              fontSize: '1rem',
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                              appearance: 'none',
+                              textAlign: 'center'
+                            }}
+                          >
+                            {Array.from({ length: 60 }).map((_, i) => (
+                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   </div>
