@@ -68,6 +68,8 @@ const ServicesPage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
+        mall: '同城商场',
+        cart: '购物车',
         admin: '管理后台',
       },
       features: {
@@ -102,13 +104,15 @@ const ServicesPage: React.FC = () => {
       }
     },
     en: {
-      nav: {
-        home: 'Home',
-        services: 'Services',
-        tracking: 'Tracking',
-        contact: 'Contact',
-        admin: 'Admin',
-      },
+        nav: {
+            home: 'Home',
+            services: 'Services',
+            tracking: 'Tracking',
+            contact: 'Contact',
+            mall: 'City Mall',
+            cart: 'Cart',
+            admin: 'Admin',
+        },
       features: {
         title: 'Service Features',
         subtitle: 'Professional, efficient, and trustworthy express delivery service experience',
@@ -141,13 +145,15 @@ const ServicesPage: React.FC = () => {
       }
     },
     my: {
-      nav: {
-        home: 'ပင်မ',
-        services: 'ဝန်ဆောင်မှု',
-        tracking: 'ထုပ်ပိုးခြင်း',
-        contact: 'ဆက်သွယ်ရန်',
-        admin: 'စီမံခန့်ခွဲမှု',
-      },
+        nav: {
+            home: 'ပင်မ',
+            services: 'ဝန်ဆောင်မှု',
+            tracking: 'ထုပ်ပိုးခြင်း',
+            contact: 'ဆက်သွယ်ရန်',
+            mall: 'ဈေး',
+            cart: 'ခြင်း',
+            admin: 'စီမံခန့်ခွဲမှု',
+        },
       features: {
         title: 'ဝန်ဆောင်မှုများ',
         subtitle: 'ပရော်ဖက်ရှင်နယ်၊ ထိရောက်သော၊ ယုံကြည်စိတ်ချရသော ပို့ဆောင်မှု အတွေ့အကြုံ',

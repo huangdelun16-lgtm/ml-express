@@ -131,6 +131,8 @@ const TrackingPage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
+        mall: '同城商场',
+        cart: '购物车',
         admin: '管理后台',
       },
       tracking: {
@@ -163,6 +165,8 @@ const TrackingPage: React.FC = () => {
             services: 'Services',
             tracking: 'Tracking',
             contact: 'Contact',
+            mall: 'City Mall',
+            cart: 'Cart',
             admin: 'Admin',
         },
         tracking: {
@@ -195,6 +199,8 @@ const TrackingPage: React.FC = () => {
             services: 'ဝန်ဆောင်မှု',
             tracking: 'ထုပ်ပိုးခြင်း',
             contact: 'ဆက်သွယ်ရန်',
+            mall: 'ဈေး',
+            cart: 'ခြင်း',
             admin: 'စီမံခန့်ခွဲမှု',
         },
         tracking: {

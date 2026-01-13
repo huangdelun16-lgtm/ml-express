@@ -14,8 +14,6 @@ interface NavigationBarProps {
       services: string;
       tracking: string;
       contact: string;
-      mall?: string;
-      cart?: string;
     };
   };
 }
@@ -194,59 +192,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             e.currentTarget.style.backgroundColor = 'transparent';
           }}
           >{t.nav.contact}</button>
-
-          {/* 🚀 恢复：同城商场和购物车入口 (仅限非 Partner 账号) */}
-          {currentUser?.user_type !== 'partner' && (
-            <>
-              <button onClick={() => handleNavigation('/mall')} style={{ 
-                color: 'white', 
-                textDecoration: 'none',
-                fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-                fontWeight: 'var(--font-weight-medium)',
-                textAlign: 'center',
-                padding: 'var(--spacing-2) var(--spacing-3)',
-                borderRadius: 'var(--radius-md)',
-                transition: 'all var(--transition-fast)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                lineHeight: 'var(--line-height-normal)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.color = 'white';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              >{t.nav.mall || '同城商场'}</button>
-
-              <button onClick={() => handleNavigation('/cart')} style={{ 
-                color: 'white', 
-                textDecoration: 'none',
-                fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-                fontWeight: 'var(--font-weight-medium)',
-                textAlign: 'center',
-                padding: 'var(--spacing-2) var(--spacing-3)',
-                borderRadius: 'var(--radius-md)',
-                transition: 'all var(--transition-fast)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                lineHeight: 'var(--line-height-normal)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.color = 'white';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              >{t.nav.cart || '购物车'}</button>
-            </>
-          )}
         </div>
 
         <div style={{

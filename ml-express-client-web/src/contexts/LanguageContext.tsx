@@ -15,12 +15,16 @@ const translations = {
       home: '首页',
       services: '服务',
       tracking: '包裹跟踪',
-      contact: '联系我们'
+      contact: '联系我们',
+      mall: '同城商场',
+      cart: '购物车',
     },
     hero: {
       title: '缅甸同城快递',
       subtitle: '快速、安全、可靠的同城快递服务',
-      cta: '立即下单'
+      cta: '立即下单',
+      mall: '同城商场',
+      cart: '购物车'
     },
     features: {
       title: '服务特色',
@@ -41,12 +45,16 @@ const translations = {
       home: 'Home',
       services: 'Services',
       tracking: 'Tracking',
-      contact: 'Contact'
+      contact: 'Contact',
+      mall: 'City Mall',
+      cart: 'Cart',
     },
     hero: {
       title: 'Myanmar Same-Day Delivery',
       subtitle: 'Fast, Safe, and Reliable Same-Day Delivery Service',
-      cta: 'Order Now'
+      cta: 'Order Now',
+      mall: 'City Mall',
+      cart: 'Cart'
     },
     features: {
       title: 'Service Features',
@@ -67,12 +75,16 @@ const translations = {
       home: 'ပင်မ',
       services: 'ဝန်ဆောင်မှု',
       tracking: 'ထုပ်ပိုးခြင်း',
-      contact: 'ဆက်သွယ်ရန်'
+      contact: 'ဆက်သွယ်ရန်',
+      mall: 'ဈေး',
+      cart: 'ခြင်း',
     },
     hero: {
       title: 'မြန်မာမြို့တွင်းပို့ဆောင်ရေး',
       subtitle: 'မြန်ဆန်၊ လုံခြုံ၊ ယုံကြည်စိတ်ချရသော မြို့တွင်းပို့ဆောင်ရေး',
-      cta: 'အခုပဲအမှာတင်ပါ'
+      cta: 'အခုပဲအမှာတင်ပါ',
+      mall: 'ဈေး',
+      cart: 'ခြင်း'
     },
     features: {
       title: 'ဝန်ဆောင်မှုအထူးခြားမှု',

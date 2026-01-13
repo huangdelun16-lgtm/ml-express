@@ -155,7 +155,7 @@ export interface DeliveryStore {
   email?: string;
   manager_name: string;
   manager_phone: string;
-  store_type: 'restaurant' | 'tea_shop' | 'drinks_snacks' | 'grocery' | 'transit_station';
+  store_type: 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other';
   status: 'active' | 'inactive' | 'maintenance';
   operating_hours: string;
   service_area_radius: number;

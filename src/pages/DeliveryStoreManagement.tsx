@@ -708,12 +708,15 @@ const DeliveryStoreManagement: React.FC = () => {
     
     if (isEditing && editingStore) {
       // 编辑模式
+      // 🚀 优化：解构 formData，将需要转换为数字的字段分离出来，避免类型冲突
+      const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+
       const result = await deliveryStoreService.updateStore(editingStore.id!, {
-        ...formData,
-        latitude: Number(formData.latitude),
-        longitude: Number(formData.longitude),
-        service_area_radius: Number(formData.service_area_radius),
-        capacity: Number(formData.capacity),
+        ...restFormData,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        service_area_radius: Number(service_area_radius),
+        capacity: Number(capacity),
         updated_at: new Date().toISOString()
       });
 
@@ -728,12 +731,15 @@ const DeliveryStoreManagement: React.FC = () => {
       }
     } else {
       // 创建模式
+      // 🚀 优化：同样进行解构处理
+      const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+
       const result = await deliveryStoreService.createStore({
-        ...formData,
-        latitude: Number(formData.latitude),
-        longitude: Number(formData.longitude),
-        service_area_radius: Number(formData.service_area_radius),
-        capacity: Number(formData.capacity),
+        ...restFormData,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        service_area_radius: Number(service_area_radius),
+        capacity: Number(capacity),
         created_by: currentUser
       });
 
