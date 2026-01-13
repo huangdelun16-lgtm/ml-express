@@ -74,6 +74,49 @@ export interface Banner {
   updated_at?: string;
 }
 
+// 配送店接口
+export interface DeliveryStore {
+  id: string;
+  store_name: string;
+  store_code?: string;
+  address: string;
+  phone: string;
+  manager_phone?: string;
+  store_type: string;
+  status: string;
+  operating_hours?: string;
+  is_closed_today?: boolean;
+  latitude?: number;
+  longitude?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 商品接口
+export interface Product {
+  id: string;
+  store_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  original_price?: number;
+  image_url?: string;
+  stock: number;
+  is_available: boolean;
+  sales_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 商品分类接口
+export interface ProductCategory {
+  id: string;
+  store_id: string;
+  name: string;
+  display_order: number;
+}
+
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
   // 获取所有包裹（用于跟踪页面）
@@ -710,6 +753,189 @@ export const pendingOrderService = {
     } catch (err) {
       LoggerService.error('删除临时订单异常:', err);
       return false;
+    }
+  }
+};
+
+// 配送店服务
+export const deliveryStoreService = {
+  async getActiveStores() {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('status', 'active')
+        .order('store_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取配送店列表失败:', error);
+      return [];
+    }
+  },
+
+  async getStoreById(storeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .select('*')
+        .eq('id', storeId)
+        .single();
+
+      if (error) throw error;
+      return data as DeliveryStore;
+    } catch (error) {
+      LoggerService.error('获取店铺详情失败:', error);
+      return null;
+    }
+  },
+
+  async updateStoreInfo(storeId: string, updates: Partial<DeliveryStore>) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_stores')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', storeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商店信息失败:', error);
+      return { success: false, error };
+    }
+  }
+};
+
+// 商家服务
+export const merchantService = {
+  // 获取商店的所有商品
+  async getStoreProducts(storeId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店商品失败:', error);
+      return [];
+    }
+  },
+
+  // 获取商店分类
+  async getStoreCategories(storeId: string): Promise<ProductCategory[]> {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取商店分类失败:', error);
+      return [];
+    }
+  },
+
+  // 添加商品
+  async addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([product])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('添加商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 更新商品
+  async updateProduct(productId: string, updates: Partial<Product>) {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 删除商品
+  async deleteProduct(productId: string) {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      LoggerService.error('删除商品失败:', error);
+      return { success: false, error };
+    }
+  },
+
+  // 更新库存
+  async updateStock(productId: string, newStock: number) {
+    return this.updateProduct(productId, { stock: newStock });
+  },
+
+  // 上下架切换
+  async toggleAvailability(productId: string, isAvailable: boolean) {
+    return this.updateProduct(productId, { is_available: isAvailable });
+  },
+
+  // 上传商品图片 (Web版)
+  async uploadProductImage(storeId: string, file: File): Promise<string | null> {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${storeId}/${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('product_images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // 获取公共 URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product_images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传商品图片失败:', error?.message || '未知错误');
+      return null;
     }
   }
 };
