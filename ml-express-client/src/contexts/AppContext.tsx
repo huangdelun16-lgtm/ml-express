@@ -183,7 +183,6 @@ export function AppProvider({ children }: AppProviderProps) {
       }
     };
   }, [language, showOrderAlert]); // 增加 showOrderAlert 依赖，当弹窗消失后立刻恢复监听状态环境
-  }, [language]); // 当语言改变时，重新订阅以确保语音正确 (实际上主要是需要 user 状态)
 
   const setLanguage = async (lang: Language) => {
     setLanguageState(lang);
