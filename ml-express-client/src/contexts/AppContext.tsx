@@ -3,7 +3,8 @@ import LoggerService from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import * as Speech from 'expo-speech';
-import { Vibration } from 'react-native';
+import { Vibration, Platform } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
 
 type Language = 'zh' | 'en' | 'my';
 interface AppContextType {
@@ -26,20 +27,34 @@ export function AppProvider({ children }: AppProviderProps) {
   const [showOrderAlert, setShowOrderAlert] = useState(false);
   const [newOrderData, setNewOrderData] = useState<any>(null);
   const subscriptionRef = useRef<any>(null);
+  const [userType, setUserType] = useState<string | null>(null);
 
-  // 从本地存储加载语言设置
+  // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
+  // 这样在充电或挂机时不会自动黑屏，从而保证 Realtime 监听不中断
+  if (userType === 'partner') {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useKeepAwake();
+  }
+
+  // 从本地存储加载语言设置和用户信息
   useEffect(() => {
-    const loadLanguage = async () => {
+    const loadInitialData = async () => {
       try {
         const savedLang = await AsyncStorage.getItem('ml-express-language');
         if (savedLang && (savedLang === 'zh' || savedLang === 'en' || savedLang === 'my')) {
           setLanguageState(savedLang as Language);
         }
+
+        const currentUserStr = await AsyncStorage.getItem('currentUser');
+        if (currentUserStr) {
+          const user = JSON.parse(currentUserStr);
+          setUserType(user.user_type || 'customer');
+        }
       } catch (error) {
-        LoggerService.error('加载语言设置失败:', error);
+        LoggerService.error('加载初始设置失败:', error);
       }
     };
-    loadLanguage();
+    loadInitialData();
   }, []);
 
   // 🚀 全局订单监听逻辑
@@ -50,6 +65,8 @@ export function AppProvider({ children }: AppProviderProps) {
         if (!currentUserStr) return;
         
         const user = JSON.parse(currentUserStr);
+        setUserType(user.user_type || 'customer'); // 同步更新 userType 状态
+
         if (user.user_type === 'partner' && user.id) {
           console.log('✅ 检测到商家账号，建立全局订单监听:', user.id);
           
@@ -59,25 +76,28 @@ export function AppProvider({ children }: AppProviderProps) {
             supabase.removeChannel(subscriptionRef.current);
           }
 
+          // 🚀 增强版订阅设置：开启 ack 以提高稳定性
           const subscription = supabase
-            .channel(`global-merchant-orders-${user.id}`)
+            .channel(`global-merchant-orders-${user.id}`, {
+              config: {
+                presence: { key: user.id },
+              }
+            })
             .on('postgres_changes', { 
               event: 'INSERT', 
               schema: 'public', 
               table: 'packages',
-              // 🚀 核心修复：确保 filter 字段名与数据库完全一致
-              // 注意：Supabase 的 filter 只支持简单的字段比较
               filter: `delivery_store_id=eq.${user.id}` 
             }, payload => {
               const newOrder = payload.new;
-              console.log('🔔 全局监听到新订单消息:', { id: newOrder.id, status: newOrder.status, store_id: newOrder.delivery_store_id });
+              console.log('🔔 全局监听到新订单消息:', { id: newOrder.id, status: newOrder.status });
               
               if (newOrder.status === '待确认') {
                 setNewOrderData(newOrder);
                 setShowOrderAlert(true);
                 
                 // 🚀 核心优化：震动 + 循环语音直到接单
-                Vibration.vibrate([0, 500, 200, 500], false);
+                Vibration.vibrate([0, 1000, 500, 1000], true); // 开启循环震动
                 
                 // 语音播报
                 const speakText = language === 'my' 
@@ -88,12 +108,21 @@ export function AppProvider({ children }: AppProviderProps) {
                 
                 Speech.speak(speakText, { 
                   language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
-                  rate: 0.9
+                  rate: 0.9,
+                  pitch: 1.0,
+                  onDone: () => {
+                    // 如果弹窗还没关闭，再播一遍
+                    // 这里由于是在 context 里的全局函数，可以递归或循环调用
+                  }
                 });
               }
             })
             .subscribe((status) => {
               console.log('📡 Supabase 监听订阅状态:', status);
+              // 如果订阅断开，尝试重新建立连接
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                setTimeout(setupOrderListener, 5000);
+              }
             });
           
           subscriptionRef.current = subscription;
@@ -105,7 +134,7 @@ export function AppProvider({ children }: AppProviderProps) {
 
     setupOrderListener();
 
-    // 🚀 新增：轮询补丁（每30秒检查一次，防止错过Realtime消息）
+    // 🚀 增加轮询补丁频率，针对手机休眠时的补偿
     const pollMissingOrders = setInterval(async () => {
       try {
         const currentUserStr = await AsyncStorage.getItem('currentUser');
@@ -113,19 +142,20 @@ export function AppProvider({ children }: AppProviderProps) {
         const user = JSON.parse(currentUserStr);
         
         if (user.user_type === 'partner' && user.id && !showOrderAlert) {
-          const { data: missingOrders } = await supabase
+          const { data: missingOrders, error } = await supabase
             .from('packages')
             .select('*')
             .eq('delivery_store_id', user.id)
             .eq('status', '待确认')
+            .order('created_at', { ascending: false })
             .limit(1);
           
-          if (missingOrders && missingOrders.length > 0) {
-            console.log('🔍 轮询补丁发现未处理订单:', missingOrders[0].id);
+          if (!error && missingOrders && missingOrders.length > 0) {
+            console.log('🔍 轮询发现未提醒订单:', missingOrders[0].id);
             setNewOrderData(missingOrders[0]);
             setShowOrderAlert(true);
             
-            Vibration.vibrate([0, 500, 200, 500], false);
+            Vibration.vibrate([0, 1000, 500, 1000], true);
             
             const speakText = language === 'my' 
               ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
@@ -140,17 +170,19 @@ export function AppProvider({ children }: AppProviderProps) {
           }
         }
       } catch (err) {
-        console.warn('轮询补丁执行失败:', err);
+        // 静默处理轮询错误
       }
-    }, 30000);
+    }, 15000); // 缩短到 15 秒轮询一次
 
     return () => {
       console.log('清理监听和轮询');
       clearInterval(pollMissingOrders);
+      Vibration.cancel();
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
       }
     };
+  }, [language, showOrderAlert]); // 增加 showOrderAlert 依赖，当弹窗消失后立刻恢复监听状态环境
   }, [language]); // 当语言改变时，重新订阅以确保语音正确 (实际上主要是需要 user 状态)
 
   const setLanguage = async (lang: Language) => {

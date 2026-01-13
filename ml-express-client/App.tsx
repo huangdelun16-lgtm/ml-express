@@ -69,8 +69,16 @@ import { analytics, EventType } from './src/services/AnalyticsService';
 
 // ...
 
+import { supabase } from './src/services/supabase';
+import { Vibration } from 'react-native';
+
 function AppContent({ onLayoutRootView }: any) {
   const { language, showOrderAlert, setShowOrderAlert, newOrderData } = useApp();
+
+  const handleCloseAlert = () => {
+    setShowOrderAlert(false);
+    Vibration.cancel(); // 🚀 关键：关闭弹窗时停止震动
+  };
 
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
@@ -89,7 +97,7 @@ function AppContent({ onLayoutRootView }: any) {
             animation: 'slide_from_right',
           }}
         >
-          {/* 欢迎页面（广告/通知） */}
+          {/* ... */}
           <Stack.Screen 
             name="Welcome" 
             component={WelcomeScreen}
@@ -218,7 +226,7 @@ function AppContent({ onLayoutRootView }: any) {
         visible={showOrderAlert}
         orderData={newOrderData}
         language={language}
-        onClose={() => setShowOrderAlert(false)}
+        onClose={handleCloseAlert}
         onStatusUpdate={() => {
           console.log('✅ 订单状态已更新，发送全局通知');
           DeviceEventEmitter.emit('order_status_updated');

@@ -22,27 +22,39 @@ const { width } = Dimensions.get('window');
 const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
   const pan = useRef(new Animated.ValueXY()).current;
   const buttonWidth = width - 80;
-  const swipeThreshold = buttonWidth * 0.4;
+  const handleWidth = 100;
+  const swipeRange = (buttonWidth - handleWidth) / 2;
+  const swipeThreshold = swipeRange * 0.7;
 
   const panResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        pan.setOffset({ x: (pan.x as any)._value, y: 0 });
+        pan.setValue({ x: 0, y: 0 });
+      },
       onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
       onPanResponderRelease: (e, gestureState) => {
+        pan.flattenOffset();
+        
         if (gestureState.dx > swipeThreshold) {
           // 右滑接单
-          Animated.spring(pan, { toValue: { x: buttonWidth, y: 0 }, useNativeDriver: false }).start(() => {
+          console.log('✅ 触发右滑接单');
+          Animated.spring(pan, { toValue: { x: swipeRange * 2, y: 0 }, useNativeDriver: false }).start(() => {
             onAccept();
             pan.setValue({ x: 0, y: 0 });
           });
         } else if (gestureState.dx < -swipeThreshold) {
           // 左滑取消
-          Animated.spring(pan, { toValue: { x: -buttonWidth, y: 0 }, useNativeDriver: false }).start(() => {
+          console.log('❌ 触发左滑取消');
+          Animated.spring(pan, { toValue: { x: -swipeRange * 2, y: 0 }, useNativeDriver: false }).start(() => {
             onDecline();
             pan.setValue({ x: 0, y: 0 });
           });
         } else {
           // 回弹
+          console.log('↩️ 滑动距离不足，回弹');
           Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
         }
       },
