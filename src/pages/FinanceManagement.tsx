@@ -172,6 +172,9 @@ const FinanceManagement: React.FC = () => {
   const [salaryDetails, setSalaryDetails] = useState<CourierSalaryDetail[]>([]);
   const [selectedSalaries, setSelectedSalaries] = useState<number[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [showSalarySelectionModal, setShowSalarySelectionModal] = useState<boolean>(false);
+  const [selectedCouriersForSalary, setSelectedCouriersForSalary] = useState<Set<string>>(new Set());
+  const [courierSalaryGroups, setCourierSalaryGroups] = useState<Record<string, Package[]>>({});
   const [paymentForm, setPaymentForm] = useState({
     payment_method: 'bank_transfer',
     payment_reference: '',
@@ -661,15 +664,12 @@ const FinanceManagement: React.FC = () => {
     }
   };
 
-  // 生成本月工资
-  const generateMonthlySalaries = async () => {
-    if (!window.confirm('是否为所有骑手生成本月工资记录？')) return;
-    
+  // 打开工资生成选择窗口
+  const handleOpenSalaryGeneration = async () => {
     setLoading(true);
     try {
-      // 确保账号数据已加载（如果没有，先加载一次）
+      // 确保账号数据已加载
       if (adminAccounts.length === 0) {
-        console.log('📋 加载账号数据以获取骑手工资信息...');
         const accountsData = await adminAccountService.getAllAccounts();
         setAdminAccounts(accountsData);
       }
@@ -686,53 +686,71 @@ const FinanceManagement: React.FC = () => {
         }
         courierGroups[courierId].push(pkg);
       });
-      
+
+      setCourierSalaryGroups(courierGroups);
+      // 默认全选
+      setSelectedCouriersForSalary(new Set(Object.keys(courierGroups)));
+      setShowSalarySelectionModal(true);
+    } catch (error) {
+      console.error('获取骑手分组失败:', error);
+      window.alert('获取骑手分组失败，请重试！');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 生成选定骑手的本月工资
+  const generateMonthlySalaries = async () => {
+    if (selectedCouriersForSalary.size === 0) {
+      window.alert('请至少选择一位骑手');
+      return;
+    }
+
+    if (!window.confirm(`确定要为选中的 ${selectedCouriersForSalary.size} 位骑手生成本月工资记录吗？`)) return;
+    
+    setLoading(true);
+    setShowSalarySelectionModal(false);
+    try {
       // 结算周期
       const now = new Date();
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
       
-      // 为每个骑手生成工资记录
+      // 为每个选中的骑手生成工资记录
       let successCount = 0;
       let createdCount = 0;
       let updatedCount = 0;
-      for (const [courierId, pkgs] of Object.entries(courierGroups)) {
+
+      for (const courierId of Array.from(selectedCouriersForSalary)) {
+        const pkgs = courierSalaryGroups[courierId];
+        if (!pkgs) continue;
+
         // 计算统计数据
         const totalDeliveries = pkgs.length;
         const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
-        const relatedPackageIds = pkgs.map(p => p.id); // <-- 新增：收集包裹ID
+        const relatedPackageIds = pkgs.map(p => p.id);
         
         // 从账号管理中获取骑手的基本工资
-        // courierId 是骑手名称，需要匹配 admin_accounts.employee_name
         const courierAccount = adminAccounts.find(account => 
           account.employee_name === courierId && 
           (account.position === '骑手' || account.position === '骑手队长')
         );
         
-        // 如果找到账号且设置了工资，使用账号中的工资；否则使用默认值
-        const DEFAULT_BASE_SALARY = 200000; // 默认基本工资 MMK
+        const DEFAULT_BASE_SALARY = 200000;
         const baseSalary = courierAccount?.salary && courierAccount.salary > 0 
           ? courierAccount.salary 
           : DEFAULT_BASE_SALARY;
         
-        // 记录工资来源（用于调试和日志）
-        if (courierAccount?.salary && courierAccount.salary > 0) {
-          console.log(`✅ 骑手 ${courierId} 使用账号管理中的工资: ${courierAccount.salary.toLocaleString()} MMK`);
-        } else {
-          console.log(`⚠️ 骑手 ${courierId} 未在账号管理中设置工资，使用默认值: ${DEFAULT_BASE_SALARY.toLocaleString()} MMK`);
-        }
-        
-        // 计算各项费用（仅计算送货距离费用，不包含取件距离）
         const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500; 
-        const DELIVERY_BONUS_RATE = 1000; // MMK/单
+        const DELIVERY_BONUS_RATE = 1000; 
         
-        const kmFee = totalKm * COURIER_KM_RATE; // 仅送货距离费用
+        const kmFee = totalKm * COURIER_KM_RATE; 
         const deliveryBonus = totalDeliveries * DELIVERY_BONUS_RATE;
         
         const grossSalary = baseSalary + kmFee + deliveryBonus;
         const netSalary = grossSalary;
         
-        // 检查该骑手是否已经存在本月的工资记录
+        // 检查是否已存在
         const existingSalary = courierSalaries.find(s => 
           s.courier_id === courierId && 
           s.period_start_date === periodStart && 
@@ -759,12 +777,11 @@ const FinanceManagement: React.FC = () => {
           gross_salary: grossSalary,
           net_salary: netSalary,
           status: 'pending',
-          related_package_ids: relatedPackageIds, // <-- 新增：保存包裹ID
+          related_package_ids: relatedPackageIds,
         };
         
         let success = false;
         if (existingSalary) {
-          // 如果已存在，则更新现有记录（保留原有状态，除非是pending状态）
           const updateData: Partial<CourierSalary> = {
             base_salary: baseSalary,
             km_fee: kmFee,
@@ -776,36 +793,27 @@ const FinanceManagement: React.FC = () => {
             gross_salary: grossSalary,
             net_salary: netSalary,
             related_package_ids: relatedPackageIds,
-            // 如果原记录是pending状态，保持pending；否则保持原状态
             status: existingSalary.status === 'pending' ? 'pending' : existingSalary.status
           };
           
           success = await courierSalaryService.updateSalary(existingSalary.id!, updateData);
           if (success) {
-            console.log(`🔄 更新骑手 ${courierId} 的本月工资记录`);
             successCount++;
             updatedCount++;
           }
         } else {
-          // 如果不存在，则创建新记录
           success = await courierSalaryService.createSalary(salaryData);
           if (success) {
-            console.log(`✅ 创建骑手 ${courierId} 的本月工资记录`);
             successCount++;
             createdCount++;
           }
         }
       }
       
-      // 显示详细的结果信息
       let message = `成功处理 ${successCount} 条工资记录！`;
-      if (createdCount > 0 && updatedCount > 0) {
-        message += `\n\n新建：${createdCount} 条\n更新：${updatedCount} 条`;
-      } else if (createdCount > 0) {
-        message += `\n\n新建：${createdCount} 条`;
-      } else if (updatedCount > 0) {
-        message += `\n\n更新：${updatedCount} 条`;
-      }
+      if (createdCount > 0) message += `\n新建：${createdCount} 条`;
+      if (updatedCount > 0) message += `\n更新：${updatedCount} 条`;
+      
       window.alert(message);
       await loadRecords();
     } catch (error) {
@@ -3173,7 +3181,7 @@ const FinanceManagement: React.FC = () => {
               {/* 生成工资按钮 */}
               {!isRegionalUser && (
                 <button
-                  onClick={generateMonthlySalaries}
+                  onClick={handleOpenSalaryGeneration}
                   disabled={loading}
                   style={{
                     padding: '10px 20px',
@@ -4101,6 +4109,170 @@ const FinanceManagement: React.FC = () => {
             )}
 
             {/* 发放工资模态框 */}
+            {/* 🚀 生成工资骑手选择弹窗 */}
+            {showSalarySelectionModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.75)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 2000,
+                padding: '20px'
+              }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  width: '100%',
+                  maxWidth: '600px',
+                  maxHeight: '80vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: 800 }}>选择生成工资的骑手</h2>
+                    <button 
+                      onClick={() => setShowSalarySelectionModal(false)}
+                      style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '1.5rem' }}
+                    >✕</button>
+                  </div>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '12px 16px', 
+                    background: 'rgba(255,255,255,0.05)', 
+                    borderRadius: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                      本月有待结算订单的骑手: <strong style={{ color: '#4facfe' }}>{Object.keys(courierSalaryGroups).length}</strong> 名
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (selectedCouriersForSalary.size === Object.keys(courierSalaryGroups).length) {
+                          setSelectedCouriersForSalary(new Set());
+                        } else {
+                          setSelectedCouriersForSalary(new Set(Object.keys(courierSalaryGroups)));
+                        }
+                      }}
+                      style={{
+                        background: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {selectedCouriersForSalary.size === Object.keys(courierSalaryGroups).length ? '取消全选' : '全选'}
+                    </button>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px', marginBottom: '24px' }}>
+                    {Object.keys(courierSalaryGroups).length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.4)' }}>
+                        暂无本月待结算的骑手数据
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+                        {Object.entries(courierSalaryGroups).map(([courierId, pkgs]) => {
+                          const isSelected = selectedCouriersForSalary.has(courierId);
+                          const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
+                          
+                          return (
+                            <div 
+                              key={courierId}
+                              onClick={() => {
+                                const next = new Set(selectedCouriersForSalary);
+                                if (next.has(courierId)) next.delete(courierId);
+                                else next.add(courierId);
+                                setSelectedCouriersForSalary(next);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '15px',
+                                padding: '16px',
+                                borderRadius: '12px',
+                                background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <div style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '6px',
+                                border: isSelected ? 'none' : '2px solid rgba(255,255,255,0.3)',
+                                background: isSelected ? '#3b82f6' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {isSelected && <span style={{ color: 'white', fontWeight: 'bold' }}>✓</span>}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ color: 'white', fontWeight: 700, fontSize: '1.05rem' }}>{courierId}</div>
+                                <div style={{ display: 'flex', gap: '15px', marginTop: '4px' }}>
+                                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>📦 {pkgs.length} 单</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>🛣️ {totalKm.toFixed(1)} KM</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      onClick={() => setShowSalarySelectionModal(false)}
+                      style={{
+                        flex: 1,
+                        padding: '14px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >取消</button>
+                    <button
+                      onClick={generateMonthlySalaries}
+                      disabled={selectedCouriersForSalary.size === 0}
+                      style={{
+                        flex: 2,
+                        padding: '14px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: selectedCouriersForSalary.size === 0 ? '#4a5568' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                        color: '#05223b',
+                        fontWeight: 800,
+                        cursor: selectedCouriersForSalary.size === 0 ? 'not-allowed' : 'pointer',
+                        boxShadow: selectedCouriersForSalary.size === 0 ? 'none' : '0 10px 20px rgba(79, 172, 254, 0.3)'
+                      }}
+                    >
+                      确认生成 ({selectedCouriersForSalary.size} 名)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {showPaymentModal && (
               <div
                 style={{

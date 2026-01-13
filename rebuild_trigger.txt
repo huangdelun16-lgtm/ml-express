@@ -1,7 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 18:30:00
+Timestamp: 2026-01-01 20:00:00
 Changes: 
-- Removed Responsive Sidebar and AdminLayout as per user request
-- Restored original flat routing structure in App.tsx
-- Cleaned up unused sidebar and layout components
-- Ensured original dashboard-centric navigation remains active
+- Implemented selective salary generation for couriers
+- Added multi-selection modal with 'Select All' functionality
+- Displayed real-time stats (orders & KM) in the selection list
+- Enhanced precision for mileage-based fee calculation in the selection preview
+- Improved workflow for financial administrators when processing payroll
