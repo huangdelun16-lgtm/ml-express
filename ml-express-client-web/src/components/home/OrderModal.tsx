@@ -34,6 +34,9 @@ interface OrderModalProps {
   handleOpenMapModal: (type: 'sender' | 'receiver') => void;
   calculatePriceEstimate: () => void;
   handleOrderSubmit: (e: React.FormEvent) => void;
+  // 🚀 优化：坐标自动选择相关
+  setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
+  setSelectedReceiverLocation?: (loc: {lat: number, lng: number} | null) => void;
   // 🚀 新增：商家选货相关
   merchantProducts?: any[];
   selectedProducts?: Record<string, number>;
@@ -77,6 +80,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleOpenMapModal,
   calculatePriceEstimate,
   handleOrderSubmit,
+  setSelectedSenderLocation = () => {},
+  setSelectedReceiverLocation = () => {},
   merchantProducts = [],
   selectedProducts = {},
   handleProductQuantityChange = () => {},
@@ -230,10 +235,22 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 }}
                 onChange={(e) => {
                   const value = e.target.value;
-                  // 如果用户手动编辑地址，移除坐标信息
+                  // 如果用户手动编辑地址，移除坐标信息并清除坐标状态
                   const lines = value.split('\n');
                   const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
                   setSenderAddressText(addressLines.join('\n'));
+                  
+                  // 🚀 优化：如果用户手动修改了非坐标部分的地址，清除精确坐标状态
+                  if (value.includes('📍 坐标:')) {
+                    // 说明只是在带有坐标的地址上删除了东西，或者增加了东西
+                    // 如果删除了坐标行，清除状态
+                    if (!value.includes('📍 坐标:')) {
+                      setSelectedSenderLocation(null);
+                    }
+                  } else {
+                    // 如果地址里本来就没有坐标，每次编辑都确保状态为null（除非是从地图选的）
+                    setSelectedSenderLocation(null);
+                  }
                 }}
               />
               <button
@@ -359,6 +376,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
                   const lines = value.split('\n');
                   const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
                   setReceiverAddressText(addressLines.join('\n'));
+                  
+                  // 🚀 优化：如果用户手动修改地址，清除精确坐标状态
+                  if (!value.includes('📍 坐标:')) {
+                    setSelectedReceiverLocation(null);
+                  }
                 }}
               />
               <button

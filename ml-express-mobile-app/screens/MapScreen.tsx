@@ -519,7 +519,7 @@ export default function MapScreen({ navigation }: any) {
             const isMoving = speed > 0.5;
             if ((isMoving && distance * 1000 > 15) || (now - lastUpdateLocation.current.time) > 2 * 60 * 1000) {
               shouldUpdate = true;
-            }
+          }
           }
 
           if (shouldUpdate) {
@@ -548,7 +548,7 @@ export default function MapScreen({ navigation }: any) {
       if ((locationIntervalRef.current as any).remove) {
         (locationIntervalRef.current as any).remove();
       } else {
-        clearInterval(locationIntervalRef.current);
+      clearInterval(locationIntervalRef.current);
       }
       locationIntervalRef.current = null;
     }

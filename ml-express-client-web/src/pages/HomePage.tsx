@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
+import { useCart } from '../contexts/CartContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import TrackingSection from '../components/home/TrackingSection';
@@ -69,6 +70,7 @@ class ErrorBoundary extends React.Component<
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { clearCart } = useCart();
 
   // 处理从其他页面跳转过来的登录/注册请求
   useEffect(() => {
@@ -80,6 +82,75 @@ const HomePage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
+
+  // 🚀 新增：处理从购物车跳转过来的订单请求
+  useEffect(() => {
+    if (location.state && (location.state as any).selectedProducts) {
+      const incomingProducts = (location.state as any).selectedProducts as any[];
+      console.log('📦 收到购物车商品:', incomingProducts);
+      
+      setIsFromCart(true);
+      setShowOrderForm(true);
+      
+      // 转换商品格式为 Record<string, number>
+      const selectedMap: Record<string, number> = {};
+      incomingProducts.forEach(item => {
+        selectedMap[item.id] = item.quantity;
+      });
+      setSelectedProducts(selectedMap);
+      setMerchantProducts(incomingProducts);
+      
+      // 计算总价
+      const total = incomingProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      setCartTotal(total);
+      
+      // 🚀 优化：自动设置代收款金额
+      if (total > 0) {
+        setCodAmount(total.toString());
+        setHasCOD(true);
+      }
+      
+      // 如果有店铺信息，自动填充寄件人
+      if (incomingProducts.length > 0 && incomingProducts[0].store_id) {
+        const storeId = incomingProducts[0].store_id;
+        const fillSenderFromStore = async () => {
+          try {
+            console.log('正在查找关联店铺:', storeId);
+            const { data: store, error: storeError } = await supabase
+              .from('delivery_stores')
+              .select('*')
+              .eq('id', storeId)
+              .maybeSingle();
+            
+            if (storeError) throw storeError;
+            
+            if (store) {
+              console.log('✅ 自动填充寄件人信息:', store.store_name);
+              setSenderName(store.store_name);
+              setSenderPhone(store.phone || store.manager_phone);
+              
+              // 🚀 优化：自动格式化地址并包含精确坐标
+              if (store.latitude && store.longitude) {
+                const formattedAddress = `${store.address}\n📍 坐标: ${store.latitude.toFixed(6)}, ${store.longitude.toFixed(6)}`;
+                setSenderAddressText(formattedAddress);
+                setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
+                console.log('📍 已自动选择店铺坐标:', { lat: store.latitude, lng: store.longitude });
+              } else {
+                setSenderAddressText(store.address);
+                console.warn('⚠️ 店铺没有经纬度信息');
+              }
+            }
+          } catch (error) {
+            console.error('自动填充寄件人信息失败:', error);
+          }
+        };
+        fillSenderFromStore();
+      }
+      
+      // 清除 state，防止刷新时再次弹出
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, supabase]);
   
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
@@ -156,7 +227,13 @@ const HomePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
-  // const [orderData, setOrderData] = useState<any>(null);
+  
+  // 🚀 新增：商家商品选择相关状态
+  const [merchantProducts, setMerchantProducts] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  const [isFromCart, setIsFromCart] = useState(false);
+  const [cartTotal, setCartTotal] = useState(0);
+  const [hasCOD, setHasCOD] = useState(true);
   
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -1803,6 +1880,28 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：处理商品数量变化
+  const handleProductQuantityChange = (productId: string, delta: number) => {
+    setSelectedProducts(prev => {
+      const newQty = Math.max(0, (prev[productId] || 0) + delta);
+      const newSelected = { ...prev };
+      if (newQty === 0) {
+        delete newSelected[productId];
+      } else {
+        newSelected[productId] = newQty;
+      }
+      
+      // 更新总价
+      const newTotal = Object.entries(newSelected).reduce((sum, [id, qty]) => {
+        const product = merchantProducts.find(p => p.id === id);
+        return sum + (product ? product.price * qty : 0);
+      }, 0);
+      setCartTotal(newTotal);
+      
+      return newSelected;
+    });
+  };
+
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
@@ -2488,6 +2587,17 @@ const HomePage: React.FC = () => {
         handleOpenMapModal={handleOpenMapModal}
         calculatePriceEstimate={calculatePriceEstimate}
         handleOrderSubmit={handleOrderSubmit}
+        // 🚀 优化：坐标自动选择相关
+        setSelectedSenderLocation={setSelectedSenderLocation}
+        setSelectedReceiverLocation={setSelectedReceiverLocation}
+        // 🚀 新增：商家商品选择相关
+        merchantProducts={merchantProducts}
+        selectedProducts={selectedProducts}
+        handleProductQuantityChange={handleProductQuantityChange}
+        cartTotal={cartTotal}
+        hasCOD={hasCOD}
+        setHasCOD={setHasCOD}
+        isFromCart={isFromCart}
       />
 
       {/* 支付二维码模态窗口 */}
@@ -2828,6 +2938,15 @@ const HomePage: React.FC = () => {
                       setOrderSubmitStatus('success');
                       setShowPaymentModal(false);
                       setShowOrderSuccessModal(true);
+                      
+                      // 🚀 新增：下单成功后清空购物车和商品选择
+                      if (isFromCart) {
+                        clearCart();
+                        setSelectedProducts({});
+                        setMerchantProducts([]);
+                        setIsFromCart(false);
+                        console.log('✅ 已清空购物车和商品选择');
+                      }
                     } else {
                       // 包裹创建失败
                       setOrderSubmitStatus('failed');

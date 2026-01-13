@@ -885,7 +885,7 @@ const MyTasksScreen: React.FC = () => {
               <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
               <View style={[styles.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
               <View style={[styles.corner, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 }]} />
-              <View style={[styles.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
+              <View style={[styles.corner, { bottom: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
             </View>
             <Text style={styles.scanHint}>{language === 'zh' ? '对准二维码/条形码' : 'Align code'}</Text>
           </View>
@@ -946,11 +946,13 @@ const MyTasksScreen: React.FC = () => {
                   disabled={uploadingPhoto}
                 >
                   {(() => {
+                    if (!selectedPackage) return null;
+                    
                     const dist = calculateDistance(
                       currentLocation?.coords.latitude || 0,
                       currentLocation?.coords.longitude || 0,
-                      (selectedPackage as any).receiver_latitude,
-                      (selectedPackage as any).receiver_longitude
+                      (selectedPackage as any).receiver_latitude || 0,
+                      (selectedPackage as any).receiver_longitude || 0
                     );
                     const isWithinRange = dist <= 50;
                     
