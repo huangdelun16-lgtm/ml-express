@@ -22,6 +22,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // 从 localStorage 加载购物车
   useEffect(() => {
+    // 🚀 优化：如果没有登录，不加载购物车数据，确保未登录时购物车为空
+    const savedUser = localStorage.getItem('ml-express-customer');
+    if (!savedUser) {
+      setCartItems([]);
+      localStorage.removeItem('ml-express-cart');
+      return;
+    }
+
     const savedCart = localStorage.getItem('ml-express-cart');
     if (savedCart) {
       try {

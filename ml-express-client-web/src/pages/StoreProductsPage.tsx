@@ -129,6 +129,12 @@ const StoreProductsPage: React.FC = () => {
   };
 
   const handleAddToCart = (product: Product) => {
+    // 🚀 优化：必须登录才能加入购物车
+    if (!currentUser) {
+      alert(language === 'zh' ? '请先登录后再加入购物车' : language === 'en' ? 'Please login first to add items' : 'ခြင်းထဲသို့ထည့်ရန် အရင်ဝင်ပါ');
+      return;
+    }
+
     const status = checkStoreOpenStatus();
     if (!status.isOpen) {
       alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
@@ -171,6 +177,12 @@ const StoreProductsPage: React.FC = () => {
 
   // 🚀 新增：批量加入购物车
   const handleBulkAddToCart = () => {
+    // 🚀 优化：必须登录才能加入购物车
+    if (!currentUser) {
+      alert(language === 'zh' ? '请先登录后再加入购物车' : language === 'en' ? 'Please login first to add items' : 'ခြင်းထဲသို့ထည့်ရန် အရင်ဝင်ပါ');
+      return;
+    }
+
     const status = checkStoreOpenStatus();
     if (!status.isOpen) {
       alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
