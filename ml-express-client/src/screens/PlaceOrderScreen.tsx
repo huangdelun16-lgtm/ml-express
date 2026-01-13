@@ -1347,6 +1347,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       let finalSenderLat = senderCoordinates?.lat;
       let finalSenderLng = senderCoordinates?.lng;
       let finalSenderAddr = extractAddress(senderAddress);
+      let deliveryStoreId = null;
+
+      // 如果是商城选货订单，获取店铺ID
+      if (route.params?.selectedProducts && route.params.selectedProducts.length > 0) {
+        deliveryStoreId = route.params.selectedProducts[0].store_id;
+      }
 
       // 如果是 Partner 账号，强制使用店铺信息
       if (currentUser?.user_type === 'partner') {
@@ -1385,12 +1391,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
-        cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : 0,
+        cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
         description: `${typeTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
-        status: paymentMethod === 'cash' ? '待收款' : '待取件', // 现金支付：状态设为"待收款"，骑手代收
+        // 🚀 优化：商城订单初始状态为“待确认”，合伙人订单直接为“待取件/待收款”
+        status: (deliveryStoreId && currentUser?.user_type !== 'partner') 
+          ? '待确认' 
+          : (paymentMethod === 'cash' ? '待收款' : '待取件'),
+        delivery_store_id: deliveryStoreId || (currentUser?.user_type === 'partner' ? userId : null),
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',

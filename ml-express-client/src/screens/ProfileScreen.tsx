@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LoggerService from './../services/LoggerService';
 import { 
   View, 
@@ -14,14 +14,17 @@ import {
   Linking,
   FlatList,
   ActivityIndicator,
-  Platform
+  Platform,
+  Animated,
+  PanResponder
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
 import { useApp } from '../contexts/AppContext';
-import { customerService, packageService, deliveryStoreService } from '../services/supabase';
+import { customerService, packageService, deliveryStoreService, supabase } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
@@ -119,6 +122,11 @@ export default function ProfileScreen({ navigation }: any) {
   const [pickingTimeType, setPickingTimeType] = useState<'open' | 'close' | null>(null);
   const [tempHour, setTempHour] = useState('09');
   const [tempMinute, setTempMinute] = useState('00');
+
+  // 🚀 新增：新订单确认相关状态
+  const [showOrderAlertModal, setShowOrderAlertModal] = useState(false);
+  const [newOrderData, setNewOrderAlertData] = useState<any>(null);
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   const isPartnerStore = userType === 'partner';
 
@@ -500,6 +508,48 @@ export default function ProfileScreen({ navigation }: any) {
     loadNotificationSettings();
   }, []);
 
+  // 🚀 新增：商家账号实时监听新订单
+  useEffect(() => {
+    if (userType === 'partner' && userId) {
+      console.log('商家账号已登录，启动实时订单监听:', userId);
+      
+      const subscription = supabase
+        .channel(`merchant-orders-${userId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'packages',
+          filter: `delivery_store_id=eq.${userId}` 
+        }, payload => {
+          const newOrder = payload.new;
+          console.log('检测到归属本店铺的新订单:', newOrder.id);
+          
+          if (newOrder.status === '待确认') {
+            setNewOrderAlertData(newOrder);
+            setShowOrderAlertModal(true);
+            
+            // 语音播报
+            const speakText = language === 'my' 
+              ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
+              : language === 'en' 
+              ? 'You have a new order, please accept' 
+              : '你有新的订单，请接单';
+            
+            Speech.speak(speakText, { 
+              language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+              rate: 0.9
+            });
+          }
+        })
+        .subscribe();
+
+      return () => {
+        console.log('关闭订单监听');
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [userType, userId, language]);
+
   const loadUserData = async () => {
     try {
       const currentUser = await AsyncStorage.getItem('currentUser');
@@ -618,6 +668,80 @@ export default function ProfileScreen({ navigation }: any) {
       setBusinessStatus(prev => ({ ...prev, operating_hours: `${times[0] || '09:00'} - ${newTime}` }));
     }
     setShowTimePicker(false);
+  };
+
+  // 🚀 新增：商家接单处理
+  const handleAcceptNewOrder = async () => {
+    if (!newOrderData || isProcessingOrder) return;
+    
+    setIsProcessingOrder(true);
+    try {
+      // 这里的逻辑：接单后状态变为 待取件 或 待收款（如果是现金）
+      const newStatus = newOrderData.payment_method === 'cash' ? '待收款' : '待取件';
+      
+      const { error } = await supabase
+        .from('packages')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', newOrderData.id);
+
+      if (error) throw error;
+
+      showToast(language === 'zh' ? '接单成功' : 'Order Accepted', 'success');
+      setShowOrderAlertModal(false);
+      setNewOrderAlertData(null);
+      
+      // 刷新数据
+      loadUserData();
+    } catch (error) {
+      console.error('接单失败:', error);
+      showToast(language === 'zh' ? '接单失败，请重试' : 'Failed to accept', 'error');
+    } finally {
+      setIsProcessingOrder(false);
+    }
+  };
+
+  // 🚀 新增：商家拒绝/取消订单处理
+  const handleCancelNewOrder = async () => {
+    if (!newOrderData || isProcessingOrder) return;
+    
+    Alert.alert(
+      language === 'zh' ? '确认取消' : 'Confirm Cancel',
+      language === 'zh' ? '确定要拒绝该订单吗？' : 'Are you sure you want to decline this order?',
+      [
+        { text: t.cancel, style: 'cancel' },
+        { 
+          text: t.confirm, 
+          style: 'destructive',
+          onPress: async () => {
+            setIsProcessingOrder(true);
+            try {
+              const { error } = await supabase
+                .from('packages')
+                .update({ 
+                  status: '已取消',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', newOrderData.id);
+
+              if (error) throw error;
+
+              showToast(language === 'zh' ? '订单已取消' : 'Order Cancelled', 'info');
+              setShowOrderAlertModal(false);
+              setNewOrderAlertData(null);
+              loadUserData();
+            } catch (error) {
+              console.error('取消订单失败:', error);
+              showToast(language === 'zh' ? '操作失败' : 'Failed to cancel', 'error');
+            } finally {
+              setIsProcessingOrder(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const onRefresh = async () => {
@@ -2153,6 +2277,80 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </Modal>
 
+      {/* 🚀 新增：商家新订单提醒模态框 */}
+      <Modal
+        visible={showOrderAlertModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !isProcessingOrder && setShowOrderAlertModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', maxWidth: 360 }]}>
+            <LinearGradient
+              colors={['#1e3a8a', '#2563eb']}
+              style={{ padding: 24, alignItems: 'center' }}
+            >
+              <View style={{ 
+                width: 80, 
+                height: 80, 
+                borderRadius: 40, 
+                backgroundColor: 'rgba(255,255,255,0.2)', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                marginBottom: 16,
+                borderWidth: 2,
+                borderColor: '#fbbf24'
+              }}>
+                <Ionicons name="notifications" size={40} color="#fbbf24" />
+              </View>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: 'white', textAlign: 'center' }}>
+                {language === 'zh' ? '您有新的订单！' : language === 'en' ? 'New Order!' : 'အော်ဒါအသစ်ရှိပါသည်!'}
+              </Text>
+              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 8 }}>
+                {newOrderData?.id}
+              </Text>
+            </LinearGradient>
+
+            <View style={{ padding: 24 }}>
+              <View style={styles.orderAlertDetail}>
+                <View style={styles.orderAlertRow}>
+                  <Text style={styles.orderAlertLabel}>{language === 'zh' ? '寄件人' : 'Sender'}:</Text>
+                  <Text style={styles.orderAlertValue}>{newOrderData?.sender_name}</Text>
+                </View>
+                <View style={styles.orderAlertRow}>
+                  <Text style={styles.orderAlertLabel}>{language === 'zh' ? '总计' : 'Total'}:</Text>
+                  <Text style={[styles.orderAlertValue, { color: '#ef4444', fontWeight: '900' }]}>{newOrderData?.price}</Text>
+                </View>
+                <View style={[styles.orderAlertRow, { borderBottomWidth: 0 }]}>
+                  <Text style={styles.orderAlertLabel}>{language === 'zh' ? '支付方式' : 'Payment'}:</Text>
+                  <Text style={styles.orderAlertValue}>
+                    {newOrderData?.payment_method === 'cash' ? (language === 'zh' ? '现金支付' : 'Cash') : (language === 'zh' ? '在线支付' : 'Online')}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ alignItems: 'center' }}>
+                <SwipeAcceptDecline 
+                  language={language}
+                  onAccept={handleAcceptNewOrder}
+                  onDecline={handleCancelNewOrder}
+                />
+              </View>
+
+              <Text style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>
+                {language === 'zh' ? '💡 请滑动下方按钮进行接单或拒绝' : '💡 Slide to accept or decline the order'}
+              </Text>
+            </View>
+
+            {isProcessingOrder && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#3b82f6" />
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Toast
         message={toastMessage}
         type={toastType}
@@ -2163,6 +2361,134 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 }
+
+// 🚀 新增：双向滑动确认组件 (右滑接单/左滑取消)
+const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const buttonWidth = width - 80;
+  const swipeThreshold = buttonWidth * 0.4;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
+      onPanResponderRelease: (e, gestureState) => {
+        if (gestureState.dx > swipeThreshold) {
+          // 右滑接单
+          Animated.spring(pan, { toValue: { x: buttonWidth, y: 0 }, useNativeDriver: false }).start(() => {
+            onAccept();
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else if (gestureState.dx < -swipeThreshold) {
+          // 左滑取消
+          Animated.spring(pan, { toValue: { x: -buttonWidth, y: 0 }, useNativeDriver: false }).start(() => {
+            onDecline();
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else {
+          // 回弹
+          Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
+      },
+    })
+  ).current;
+
+  const translateX = pan.x.interpolate({
+    inputRange: [-buttonWidth, buttonWidth],
+    outputRange: [-buttonWidth, buttonWidth],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={swipeStyles.container}>
+      {/* 背景轨道 */}
+      <View style={swipeStyles.track}>
+        <View style={swipeStyles.declineZone}>
+          <Ionicons name="close-circle" size={24} color="white" />
+          <Text style={swipeStyles.zoneText}>{language === 'zh' ? '左滑取消' : 'Slide Left to Cancel'}</Text>
+        </View>
+        <View style={swipeStyles.acceptZone}>
+          <Text style={swipeStyles.zoneText}>{language === 'zh' ? '右滑接单' : 'Slide Right to Accept'}</Text>
+          <Ionicons name="checkmark-circle" size={24} color="white" />
+        </View>
+      </View>
+
+      {/* 滑动滑块 */}
+      <Animated.View
+        style={[swipeStyles.handle, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
+        <LinearGradient
+          colors={['#3b82f6', '#2563eb']}
+          style={swipeStyles.handleGradient}
+        >
+          <Ionicons name="swap-horizontal" size={28} color="white" />
+        </LinearGradient>
+      </Animated.View>
+    </View>
+  );
+};
+
+const swipeStyles = StyleSheet.create({
+  container: {
+    height: 60,
+    width: width - 80,
+    borderRadius: 30,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    marginVertical: 20,
+  },
+  track: {
+    flexDirection: 'row',
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  declineZone: {
+    flex: 1,
+    backgroundColor: '#ef4444',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 15,
+    gap: 8,
+  },
+  acceptZone: {
+    flex: 1,
+    backgroundColor: '#10b981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 15,
+    gap: 8,
+  },
+  zoneText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  handle: {
+    width: 100,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'white',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 10,
+  },
+  handleGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -2835,6 +3161,31 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // 🚀 新增：新订单提醒样式
+  orderAlertDetail: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  orderAlertRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  orderAlertLabel: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  orderAlertValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1e293b',
   },
 });
 

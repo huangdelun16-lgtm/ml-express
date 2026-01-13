@@ -2919,8 +2919,13 @@ const HomePage: React.FC = () => {
                       : (orderInfo.weight || '1'); // 默认重量为 1kg
                     
                     // 根据支付方式设置订单状态
-                    // 现金支付：状态设为"待收款"，骑手代收
-                    const orderStatus = '待收款';
+                    // 🚀 优化：商城订单初始状态为“待确认”，合伙人订单直接为“待收款/待取件”
+                    let orderStatus = '待取件';
+                    if (isFromCart && currentUser?.user_type !== 'partner') {
+                      orderStatus = '待确认';
+                    } else if (currentPaymentMethod === 'cash') {
+                      orderStatus = '待收款';
+                    }
                     
                     // 构建包裹数据，只包含数据库表中存在的字段
                     const packageData: any = {

@@ -804,7 +804,8 @@ export const packageService = {
         delivery_speed: packageData.delivery_speed || '准时达',
         scheduled_delivery_time: packageData.scheduled_delivery_time || null,
         delivery_distance: packageData.delivery_distance || 0,
-        status: '待取件',
+        status: packageData.status || '待取件',
+        delivery_store_id: packageData.delivery_store_id || null, // 🚀 新增：保存配送店ID
         create_time: packageData.create_time || new Date().toLocaleString('zh-CN'),
         pickup_time: '',
         delivery_time: '',
@@ -1009,7 +1010,7 @@ export const packageService = {
 
       const stats = {
         total: data?.length || 0,
-        pending: data?.filter(p => p.status === '待取件').length || 0,
+        pending: data?.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length || 0,
         inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
         delivered: data?.filter(p => p.status === '已送达').length || 0,
         cancelled: data?.filter(p => p.status === '已取消').length || 0,
