@@ -9,10 +9,12 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
@@ -190,6 +192,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const statusFilters = [
     { key: 'all', label: t.all, color: '#6b7280' },
     { key: '待取件', label: t.pending, color: '#f59e0b' },
+    { key: '待确认', label: language === 'zh' ? '待接单' : 'Pending', color: '#f97316' },
     { key: '已取件', label: t.pickedUp, color: '#3b82f6' },
     { key: '配送中', label: t.inTransit, color: '#8b5cf6' },
     { key: '已送达', label: t.delivered, color: '#10b981' },
@@ -199,6 +202,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 加载用户ID
   useEffect(() => {
     loadCustomerId();
+
+    // 🚀 新增：监听全局状态更新事件
+    const statusUpdateSub = DeviceEventEmitter.addListener('order_status_updated', () => {
+      console.log('🔄 收到状态更新事件，刷新订单列表');
+      onRefresh();
+    });
+
+    return () => {
+      statusUpdateSub.remove();
+    };
   }, []);
 
   // 监听路由参数变化，自动设置筛选状态
@@ -367,6 +380,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     
     // 中文状态映射
     const statusMap: {[key: string]: string} = {
+      '待确认': language === 'zh' ? '待接单' : 'Pending',
       '待取件': t.statusTypes['pending'] || status,
       '已取件': t.statusTypes['picked_up'] || status,
       '配送中': t.statusTypes['in_transit'] || status,
@@ -393,6 +407,60 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 查看详情
   const handleViewDetail = (orderId: string) => {
     navigation.navigate('OrderDetail', { orderId });
+  };
+
+  // 🚀 新增：商家接单
+  const handlePartnerAccept = async (orderId: string, paymentMethod: string) => {
+    try {
+      showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
+      const newStatus = paymentMethod === 'cash' ? '待收款' : '待取件';
+      
+      const { error } = await supabase
+        .from('packages')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      
+      showToast(language === 'zh' ? '接单成功' : 'Accepted', 'success');
+      onRefresh();
+    } catch (error) {
+      Alert.alert('错误', '接单失败');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // 🚀 新增：商家拒绝
+  const handlePartnerDecline = async (orderId: string) => {
+    Alert.alert(
+      language === 'zh' ? '拒绝订单' : 'Decline Order',
+      language === 'zh' ? '确定要拒绝并取消此订单吗？' : 'Decline and cancel this order?',
+      [
+        { text: t.cancel, style: 'cancel' },
+        { 
+          text: t.confirm, 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              showLoading(language === 'zh' ? '正在取消...' : 'Cancelling...', 'package');
+              const { error } = await supabase
+                .from('packages')
+                .update({ status: '已取消', updated_at: new Date().toISOString() })
+                .eq('id', orderId);
+
+              if (error) throw error;
+              showToast(language === 'zh' ? '订单已拒绝' : 'Declined', 'info');
+              onRefresh();
+            } catch (error) {
+              Alert.alert('错误', '操作失败');
+            } finally {
+              hideLoading();
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading && !refreshing) {
@@ -664,6 +732,27 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* 🚀 新增：商家快捷接单/取消按钮 */}
+              {userType === 'partner' && order.status === '待确认' && (
+                <View style={styles.partnerActionRow}>
+                  <TouchableOpacity 
+                    style={[styles.partnerButton, styles.partnerDeclineButton]}
+                    onPress={() => handlePartnerDecline(order.id)}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
+                    <Text style={styles.partnerDeclineText}>{language === 'zh' ? '拒绝' : 'Decline'}</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.partnerButton, styles.partnerAcceptButton]}
+                    onPress={() => handlePartnerAccept(order.id, order.payment_method)}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="white" />
+                    <Text style={styles.partnerAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           ))
         )}
@@ -955,5 +1044,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2563eb',
     fontWeight: 'bold',
+  },
+  // 🚀 新增：商家动作行
+  partnerActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  partnerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  partnerAcceptButton: {
+    backgroundColor: '#10b981',
+  },
+  partnerDeclineButton: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  partnerAcceptText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  partnerDeclineText: {
+    color: '#ef4444',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

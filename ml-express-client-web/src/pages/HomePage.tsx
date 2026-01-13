@@ -2955,16 +2955,20 @@ const HomePage: React.FC = () => {
                       cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
                     };
 
-                    // 如果是合伙店铺，添加店铺关联信息
+                    // 🚀 优化：关联配送店ID（供实时接单监听使用）
+                    let deliveryStoreIdToLink = null;
+                    if (isFromCart && merchantProducts.length > 0) {
+                      deliveryStoreIdToLink = merchantProducts[0].store_id;
+                    } else if (currentUser && currentUser.user_type === 'partner') {
+                      deliveryStoreIdToLink = currentUser.store_id || currentUser.id;
+                    }
+
+                    if (deliveryStoreIdToLink) {
+                      packageData.delivery_store_id = deliveryStoreIdToLink;
+                    }
+
+                    // 如果是合伙店铺账号下单，补充更多关联信息
                     if (currentUser && currentUser.user_type === 'partner') {
-                      // 如果 store_id 存在，添加到 delivery_store_id
-                      if (currentUser.store_id) {
-                        packageData.delivery_store_id = currentUser.store_id;
-                      } else if (currentUser.id) {
-                        // 兼容旧逻辑，如果 id 就是 store_id
-                        packageData.delivery_store_id = currentUser.id;
-                      }
-                      
                       // 添加店铺名称
                       if (currentUser.name) {
                         packageData.delivery_store_name = currentUser.name;

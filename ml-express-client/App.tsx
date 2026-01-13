@@ -5,19 +5,21 @@ import {
   ActivityIndicator, 
   Text, 
   TouchableOpacity, 
-  Platform 
+  Platform,
+  DeviceEventEmitter 
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import NotificationService from './src/services/notificationService';
-import { AppProvider } from './src/contexts/AppContext';
+import { AppProvider, useApp } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
+import { OrderAlertModal } from './src/components/OrderAlertModal';
 // Sentry 已暂时禁用以避免依赖问题
 // import { sentryService } from './src/services/SentryService';
 
@@ -66,6 +68,165 @@ const linking = {
 import { analytics, EventType } from './src/services/AnalyticsService';
 
 // ...
+
+function AppContent({ onLayoutRootView }: any) {
+  const { language, showOrderAlert, setShowOrderAlert, newOrderData } = useApp();
+
+  return (
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <NetworkStatus />
+      <GlobalToast />
+      <NavigationContainer 
+        linking={linking}
+        onReady={() => {
+          console.log('Navigation container ready');
+        }}
+      >
+        <Stack.Navigator
+          initialRouteName="Welcome"
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        >
+          {/* 欢迎页面（广告/通知） */}
+          <Stack.Screen 
+            name="Welcome" 
+            component={WelcomeScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+          
+          {/* 登录注册页面 */}
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+          <Stack.Screen 
+            name="Register" 
+            component={RegisterScreen}
+            options={{
+              animation: 'slide_from_bottom',
+            }}
+          />
+          
+          {/* 主应用 - 直接显示首页，不使用底部导航 */}
+          <Stack.Screen 
+            name="Main" 
+            component={HomeScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+          
+          {/* 使用Stack导航，代替Tab导航 */}
+          <Stack.Screen 
+            name="PlaceOrder" 
+            component={PlaceOrderScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="MyOrders" 
+            component={MyOrdersScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="TrackOrder" 
+            component={TrackOrderScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="Profile" 
+            component={ProfileScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          
+          {/* 其他页面 */}
+          <Stack.Screen 
+            name="OrderDetail" 
+            component={OrderDetailScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="NotificationSettings" 
+            component={NotificationSettingsScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="NotificationWorkflow" 
+            component={NotificationWorkflowScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="AddressBook" 
+            component={AddressBookScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="NotificationCenter" 
+            component={NotificationCenterScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="MerchantProducts" 
+            component={MerchantProductsScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="CityMall" 
+            component={CityMallScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen 
+            name="Cart" 
+            component={CartScreen}
+            options={{
+              animation: 'slide_from_right',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+
+      {/* 🚀 全局订单提醒模态框 */}
+      <OrderAlertModal 
+        visible={showOrderAlert}
+        orderData={newOrderData}
+        language={language}
+        onClose={() => setShowOrderAlert(false)}
+        onStatusUpdate={() => {
+          console.log('✅ 订单状态已更新，发送全局通知');
+          DeviceEventEmitter.emit('order_status_updated');
+        }}
+      />
+    </View>
+  );
+}
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -251,159 +412,15 @@ export default function App() {
   }
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      <ErrorBoundary>
-        <AppProvider>
-          <CartProvider>
-            <LoadingProvider>
-              <NetworkStatus />
-              <GlobalToast />
-              <NavigationContainer 
-                linking={linking}
-                onReady={() => {
-                  // 导航容器准备就绪时的回调
-                  console.log('Navigation container ready');
-                }}
-                onStateChange={(state) => {
-                  // 可以在这里添加导航状态变化监听
-                  // 例如：页面访问统计
-                }}
-              >
-              <Stack.Navigator
-                initialRouteName="Welcome"
-                screenOptions={{
-                  headerShown: false,
-                animation: 'slide_from_right',
-              }}
-                >
-                {/* 欢迎页面（广告/通知） */}
-                <Stack.Screen 
-                  name="Welcome" 
-                  component={WelcomeScreen}
-                  options={{
-                    animation: 'fade',
-                  }}
-                />
-                
-                {/* 登录注册页面 */}
-                <Stack.Screen 
-                  name="Login" 
-                  component={LoginScreen}
-                  options={{
-                    animation: 'fade',
-                  }}
-                />
-                <Stack.Screen 
-                  name="Register" 
-                  component={RegisterScreen}
-                  options={{
-                    animation: 'slide_from_bottom',
-                  }}
-                />
-                
-                {/* 主应用 - 直接显示首页，不使用底部导航 */}
-                <Stack.Screen 
-                  name="Main" 
-                  component={HomeScreen}
-                  options={{
-                    animation: 'fade',
-                  }}
-                />
-                
-                {/* 使用Stack导航，代替Tab导航 */}
-                <Stack.Screen 
-                  name="PlaceOrder" 
-                  component={PlaceOrderScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="MyOrders" 
-                  component={MyOrdersScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="TrackOrder" 
-                  component={TrackOrderScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="Profile" 
-                  component={ProfileScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                
-                {/* 其他页面 */}
-                <Stack.Screen 
-                  name="OrderDetail" 
-                  component={OrderDetailScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="NotificationSettings" 
-                  component={NotificationSettingsScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="NotificationWorkflow" 
-                  component={NotificationWorkflowScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="AddressBook" 
-                  component={AddressBookScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="NotificationCenter" 
-                  component={NotificationCenterScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <Stack.Screen 
-                  name="MerchantProducts" 
-                  component={MerchantProductsScreen}
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
-              <Stack.Screen 
-                name="CityMall" 
-                component={CityMallScreen}
-                options={{
-                  animation: 'slide_from_right',
-                }}
-              />
-              <Stack.Screen 
-                name="Cart" 
-                component={CartScreen}
-                options={{
-                  animation: 'slide_from_right',
-                }}
-              />
-              </Stack.Navigator>
-              </NavigationContainer>
-            </LoadingProvider>
-          </CartProvider>
-        </AppProvider>
-      </ErrorBoundary>
-    </View>
+    <ErrorBoundary>
+      <AppProvider>
+        <CartProvider>
+          <LoadingProvider>
+            <AppContent onLayoutRootView={onLayoutRootView} />
+          </LoadingProvider>
+        </CartProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 
