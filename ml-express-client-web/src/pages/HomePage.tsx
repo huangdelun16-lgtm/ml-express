@@ -1146,11 +1146,15 @@ const HomePage: React.FC = () => {
         services: '服务',
         tracking: '包裹跟踪',
         contact: '联系我们',
+        mall: '同城商场',
+        cart: '购物车',
       },
       hero: {
         title: '缅甸同城快递',
         subtitle: '快速、安全、可靠的同城快递服务',
-        cta: '立即下单'
+        cta: '立即下单',
+        mall: '同城商场',
+        cart: '购物车'
       },
       features: {
         title: '服务特色',
@@ -1290,11 +1294,15 @@ const HomePage: React.FC = () => {
         services: 'Services',
         tracking: 'Tracking',
         contact: 'Contact',
+        mall: 'City Mall',
+        cart: 'Cart',
       },
       hero: {
         title: 'Myanmar Same-Day Delivery',
         subtitle: 'Fast, Safe, and Reliable Same-Day Delivery Service',
-        cta: 'Order Now'
+        cta: 'Order Now',
+        mall: 'City Mall',
+        cart: 'Cart'
       },
       features: {
         title: 'Service Features',
@@ -1434,11 +1442,15 @@ const HomePage: React.FC = () => {
         services: 'ဝန်ဆောင်မှု',
         tracking: 'ထုပ်ပိုးခြင်း',
         contact: 'ဆက်သွယ်ရန်',
+        mall: 'ဈေး',
+        cart: 'ခြင်း',
       },
       hero: {
         title: 'မြန်မာမြို့တွင်းပို့ဆောင်ရေး',
         subtitle: 'မြန်ဆန်၊ လုံခြုံ၊ ယုံကြည်စိတ်ချရသော မြို့တွင်းပို့ဆောင်ရေး',
-        cta: 'အခုပဲအမှာတင်ပါ'
+        cta: 'အခုပဲအမှာတင်ပါ',
+        mall: 'ဈေး',
+        cart: 'ခြင်း'
       },
       features: {
         title: 'ဝန်ဆောင်မှုအထူးခြားမှု',
@@ -2478,6 +2490,71 @@ const HomePage: React.FC = () => {
             >
               📦 {t.ui.packageTracking}
             </button>
+
+            {/* 🚀 恢复：同城商场和购物车入口 (仅限非 Partner 账号) */}
+            {currentUser?.user_type !== 'partner' && (
+              <>
+                <button
+                  onClick={() => handleNavigation('/mall')}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    border: '2px solid rgba(255,255,255,0.4)',
+                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
+                    borderRadius: '60px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+                  }}
+                >
+                  🛍️ {t.hero.mall}
+                </button>
+
+                <button
+                  onClick={() => handleNavigation('/cart')}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    border: '2px solid rgba(255,255,255,0.4)',
+                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
+                    borderRadius: '60px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+                  }}
+                >
+                  🛒 {t.hero.cart}
+                </button>
+              </>
+            )}
             </div>
 
           {/* 特色标签 */}
