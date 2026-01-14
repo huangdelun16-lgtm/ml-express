@@ -102,7 +102,6 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：充值模态框状态
   const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [userBalance, setUserBalance] = useState<number>(0);
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
   
   // 🚀 新增：支付二维码模态框状态
