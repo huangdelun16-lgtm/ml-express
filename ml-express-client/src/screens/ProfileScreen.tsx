@@ -29,6 +29,14 @@ import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
 
+// 🚀 新增：充值二维码图片资源映射
+const RECHARGE_QR_IMAGES: Record<number, any> = {
+  10000: require('../../assets/kbz_qr_10000.png'),
+  50000: require('../../assets/kbz_qr_50000.png'),
+  100000: require('../../assets/kbz_qr_100000.png'),
+  300000: require('../../assets/kbz_qr_300000.png'),
+};
+
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
@@ -39,6 +47,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [userName, setUserName] = useState<string>('访客用户');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
+  const [accountBalance, setAccountBalance] = useState<number>(0); // 🚀 新增：账户余额
   const [isGuest, setIsGuest] = useState(false);
   const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
@@ -101,7 +110,6 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：充值模态框状态
   const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [userBalance, setUserBalance] = useState<number>(0);
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
   
   // 🚀 新增：支付二维码模态框状态
@@ -566,7 +574,7 @@ export default function ProfileScreen({ navigation }: any) {
       setUserName(user.name || t.guest);
       setUserEmail(user.email || '');
       setUserPhone(user.phone || '');
-      setUserBalance(user.balance || 0); // 🚀 获取余额
+      setAccountBalance(user.balance || 0); // 🚀 获取余额
       setIsGuest(false);
 
       // 检测用户类型
@@ -975,7 +983,7 @@ export default function ProfileScreen({ navigation }: any) {
       // 在实际项目中，这里应该先上传图片到存储，然后创建待审核的交易记录
       // 目前为了快速演示逻辑，直接加余额
       
-      const newBalance = userBalance + selectedRechargeAmount;
+      const newBalance = accountBalance + selectedRechargeAmount;
 
       const { error } = await supabase
         .from('users')
@@ -988,7 +996,7 @@ export default function ProfileScreen({ navigation }: any) {
       if (error) throw error;
 
       // 更新本地状态和缓存
-      setUserBalance(newBalance);
+      setAccountBalance(newBalance);
       
       const currentUser = await AsyncStorage.getItem('currentUser');
       if (currentUser) {
@@ -1148,21 +1156,21 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={[
                 styles.userBadge,
                 userType === 'partner' && styles.partnerBadge,
-                (userBalance > 0 || userType === 'vip') && styles.vipBadge,
+                (accountBalance > 0 || userType === 'vip') && styles.vipBadge,
                 userType === 'admin' && styles.adminBadge,
                 userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(userBalance > 0 || userType === 'vip') && styles.memberBadge
+                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
                   userType === 'partner' && styles.partnerBadgeText,
-                  (userBalance > 0 || userType === 'vip') && styles.vipBadgeText,
+                  (accountBalance > 0 || userType === 'vip') && styles.vipBadgeText,
                   userType === 'admin' && styles.adminBadgeText,
                   userType === 'courier' && styles.courierBadgeText,
                   (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && styles.memberBadgeText
                 ]}>
                   {userType === 'partner' ? 'PARTNER' : (
-                    (userBalance > 0 || userType === 'vip') ? 'VIP' : (
+                    (accountBalance > 0 || userType === 'vip') ? 'VIP' : (
                       userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : 'MEMBER')
                     )
                   )}
@@ -1190,7 +1198,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <View style={[styles.contactRow, { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }]}>
                   <Ionicons name="wallet-outline" size={16} color="#fbbf24" />
                   <Text style={[styles.userContact, { color: '#fbbf24', fontWeight: 'bold' }]}>
-                    {language === 'zh' ? '账户余额' : 'Balance'}: {formatMoney(userBalance)} MMK
+                    {language === 'zh' ? '账户余额' : 'Balance'}: {formatMoney(accountBalance)} MMK
                   </Text>
                 </View>
               )}
@@ -2380,11 +2388,21 @@ export default function ProfileScreen({ navigation }: any) {
 
             <View style={{ padding: 20, alignItems: 'center' }}>
               <View style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
-                {/* 🚀 恢复：根据金额显示对应二维码 */}
-                {selectedRechargeAmount === 10000 && <Image source={require('../../assets/kbz_qr_10000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 50000 && <Image source={require('../../assets/kbz_qr_50000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 100000 && <Image source={require('../../assets/kbz_qr_100000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 300000 && <Image source={require('../../assets/kbz_qr_300000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+                {/* 🚀 使用预定义的映射显示二维码 */}
+                {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
+                  <Image 
+                    source={RECHARGE_QR_IMAGES[selectedRechargeAmount]} 
+                    style={{ width: '100%', height: '100%' }} 
+                    resizeMode="contain" 
+                  />
+                ) : (
+                  <View style={{ alignItems: 'center' }}>
+                    <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
+                    <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+                      {language === 'zh' ? '加载中...' : 'Loading...'}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity 
