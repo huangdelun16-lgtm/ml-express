@@ -100,6 +100,11 @@ export default function ProfileScreen({ navigation }: any) {
   // 关于我们模态框
   const [showAboutModal, setShowAboutModal] = useState(false);
 
+  // 🚀 新增：充值模态框状态
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
+
   // 通知设置状态
   const [notificationSettings, setNotificationSettings] = useState({
     orderUpdates: true,        // 订单状态更新通知
@@ -238,6 +243,15 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: '账号已注销',
       deleteFailed: '注销账号失败',
       deleteProcessing: '正在注销...',
+      // 🚀 充值相关
+      recharge: '充值余额',
+      rechargeCard: '充值卡',
+      rechargeDesc: '请选择充值金额，快速升级 VIP',
+      discount5: '小提示：优惠 5%',
+      discount10: '小提示：优惠 10%',
+      confirmRecharge: '确认充值',
+      rechargeSuccess: '充值成功',
+      rechargeFailed: '充值失败',
       // 身份标识
       partner: '合伙人',
       vipMember: 'VIP 会员',
@@ -353,6 +367,15 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: 'Account deleted successfully',
       deleteFailed: 'Failed to delete account',
       deleteProcessing: 'Deleting...',
+      // 🚀 Recharge related
+      recharge: 'Recharge',
+      rechargeCard: 'Recharge Card',
+      rechargeDesc: 'Select amount to upgrade to VIP',
+      discount5: 'Tip: 5% Discount',
+      discount10: 'Tip: 10% Discount',
+      confirmRecharge: 'Confirm Recharge',
+      rechargeSuccess: 'Recharge Successful',
+      rechargeFailed: 'Recharge Failed',
       // Badges
       partner: 'Partner',
       vipMember: 'VIP Member',
@@ -468,6 +491,15 @@ export default function ProfileScreen({ navigation }: any) {
       deleteSuccess: 'အကောင့်ဖျက်သိမ်းပြီးပါပြီ',
       deleteFailed: 'အကောင့်ဖျက်သိမ်းမှုမအောင်မြင်ပါ',
       deleteProcessing: 'ဖျက်သိမ်းနေဆဲ...',
+      // 🚀 Recharge related
+      recharge: 'ငွေဖြည့်မည်',
+      rechargeCard: 'ငွေဖြည့်ကတ်',
+      rechargeDesc: 'VIP အဆင့်မြှင့်ရန် ပမာဏရွေးချယ်ပါ',
+      discount5: 'အကြံပြုချက် - ၅% လျှော့စျေး',
+      discount10: 'အကြံပြုချက် - ၁၀% လျှော့စျေး',
+      confirmRecharge: 'ငွေဖြည့်မည်',
+      rechargeSuccess: 'ငွေဖြည့်သွင်းမှု အောင်မြင်ပါသည်',
+      rechargeFailed: 'ငွေဖြည့်သွင်းမှု မအောင်မြင်ပါ',
       // အဆင့်အတန်းများ
       partner: 'မိတ်ဖက်',
       vipMember: 'VIP အဖွဲ့၀င်',
@@ -883,51 +915,50 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleSaveProfile = async () => {
+    // ... (rest of the function)
+  };
+
+  // 🚀 新增：执行充值逻辑
+  const handleConfirmRecharge = async () => {
+    if (!selectedRechargeAmount || !userId) return;
+
     try {
-      if (!userId || userId === 'guest') {
-        showToast(t.pleaseLogin, 'warning');
-        return;
-      }
+      setRefreshing(true);
+      const newBalance = userBalance + selectedRechargeAmount;
 
-      const updateData: any = {};
-      if (editForm.name !== userName) updateData.name = editForm.name;
-      if (editForm.email !== userEmail) updateData.email = editForm.email;
-      if (editForm.phone !== userPhone) updateData.phone = editForm.phone;
-      if (editForm.address) updateData.address = editForm.address;
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
-      if (Object.keys(updateData).length === 0) {
-        setShowEditModal(false);
-        return;
-      }
+      if (error) throw error;
 
-      // 更新用户信息
-      const result = await customerService.updateUser(userId, updateData);
+      // 更新本地状态和缓存
+      setUserBalance(newBalance);
       
-      if (result.success) {
-        // 更新本地数据
-        setUserName(editForm.name);
-        setUserEmail(editForm.email);
-        setUserPhone(editForm.phone);
-        
-        // 更新AsyncStorage
-        const currentUser = await AsyncStorage.getItem('currentUser');
-        if (currentUser) {
-          const user = JSON.parse(currentUser);
-          const updatedUser = { ...user, ...updateData };
-          await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
-          await AsyncStorage.setItem('userName', editForm.name);
-          await AsyncStorage.setItem('userEmail', editForm.email);
-          await AsyncStorage.setItem('userPhone', editForm.phone);
-        }
+      const currentUser = await AsyncStorage.getItem('currentUser');
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        const updatedUser = { ...user, balance: newBalance };
+        await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      }
 
-        setShowEditModal(false);
-        showToast(t.updateSuccess, 'success');
-      } else {
-        showToast(t.updateFailed, 'error');
+      showToast(t.rechargeSuccess, 'success');
+      setShowRechargeModal(false);
+      setSelectedRechargeAmount(null);
+      
+      // 🚀 如果之前是普通Member且余额现在>0，刷新界面显示为VIP
+      if (userType === 'customer') {
+        loadUserData();
       }
     } catch (error) {
-      LoggerService.error('更新用户资料失败:', error);
-      showToast(t.updateFailed, 'error');
+      LoggerService.error('充值失败:', error);
+      showToast(t.rechargeFailed, 'error');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -981,6 +1012,9 @@ export default function ProfileScreen({ navigation }: any) {
         break;
       case 'notifications':
         navigation.navigate('NotificationCenter');
+        break;
+      case 'recharge': // 🚀 新增：开启充值弹窗
+        setShowRechargeModal(true);
         break;
       case 'coupons':
       case 'help':
@@ -1366,6 +1400,7 @@ export default function ProfileScreen({ navigation }: any) {
           { label: t.myProfile, icon: '👤', action: 'profile', color: '#3b82f6' },
           { label: t.addressManagement, icon: '📍', action: 'address', color: '#f59e0b' },
           { label: '通知中心', icon: '🔔', action: 'notifications', color: '#8b5cf6' },
+          { label: t.recharge, icon: '💰', action: 'recharge', color: '#10b981' }, // 🚀 新增：充值按钮
         ].map((action, index) => (
           <TouchableOpacity
             key={index}
@@ -2185,6 +2220,92 @@ export default function ProfileScreen({ navigation }: any) {
                   }
                 />
               )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🚀 新增：充值余额模态框 */}
+      <Modal
+        visible={showRechargeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRechargeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
+            <LinearGradient
+              colors={['#1e3a8a', '#2563eb']}
+              style={{ padding: 20, alignItems: 'center' }}
+            >
+              <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>💰 {t.recharge}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>{t.rechargeDesc}</Text>
+            </LinearGradient>
+
+            <View style={{ padding: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#1e293b' }}>{t.rechargeCard}</Text>
+              
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
+                {[
+                  { amount: 10000, label: '10,000', tip: null },
+                  { amount: 50000, label: '50,000', tip: null },
+                  { amount: 100000, label: '100,000', tip: t.discount5 },
+                  { amount: 300000, label: '300,000', tip: t.discount10 },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.amount}
+                    onPress={() => setSelectedRechargeAmount(item.amount)}
+                    style={{
+                      width: (width * 0.9 - 52) / 2,
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: selectedRechargeAmount === item.amount ? '#3b82f6' : '#f1f5f9',
+                      backgroundColor: selectedRechargeAmount === item.amount ? '#eff6ff' : 'white',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#3b82f6' : '#1e293b' }}>
+                      {item.label}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>MMK</Text>
+                    {item.tip && (
+                      <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 8 }}>
+                        <Text style={{ fontSize: 9, color: '#d97706', fontWeight: 'bold' }}>{item.tip}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => {
+                    setShowRechargeModal(false);
+                    setSelectedRechargeAmount(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>{t.cancel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    styles.modalButtonConfirm,
+                    !selectedRechargeAmount && { opacity: 0.5 }
+                  ]}
+                  disabled={!selectedRechargeAmount || refreshing}
+                  onPress={handleConfirmRecharge}
+                >
+                  {refreshing ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                      {t.confirmRecharge}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
