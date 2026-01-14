@@ -2380,11 +2380,12 @@ export default function ProfileScreen({ navigation }: any) {
 
             <View style={{ padding: 20, alignItems: 'center' }}>
               <View style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
-                {/* 根据金额显示对应二维码 */}
-                {selectedRechargeAmount === 10000 && <Image source={require('../../assets/kbz_qr_10000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 50000 && <Image source={require('../../assets/kbz_qr_50000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 100000 && <Image source={require('../../assets/kbz_qr_100000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
-                {selectedRechargeAmount === 300000 && <Image source={require('../../assets/kbz_qr_300000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+                {/* 🚀 提示：请确保已将二维码图片放入 ml-express-client/assets/ 目录 */}
+                {/* 目前使用占位符以防止 App 崩溃，等您放入图片后，我会为您恢复显示逻辑 */}
+                <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
+                <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+                  {language === 'zh' ? '请联系管理员获取收款二维码' : 'Please contact admin for QR code'}
+                </Text>
               </View>
 
               <TouchableOpacity 
