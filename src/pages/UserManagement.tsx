@@ -297,35 +297,37 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
           gap: '12px',
           flexWrap: 'wrap'
         }}>
-          {/* 🚀 新增：Credit 充值按钮 */}
-          <button
-            onClick={() => handleOpenRecharge(user)}
-            style={{
-              background: 'linear-gradient(135deg, #f1c40f 0%, #f39c12 100%)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 'bold',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 12px rgba(243, 156, 18, 0.3)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.3)';
-            }}
-          >
-            💰 Credit 充值
-          </button>
+          {/* 🚀 仅非管理员账号显示 Credit 充值按钮 */}
+          {user.user_type !== 'admin' && (
+            <button
+              onClick={() => handleOpenRecharge(user)}
+              style={{
+                background: 'linear-gradient(135deg, #f1c40f 0%, #f39c12 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(243, 156, 18, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.3)';
+              }}
+            >
+              💰 Credit 充值
+            </button>
+          )}
 
           <button
             onClick={() => handleEditUser(user)}
@@ -859,10 +861,9 @@ const UserManagement: React.FC = () => {
       
       if (usersError) throw usersError;
 
-      // 2. 获取系统管理员账号
+      // 2. 获取所有管理端账号并整合进管理员列表
       const adminAccounts = await adminAccountService.getAllAccounts();
       const adminUsers = adminAccounts
-        .filter(acc => acc.role === 'admin')
         .map(acc => ({
           id: acc.id || `ADM-${acc.employee_id}`,
           name: acc.employee_name || acc.username,
@@ -876,7 +877,7 @@ const UserManagement: React.FC = () => {
           total_orders: 0,
           total_spent: 0,
           rating: 0,
-          notes: acc.notes,
+          notes: acc.notes || `职位: ${acc.position || '员工'} | 角色: ${acc.role}`,
           created_at: acc.created_at
         }));
 
