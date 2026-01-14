@@ -39,7 +39,6 @@ export default function ProfileScreen({ navigation }: any) {
   const [userName, setUserName] = useState<string>('访客用户');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
-  const [userBalance, setUserBalance] = useState<number>(0); // 🚀 新增：余额状态
   const [isGuest, setIsGuest] = useState(false);
   const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
@@ -102,6 +101,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：充值模态框状态
   const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(0);
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
   
   // 🚀 新增：支付二维码模态框状态
