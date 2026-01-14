@@ -3574,6 +3574,127 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* 🚀 新增：充值余额模态框 */}
+      {showRechargeModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '32px',
+            padding: '2.5rem',
+            width: '100%',
+            maxWidth: '450px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowRechargeModal(false)}
+              style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >✕</button>
+
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>💳</div>
+              <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: 0 }}>
+                {language === 'zh' ? '账户充值' : language === 'en' ? 'Recharge Balance' : 'ငွေဖြည့်သွင်းခြင်း'}
+              </h3>
+              <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>
+                {language === 'zh' ? '请输入您要充值的金额' : language === 'en' ? 'Please enter the amount to recharge' : 'ဖြည့်သွင်းလိုသော ပမာဏကို ထည့်ပါ'}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type="number"
+                  value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  placeholder="0.00"
+                  style={{ 
+                    width: '100%', 
+                    background: 'rgba(255,255,255,0.05)', 
+                    border: '2px solid rgba(255,255,255,0.1)', 
+                    borderRadius: '18px', 
+                    padding: '16px 20px', 
+                    paddingRight: '60px',
+                    color: 'white', 
+                    fontSize: '1.5rem',
+                    fontWeight: '800',
+                    textAlign: 'center',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#10b981'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                />
+                <span style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontWeight: '800' }}>MMK</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                {[5000, 10000, 20000, 50000, 100000, 200000].map(amount => (
+                  <button
+                    key={amount}
+                    onClick={() => setRechargeAmount(amount.toString())}
+                    style={{
+                      padding: '10px',
+                      borderRadius: '12px',
+                      background: rechargeAmount === amount.toString() ? '#10b981' : 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {amount.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={handleRecharge}
+                disabled={loading || !rechargeAmount || parseFloat(rechargeAmount) <= 0}
+                style={{ 
+                  marginTop: '1rem',
+                  padding: '16px', 
+                  borderRadius: '18px', 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                  border: 'none', 
+                  color: 'white', 
+                  fontSize: '1.1rem',
+                  fontWeight: '800', 
+                  cursor: (loading || !rechargeAmount) ? 'not-allowed' : 'pointer', 
+                  boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
+                  opacity: (loading || !rechargeAmount) ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.8rem'
+                }}
+              >
+                {loading ? <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div> : '确认充值'}
+              </button>
+              
+              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: '1.4' }}>
+                💡 {language === 'zh' ? '当前为模拟测试模式，确认后余额将直接增加' : language === 'en' ? 'Simulated test mode: balance will increase immediately after confirmation' : 'စမ်းသပ်မှုစနစ်ဖြစ်သောကြောင့် အတည်ပြုပြီးပါက လက်ကျန်ငွေ ချက်ချင်းတိုးပါမည်'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
