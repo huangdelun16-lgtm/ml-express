@@ -15,6 +15,7 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  Image,
   Animated,
   PanResponder
 } from 'react-native';
