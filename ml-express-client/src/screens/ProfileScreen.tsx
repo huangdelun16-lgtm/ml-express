@@ -1062,22 +1062,22 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={[
                 styles.userBadge,
                 userType === 'partner' && styles.partnerBadge,
-                (userType === 'vip' || (userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0))) && styles.vipBadge,
+                (userBalance > 0 || userType === 'vip') && styles.vipBadge,
                 userType === 'admin' && styles.adminBadge,
                 userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0)) && styles.memberBadge
+                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(userBalance > 0 || userType === 'vip') && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
                   userType === 'partner' && styles.partnerBadgeText,
-                  userType === 'vip' && styles.vipBadgeText,
+                  (userBalance > 0 || userType === 'vip') && styles.vipBadgeText,
                   userType === 'admin' && styles.adminBadgeText,
                   userType === 'courier' && styles.courierBadgeText,
                   (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && styles.memberBadgeText
                 ]}>
-                  {userType === 'partner' ? t.partner : (
-                    (userType === 'vip' || (userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0))) ? t.vipMember : (
-                      userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : t.member)
+                  {userType === 'partner' ? 'PARTNER' : (
+                    (userBalance > 0 || userType === 'vip') ? 'VIP' : (
+                      userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : 'MEMBER')
                     )
                   )}
                 </Text>

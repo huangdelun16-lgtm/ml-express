@@ -1115,7 +1115,7 @@ const ProfilePage: React.FC = () => {
                           ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
                           : (currentUser.user_type === 'courier' 
                             ? 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)' 
-                            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'))),
+                            : 'linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%)'))),
                     boxShadow: isPartnerStore 
                       ? '0 4px 15px rgba(14, 165, 233, 0.4)' 
                       : (userBalance > 0 || currentUser.user_type === 'vip'
@@ -1124,7 +1124,7 @@ const ProfilePage: React.FC = () => {
                           ? '0 4px 15px rgba(249, 115, 22, 0.4)'
                           : (currentUser.user_type === 'courier'
                             ? '0 4px 15px rgba(168, 85, 247, 0.4)'
-                            : '0 4px 15px rgba(59, 130, 246, 0.4)'))),
+                            : '0 4px 15px rgba(127, 140, 141, 0.4)'))),
                     color: 'white',
                     padding: '0.4rem 1.2rem',
                     borderRadius: '14px',
@@ -1134,12 +1134,12 @@ const ProfilePage: React.FC = () => {
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase'
                   }}>
-                    {isPartnerStore ? 'Partner' : (
+                    {isPartnerStore ? 'PARTNER' : (
                       (userBalance > 0 || currentUser.user_type === 'vip') 
-                        ? (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')
+                        ? 'VIP'
                         : (currentUser.user_type === 'admin' 
                           ? 'Admin' 
-                          : (currentUser.user_type === 'courier' ? 'Courier' : 'Member'))
+                          : (currentUser.user_type === 'courier' ? 'Courier' : 'MEMBER'))
                     )}
                   </div>
                 </div>

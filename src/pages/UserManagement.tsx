@@ -78,22 +78,27 @@ const getStatusText = (status: string) => {
   }
 };
 
-const getUserTypeText = (type: string) => {
-  switch (type) {
-    case 'customer': return 'Member';
-    case 'courier': return 'Courier';
-    case 'admin': return 'Admin';
-    default: return type;
+const getUserTypeText = (user: any) => {
+  if (user.user_type === 'admin') return 'Admin';
+  if (user.user_type === 'courier') return 'Courier';
+  if (user.user_type === 'partner') return 'PARTNER';
+  
+  // 对于客户类型进行细分
+  if (user.balance > 0 || user.user_type === 'vip') {
+    return 'VIP';
   }
+  return 'MEMBER';
 };
 
-const getUserTypeColor = (type: string) => {
-  switch (type) {
-    case 'customer': return '#3498db';
-    case 'courier': return '#9b59b6';
-    case 'admin': return '#e67e22';
-    default: return '#95a5a6';
+const getUserTypeColor = (user: any) => {
+  if (user.user_type === 'admin') return '#e67e22';
+  if (user.user_type === 'courier') return '#9b59b6';
+  if (user.user_type === 'partner') return '#3498db';
+  
+  if (user.balance > 0 || user.user_type === 'vip') {
+    return 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)';
   }
+  return '#7f8c8d'; // 普通 Member 灰色
 };
 
 const getVehicleIcon = (type: string) => {
@@ -217,7 +222,7 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
               </div>
             )}
             <div style={{
-              background: (user.balance > 0 || user.user_type === 'vip') ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' : getUserTypeColor(user.user_type),
+              background: getUserTypeColor(user),
               color: 'white',
               padding: '5px 15px',
               borderRadius: '20px',
@@ -225,7 +230,7 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
               fontWeight: 'bold',
               boxShadow: (user.balance > 0 || user.user_type === 'vip') ? '0 4px 10px rgba(251, 191, 36, 0.3)' : 'none'
             }}>
-              {(user.balance > 0 || user.user_type === 'vip') ? 'VIP Member' : getUserTypeText(user.user_type)}
+              {getUserTypeText(user)}
             </div>
             <div style={{
               background: getStatusColor(user.status),
