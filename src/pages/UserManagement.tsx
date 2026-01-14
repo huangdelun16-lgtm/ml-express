@@ -801,7 +801,7 @@ const UserManagement: React.FC = () => {
       // 2. 获取管理员统计
       const { data: admins } = await supabase
         .from('admin_accounts')
-        .select('status, role, last_login');
+        .select('status, role, last_login, position');
       
       // 3. 获取快递员统计
       const { data: couriersData } = await supabase
