@@ -311,16 +311,16 @@ export default function MapScreen({ navigation }: any) {
       const packagePromises = allPackages
         .filter(pkg => pkg.courier === currentUser && !['已送达', '已取消'].includes(pkg.status))
         .map(async pkg => {
-          const pickupCoords = await getPickupCoordinates(pkg);
-          const deliveryCoords = await getDeliveryCoordinates(pkg);
-          return {
-            ...pkg,
-            pickupCoords: pickupCoords || undefined,
-            deliveryCoords: deliveryCoords || undefined,
-            coords: deliveryCoords || undefined,
-            resolvedAddress: deliveryCoords?.resolvedAddress || pkg.receiver_address,
-            locationSource: deliveryCoords?.source || 'fallback',
-          };
+            const pickupCoords = await getPickupCoordinates(pkg);
+            const deliveryCoords = await getDeliveryCoordinates(pkg);
+            return {
+              ...pkg,
+              pickupCoords: pickupCoords || undefined,
+              deliveryCoords: deliveryCoords || undefined,
+              coords: deliveryCoords || undefined,
+              resolvedAddress: deliveryCoords?.resolvedAddress || pkg.receiver_address,
+              locationSource: deliveryCoords?.source || 'fallback',
+            };
         });
 
       const results = await Promise.allSettled(packagePromises);
@@ -578,9 +578,9 @@ export default function MapScreen({ navigation }: any) {
     const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.3 });
     if (!res.canceled && res.assets[0]) {
       setCapturedPhoto(res.assets[0].uri);
-      setShowPhotoModal(true);
-      setShowCameraModal(false);
-    }
+        setShowPhotoModal(true);
+        setShowCameraModal(false);
+      }
   }, []);
 
   const convertImageToBase64 = useCallback(async (uri: string): Promise<string> => {
@@ -603,23 +603,23 @@ export default function MapScreen({ navigation }: any) {
       const name = await AsyncStorage.getItem('currentUserName') || '未知';
       const b64 = await convertImageToBase64(capturedPhoto);
       await deliveryPhotoService.saveDeliveryPhoto({ 
-        packageId: currentPackageForDelivery.id, 
+          packageId: currentPackageForDelivery.id,
         photoBase64: b64, 
         courierName: name, 
         latitude: location?.latitude || 0, 
         longitude: location?.longitude || 0, 
-        locationName: '配送位置' 
-      });
+          locationName: '配送位置'
+        });
       const ok = await packageService.updatePackageStatus(currentPackageForDelivery.id, '已送达', undefined, new Date().toISOString(), name);
       if (ok) {
         const id = await AsyncStorage.getItem('currentCourierId');
         if (id) await supabase.from('couriers').update({ current_delivering_package_id: null }).eq('id', id);
         setCurrentDeliveringPackageId(null);
-        setShowPhotoModal(false);
-        setCapturedPhoto(null);
-        setCurrentPackageForDelivery(null);
-        loadPackages();
-      }
+                setShowPhotoModal(false);
+                setCapturedPhoto(null);
+                setCurrentPackageForDelivery(null);
+                loadPackages();
+              }
     } finally { setUploadingPhoto(false); }
   }, [capturedPhoto, currentPackageForDelivery, location, convertImageToBase64, loadPackages]);
 
@@ -674,8 +674,8 @@ export default function MapScreen({ navigation }: any) {
     if (!location || packagesList.length <= 1) return packagesList;
     try {
       const packagesWithCoords = await Promise.all(packagesList.map(async (pkg) => {
-        const pickupCoords = await getPickupCoordinates(pkg);
-        const deliveryCoords = await getDeliveryCoordinates(pkg);
+          const pickupCoords = await getPickupCoordinates(pkg);
+          const deliveryCoords = await getDeliveryCoordinates(pkg);
         const pickupDistance = pickupCoords ? calculateDistanceKm(location.latitude, location.longitude, pickupCoords.lat, pickupCoords.lng) : null;
         const deliveryDistance = (pickupCoords && deliveryCoords) ? calculateDistanceKm(pickupCoords.lat, pickupCoords.lng, deliveryCoords.lat, deliveryCoords.lng) : null;
         const totalDistance = (pickupDistance || 0) + (deliveryDistance || 0);
@@ -813,24 +813,24 @@ export default function MapScreen({ navigation }: any) {
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
     const isCurrent = currentDeliveringPackageId === item.id;
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         activeOpacity={0.7}
         style={[
-          styles.packageCard, 
+          styles.packageCard,
           isCurrent && styles.currentDeliveringCard
-        ]} 
+        ]}
         onPress={() => navigation.navigate('PackageDetail', { package: item, coords: item.coords })}
       >
         <View style={styles.packageInfo}>
           <View style={styles.cardHeader}>
             <View style={styles.idGroup}>
               <Text style={styles.packageId}>#{item.id.slice(-6)}</Text>
-              {item.delivery_speed && (
-                <View style={styles.speedBadge}>
+            {item.delivery_speed && (
+              <View style={styles.speedBadge}>
                   <Text style={styles.speedIcon}>{getMarkerIcon(item.delivery_speed)}</Text>
-                  <Text style={styles.speedText}>{item.delivery_speed}</Text>
-                </View>
-              )}
+                <Text style={styles.speedText}>{item.delivery_speed}</Text>
+              </View>
+            )}
               
               {/* 🚀 新增：在顶部显示下单身份 */}
               {(() => {
@@ -854,9 +854,9 @@ export default function MapScreen({ navigation }: any) {
               </View>
             )}
           </View>
-
+          
           <View style={styles.cardBody}>
-            <View style={styles.pickupSection}>
+          <View style={styles.pickupSection}>
               <View style={styles.pointIndicator}>
                 <View style={[styles.pointDot, { backgroundColor: '#f59e0b' }]} />
                 <View style={styles.pointLine} />
@@ -865,9 +865,9 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.sectionTitle}>
                   {language === 'zh' ? '取货点' : language === 'en' ? 'Pickup' : 'ပစ္စည်းယူရန်'}
                 </Text>
-                <Text style={styles.senderName}>{item.sender_name}</Text>
+            <Text style={styles.senderName}>{item.sender_name}</Text>
                 <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
-                {item.pickupCoords && (
+            {item.pickupCoords && (
                   <TouchableOpacity 
                     style={styles.pointNavAction} 
                     onPress={() => handleSingleNavigate(item.pickupCoords!.lat, item.pickupCoords!.lng)}
@@ -877,9 +877,9 @@ export default function MapScreen({ navigation }: any) {
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+          </View>
 
-            <View style={styles.deliverySection}>
+          <View style={styles.deliverySection}>
               <View style={styles.pointIndicator}>
                 <View style={[styles.pointDot, { backgroundColor: '#3b82f6' }]} />
               </View>
@@ -887,7 +887,7 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.sectionTitle}>
                   {language === 'zh' ? '送货点' : language === 'en' ? 'Delivery' : 'ပစ္စည်းပို့ရန်'}
                 </Text>
-                <Text style={styles.receiverName}>{item.receiver_name}</Text>
+            <Text style={styles.receiverName}>{item.receiver_name}</Text>
                 <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
                 
                 {/* 🚀 新增：地图展示平台支付金额 */}
@@ -898,8 +898,8 @@ export default function MapScreen({ navigation }: any) {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                         <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
                           💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
-                        </Text>
-                      </View>
+                </Text>
+              </View>
                     );
                   }
                   return null;
@@ -919,49 +919,49 @@ export default function MapScreen({ navigation }: any) {
           </View>
 
           <View style={styles.actionRow}>
-            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>                                                                    
               <Text style={styles.numberText}>{index + 1}</Text>
             </View>
             
             <View style={styles.buttonGroup}>
-              {item.status === '已取件' ? (
+            {item.status === '已取件' ? (
                 !isCurrent ? (
-                  <TouchableOpacity 
-                    style={styles.startDeliveryButton} 
-                    onPress={(e) => { e.stopPropagation(); startDelivering(item.id); }}
-                  >
-                    <Text style={styles.startDeliveryText}>
-                      🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.finishDeliveryButton} 
-                    onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
-                  >
-                    <Text style={styles.finishDeliveryText}>
-                      🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              ) : item.status === '配送中' ? (
                 <TouchableOpacity 
-                  style={styles.finishDeliveryButton} 
-                  onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
+                  style={styles.startDeliveryButton}
+                    onPress={(e) => { e.stopPropagation(); startDelivering(item.id); }}
                 >
-                  <Text style={styles.finishDeliveryText}>
-                    🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
+                  <Text style={styles.startDeliveryText}>
+                    🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
                   </Text>
                 </TouchableOpacity>
-              ) : item.status === '待取件' ? (
+              ) : (
+                <TouchableOpacity 
+                  style={styles.finishDeliveryButton}
+                    onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
+                >
+                  <Text style={styles.finishDeliveryText}>
+                      🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
+                  </Text>
+                </TouchableOpacity>
+              )
+            ) : item.status === '配送中' ? (
+              <TouchableOpacity 
+                style={styles.finishDeliveryButton}
+                  onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
+              >
+                <Text style={styles.finishDeliveryText}>
+                    🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
+                </Text>
+              </TouchableOpacity>
+            ) : item.status === '待取件' ? (
                 <View style={styles.dualButtons}>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#3b82f6' }]} 
                     onPress={(e) => { e.stopPropagation(); navigation.navigate('Scan'); }}
                   >
-                    <Text style={styles.placeholderText}>
+                <Text style={styles.placeholderText}>
                       {language === 'zh' ? '扫码取件' : language === 'en' ? 'Scan' : 'စကင်န်ဖတ်ပါ'}
-                    </Text>
+                </Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#10b981' }]} 
@@ -969,14 +969,14 @@ export default function MapScreen({ navigation }: any) {
                   >
                     <Text style={styles.placeholderText}>
                       {language === 'zh' ? '手动取件' : language === 'en' ? 'Manual' : 'ကိုယ်တိုင်ယူ'}
-                    </Text>
+                </Text>
                   </TouchableOpacity>
-                </View>
-              ) : (
+              </View>
+            ) : (
                 <View style={styles.completedButton}>
                   <Text style={styles.completedText}>✅ {item.status}</Text>
-                </View>
-              )}
+              </View>
+            )}
             </View>
           </View>
         </View>
@@ -1026,17 +1026,17 @@ export default function MapScreen({ navigation }: any) {
           🗺️ {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်ရေးလမ်းကြောင်း'}
         </Text>
       </View>
-      
+
       {errorMessage && (
         <View style={[styles.statusBanner, !isOnline && styles.statusBannerOffline]}>
           <Text style={styles.statusBannerText}>
             {!isOnline ? '📡 ' : '⚠️ '}{errorMessage}
-          </Text>
+                </Text>
           {!isOnline && (
             <TouchableOpacity onPress={() => loadPackages(true)} style={styles.retryButton}>
               <Text style={styles.retryButtonText}>
                 {language === 'zh' ? '重试' : language === 'en' ? 'Retry' : 'ပြန်ကြိုးစားပါ'}
-              </Text>
+                </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1046,8 +1046,8 @@ export default function MapScreen({ navigation }: any) {
         <View style={styles.lastUpdateContainer}>
           <Text style={styles.lastUpdateText}>
             {language === 'zh' ? '最后更新' : language === 'en' ? 'Last update' : 'နောက်ဆုံးအပ်ဒိတ်'}: {lastUpdateTime.toLocaleTimeString()}
-          </Text>
-        </View>
+                  </Text>
+                </View>
       )}
       <View style={styles.listContainer}>
         <View style={styles.searchFilterContainer}>
@@ -1064,30 +1064,30 @@ export default function MapScreen({ navigation }: any) {
             <TouchableOpacity style={styles.filterButton} onPress={handleNavigateAll}>
               <Text style={styles.filterButtonText}>
                 {language === 'zh' ? '🗺️ 规划路线' : language === 'en' ? '🗺️ Plan Route' : '🗺️ လမ်းကြောင်းစီစဉ်ပါ'}
-              </Text>
-            </TouchableOpacity>
+            </Text>
+          </TouchableOpacity>
           )}
         </View>
-
+        
         {loading ? (
-          <ActivityIndicator size="large" color="#3b82f6" />
+            <ActivityIndicator size="large" color="#3b82f6" />
         ) : (
           packages.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>📦</Text>
-              <Text style={styles.emptyTitle}>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>📦</Text>
+            <Text style={styles.emptyTitle}>
                 {language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိပါ'}
-              </Text>
+            </Text>
               <TouchableOpacity style={styles.refreshButton} onPress={() => loadPackages(true)}>
-                <Text style={styles.refreshButtonText}>
+              <Text style={styles.refreshButtonText}>
                   {language === 'zh' ? '🔄 刷新' : language === 'en' ? '🔄 Refresh' : '🔄 ပြန်လည်ရယူပါ'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList 
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
               data={filteredPackages} 
-              renderItem={renderPackageItem} 
+            renderItem={renderPackageItem}
               keyExtractor={p => p.id} 
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} 
             />
@@ -1107,11 +1107,11 @@ export default function MapScreen({ navigation }: any) {
             <View style={{ width: 40 }} />
           </LinearGradient>
           <View style={{ flex: 1, position: 'relative' }}>
-            <MapView 
+            <MapView
               ref={mapRef}
-              provider={PROVIDER_GOOGLE} 
+              provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFillObject} 
-              initialRegion={{ 
+              initialRegion={{
                 latitude: location?.latitude || 21.9588, 
                 longitude: location?.longitude || 96.0891, 
                 latitudeDelta: 0.05, 
@@ -1119,39 +1119,39 @@ export default function MapScreen({ navigation }: any) {
               }}
             >
               {location && (
-                <Marker 
+              <Marker
                   coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
                   title={language === 'zh' ? '当前位置' : 'My Location'}
-                >
-                  <View style={styles.courierMarker}>
+              >
+                <View style={styles.courierMarker}>
                     <Text style={styles.courierMarkerText}>🛵</Text>
-                  </View>
-                </Marker>
+                </View>
+              </Marker>
               )}
               
               {optimizedPackagesWithCoords.map((p, i) => (
                 <React.Fragment key={`${p.id}-${i}`}>
                   {p.pickupCoords && (
-                    <Marker 
+                  <Marker
                       coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
                       title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
                       description={p.sender_address}
-                    >
-                      <View style={styles.pickupMarker}>
+                  >
+                    <View style={styles.pickupMarker}>
                         <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
-                      </View>
-                    </Marker>
+                    </View>
+                  </Marker>
                   )}
                   {p.deliveryCoords && (
-                    <Marker 
+                  <Marker
                       coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
                       title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
                       description={p.receiver_address}
-                    >
-                      <View style={styles.packageMarker}>
+                  >
+                    <View style={styles.packageMarker}>
                         <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
-                      </View>
-                    </Marker>
+                    </View>
+                  </Marker>
                   )}
                 </React.Fragment>
               ))}
@@ -1161,15 +1161,15 @@ export default function MapScreen({ navigation }: any) {
                 <View style={styles.routeListHeader}>
                   <Text style={styles.routeListTitle}>
                     {language === 'zh' ? '📦 配送顺序' : language === 'en' ? '📦 Delivery Order' : '📦 ပို့ဆောင်မည့်အစဉ်'}
-                  </Text>
+              </Text>
                   <TouchableOpacity style={styles.startNavigationButtonCompact} onPress={openGoogleMapsNavigation}>
                     <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.navBtnGradientSmall}>
                       <Text style={styles.navBtnTextSmall}>
                         {language === 'zh' ? '🚀 开始导航' : language === 'en' ? '🚀 Start Nav' : '🚀 လမ်းညွှန်စတင်ပါ'}
                       </Text>
                     </LinearGradient>
-                  </TouchableOpacity>
-                </View>
+            </TouchableOpacity>
+          </View>
                 <ScrollView style={styles.routeListScroll}>
                   {optimizedPackagesWithCoords.map((p, i) => (
                     <View key={p.id} style={[styles.routeListItem, { padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }]}>
@@ -1177,13 +1177,13 @@ export default function MapScreen({ navigation }: any) {
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={{ fontWeight: '600' }}>{p.receiver_name}</Text>
                         <Text style={{ fontSize: 11, color: '#64748b' }} numberOfLines={1}>{p.receiver_address}</Text>
-                      </View>
+                  </View>
                       <View style={[styles.statusDot, { backgroundColor: getStatusColor(p.status) }]} />
                     </View>
                   ))}
                 </ScrollView>
-              </View>
-            </View>
+                    </View>
+                  </View>
           </View>
         </View>
       </Modal>
@@ -1225,13 +1225,13 @@ export default function MapScreen({ navigation }: any) {
               <Image source={{ uri: capturedPhoto || '' }} style={styles.photoPreviewWrapper} />
               <TouchableOpacity onPress={handleUploadPhoto} style={styles.uploadButton}>
                 <LinearGradient colors={['#10b981', '#059669']} style={styles.uploadButtonGradient}>
-                  <Text style={styles.uploadButtonText}>
+                    <Text style={styles.uploadButtonText}>
                     {uploadingPhoto 
                       ? (language === 'zh' ? '正在上传...' : language === 'en' ? 'Uploading...' : 'တင်နေသည်...') 
                       : (language === 'zh' ? '确认送达' : language === 'en' ? 'Confirm Delivery' : 'ပစ္စည်းရောက်ရှိကြောင်းအတည်ပြု')}
-                  </Text>
+                    </Text>
                 </LinearGradient>
-              </TouchableOpacity>
+                </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1242,11 +1242,11 @@ export default function MapScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { 
+  header: {
     backgroundColor: '#1e293b', 
     paddingTop: Platform.OS === 'ios' ? 60 : 40, 
     paddingBottom: 15, 
-    paddingHorizontal: 20, 
+    paddingHorizontal: 20,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1265,9 +1265,9 @@ const styles = StyleSheet.create({
   listContainer: { flex: 1, paddingTop: 10 },
   searchFilterContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
   searchContainer: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff', 
     borderRadius: 12, 
     paddingHorizontal: 12, 
@@ -1299,13 +1299,13 @@ const styles = StyleSheet.create({
   filterButtonText: { color: '#3b82f6', fontSize: 13, fontWeight: '700' },
   
   // 包裹卡片
-  packageCard: { 
-    backgroundColor: '#fff', 
+  packageCard: {
+    backgroundColor: '#fff',
     marginHorizontal: 16, 
     marginBottom: 12, 
     borderRadius: 16, 
     padding: 16, 
-    shadowColor: '#000', 
+    shadowColor: '#000',
     shadowOpacity: 0.08, 
     shadowRadius: 12, 
     elevation: 4,
@@ -1335,7 +1335,7 @@ const styles = StyleSheet.create({
   speedBadge: { 
     flexDirection: 'row', 
     backgroundColor: '#f1f5f9', 
-    paddingHorizontal: 8, 
+    paddingHorizontal: 8,
     paddingVertical: 3, 
     borderRadius: 8, 
     alignItems: 'center', 
@@ -1385,8 +1385,8 @@ const styles = StyleSheet.create({
   receiverName: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginBottom: 2 },
   address: { fontSize: 12, color: '#64748b', lineHeight: 18 },
   
-  actionRow: { 
-    flexDirection: 'row', 
+  actionRow: {
+    flexDirection: 'row',
     gap: 12, 
     marginTop: 4,
     alignItems: 'center'
@@ -1395,7 +1395,7 @@ const styles = StyleSheet.create({
     width: 28, 
     height: 28, 
     borderRadius: 14, 
-    justifyContent: 'center', 
+    justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -1410,8 +1410,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10
   },
-  startDeliveryButton: { 
-    backgroundColor: '#10b981', 
+  startDeliveryButton: {
+    backgroundColor: '#10b981',
     height: 44,
     borderRadius: 12, 
     alignItems: 'center',
@@ -1422,8 +1422,8 @@ const styles = StyleSheet.create({
     elevation: 3
   },
   startDeliveryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  finishDeliveryButton: { 
-    backgroundColor: '#ef4444', 
+  finishDeliveryButton: {
+    backgroundColor: '#ef4444',
     height: 44,
     borderRadius: 12, 
     alignItems: 'center',
@@ -1450,37 +1450,37 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12, 
     backgroundColor: '#f1f5f9', 
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center'
   },
   completedText: { color: '#94a3b8', fontWeight: '800', fontSize: 14 },
 
   // 地图Modal
   mapModalContainer: { flex: 1, backgroundColor: '#fff' },
-  mapModalHeader: { 
-    flexDirection: 'row', 
+  mapModalHeader: {
+    flexDirection: 'row',
     paddingHorizontal: 20, 
     paddingTop: Platform.OS === 'ios' ? 60 : 40, 
     paddingBottom: 20,
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#1e293b'
   },
   mapModalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  closeButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)', 
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center' 
   },
-  courierMarker: { 
+  courierMarker: {
     backgroundColor: '#10b981', 
     width: 40,
     height: 40,
-    borderRadius: 20, 
-    borderWidth: 3, 
+    borderRadius: 20,
+    borderWidth: 3,
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1495,9 +1495,9 @@ const styles = StyleSheet.create({
     width: 34, 
     height: 34, 
     borderRadius: 17, 
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center', 
-    borderWidth: 3, 
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOpacity: 0.25,
@@ -1509,9 +1509,9 @@ const styles = StyleSheet.create({
     width: 34, 
     height: 34, 
     borderRadius: 17, 
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center', 
-    borderWidth: 3, 
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOpacity: 0.25,
@@ -1543,7 +1543,7 @@ const styles = StyleSheet.create({
   routeListScroll: { flex: 1 },
   routeListItem: { 
     backgroundColor: '#f8fafc', 
-    borderRadius: 16, 
+    borderRadius: 16,
     borderWidth: 1, 
     borderColor: '#f1f5f9',
     padding: 12,
@@ -1554,7 +1554,7 @@ const styles = StyleSheet.create({
     height: 26, 
     borderRadius: 13, 
     backgroundColor: '#1e293b', 
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center' 
   },
   routeNumberBadgeTextCompact: { color: '#fff', fontSize: 12, fontWeight: '800' },
@@ -1579,8 +1579,8 @@ const styles = StyleSheet.create({
   uploadButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   
   pointNavAction: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6, 
     backgroundColor: '#eff6ff', 
     paddingHorizontal: 10, 

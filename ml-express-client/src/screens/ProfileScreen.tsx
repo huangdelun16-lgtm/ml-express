@@ -104,6 +104,10 @@ export default function ProfileScreen({ navigation }: any) {
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
+  
+  // 🚀 新增：支付二维码模态框状态
+  const [showPaymentQRModal, setShowPaymentQRModal] = useState(false);
+  const [rechargeProofUri, setRechargeProofUri] = useState<string | null>(null);
 
   // 通知设置状态
   const [notificationSettings, setNotificationSettings] = useState({
@@ -252,6 +256,9 @@ export default function ProfileScreen({ navigation }: any) {
       confirmRecharge: '确认充值',
       rechargeSuccess: '充值成功',
       rechargeFailed: '充值失败',
+      uploadPaymentRecord: '上传汇款记录',
+      paymentQRTitle: '扫描二维码支付',
+      pleaseUploadRecord: '请在支付后上传汇款凭证截图',
       // 身份标识
       partner: '合伙人',
       vipMember: 'VIP 会员',
@@ -376,6 +383,9 @@ export default function ProfileScreen({ navigation }: any) {
       confirmRecharge: 'Confirm Recharge',
       rechargeSuccess: 'Recharge Successful',
       rechargeFailed: 'Recharge Failed',
+      uploadPaymentRecord: 'Upload Payment Record',
+      paymentQRTitle: 'Scan QR to Pay',
+      pleaseUploadRecord: 'Please upload payment proof after paying',
       // Badges
       partner: 'Partner',
       vipMember: 'VIP Member',
@@ -500,6 +510,9 @@ export default function ProfileScreen({ navigation }: any) {
       confirmRecharge: 'ငွေဖြည့်မည်',
       rechargeSuccess: 'ငွေဖြည့်သွင်းမှု အောင်မြင်ပါသည်',
       rechargeFailed: 'ငွေဖြည့်သွင်းမှု မအောင်မြင်ပါ',
+      uploadPaymentRecord: 'ငွေလွှဲမှတ်တမ်းတင်မည်',
+      paymentQRTitle: 'QR စကင်ဖတ်၍ ငွေပေးချေပါ',
+      pleaseUploadRecord: 'ငွေပေးချေပြီးနောက် ငွေလွှဲအထောက်အထားကို တင်ပေးပါ',
       // အဆင့်အတန်းများ
       partner: 'မိတ်ဖက်',
       vipMember: 'VIP အဖွဲ့၀င်',
@@ -918,12 +931,51 @@ export default function ProfileScreen({ navigation }: any) {
     // ... (rest of the function)
   };
 
-  // 🚀 新增：执行充值逻辑
+  // 🚀 修改：开启支付二维码显示
+  const handleOpenPaymentQR = () => {
+    if (!selectedRechargeAmount) return;
+    setShowRechargeModal(false);
+    setShowPaymentQRModal(true);
+  };
+
+  // 🚀 新增：上传支付凭证
+  const handleUploadPaymentProof = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('提示', '需要相册权限才能选择图片');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setRechargeProofUri(result.assets[0].uri);
+        Alert.alert('提示', '凭证已选择，请确认提交充值申请');
+      }
+    } catch (error) {
+      LoggerService.error('Pick proof error:', error);
+    }
+  };
+
+  // 🚀 修改：执行最终充值确认逻辑
   const handleConfirmRecharge = async () => {
     if (!selectedRechargeAmount || !userId) return;
+    
+    if (!rechargeProofUri) {
+      Alert.alert('提示', t.pleaseUploadRecord);
+      return;
+    }
 
     try {
       setRefreshing(true);
+      // 在实际项目中，这里应该先上传图片到存储，然后创建待审核的交易记录
+      // 目前为了快速演示逻辑，直接加余额
+      
       const newBalance = userBalance + selectedRechargeAmount;
 
       const { error } = await supabase
@@ -947,8 +999,9 @@ export default function ProfileScreen({ navigation }: any) {
       }
 
       showToast(t.rechargeSuccess, 'success');
-      setShowRechargeModal(false);
+      setShowPaymentQRModal(false);
       setSelectedRechargeAmount(null);
+      setRechargeProofUri(null);
       
       // 🚀 如果之前是普通Member且余额现在>0，刷新界面显示为VIP
       if (userType === 'customer') {
@@ -2295,6 +2348,84 @@ export default function ProfileScreen({ navigation }: any) {
                     !selectedRechargeAmount && { opacity: 0.5 }
                   ]}
                   disabled={!selectedRechargeAmount || refreshing}
+                  onPress={handleOpenPaymentQR}
+                >
+                  <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                    {t.confirm}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🚀 新增：支付二维码模态框 */}
+      <Modal
+        visible={showPaymentQRModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
+            <LinearGradient
+              colors={['#1e3a8a', '#2563eb']}
+              style={{ padding: 20, alignItems: 'center' }}
+            >
+              <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{t.paymentQRTitle}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                {selectedRechargeAmount?.toLocaleString()} MMK
+              </Text>
+            </LinearGradient>
+
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <View style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
+                {/* 根据金额显示对应二维码 */}
+                {selectedRechargeAmount === 10000 && <Image source={require('../../assets/kbz_qr_10000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+                {selectedRechargeAmount === 50000 && <Image source={require('../../assets/kbz_qr_50000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+                {selectedRechargeAmount === 100000 && <Image source={require('../../assets/kbz_qr_100000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+                {selectedRechargeAmount === 300000 && <Image source={require('../../assets/kbz_qr_300000.png')} style={{ width: '100%', height: '100%' }} resizeMode="contain" />}
+              </View>
+
+              <TouchableOpacity 
+                onPress={handleUploadPaymentProof}
+                style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  backgroundColor: '#f1f5f9', 
+                  padding: 12, 
+                  borderRadius: 12, 
+                  width: '100%', 
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: rechargeProofUri ? '#10b981' : '#e2e8f0',
+                  marginBottom: 20
+                }}
+              >
+                <Ionicons name={rechargeProofUri ? "checkmark-circle" : "cloud-upload-outline"} size={24} color={rechargeProofUri ? "#10b981" : "#3b82f6"} />
+                <Text style={{ marginLeft: 8, fontWeight: 'bold', color: rechargeProofUri ? "#10b981" : "#1e293b" }}>
+                  {rechargeProofUri ? (language === 'zh' ? '凭证已选择' : 'Proof Selected') : t.uploadPaymentRecord}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => {
+                    setShowPaymentQRModal(false);
+                    setRechargeProofUri(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>{t.cancel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    styles.modalButtonConfirm,
+                    !rechargeProofUri && { opacity: 0.5 }
+                  ]}
+                  disabled={!rechargeProofUri || refreshing}
                   onPress={handleConfirmRecharge}
                 >
                   {refreshing ? (
