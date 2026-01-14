@@ -19,6 +19,7 @@ interface User {
   last_login: string;
   total_orders: number;
   total_spent: number;
+  balance?: number; // 🚀 新增：账户余额
   rating: number;
   notes?: string;
   register_region?: string;
@@ -108,7 +109,7 @@ const getVehicleIcon = (type: string) => {
 };
 
 // 列表行组件 - 用户
-const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUser, updateUserStatus, handleDeleteUser }: any) => {
+const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUser, updateUserStatus, handleDeleteUser, handleOpenRecharge }: any) => {
   if (!user) return null;
   
   const isSelected = selectedUsers.has(user.id);
@@ -183,6 +184,19 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
               }}>
                 {user.id}
               </span>
+              {/* 🚀 新增：余额标签 */}
+              <div style={{
+                background: 'rgba(46, 204, 113, 0.15)',
+                color: '#2ecc71',
+                padding: '2px 10px',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold',
+                border: '1px solid rgba(46, 204, 113, 0.3)',
+                marginLeft: '5px'
+              }}>
+                💰 {user.balance?.toLocaleString() || 0} MMK
+              </div>
             </div>
             <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.85rem' }}>
               📅 注册: {user.registration_date} | 🔑 最后登录: {user.last_login}
@@ -203,14 +217,15 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
               </div>
             )}
             <div style={{
-              background: getUserTypeColor(user.user_type),
+              background: (user.balance > 0 || user.user_type === 'vip') ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' : getUserTypeColor(user.user_type),
               color: 'white',
               padding: '5px 15px',
               borderRadius: '20px',
               fontSize: '0.9rem',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              boxShadow: (user.balance > 0 || user.user_type === 'vip') ? '0 4px 10px rgba(251, 191, 36, 0.3)' : 'none'
             }}>
-              {getUserTypeText(user.user_type)}
+              {(user.balance > 0 || user.user_type === 'vip') ? 'VIP Member' : getUserTypeText(user.user_type)}
             </div>
             <div style={{
               background: getStatusColor(user.status),
@@ -277,6 +292,36 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
           gap: '12px',
           flexWrap: 'wrap'
         }}>
+          {/* 🚀 新增：Credit 充值按钮 */}
+          <button
+            onClick={() => handleOpenRecharge(user)}
+            style={{
+              background: 'linear-gradient(135deg, #f1c40f 0%, #f39c12 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(243, 156, 18, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.3)';
+            }}
+          >
+            💰 Credit 充值
+          </button>
+
           <button
             onClick={() => handleEditUser(user)}
             style={{
@@ -704,6 +749,11 @@ const UserManagement: React.FC = () => {
   const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [showAddCourierForm, setShowAddCourierForm] = useState(false);
   
+  // 🚀 新增：充值功能状态
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeUser, setRechargeUser] = useState<User | null>(null);
+  const [isRecharging, setIsRechargeing] = useState(false);
+  
   // 批量操作状态
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
@@ -879,6 +929,60 @@ const UserManagement: React.FC = () => {
       notes: user.notes || ''
     });
     setShowAddUserForm(true);
+  };
+
+  // 🚀 新增：充值处理逻辑
+  const handleOpenRecharge = (user: User) => {
+    setRechargeUser(user);
+    setShowRechargeModal(true);
+  };
+
+  const handleRecharge = async (amount: number) => {
+    if (!rechargeUser) return;
+    
+    if (!window.confirm(`确定要为用户 "${rechargeUser.name}" 充值 ${amount.toLocaleString()} MMK 吗？`)) {
+      return;
+    }
+
+    try {
+      setIsRechargeing(true);
+      const currentBalance = rechargeUser.balance || 0;
+      const newBalance = currentBalance + amount;
+
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', rechargeUser.id);
+
+      if (error) {
+        console.error('充值失败:', error);
+        window.alert('充值失败，请重试');
+      } else {
+        // 记录审计日志
+        await auditLogService.log({
+          user_id: 'admin',
+          user_name: '管理员',
+          action_type: 'update',
+          module: 'users',
+          target_id: rechargeUser.id,
+          target_name: rechargeUser.name,
+          details: `充值余额: ${amount} MMK, 新余额: ${newBalance} MMK`
+        });
+
+        await loadUsers();
+        setShowRechargeModal(false);
+        setRechargeUser(null);
+        window.alert('充值成功！');
+      }
+    } catch (error) {
+      console.error('充值异常:', error);
+      window.alert('操作出错');
+    } finally {
+      setIsRechargeing(false);
+    }
   };
 
   const handleUpdateUser = async (e: React.FormEvent) => {
@@ -1176,7 +1280,17 @@ const UserManagement: React.FC = () => {
 
             <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
               {filteredUsers.map((user, index) => (
-                <UserRow key={user.id} user={user} selectedUsers={selectedUsers} handleSelectUser={handleSelectUser} isMobile={isMobile} handleEditUser={handleEditUser} updateUserStatus={updateUserStatus} handleDeleteUser={handleDeleteUser} />
+                <UserRow 
+                  key={user.id} 
+                  user={user} 
+                  selectedUsers={selectedUsers} 
+                  handleSelectUser={handleSelectUser} 
+                  isMobile={isMobile} 
+                  handleEditUser={handleEditUser} 
+                  updateUserStatus={updateUserStatus} 
+                  handleDeleteUser={handleDeleteUser}
+                  handleOpenRecharge={handleOpenRecharge} 
+                />
               ))}
             </div>
           </div>
@@ -1249,6 +1363,92 @@ const UserManagement: React.FC = () => {
                   <button type="button" onClick={() => setShowAddCourierForm(false)} style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>取消</button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* 🚀 新增：充值模态框 */}
+        {showRechargeModal && rechargeUser && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(15px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px' }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', 
+              padding: '40px', 
+              borderRadius: '32px', 
+              width: '100%', 
+              maxWidth: '500px', 
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.4)',
+              position: 'relative'
+            }}>
+              <button 
+                onClick={() => setShowRechargeModal(false)}
+                style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >✕</button>
+
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>💳</div>
+                <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 800, margin: 0 }}>账户充值</h2>
+                <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: '10px' }}>为用户 <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{rechargeUser.name}</span> 选择充值金额</p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
+                {[10000, 50000, 100000, 300000].map(amount => (
+                  <button
+                    key={amount}
+                    onClick={() => handleRecharge(amount)}
+                    disabled={isRecharging}
+                    style={{
+                      padding: '20px',
+                      borderRadius: '16px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: 'white',
+                      fontSize: '1.1rem',
+                      fontWeight: '800',
+                      cursor: isRecharging ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isRecharging) {
+                        e.currentTarget.style.background = '#fbbf24';
+                        e.currentTarget.style.color = '#1e3c72';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isRecharging) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.color = 'white';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }
+                    }}
+                  >
+                    {amount.toLocaleString()} MMK
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => setShowRechargeModal(false)}
+                style={{ 
+                  width: '100%', 
+                  padding: '16px', 
+                  borderRadius: '16px', 
+                  background: 'rgba(255,255,255,0.1)', 
+                  border: '1px solid rgba(255,255,255,0.2)', 
+                  color: 'white', 
+                  fontSize: '1rem', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer' 
+                }}
+              >返回列表</button>
+
+              {isRecharging && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', borderRadius: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                </div>
+              )}
             </div>
           </div>
         )}
