@@ -752,7 +752,7 @@ const UserManagement: React.FC = () => {
   // 🚀 新增：充值功能状态
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [rechargeUser, setRechargeUser] = useState<User | null>(null);
-  const [isRecharging, setIsRechargeing] = useState(false);
+  const [isRecharging, setIsRecharging] = useState(false);
   
   // 批量操作状态
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
@@ -945,7 +945,7 @@ const UserManagement: React.FC = () => {
     }
 
     try {
-      setIsRechargeing(true);
+      setIsRecharging(true);
       const currentBalance = rechargeUser.balance || 0;
       const newBalance = currentBalance + amount;
 
@@ -969,7 +969,7 @@ const UserManagement: React.FC = () => {
           module: 'users',
           target_id: rechargeUser.id,
           target_name: rechargeUser.name,
-          details: `充值余额: ${amount} MMK, 新余额: ${newBalance} MMK`
+          action_description: `充值余额: ${amount} MMK, 新余额: ${newBalance} MMK`
         });
 
         await loadUsers();
@@ -981,7 +981,7 @@ const UserManagement: React.FC = () => {
       console.error('充值异常:', error);
       window.alert('操作出错');
     } finally {
-      setIsRechargeing(false);
+      setIsRecharging(false);
     }
   };
 
