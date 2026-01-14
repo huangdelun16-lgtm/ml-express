@@ -24,8 +24,12 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import { Asset } from 'expo-asset';
 import { useApp } from '../contexts/AppContext';
-import { customerService, packageService, deliveryStoreService } from '../services/supabase';
+import { customerService, packageService, deliveryStoreService, rechargeService, supabase } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
@@ -946,6 +950,43 @@ export default function ProfileScreen({ navigation }: any) {
     setShowPaymentQRModal(true);
   };
 
+  // 🚀 新增：保存二维码到本机
+  const handleSaveQRCode = async (amount: number) => {
+    try {
+      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        hideLoading();
+        Alert.alert('提示', '需要相册权限才能保存图片');
+        return;
+      }
+
+      // 获取图片资源
+      const imageAsset = RECHARGE_QR_IMAGES[amount];
+      if (!imageAsset) {
+        hideLoading();
+        return;
+      }
+
+      // 解析 local 资源
+      const asset = Asset.fromModule(imageAsset);
+      await asset.downloadAsync();
+      
+      if (asset.localUri) {
+        await MediaLibrary.saveToLibraryAsync(asset.localUri);
+        hideLoading();
+        Alert.alert('成功', '收款码已保存到您的相册，请前往 KBZPay 进行支付');
+      } else {
+        throw new Error('Local URI not found');
+      }
+    } catch (error) {
+      hideLoading();
+      LoggerService.error('保存二维码失败:', error);
+      showToast('保存失败', 'error');
+    }
+  };
+
   // 🚀 新增：上传支付凭证
   const handleUploadPaymentProof = async () => {
     try {
@@ -980,46 +1021,39 @@ export default function ProfileScreen({ navigation }: any) {
     }
 
     try {
-      setRefreshing(true);
-      // 在实际项目中，这里应该先上传图片到存储，然后创建待审核的交易记录
-      // 目前为了快速演示逻辑，直接加余额
+      showLoading(language === 'zh' ? '正在提交申请...' : 'Submitting...', 'package');
       
-      const newBalance = accountBalance + selectedRechargeAmount;
-
-      const { error } = await supabase
-        .from('users')
-        .update({ 
-          balance: newBalance,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      // 更新本地状态和缓存
-      setAccountBalance(newBalance);
+      // 1. 上传图片到 Supabase Storage
+      const proofUrl = await rechargeService.uploadProof(userId, rechargeProofUri);
       
-      const currentUser = await AsyncStorage.getItem('currentUser');
-      if (currentUser) {
-        const user = JSON.parse(currentUser);
-        const updatedUser = { ...user, balance: newBalance };
-        await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      if (!proofUrl) {
+        throw new Error('Upload failed');
       }
 
-      showToast(t.rechargeSuccess, 'success');
+      // 2. 创建充值记录申请
+      const requestResult = await rechargeService.createRequest({
+        user_id: userId,
+        user_name: userName,
+        amount: selectedRechargeAmount,
+        proof_url: proofUrl,
+        status: 'pending',
+        notes: `充值卡金额: ${selectedRechargeAmount} MMK`
+      });
+
+      if (!requestResult.success) {
+        throw new Error('Request creation failed');
+      }
+
+      hideLoading();
+      showToast(language === 'zh' ? '申请已提交，等待管理员审核' : 'Request submitted, pending review', 'success');
       setShowPaymentQRModal(false);
       setSelectedRechargeAmount(null);
       setRechargeProofUri(null);
       
-      // 🚀 如果之前是普通Member且余额现在>0，刷新界面显示为VIP
-      if (userType === 'customer') {
-        loadUserData();
-      }
     } catch (error) {
+      hideLoading();
       LoggerService.error('充值失败:', error);
       showToast(t.rechargeFailed, 'error');
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -2388,7 +2422,11 @@ export default function ProfileScreen({ navigation }: any) {
             </LinearGradient>
 
             <View style={{ padding: 20, alignItems: 'center' }}>
-              <View style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onLongPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
+                style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 10, justifyContent: 'center', alignItems: 'center' }}
+              >
                 {/* 🚀 使用预定义的映射显示二维码 */}
                 {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
                   <Image 
@@ -2404,7 +2442,11 @@ export default function ProfileScreen({ navigation }: any) {
                     </Text>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
+              
+              <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 20 }}>
+                {language === 'zh' ? '💡 长按二维码图片可保存到手机' : '💡 Long press image to save'}
+              </Text>
 
               <TouchableOpacity 
                 onPress={handleUploadPaymentProof}

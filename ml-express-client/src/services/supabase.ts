@@ -1526,6 +1526,77 @@ export const systemSettingsService = {
   },
 };
 
+// 充值服务
+export const rechargeService = {
+  // 上传支付凭证
+  async uploadProof(userId: string, imageUri: string): Promise<string | null> {
+    try {
+      const fileName = `recharge_${userId}_${Date.now()}.jpg`;
+      
+      // 使用 FileSystem 读取图片
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
+      });
+
+      // 转换为二进制
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // 上传到 storage
+      const { data, error } = await supabase.storage
+        .from('payment_proofs')
+        .upload(fileName, bytes, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // 获取公共 URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment_proofs')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传凭证失败:', error?.message || '未知错误');
+      return null;
+    }
+  },
+
+  // 创建充值申请
+  async createRequest(requestData: {
+    user_id: string;
+    user_name: string;
+    amount: number;
+    proof_url: string;
+    status: 'pending' | 'completed' | 'rejected';
+    notes?: string;
+  }) {
+    try {
+      const { data, error } = await supabase
+        .from('recharge_requests')
+        .insert([{
+          ...requestData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('创建充值申请失败:', error?.message || '未知错误');
+      return { success: false, error };
+    }
+  }
+};
+
 // 商家服务 (外卖/零售)
 export const merchantService = {
   // 获取商店的所有商品

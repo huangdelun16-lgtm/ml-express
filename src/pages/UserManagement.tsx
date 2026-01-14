@@ -27,6 +27,18 @@ interface User {
   updated_at?: string;
 }
 
+interface RechargeRequest {
+  id: string;
+  user_id: string;
+  user_name: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'rejected';
+  proof_url: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 interface Courier {
   id: string;
   name: string;
@@ -542,7 +554,11 @@ const StoreRow = ({ store, isMobile }: any) => {
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'partner_store' | 'courier_management'>('customer_list');
+  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'partner_store' | 'courier_management' | 'recharge_requests'>('customer_list');
+
+  // ... (rest of the component)
+  const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
 
   // 列表行组件 - 快递员 (移动到内部以确保闭包正确)
   const CourierRow = ({ courier, isMobile, handleEditCourier, handleCourierStatusChange, handleDeleteCourier }: any) => {
@@ -1310,10 +1326,107 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const loadRechargeRequests = async () => {
+    try {
+      setLoadingRequests(true);
+      const { data, error } = await supabase
+        .from('recharge_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setRechargeRequests(data || []);
+    } catch (error) {
+      console.error('加载充值申请失败:', error);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  const handleApproveRecharge = async (request: RechargeRequest) => {
+    if (!window.confirm(`确定要通过该充值申请吗？\n用户: ${request.user_name}\n金额: ${request.amount.toLocaleString()} MMK`)) return;
+
+    try {
+      setLoadingRequests(true);
+      
+      // 1. 获取当前用户余额
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('id', request.user_id)
+        .single();
+      
+      if (userError) throw userError;
+
+      const newBalance = (userData.balance || 0) + request.amount;
+
+      // 2. 更新用户余额
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ balance: newBalance })
+        .eq('id', request.user_id);
+      
+      if (updateError) throw updateError;
+
+      // 3. 更新申请状态
+      const { error: requestError } = await supabase
+        .from('recharge_requests')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('id', request.id);
+      
+      if (requestError) throw requestError;
+
+      // 4. 记录日志
+      await auditLogService.log({
+        user_id: 'admin',
+        user_name: '管理员',
+        action_type: 'update',
+        module: 'users',
+        target_id: request.user_id,
+        target_name: request.user_name,
+        action_description: `通过充值申请: ${request.amount} MMK, 新余额: ${newBalance} MMK`
+      });
+
+      window.alert('充值已到账！');
+      await loadRechargeRequests();
+    } catch (error: any) {
+      console.error('审批失败:', error);
+      window.alert(`操作失败: ${error.message}`);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  const handleRejectRecharge = async (request: RechargeRequest) => {
+    const reason = window.prompt('请输入拒绝原因:');
+    if (reason === null) return;
+
+    try {
+      setLoadingRequests(true);
+      const { error } = await supabase
+        .from('recharge_requests')
+        .update({ 
+          status: 'rejected', 
+          notes: `拒绝原因: ${reason}`,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', request.id);
+      
+      if (error) throw error;
+
+      window.alert('申请已拒绝');
+      await loadRechargeRequests();
+    } catch (error: any) {
+      window.alert(`操作失败: ${error.message}`);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
   useEffect(() => {
-    loadSummaryStats(); // 🚀 每次切换标签都刷新真实统计数据
     if (activeTab === 'courier_management') loadCouriers();
     else if (activeTab === 'partner_store') loadPartnerStores();
+    else if (activeTab === 'recharge_requests') loadRechargeRequests();
     else loadUsers();
   }, [activeTab]);
 
@@ -1329,9 +1442,13 @@ const UserManagement: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-          {['customer_list', 'admin_list', 'partner_store', 'courier_management'].map(tab => (
+          {['customer_list', 'admin_list', 'partner_store', 'courier_management', 'recharge_requests'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '12px 24px', borderRadius: '12px', border: 'none', background: activeTab === tab ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)', color: 'white', cursor: 'pointer', fontWeight: activeTab === tab ? '600' : '400', transition: 'all 0.3s ease' }}>
-              {tab === 'customer_list' ? '客户列表' : tab === 'admin_list' ? '管理员列表' : tab === 'partner_store' ? '合伙店铺' : '快递员管理'}
+              {tab === 'customer_list' ? '客户列表' : 
+               tab === 'admin_list' ? '管理员列表' : 
+               tab === 'partner_store' ? '合伙店铺' : 
+               tab === 'courier_management' ? '快递员管理' : 
+               '充值申请审核'}
             </button>
           ))}
         </div>
@@ -1449,6 +1566,103 @@ const UserManagement: React.FC = () => {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'recharge_requests' && (
+          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ color: 'white', margin: 0 }}>💰 充值申请审核</h2>
+              <button onClick={loadRechargeRequests} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>🔄 刷新列表</button>
+            </div>
+
+            {loadingRequests ? (
+              <SkeletonTable rows={5} />
+            ) : rechargeRequests.length === 0 ? (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+                <span style={{ fontSize: '4rem', display: 'block', marginBottom: '20px' }}>📋</span>
+                <p style={{ fontSize: '1.2rem' }}>暂无充值申请记录</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {rechargeRequests.map(request => (
+                  <div key={request.id} style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    borderRadius: '20px',
+                    padding: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr 1.5fr 1.5fr',
+                    gap: '20px',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '1.5rem' }}>👤</span>
+                        <div>
+                          <div style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>{request.user_name}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>{request.user_id}</div>
+                        </div>
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
+                        ⏰ {new Date(request.created_at).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', marginBottom: '4px' }}>充值金额</div>
+                      <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: '900' }}>{request.amount.toLocaleString()} MMK</div>
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', marginBottom: '8px' }}>汇款凭证</div>
+                      <a href={request.proof_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
+                        <div style={{
+                          width: '100px',
+                          height: '100px',
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          border: '2px solid rgba(255,255,255,0.1)',
+                          background: '#000'
+                        }}>
+                          <img src={request.proof_url} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      </a>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ 
+                        textAlign: 'center',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        background: request.status === 'pending' ? 'rgba(241, 196, 15, 0.2)' : 
+                                   request.status === 'completed' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)',
+                        color: request.status === 'pending' ? '#f1c40f' : 
+                               request.status === 'completed' ? '#2ecc71' : '#e74c3c',
+                        border: `1px solid ${request.status === 'pending' ? '#f1c40f44' : 
+                                             request.status === 'completed' ? '#2ecc7144' : '#e74c3c44'}`
+                      }}>
+                        {request.status === 'pending' ? '⏳ 待审核' : 
+                         request.status === 'completed' ? '✅ 已通过' : '❌ 已拒绝'}
+                      </div>
+
+                      {request.status === 'pending' ? (
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => handleApproveRecharge(request)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#2ecc71', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>通过</button>
+                          <button onClick={() => handleRejectRecharge(request)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#e74c3c', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>拒绝</button>
+                        </div>
+                      ) : (
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontStyle: 'italic', textAlign: 'center' }}>
+                          {request.notes || '无备注'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
