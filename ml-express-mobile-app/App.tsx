@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,8 +11,10 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { notificationService } from './services/notificationService';
 import { errorService } from './services/errorService';
 import { locationService } from './services/locationService';
-import { packageService } from './services/supabase';
+import { packageService, supabase } from './services/supabase';
 import NetInfo from '@react-native-community/netinfo';
+import * as Speech from 'expo-speech';
+import { Vibration } from 'react-native';
 
 // 保持启动页可见
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -253,6 +255,114 @@ function MainTabs() {
   return <CourierTabs />;
 }
 
+// 🚀 全局订单实时监控组件
+// 负责在 App 运行期间监听新订单分配，并强制执行语音和震动提醒
+const GlobalOrderMonitor = () => {
+  const [courierName, setCourierName] = useState<string | null>(null);
+  const announcedOrders = useRef<Set<string>>(new Set()); // 记录本轮已播报过的订单 ID
+  
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const name = await AsyncStorage.getItem('currentUserName');
+        if (name && name.trim() !== (courierName || '').trim()) {
+          console.log('👤 [监控器] 检测到骑手登录:', name.trim());
+          setCourierName(name.trim());
+        } else if (!name && courierName) {
+          console.log('👤 [监控器] 检测到骑手登出');
+          setCourierName(null);
+          announcedOrders.current.clear();
+        }
+      } catch (e) {
+        console.error('检查登录状态失败:', e);
+      }
+    };
+
+    checkLoginStatus();
+    const timer = setInterval(checkLoginStatus, 5000); // 降低轮询频率至 5s，减少开销
+    return () => clearInterval(timer);
+  }, [courierName]);
+
+  useEffect(() => {
+    if (!courierName) return;
+
+    console.log('📡 [监控器] 正在启动增强型监听，骑手:', courierName);
+
+    const channelId = `monitor-orders-${Date.now()}`;
+    const channel = supabase
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'packages'
+        },
+        async (payload) => {
+          const { eventType, new: newPkg, old: oldPkg } = payload;
+          
+          if (!newPkg || !newPkg.id) return;
+
+          // 🚀 核心改进：执行不区分大小写且去除空格的匹配
+          const currentCourierClean = courierName.toLowerCase().trim();
+          const pkgCourierClean = (newPkg.courier || '').toLowerCase().trim();
+          const isMyOrder = pkgCourierClean === currentCourierClean;
+
+          // 判定是否需要播报：
+          // 1. 是一条新插入且指派给我的记录
+          // 2. 是更新操作，且指派对象从别人变成了我（或从空变我）
+          const isNewlyAssigned = eventType === 'UPDATE' && 
+                                (oldPkg.courier || '').toLowerCase().trim() !== pkgCourierClean && 
+                                isMyOrder;
+          
+          const isNewRecord = eventType === 'INSERT' && isMyOrder;
+
+          if ((isNewRecord || isNewlyAssigned) && !announcedOrders.current.has(newPkg.id)) {
+            // 过滤状态，只有待处理状态才播报
+            if (['待取件', '已分配', '待收款', '待派送'].includes(newPkg.status)) {
+              console.log('🚨 [监控器] 成功捕捉到新任务分配:', newPkg.id);
+              announcedOrders.current.add(newPkg.id);
+              
+              // 1. 强力震动 (三连振)
+              Vibration.vibrate([0, 800, 200, 800, 200, 800]);
+              
+              // 2. 强力语音播报
+              try {
+                const lang = await AsyncStorage.getItem('ml-express-language') || 'zh';
+                let voiceMsg = '';
+                if (lang === 'my') {
+                  voiceMsg = 'သင့်တွင် မြို့တွင်းပို့ဆောင်ရေး အော်ဒါအသစ်တစ်ခုရှိသည်။ ကျေးဇူးပြု၍ အချိန်မီစစ်ဆေးပါ။';
+                } else if (lang === 'en') {
+                  voiceMsg = 'You have a new local delivery order. Please check it in time.';
+                } else {
+                  voiceMsg = '您有新的同城配送订单，请及时查看';
+                }
+
+                Speech.stop(); // 停止当前所有播放，新通知最高优先级
+                Speech.speak(voiceMsg, {
+                  language: lang === 'my' ? 'my-MM' : lang === 'en' ? 'en-US' : 'zh-CN',
+                  pitch: 1.0,
+                  rate: 0.85,
+                });
+              } catch (err) {
+                console.warn('语音播放失败:', err);
+              }
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`🔌 [监控器] 实时频道状态: ${status}`);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [courierName]);
+
+  return null;
+};
+
 export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
 
@@ -332,6 +442,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
+        <GlobalOrderMonitor />
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName="Login"
