@@ -765,6 +765,88 @@ const UserManagement: React.FC = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
+  // 🚀 新增：统计数据状态
+  const [summaryStats, setSummaryStats] = useState({
+    // 客户统计
+    totalCustomers: 0,
+    vipCustomers: 0,
+    activeCustomers: 0,
+    totalSpent: 0,
+    // 管理员统计
+    totalAdmins: 0,
+    activeAdmins: 0,
+    superAdmins: 0,
+    recentLogins: 0,
+    // 快递员统计
+    totalCouriers: 0,
+    activeCouriers: 0,
+    totalDeliveries: 0,
+    avgRating: 0,
+    // 店铺统计
+    totalStores: 0,
+    activeStores: 0,
+    totalCOD: 0,
+    // 全局统计
+    totalOrders: 0
+  });
+
+  // 🚀 获取真实统计数据
+  const loadSummaryStats = async () => {
+    try {
+      // 1. 获取客户统计
+      const { data: customers } = await supabase
+        .from('users')
+        .select('status, balance, total_spent, user_type');
+      
+      // 2. 获取管理员统计
+      const { data: admins } = await supabase
+        .from('admin_accounts')
+        .select('status, role, last_login');
+      
+      // 3. 获取快递员统计
+      const { data: couriersData } = await supabase
+        .from('couriers')
+        .select('status, total_deliveries, rating');
+      
+      // 4. 获取店铺统计
+      const { data: stores } = await supabase
+        .from('delivery_stores')
+        .select('status');
+      
+      // 5. 获取订单总数
+      const { count: orderCount } = await supabase
+        .from('packages')
+        .select('*', { count: 'exact', head: true });
+
+      const stats = {
+        totalCustomers: customers?.filter(u => u.user_type === 'customer').length || 0,
+        vipCustomers: customers?.filter(u => u.user_type === 'customer' && (u.balance > 0 || u.user_type === 'vip')).length || 0,
+        activeCustomers: customers?.filter(u => u.user_type === 'customer' && u.status === 'active').length || 0,
+        totalSpent: customers?.reduce((sum, u) => sum + (u.total_spent || 0), 0) || 0,
+        
+        totalAdmins: admins?.length || 0,
+        activeAdmins: admins?.filter(a => a.status === 'active').length || 0,
+        superAdmins: admins?.filter(a => a.role === 'admin').length || 0,
+        recentLogins: admins?.filter(a => a.last_login && new Date(a.last_login).toDateString() === new Date().toDateString()).length || 0,
+        
+        totalCouriers: admins?.filter(a => a.position === '骑手' || a.position === '骑手队长').length || 0,
+        activeCouriers: admins?.filter(a => (a.position === '骑手' || a.position === '骑手队长') && a.status === 'active').length || 0,
+        totalDeliveries: couriersData?.reduce((sum, c) => sum + (c.total_deliveries || 0), 0) || 0,
+        avgRating: couriersData?.length ? (couriersData.reduce((sum, c) => sum + (c.rating || 0), 0) / couriersData.length) : 5.0,
+        
+        totalStores: stores?.length || 0,
+        activeStores: stores?.filter(s => s.status === 'active').length || 0,
+        totalCOD: 0, // 待后续完善代收统计
+        
+        totalOrders: orderCount || 0
+      };
+
+      setSummaryStats(stats);
+    } catch (err) {
+      console.error('加载统计数据失败:', err);
+    }
+  };
+
   // 批量选择处理
   const handleSelectAll = () => {
     if (selectedUsers.size === filteredUsers.length && filteredUsers.length > 0) {
@@ -853,6 +935,8 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
+      loadSummaryStats(); // 🚀 同时刷新统计
+      
       // 1. 获取普通用户（客户）
       const { data: usersData, error: usersError } = await supabase
         .from('users')
@@ -1227,6 +1311,7 @@ const UserManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    loadSummaryStats(); // 🚀 每次切换标签都刷新真实统计数据
     if (activeTab === 'courier_management') loadCouriers();
     else if (activeTab === 'partner_store') loadPartnerStores();
     else loadUsers();
@@ -1251,27 +1336,92 @@ const UserManagement: React.FC = () => {
           ))}
         </div>
 
+        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'partner_store' || activeTab === 'courier_management') && !showAddUserForm && (
+          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)', marginBottom: '30px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px' }}>
+              {activeTab === 'customer_list' ? (
+                <>
+                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalCustomers}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>客户总数</p>
+                  </div>
+                  <div style={{ background: 'rgba(241, 196, 15, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#f1c40f', margin: '0 0 5px 0' }}>{summaryStats.vipCustomers}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>VIP 会员</p>
+                  </div>
+                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeCustomers}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃客户</p>
+                  </div>
+                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.totalOrders}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>总订单数</p>
+                  </div>
+                </>
+              ) : activeTab === 'admin_list' ? (
+                <>
+                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalAdmins}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>管理账号总数</p>
+                  </div>
+                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeAdmins}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃账号</p>
+                  </div>
+                  <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0' }}>{summaryStats.superAdmins}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>超级管理员</p>
+                  </div>
+                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.recentLogins}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>今日活跃</p>
+                  </div>
+                </>
+              ) : activeTab === 'partner_store' ? (
+                <>
+                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalStores}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>店铺总数</p>
+                  </div>
+                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeStores}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>正在营业</p>
+                  </div>
+                  <div style={{ background: 'rgba(231, 76, 60, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#e74c3c', margin: '0 0 5px 0' }}>{summaryStats.totalStores - summaryStats.activeStores}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>休息中</p>
+                  </div>
+                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.totalOrders}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>总订单数</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0' }}>{summaryStats.totalCouriers}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>快递员总数</p>
+                  </div>
+                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeCouriers}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃骑手</p>
+                  </div>
+                  <div style={{ background: 'rgba(241, 196, 15, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#f1c40f', margin: '0 0 5px 0' }}>{summaryStats.totalDeliveries}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>配送总数</p>
+                  </div>
+                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
+                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.avgRating.toFixed(1)}</h3>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>平均评分</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {(activeTab === 'customer_list' || activeTab === 'admin_list') && !showAddUserForm && (
           <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
-              <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{users.filter(u => u.user_type === 'customer').length}</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem' }}>客户总数</p>
-              </div>
-              <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0' }}>{couriers.length}</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem' }}>快递员总数</p>
-              </div>
-              <div style={{ background: 'rgba(39, 174, 96, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                <h3 style={{ color: '#27ae60', margin: '0 0 5px 0' }}>{users.filter(u => u.status === 'active').length}</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃用户</p>
-              </div>
-              <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{users.reduce((s, u) => s + (u.total_orders || 0), 0)}</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem' }}>总订单数</p>
-              </div>
-            </div>
-
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginBottom: '24px', alignItems: 'center' }}>
               <input type="text" placeholder="🔍 搜索客户姓名、电话..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '14px 20px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.2)', background: 'rgba(0, 0, 0, 0.4)', color: 'white' }} />
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '14px 20px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.2)', background: 'rgba(0, 0, 0, 0.4)', color: 'white' }}>
