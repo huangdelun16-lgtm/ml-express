@@ -273,14 +273,14 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={[styles.infoValue, { color: '#f59e0b' }]}>{Number(pkg.cod_amount || 0).toLocaleString()} MMK</Text>
           </View>
 
-          {/* 🚀 新增：解析并显示“付给商家”金额 */}
+          {/* 🚀 新增：解析并显示“平台支付”金额 */}
           {(() => {
-            const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+            const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
             if (payMatch && payMatch[1]) {
               return (
                 <View style={[styles.infoLine, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: 10, paddingTop: 15 }]}>
                   <Text style={[styles.infoLabel, { fontWeight: 'bold', color: '#10b981' }]}>
-                    {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}:
+                    {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}:
                   </Text>
                   <Text style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981', fontSize: 18 }]}>
                     {payMatch[1]} MMK

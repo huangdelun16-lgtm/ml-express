@@ -28,6 +28,9 @@ const ProfilePage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userBalance, setUserBalance] = useState<number>(0); // 🚀 新增：余额状态
+  const [showRechargeModal, setShowRechargeModal] = useState(false); // 🚀 新增：充值模态框
+  const [rechargeAmount, setRechargeAmount] = useState(''); // 🚀 新增：充值金额
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -325,6 +328,25 @@ const ProfilePage: React.FC = () => {
       try {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
+        setUserBalance(user.balance || 0); // 🚀 获取余额
+
+        // 🚀 实时从数据库同步最新余额和用户信息
+        if (user.id) {
+          try {
+            const { data: latestUser } = await supabase
+              .from('users')
+              .select('balance, user_type')
+              .eq('id', user.id)
+              .maybeSingle();
+            
+            if (latestUser) {
+              setUserBalance(latestUser.balance || 0);
+              // 如果需要，这里可以更新 localStorage
+            }
+          } catch (error) {
+            console.warn('获取最新余额失败');
+          }
+        }
         
         // 检查是否是合伙店铺账户
         const isPartner = await checkIfPartnerStore(user);
@@ -942,6 +964,43 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：处理充值逻辑
+  const handleRecharge = async () => {
+    const amount = parseFloat(rechargeAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert(language === 'zh' ? '请输入有效的充值金额' : 'Please enter a valid amount');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const newBalance = userBalance + amount;
+      
+      // 更新数据库
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
+      // 更新本地状态
+      setUserBalance(newBalance);
+      setShowRechargeModal(false);
+      setRechargeAmount('');
+      
+      alert(language === 'zh' ? `充值成功！新余额: ${newBalance.toLocaleString()} MMK` : `Recharge successful! New balance: ${newBalance.toLocaleString()} MMK`);
+    } catch (error) {
+      LoggerService.error('充值失败:', error);
+      alert(language === 'zh' ? '充值失败，请稍后重试' : 'Recharge failed, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -1050,7 +1109,7 @@ const ProfilePage: React.FC = () => {
                   <div style={{
                     background: isPartnerStore 
                       ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
-                      : (currentUser.user_type === 'vip' 
+                      : (userBalance > 0 || currentUser.user_type === 'vip' 
                         ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)'
                         : (currentUser.user_type === 'admin' 
                           ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
@@ -1059,7 +1118,7 @@ const ProfilePage: React.FC = () => {
                             : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'))),
                     boxShadow: isPartnerStore 
                       ? '0 4px 15px rgba(14, 165, 233, 0.4)' 
-                      : (currentUser.user_type === 'vip'
+                      : (userBalance > 0 || currentUser.user_type === 'vip'
                         ? '0 4px 15px rgba(251, 191, 36, 0.4)'
                         : (currentUser.user_type === 'admin'
                           ? '0 4px 15px rgba(249, 115, 22, 0.4)'
@@ -1076,7 +1135,7 @@ const ProfilePage: React.FC = () => {
                     textTransform: 'uppercase'
                   }}>
                     {isPartnerStore ? 'Partner' : (
-                      currentUser.user_type === 'vip' 
+                      (userBalance > 0 || currentUser.user_type === 'vip') 
                         ? (language === 'zh' ? 'VIP 会员' : language === 'en' ? 'VIP Member' : 'VIP အဖွဲ့ဝင်')
                         : (currentUser.user_type === 'admin' 
                           ? 'Admin' 
@@ -1084,6 +1143,59 @@ const ProfilePage: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* 🚀 新增：余额显示和充值按钮 */}
+                {!isPartnerStore && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      background: 'rgba(251, 191, 36, 0.15)',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                      <span style={{ fontSize: '1.2rem' }}>💰</span>
+                      <div>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                          {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}
+                        </div>
+                        <div style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>
+                          {userBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => setShowRechargeModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 1.8rem',
+                        borderRadius: '14px',
+                        fontSize: '1rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
+                      }}
+                    >
+                      {language === 'zh' ? '立即充值' : language === 'en' ? 'Recharge' : 'ငွေဖြည့်မည်'}
+                    </button>
+                  </div>
+                )}
                 
                 {/* 合伙店铺：修改密码按钮 */}
                 {isPartnerStore && (
@@ -1764,22 +1876,22 @@ const ProfilePage: React.FC = () => {
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <select 
                             value={parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00')[0]}
-                            onChange={(e) => {
+                          onChange={(e) => {
                               const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '00');
                               const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
                               setBusinessStatus(prev => ({ ...prev, operating_hours: `${e.target.value}:${oldMin} - ${end}` }));
-                            }}
-                            style={{ 
+                          }}
+                          style={{ 
                               flex: 1,
-                              background: 'white', 
-                              border: 'none', 
-                              borderRadius: '15px', 
-                              padding: '12px', 
-                              color: '#1e293b', 
-                              outline: 'none', 
-                              cursor: 'pointer', 
-                              fontWeight: '900',
-                              fontSize: '1rem',
+                            background: 'white', 
+                            border: 'none', 
+                            borderRadius: '15px', 
+                            padding: '12px', 
+                            color: '#1e293b', 
+                            outline: 'none', 
+                            cursor: 'pointer', 
+                            fontWeight: '900',
+                            fontSize: '1rem',
                               boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
                               appearance: 'none',
                               textAlign: 'center'
@@ -1824,22 +1936,22 @@ const ProfilePage: React.FC = () => {
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <select 
                             value={parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00')[0]}
-                            onChange={(e) => {
+                          onChange={(e) => {
                               const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
                               const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '00');
                               setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${e.target.value}:${oldMin}` }));
-                            }}
-                            style={{ 
+                          }}
+                          style={{ 
                               flex: 1,
-                              background: 'white', 
-                              border: 'none', 
-                              borderRadius: '15px', 
-                              padding: '12px', 
-                              color: '#1e293b', 
-                              outline: 'none', 
-                              cursor: 'pointer', 
-                              fontWeight: '900',
-                              fontSize: '1rem',
+                            background: 'white', 
+                            border: 'none', 
+                            borderRadius: '15px', 
+                            padding: '12px', 
+                            color: '#1e293b', 
+                            outline: 'none', 
+                            cursor: 'pointer', 
+                            fontWeight: '900', 
+                            fontSize: '1rem',
                               boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
                               appearance: 'none',
                               textAlign: 'center'
@@ -2421,14 +2533,14 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 🚀 新增：从描述中解析“付给商家”并显示 */}
+              {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
               {(() => {
-                const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
                 if (payMatch && payMatch[1]) {
                   return (
                     <div>
                       <label style={{ color: '#10b981', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                        {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}
+                        {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}
                       </label>
                       <div style={{ color: '#10b981', fontSize: '1.5rem', fontWeight: '900' }}>
                         {payMatch[1]} MMK

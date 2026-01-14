@@ -185,14 +185,14 @@ export default function CourierHomeScreen({ navigation }: any) {
           <Text style={styles.addressText} numberOfLines={2}>{item.receiver_address}</Text>
         </View>
 
-        {/* 🚀 新增：首页列表展示付给商家金额 */}
+        {/* 🚀 新增：首页列表展示平台支付金额 */}
         {(() => {
-          const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+          const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
           if (payMatch && payMatch[1]) {
             return (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginLeft: 16 }}>
                 <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                  💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                  💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
                 </Text>
               </View>
             );

@@ -890,14 +890,14 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.receiverName}>{item.receiver_name}</Text>
                 <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
                 
-                {/* 🚀 新增：地图展示付给商家金额 */}
+                {/* 🚀 新增：地图展示平台支付金额 */}
                 {(() => {
-                  const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                  const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
                   if (payMatch && payMatch[1]) {
                     return (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                         <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                          💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                          💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
                         </Text>
                       </View>
                     );

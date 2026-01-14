@@ -35,6 +35,7 @@ export interface User {
   last_login: string;
   total_orders: number;
   total_spent: number;
+  balance?: number; // 🚀 新增：账户余额
   rating: number;
   notes: string;
   created_at?: string;

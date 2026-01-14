@@ -237,7 +237,7 @@ export const notificationService = {
         const title = notification.request.content.title;
         const data = notification.request.content.data;
 
-        if (title?.includes('新包裹') || title?.includes('新订单') || data?.type === 'new_order') {
+        if (title?.includes('新包裹') || title?.includes('新订单') || data?.type === 'new_order' || title?.includes('分配')) {
           try {
             // 从存储中获取当前语言设置
             const language = await AsyncStorage.getItem('ml-express-language') || 'zh';

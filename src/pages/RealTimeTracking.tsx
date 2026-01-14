@@ -1374,9 +1374,23 @@ const RealTimeTracking: React.FC = () => {
                         🚗 距离: {pkg.delivery_distance} km
                       </p>
                     )}
+                    {pkg.price && (
                     <p style={{ margin: '0.3rem 0' }}>
                       💰 跑腿费: {pkg.price}
                     </p>
+                    )}
+                    {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
+                    {(() => {
+                      const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                      if (payMatch && payMatch[1]) {
+                        return (
+                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#10b981' }}>
+                            💵 平台支付: {payMatch[1]} MMK
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                     {(() => {
                       const isStoreMatch = stores.some(store => 
                         store.store_name === pkg.sender_name || 

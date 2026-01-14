@@ -719,14 +719,14 @@ export default function OrderDetailScreen({ route, navigation }: any) {
             </View>
           )}
           
-          {/* 🚀 新增：从描述中解析“付给商家”并显示 */}
+          {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
           {(() => {
-            const payMatch = order.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+            const payMatch = order.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
             if (payMatch && payMatch[1]) {
               return (
                 <View style={[styles.infoRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', marginTop: 5, paddingTop: 15 }]}>
                   <Text style={[styles.infoLabel, { fontWeight: 'bold', color: '#10b981' }]}>
-                    {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}:
+                    {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}:
                   </Text>
                   <Text style={[styles.infoValue, { fontWeight: 'bold', color: '#10b981' }]}>
                     {payMatch[1]} MMK

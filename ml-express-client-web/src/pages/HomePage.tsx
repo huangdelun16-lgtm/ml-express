@@ -146,11 +146,19 @@ const HomePage: React.FC = () => {
         };
         fillSenderFromStore();
       }
+
+      // 🚀 新增：从购物车下单时，收件人默认为当前登录用户
+      if (currentUser) {
+        console.log('✅ 自动填充收件人信息 (Member):', currentUser.name);
+        setReceiverName(currentUser.name || '');
+        setReceiverPhone(currentUser.phone || '');
+        setReceiverAddressText(currentUser.address || '');
+      }
       
       // 清除 state，防止刷新时再次弹出
       window.history.replaceState({}, document.title);
     }
-  }, [location.state, supabase]);
+  }, [location.state, supabase, currentUser]);
   
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
@@ -277,20 +285,27 @@ const HomePage: React.FC = () => {
     loadUserFromStorage();
   }, []);
 
-  // 当打开订单表单且用户已登录时，自动填充寄件人信息
+  // 当打开订单表单且用户已登录时，自动填充信息
   useEffect(() => {
     if (showOrderForm && currentUser) {
-      // 自动填充寄件人信息
-      setSenderName(currentUser.name || '');
-      setSenderPhone(currentUser.phone || currentUser.email || '');
-      setSenderAddressText(currentUser.address || '');
+      if (isFromCart) {
+        // 🛒 从购物车下单：用户是收件人
+        console.log('🛒 购物车下单模式：自动填充收件人为当前会员');
+        setReceiverName(currentUser.name || '');
+        setReceiverPhone(currentUser.phone || '');
+        setReceiverAddressText(currentUser.address || '');
+      } else {
+        // 🏠 普通下单：用户通常是寄件人
+        console.log('🏠 普通下单模式：自动填充寄件人为当前会员');
+        setSenderName(currentUser.name || '');
+        setSenderPhone(currentUser.phone || currentUser.email || '');
+        setSenderAddressText(currentUser.address || '');
+      }
     } else if (!showOrderForm) {
-      // 关闭表单时清空字段（可选，根据需求决定）
-      // setSenderName('');
-      // setSenderPhone('');
-      // setSenderAddressText('');
+      // 🚀 关闭表单时重置购物车标志
+      setIsFromCart(false);
     }
-  }, [showOrderForm, currentUser]);
+  }, [showOrderForm, currentUser, isFromCart]);
 
   // 验证码倒计时
   useEffect(() => {
@@ -1991,6 +2006,7 @@ const HomePage: React.FC = () => {
     
     // 关闭订单表单并重置确认状态
     setShowOrderForm(false);
+    setIsFromCart(false); // 🚀 新增：关闭表单时重置购物车模式标志
     setOrderConfirmationStatus('idle');
     setOrderConfirmationMessage('');
     

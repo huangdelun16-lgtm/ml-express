@@ -163,8 +163,8 @@ const CityMallPage: React.FC = () => {
       // 🚀 24小时算法优化：处理跨子夜的营业时间（如 22:00 - 02:00）
       if (startTime <= endTime) {
         // 普通情况：09:00 - 21:00
-        if (currentTime >= startTime && currentTime <= endTime) {
-          return { isOpen: true, reason: 'open' };
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return { isOpen: true, reason: 'open' };
         }
       } else {
         // 跨子夜情况：22:00 - 02:00

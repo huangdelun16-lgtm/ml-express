@@ -168,6 +168,7 @@ export interface DeliveryStore {
   created_by?: string;
   created_at?: string;
   updated_at?: string;
+  balance?: number; // 🚀 新增：账户余额
 }
 
 export interface Banner {

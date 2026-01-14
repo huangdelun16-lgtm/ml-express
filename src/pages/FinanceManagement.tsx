@@ -686,7 +686,7 @@ const FinanceManagement: React.FC = () => {
         }
         courierGroups[courierId].push(pkg);
       });
-
+      
       setCourierSalaryGroups(courierGroups);
       // 默认全选
       setSelectedCouriersForSalary(new Set(Object.keys(courierGroups)));
@@ -5418,6 +5418,27 @@ const FinanceManagement: React.FC = () => {
                                         代收: {codVal > 0 ? `${codVal.toLocaleString()} MMK` : '无'}
                                       </div>
                                     )}
+                                    {/* 🚀 新增：展示平台支付金额 */}
+                                    {(() => {
+                                      const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                                      if (payMatch && payMatch[1]) {
+                                        return (
+                                          <div style={{
+                                            background: 'rgba(16, 185, 129, 0.2)',
+                                            color: '#10b981',
+                                            padding: '4px 12px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                            marginTop: '4px'
+                                          }}>
+                                            平台支付: {payMatch[1]} MMK
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                 </div>
                               <div style={{

@@ -326,70 +326,6 @@ const MyTasksScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  // 🔔 新增：实时订单监听功能
-  useEffect(() => {
-    let channel: any = null;
-
-    const setupRealtimeListener = async () => {
-      const userName = await AsyncStorage.getItem('currentUserName') || '';
-      if (!userName) return;
-
-      console.log('📡 任务页面：正在开启实时监听...', userName);
-
-      channel = supabase
-        .channel('tasks-updates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'packages',
-            filter: `courier=eq.${userName}`
-          },
-          (payload) => {
-            console.log('🔔 任务页面收到变更:', payload.eventType);
-            
-            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && (payload.new.status === '已分配' || (payload.old.courier !== payload.new.courier && payload.new.courier === userName)))) {
-              // 1. 震动提醒
-              Vibration.vibrate([0, 500, 200, 500]);
-              
-              // 2. 🚀 新增：通过实时监听触发语音播报
-              try {
-                AsyncStorage.getItem('ml-express-language').then(lang => {
-                  const language = lang || 'zh';
-                  const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
-                                   language === 'en' ? 'You have a new order.' : 
-                                   '您有新的订单';
-                  
-                  Speech.speak(speakText, {
-                    language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
-                    pitch: 1.0,
-                    rate: 1.0,
-                  });
-                });
-              } catch (speechError) {
-                console.warn('实时监听语音播报失败:', speechError);
-              }
-              
-              // 3. 自动刷新
-              loadMyPackages();
-            } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new.status === '已取消')) {
-              loadMyPackages();
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    setupRealtimeListener();
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case '待取件':
@@ -598,8 +534,8 @@ const MyTasksScreen: React.FC = () => {
   const renderDetailModal = () => {
     if (!selectedPackage) return null;
 
-    // 🚀 解析“付给商家”金额
-    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+    // 🚀 解析“平台支付”金额
+    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
     const payToMerchantAmount = payMatch ? payMatch[1] : null;
 
     return (
@@ -644,11 +580,11 @@ const MyTasksScreen: React.FC = () => {
                     <Text style={styles.infoLineValue}>{selectedPackage.weight}kg</Text>
                   </View>
                   
-                  {/* 🚀 新增：显示付给商家金额 */}
+                  {/* 🚀 新增：显示平台支付金额 */}
                   {payToMerchantAmount && (
                     <View style={[styles.infoLine, { marginTop: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
                       <Text style={[styles.infoLineLabel, { color: '#10b981', fontWeight: 'bold' }]}>
-                        {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}
+                        {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}
                       </Text>
                       <Text style={[styles.infoLineValue, { color: '#10b981', fontWeight: 'bold', fontSize: 16 }]}>
                         {payToMerchantAmount} MMK
@@ -754,14 +690,14 @@ const MyTasksScreen: React.FC = () => {
                     <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>
                   </View>
                   
-                  {/* 🚀 新增：列表展示付给商家金额 */}
+                  {/* 🚀 新增：列表展示平台支付金额 */}
                   {(() => {
-                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
                     if (payMatch && payMatch[1]) {
                       return (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
                           <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                            💰 {language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်'}: {payMatch[1]} MMK
+                            💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
                           </Text>
                         </View>
                       );
@@ -957,31 +893,31 @@ const MyTasksScreen: React.FC = () => {
                     const isWithinRange = dist <= 50;
                     
                     return (
-                      <LinearGradient
+                  <LinearGradient
                         colors={uploadingPhoto 
                           ? ['#9ca3af', '#6b7280'] 
                           : (isWithinRange ? ['#22c55e', '#15803d'] : ['#10b981', '#059669'])
                         }
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                         style={[
                           styles.uploadButtonGradientFixed,
                           isWithinRange && { borderWidth: 2, borderColor: '#fff' }
                         ]}
-                      >
-                        {uploadingPhoto ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
+                  >
+                    {uploadingPhoto ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
                           <Ionicons name={isWithinRange ? "location" : "checkmark-circle"} size={20} color="#fff" />
-                        )}
+                    )}
                         <Text style={[styles.uploadButtonTextFixed, isWithinRange && { fontSize: 18, fontWeight: '900' }]}>
-                          {uploadingPhoto 
-                            ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
+                      {uploadingPhoto 
+                        ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
                             : (isWithinRange 
                                 ? (language === 'zh' ? '🎯 在范围内，确认送达' : '🎯 In Range, Confirm')
                                 : (language === 'zh' ? '确认送达' : 'Confirm'))}
-                        </Text>
-                      </LinearGradient>
+                    </Text>
+                  </LinearGradient>
                     );
                   })()}
                 </TouchableOpacity>

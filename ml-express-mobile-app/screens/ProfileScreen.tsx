@@ -27,8 +27,8 @@ export default function ProfileScreen({ navigation }: any) {
     totalDelivered: 0,
     todayDelivered: 0,
     inProgress: 0,
-    totalPayToMerchant: 0,
-    todayPayToMerchant: 0,
+    totalPlatformPayment: 0,
+    todayPlatformPayment: 0,
     todayDeliveryFee: 0,
     todayCOD: 0,
   });
@@ -77,12 +77,12 @@ export default function ProfileScreen({ navigation }: any) {
         todayDelivered: todayDelivered.length,
         // 🚀 优化：包含所有配送中的中间状态
         inProgress: myPackages.filter(p => ['已取件', '配送中', '配送进行中'].includes(p.status)).length,
-        totalPayToMerchant: deliveredPackages.reduce((sum, p) => {
-          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+        totalPlatformPayment: deliveredPackages.reduce((sum, p) => {
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
         }, 0),
-        todayPayToMerchant: todayDelivered.reduce((sum, p) => {
-          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်): (.*?) MMK\]/);
+        todayPlatformPayment: todayDelivered.reduce((sum, p) => {
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
         }, 0),
         todayDeliveryFee: todayDelivered.reduce((sum, p) => {
@@ -278,8 +278,8 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             <View style={styles.statDividerHorizontal} />
             <View style={styles.statRowVertical}>
-              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日付商家' : language === 'my' ? 'ယနေ့ဆိုင်ပေး' : 'Today Pay'}</Text>
-              <Text style={[styles.statNumberVertical, { color: '#10b981' }]}>{stats.todayPayToMerchant.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日平台支付' : language === 'my' ? 'ယနေ့ပလက်ဖောင်းမှပေးချေခြင်း' : 'Today Platform Pay'}</Text>
+              <Text style={[styles.statNumberVertical, { color: '#10b981' }]}>{stats.todayPlatformPayment.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
             </View>
           </LinearGradient>
         </View>

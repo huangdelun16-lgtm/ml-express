@@ -39,6 +39,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [userName, setUserName] = useState<string>('访客用户');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
+  const [userBalance, setUserBalance] = useState<number>(0); // 🚀 新增：余额状态
   const [isGuest, setIsGuest] = useState(false);
   const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
@@ -521,14 +522,38 @@ export default function ProfileScreen({ navigation }: any) {
       setUserName(user.name || t.guest);
       setUserEmail(user.email || '');
       setUserPhone(user.phone || '');
+      setUserBalance(user.balance || 0); // 🚀 获取余额
       setIsGuest(false);
 
       // 检测用户类型
       const detectedUserType = user.user_type || 'customer';
-      setUserType(detectedUserType);
+      
+      // 🚀 核心逻辑：如果余额 > 0 且是普通会员，则显示为 VIP MEMBER
+      const finalUserType = (detectedUserType === 'customer' && (user.balance || 0) > 0) ? 'vip' : detectedUserType;
+      setUserType(finalUserType);
 
       // 加载订单统计
       if (user.id && user.id !== 'guest') {
+        // 🚀 实时从数据库同步最新余额和用户信息
+        try {
+          const { data: latestUser, error: userError } = await supabase
+            .from('users')
+            .select('balance, user_type')
+            .eq('id', user.id)
+            .single();
+          
+          if (!userError && latestUser) {
+            setUserBalance(latestUser.balance || 0);
+            if (latestUser.user_type === 'customer' && (latestUser.balance || 0) > 0) {
+              setUserType('vip');
+            } else {
+              setUserType(latestUser.user_type || 'customer');
+            }
+          }
+        } catch (error) {
+          console.warn('获取最新用户信息失败');
+        }
+
         // 如果是合伙人，获取店铺名称（通常存储在user.name或AsyncStorage中）
         let storeName: string | undefined = undefined;
         if (detectedUserType === 'partner') {
@@ -1037,10 +1062,10 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={[
                 styles.userBadge,
                 userType === 'partner' && styles.partnerBadge,
-                userType === 'vip' && styles.vipBadge,
+                (userType === 'vip' || (userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0))) && styles.vipBadge,
                 userType === 'admin' && styles.adminBadge,
                 userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer') && !isPartnerStore && styles.memberBadge
+                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0)) && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
@@ -1048,10 +1073,10 @@ export default function ProfileScreen({ navigation }: any) {
                   userType === 'vip' && styles.vipBadgeText,
                   userType === 'admin' && styles.adminBadgeText,
                   userType === 'courier' && styles.courierBadgeText,
-                  (!userType || userType === 'customer') && !isPartnerStore && styles.memberBadgeText
+                  (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && styles.memberBadgeText
                 ]}>
                   {userType === 'partner' ? t.partner : (
-                    userType === 'vip' ? t.vipMember : (
+                    (userType === 'vip' || (userType === 'member' && (orderStats.total > 0 || partnerCODStats.totalCOD > 0))) ? t.vipMember : (
                       userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : t.member)
                     )
                   )}
@@ -1074,6 +1099,15 @@ export default function ProfileScreen({ navigation }: any) {
                 <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.9)" />
                 <Text style={styles.userContact}>{userEmail || '未绑定邮箱'}</Text>
               </View>
+              {/* 🚀 新增：余额显示 */}
+              {!isGuest && (
+                <View style={[styles.contactRow, { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }]}>
+                  <Ionicons name="wallet-outline" size={16} color="#fbbf24" />
+                  <Text style={[styles.userContact, { color: '#fbbf24', fontWeight: 'bold' }]}>
+                    {language === 'zh' ? '账户余额' : 'Balance'}: {formatMoney(userBalance)} MMK
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>

@@ -1523,15 +1523,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
       
-      // 🚀 优化：仅当非 Partner 账号时，才添加“付给商家”金额到描述中
+      // 🚀 优化：仅当非 Partner 账号时，才添加“平台支付”金额到描述中
       let payToMerchantTag = '';
       if (currentUser?.user_type !== 'partner') {
-        const payToMerchantText = language === 'zh' ? '付给商家' : language === 'en' ? 'Pay to Merchant' : 'ဆိုင်သို့ ပေးချေရန်';
+        const payToMerchantText = language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း';
         payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
       }
 
       // 如果原先有描述，保留它（避免重复添加）
-      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]/g, '').trim();
+      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]/g, '').trim();
       setDescription(`${productsText}${payToMerchantTag} ${cleanDesc}`.trim());
     } else {
       setCartTotal(0);

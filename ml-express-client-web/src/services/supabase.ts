@@ -569,9 +569,57 @@ export interface User {
   password?: string;
   user_type: 'customer' | 'courier';
   created_at?: string;
+  updated_at?: string;
+  balance?: number; // 🚀 新增：账户余额
 }
 
 export const userService = {
+  // 获取用户余额
+  async getUserBalance(userId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      return data?.balance || 0;
+    } catch (error) {
+      LoggerService.error('获取用户余额失败:', error);
+      return 0;
+    }
+  },
+
+  // 充值余额
+  async rechargeBalance(userId: string, amount: number) {
+    try {
+      // 1. 获取当前余额
+      const currentBalance = await this.getUserBalance(userId);
+      const newBalance = currentBalance + amount;
+
+      // 2. 更新余额
+      const { data, error } = await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 3. 记录交易 (待后续完善 transactions 表)
+      // await transactionService.create({ user_id: userId, amount, type: 'recharge' });
+
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('充值失败:', error);
+      return { success: false, error: error.message };
+    }
+  },
   // 根据手机号获取用户
   async getUserByPhone(phone: string): Promise<User | null> {
     try {

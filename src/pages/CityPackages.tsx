@@ -2995,6 +2995,19 @@ const CityPackages: React.FC = () => {
                       <span style={{ color: '#fcd34d', fontWeight: 'bold' }}>{selectedPackage.cod_amount} MMK</span>
                     </div>
                   )}
+                  {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
+                  {(() => {
+                    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                    if (payMatch && payMatch[1]) {
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                          <span style={{ color: '#10b981', fontWeight: 'bold' }}>平台支付:</span>
+                          <span style={{ color: '#10b981', fontWeight: '900', fontSize: '1.1rem' }}>{payMatch[1]} MMK</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 
