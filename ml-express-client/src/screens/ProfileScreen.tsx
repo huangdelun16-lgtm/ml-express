@@ -30,6 +30,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import { Asset } from 'expo-asset';
 import { useApp } from '../contexts/AppContext';
+import { useLoading } from '../contexts/LoadingContext';
 import { customerService, packageService, deliveryStoreService, rechargeService, supabase } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
@@ -1083,43 +1084,6 @@ export default function ProfileScreen({ navigation }: any) {
         user_name: userName,
         amount: selectedRechargeAmount,
         proof_url: proofUrl,
-        status: 'pending',
-        notes: `充值卡金额: ${selectedRechargeAmount} MMK`
-      });
-
-      if (!requestResult.success) {
-        console.error('数据库记录创建失败:', requestResult.error);
-        throw new Error(`Request creation failed: ${JSON.stringify(requestResult.error)}`);
-      }
-
-      console.log('✅ 充值申请已成功存入数据库');
-
-      hideLoading();
-      Alert.alert(
-        language === 'zh' ? '提交成功' : 'Submitted',
-        language === 'zh' ? '您的充值申请已提交，管理员审核通过后余额将自动到账。' : 'Your recharge request has been submitted. Balance will be updated after admin review.',
-        [{ text: t.confirm, onPress: () => setShowPaymentQRModal(false) }]
-      );
-      
-      setSelectedRechargeAmount(null);
-      setRechargeProofUri(null);
-      
-    } catch (error: any) {
-      hideLoading();
-      console.error('充值流程全面报错:', error);
-      LoggerService.error('充值提交全面失败:', error?.message || error);
-      
-      let errorMsg = error?.message || '未知错误';
-      if (errorMsg.includes('Network request failed')) {
-        errorMsg = '网络连接失败，请检查您的网络设置';
-      }
-
-      Alert.alert(
-        language === 'zh' ? '提交失败' : 'Failed',
-        language === 'zh' ? `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}` : `Submission failed.\nError: ${errorMsg}`
-      );
-    }
-  };
         status: 'pending',
         notes: `充值卡金额: ${selectedRechargeAmount} MMK`
       });
