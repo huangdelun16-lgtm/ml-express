@@ -177,6 +177,14 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       icon: '🖼️',
       roles: ['admin', 'manager'] // 管理员和经理可访问
     },
+    {
+      id: 'recharges',
+      title: language === 'zh' ? '充值管理' : language === 'en' ? 'Recharge Management' : 'ငွေဖြည့်သွင်းမှုစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '客户账户充值记录和余额管理' : language === 'en' ? 'Customer account recharge records and balance management' : 'ဖောက်သည်အကောင့်ငွေဖြည့်သွင်းမှုမှတ်တမ်းနှင့်လက်ကျန်ငွေစီမံခန့်ခွဲမှု',
+      color: '#d53f8c',
+      icon: '💳',
+      roles: ['admin', 'finance'] // 管理员和财务可访问
+    },
   ];
 
   // 根据当前用户角色或特有权限筛选可访问的卡片
@@ -207,6 +215,8 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       navigate('/admin/delivery-alerts');
     } else if (title === '广告管理' || title === 'Ad Management' || title === 'ကြော်ငြာစီမံခန့်ခွဲမှု') {
       navigate('/admin/banners');
+    } else if (title === '充值管理' || title === 'Recharge Management' || title === 'ငွေဖြည့်သွင်းမှုစီမံခန့်ခွဲမှု') {
+      navigate('/admin/recharges');
     }
   };
 

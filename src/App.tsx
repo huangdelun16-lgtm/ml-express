@@ -16,6 +16,7 @@ import BannerManagement from './pages/BannerManagement';
 import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
+import RechargeManagement from './pages/RechargeManagement';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
@@ -134,6 +135,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="delivery_alerts">
                   <DeliveryAlerts />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/recharges" 
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'finance']} permissionId="recharges">
+                  <RechargeManagement />
                 </ProtectedRoute>
               } 
             />

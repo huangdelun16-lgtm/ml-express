@@ -186,6 +186,19 @@ export interface Banner {
   updated_at?: string;
 }
 
+// 🚀 新增：充值申请接口
+export interface RechargeRequest {
+  id?: string;
+  user_id: string;
+  user_name: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'rejected';
+  proof_url?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 审计日志数据类型定义
 export interface AuditLog {
   id?: string;
@@ -2799,3 +2812,98 @@ async function detectViolationsAsync(
     console.error('❌ 违规检测异常:', error);
   }
 }
+// 🚀 新增：充值管理服务
+export const rechargeService = {
+  // 获取所有充值申请
+  async getAllRequests(): Promise<RechargeRequest[]> {
+    try {
+      const { data, error } = await supabase
+        .from('recharge_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('获取充值申请失败:', err);
+      return [];
+    }
+  },
+
+  // 审批充值申请
+  async updateRequestStatus(id: string, userId: string, status: 'completed' | 'rejected', amount: number): Promise<boolean> {
+    try {
+      // 1. 更新申请状态
+      const { error: updateError } = await supabase
+        .from('recharge_requests')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      
+      if (updateError) throw updateError;
+
+      // 2. 如果是完成，更新用户余额
+      if (status === 'completed') {
+        // 先获取当前余额
+        const { data: user, error: fetchError } = await supabase
+          .from('users')
+          .select('balance')
+          .eq('id', userId)
+          .single();
+        
+        if (fetchError) throw fetchError;
+
+        const newBalance = (user.balance || 0) + amount;
+
+        const { error: balanceError } = await supabase
+          .from('users')
+          .update({ balance: newBalance, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        
+        if (balanceError) throw balanceError;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('审批充值申请异常:', err);
+      return false;
+    }
+  },
+
+  // 手动调整用户余额
+  async manualAdjustBalance(userId: string, amount: number, notes: string): Promise<boolean> {
+    try {
+      // 1. 获取当前余额
+      const { data: user, error: fetchError } = await supabase
+        .from('users')
+        .select('balance, name')
+        .eq('id', userId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+
+      const newBalance = (user.balance || 0) + amount;
+
+      // 2. 更新余额
+      const { error: balanceError } = await supabase
+        .from('users')
+        .update({ balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      
+      if (balanceError) throw balanceError;
+
+      // 3. 记录到充值表作为记录
+      await supabase.from('recharge_requests').insert([{
+        user_id: userId,
+        user_name: user.name,
+        amount: amount,
+        status: 'completed',
+        notes: `手动调整: ${notes}`
+      }]);
+
+      return true;
+    } catch (err) {
+      console.error('手动调整余额异常:', err);
+      return false;
+    }
+  }
+};
