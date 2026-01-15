@@ -953,6 +953,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：保存二维码到本机
   const handleSaveQRCode = async (amount: number) => {
+    Vibration.vibrate(50); // 🚀 点击反馈
     try {
       console.log('🚀 开始保存二维码...', amount);
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
@@ -972,29 +973,37 @@ export default function ProfileScreen({ navigation }: any) {
         return;
       }
 
-      // 🚀 核心优化：确保资源已下载并获取可靠的本地 URI
+      console.log('正在解析 local 资源...');
       const asset = Asset.fromModule(imageAsset);
-      if (!asset.downloaded) {
-        await asset.downloadAsync();
-      }
+      await asset.downloadAsync();
       
       const localUri = asset.localUri || asset.uri;
-      console.log('正在处理保存路径:', localUri);
       
       if (localUri) {
-        // 🚀 关键修复：对于 local 资源，需要先复制到一个常规文件路径，MediaLibrary 才能识别
         const filename = `kbz_recharge_${amount}_${Date.now()}.png`;
         const tempPath = `${FileSystem.cacheDirectory}${filename}`;
         
+        console.log('正在复制到缓存...', localUri, '->', tempPath);
         await FileSystem.copyAsync({
           from: localUri,
           to: tempPath
         });
 
-        console.log('已复制到缓存路径:', tempPath);
-
+        console.log('正在创建相册资产...');
         const savedAsset = await MediaLibrary.createAssetAsync(tempPath);
-        await MediaLibrary.createAlbumAsync('ML Express', savedAsset, false);
+        
+        // 尝试保存到相册
+        try {
+          const albumName = 'ML Express';
+          const album = await MediaLibrary.getAlbumAsync(albumName);
+          if (album === null) {
+            await MediaLibrary.createAlbumAsync(albumName, savedAsset, false);
+          } else {
+            await MediaLibrary.addAssetsToAlbumAsync([savedAsset], album, false);
+          }
+        } catch (albumErr) {
+          console.warn('创建相册失败，但资产已创建，尝试直接保存完成');
+        }
         
         hideLoading();
         Alert.alert(
@@ -1056,6 +1065,7 @@ export default function ProfileScreen({ navigation }: any) {
     try {
       showLoading(language === 'zh' ? '正在提交申请...' : 'Submitting...', 'package');
       console.log('正在准备上传凭证:', rechargeProofUri);
+      Alert.alert('提示', '正在上传凭证，请稍候...');
       
       // 1. 上传图片到 Supabase Storage
       const proofUrl = await rechargeService.uploadProof(userId, rechargeProofUri);
