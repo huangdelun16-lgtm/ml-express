@@ -199,29 +199,6 @@ const HomePage: React.FC = () => {
     }
   }, [mapLoadError]);
   
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('ml-express-language') || 'zh';
-  });
-  const [isVisible, setIsVisible] = useState(false);
-  const [showOrderForm, setShowOrderForm] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [trackingNumber] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [trackingResult, setTrackingResult] = useState<any>(null);
-  const [showMapModal, setShowMapModal] = useState(false);
-  const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
-  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);                                                       
-  const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{lat: number; lng: number} | null>(null);
-  const [senderName, setSenderName] = useState('');
-  const [senderPhone, setSenderPhone] = useState('');
-  const [senderAddressText, setSenderAddressText] = useState('');
-  const [receiverName, setReceiverName] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
-  const [receiverAddressText, setReceiverAddressText] = useState('');
-  const [codAmount, setCodAmount] = useState(''); // 代收款金额
-  const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
   const [selectedPOI, setSelectedPOI] = useState<{name: string, types: string[]} | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CITY_CENTER);
   const [autocompleteService, setAutocompleteService] = useState<any>(null);
