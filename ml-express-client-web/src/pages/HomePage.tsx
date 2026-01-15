@@ -72,6 +72,31 @@ const HomePage: React.FC = () => {
   const location = useLocation();
   const { clearCart } = useCart();
 
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('ml-express-language') || 'zh';
+  });
+  const [currentUser, setCurrentUser] = useState<any>(null); // 🚀 核心优化：提前声明，防止 Block-scoped variable 错误
+  const [isVisible, setIsVisible] = useState(false);
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [trackingNumber] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [trackingResult, setTrackingResult] = useState<any>(null);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapSelectionType, setMapSelectionType] = useState<'sender' | 'receiver' | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
+  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{lat: number; lng: number} | null>(null);                                                       
+  const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
+  const [senderAddressText, setSenderAddressText] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [receiverAddressText, setReceiverAddressText] = useState('');
+  const [codAmount, setCodAmount] = useState(''); // 代收款金额
+  const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
+
   // 处理从其他页面跳转过来的登录/注册请求
   useEffect(() => {
     if (location.state && (location.state as any).showModal) {
@@ -247,7 +272,6 @@ const HomePage: React.FC = () => {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false); // true=登录模式, false=注册模式
   const [loginType, setLoginType] = useState<'normal' | 'partner'>('normal'); // 登录类型：普通登录或合伙登录
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [registerForm, setRegisterForm] = useState({
     name: '',
     phone: '',

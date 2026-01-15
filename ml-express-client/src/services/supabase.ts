@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
@@ -1538,13 +1538,40 @@ export const rechargeService = {
         encoding: 'base64',
       });
 
-      // 转换为二进制
-      const binaryString = atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      // 🚀 优化：手动解码 base64，不依赖 atob Polyfill
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const lookup = new Uint8Array(256);
+      for (let i = 0; i < chars.length; i++) {
+        lookup[chars.charCodeAt(i)] = i;
       }
+
+      const decode = (base64: string) => {
+        let bufferLength = base64.length * 0.75,
+          len = base64.length, i, p = 0,
+          encoded1, encoded2, encoded3, encoded4;
+
+        if (base64[base64.length - 1] === "=") {
+          bufferLength--;
+          if (base64[base64.length - 2] === "=") bufferLength--;
+        }
+
+        const bytes = new Uint8Array(bufferLength);
+
+        for (i = 0; i < len; i += 4) {
+          encoded1 = lookup[base64.charCodeAt(i)];
+          encoded2 = lookup[base64.charCodeAt(i + 1)];
+          encoded3 = lookup[base64.charCodeAt(i + 2)];
+          encoded4 = lookup[base64.charCodeAt(i + 3)];
+
+          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+        }
+
+        return bytes;
+      };
+
+      const bytes = decode(base64);
 
       // 上传到 storage
       const { data, error } = await supabase.storage
@@ -1554,7 +1581,10 @@ export const rechargeService = {
           upsert: true
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase Storage Error:', error);
+        throw error;
+      }
 
       // 获取公共 URL
       const { data: { publicUrl } } = supabase.storage
@@ -1564,6 +1594,7 @@ export const rechargeService = {
       return publicUrl;
     } catch (error: any) {
       LoggerService.error('上传凭证失败:', error?.message || '未知错误');
+      console.error('uploadProof Error Details:', error);
       return null;
     }
   },

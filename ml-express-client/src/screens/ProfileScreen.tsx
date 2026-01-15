@@ -954,6 +954,7 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：保存二维码到本机
   const handleSaveQRCode = async (amount: number) => {
     try {
+      console.log('🚀 开始保存二维码...', amount);
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
       
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -967,24 +968,47 @@ export default function ProfileScreen({ navigation }: any) {
       const imageAsset = RECHARGE_QR_IMAGES[amount];
       if (!imageAsset) {
         hideLoading();
+        Alert.alert('错误', '找不到对应金额的二维码资源');
         return;
       }
 
-      // 解析 local 资源
+      // 🚀 核心优化：确保资源已下载并获取可靠的本地 URI
       const asset = Asset.fromModule(imageAsset);
-      await asset.downloadAsync();
-      
-      if (asset.localUri) {
-        await MediaLibrary.saveToLibraryAsync(asset.localUri);
-        hideLoading();
-        Alert.alert('成功', '收款码已保存到您的相册，请前往 KBZPay 进行支付');
-      } else {
-        throw new Error('Local URI not found');
+      if (!asset.downloaded) {
+        await asset.downloadAsync();
       }
-    } catch (error) {
+      
+      const localUri = asset.localUri || asset.uri;
+      console.log('正在处理保存路径:', localUri);
+      
+      if (localUri) {
+        // 🚀 关键修复：对于 local 资源，需要先复制到一个常规文件路径，MediaLibrary 才能识别
+        const filename = `kbz_recharge_${amount}_${Date.now()}.png`;
+        const tempPath = `${FileSystem.cacheDirectory}${filename}`;
+        
+        await FileSystem.copyAsync({
+          from: localUri,
+          to: tempPath
+        });
+
+        console.log('已复制到缓存路径:', tempPath);
+
+        const savedAsset = await MediaLibrary.createAssetAsync(tempPath);
+        await MediaLibrary.createAlbumAsync('ML Express', savedAsset, false);
+        
+        hideLoading();
+        Alert.alert(
+          language === 'zh' ? '保存成功' : 'Saved!',
+          language === 'zh' ? '收款码已保存到您的相册，请打开 KBZPay 支付' : 'QR code saved to gallery, please pay with KBZPay'
+        );
+      } else {
+        throw new Error('无法解析图片路径');
+      }
+    } catch (error: any) {
       hideLoading();
+      console.error('保存二维码失败详情:', error);
       LoggerService.error('保存二维码失败:', error);
-      showToast('保存失败', 'error');
+      Alert.alert('保存失败', `原因: ${error?.message || '未知错误'}`);
     }
   };
 
@@ -1016,8 +1040,10 @@ export default function ProfileScreen({ navigation }: any) {
   const handleConfirmRecharge = async () => {
     Vibration.vibrate(50); // 🚀 点击反馈
     console.log('🚀 开始提交充值申请...');
+    
     if (!selectedRechargeAmount || !userId) {
       console.warn('缺少必要信息:', { selectedRechargeAmount, userId });
+      Alert.alert('提示', '用户信息已丢失，请重新登录');
       return;
     }
     
@@ -1029,14 +1055,14 @@ export default function ProfileScreen({ navigation }: any) {
 
     try {
       showLoading(language === 'zh' ? '正在提交申请...' : 'Submitting...', 'package');
-      console.log('正在上传凭证到服务器...', rechargeProofUri);
+      console.log('正在准备上传凭证:', rechargeProofUri);
       
       // 1. 上传图片到 Supabase Storage
       const proofUrl = await rechargeService.uploadProof(userId, rechargeProofUri);
       
       if (!proofUrl) {
-        console.error('凭证上传失败');
-        throw new Error('Upload failed');
+        console.error('凭证上传失败，返回为空');
+        throw new Error('Upload failed - URL is empty');
       }
 
       console.log('凭证上传成功，准备创建数据库记录:', proofUrl);
@@ -1053,22 +1079,72 @@ export default function ProfileScreen({ navigation }: any) {
 
       if (!requestResult.success) {
         console.error('数据库记录创建失败:', requestResult.error);
-        throw new Error('Request creation failed');
+        throw new Error(`Request creation failed: ${JSON.stringify(requestResult.error)}`);
       }
 
       console.log('✅ 充值申请已成功存入数据库');
 
       hideLoading();
-      showToast(language === 'zh' ? '申请已提交，等待管理员审核' : 'Request submitted, pending review', 'success');
-      setShowPaymentQRModal(false);
+      Alert.alert(
+        language === 'zh' ? '提交成功' : 'Submitted',
+        language === 'zh' ? '您的充值申请已提交，管理员审核通过后余额将自动到账。' : 'Your recharge request has been submitted. Balance will be updated after admin review.',
+        [{ text: t.confirm, onPress: () => setShowPaymentQRModal(false) }]
+      );
+      
       setSelectedRechargeAmount(null);
       setRechargeProofUri(null);
       
     } catch (error: any) {
       hideLoading();
-      console.error('充值流程出错:', error);
-      LoggerService.error('充值提交失败:', error?.message || error);
-      showToast(language === 'zh' ? `提交失败: ${error?.message || '未知错误'}` : `Failed: ${error?.message || 'Unknown error'}`, 'error');
+      console.error('充值流程全面报错:', error);
+      LoggerService.error('充值提交全面失败:', error?.message || error);
+      
+      let errorMsg = error?.message || '未知错误';
+      if (errorMsg.includes('Network request failed')) {
+        errorMsg = '网络连接失败，请检查您的网络设置';
+      }
+
+      Alert.alert(
+        language === 'zh' ? '提交失败' : 'Failed',
+        language === 'zh' ? `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}` : `Submission failed.\nError: ${errorMsg}`
+      );
+    }
+  };
+        status: 'pending',
+        notes: `充值卡金额: ${selectedRechargeAmount} MMK`
+      });
+
+      if (!requestResult.success) {
+        console.error('数据库记录创建失败:', requestResult.error);
+        throw new Error(`Request creation failed: ${JSON.stringify(requestResult.error)}`);
+      }
+
+      console.log('✅ 充值申请已成功存入数据库');
+
+      hideLoading();
+      Alert.alert(
+        language === 'zh' ? '提交成功' : 'Submitted',
+        language === 'zh' ? '您的充值申请已提交，管理员审核通过后余额将自动到账。' : 'Your recharge request has been submitted. Balance will be updated after admin review.',
+        [{ text: t.confirm, onPress: () => setShowPaymentQRModal(false) }]
+      );
+      
+      setSelectedRechargeAmount(null);
+      setRechargeProofUri(null);
+      
+    } catch (error: any) {
+      hideLoading();
+      console.error('充值流程全面报错:', error);
+      LoggerService.error('充值提交全面失败:', error?.message || error);
+      
+      let errorMsg = error?.message || '未知错误';
+      if (errorMsg.includes('Network request failed')) {
+        errorMsg = '网络连接失败，请检查您的网络设置';
+      }
+
+      Alert.alert(
+        language === 'zh' ? '提交失败' : 'Failed',
+        language === 'zh' ? `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}` : `Submission failed.\nError: ${errorMsg}`
+      );
     }
   };
 
