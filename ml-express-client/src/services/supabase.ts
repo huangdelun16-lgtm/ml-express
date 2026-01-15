@@ -1538,40 +1538,32 @@ export const rechargeService = {
         encoding: 'base64',
       });
 
-      // 🚀 优化：手动解码 base64，不依赖 atob Polyfill
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-      const lookup = new Uint8Array(256);
-      for (let i = 0; i < chars.length; i++) {
-        lookup[chars.charCodeAt(i)] = i;
-      }
-
-      const decode = (base64: string) => {
-        let bufferLength = base64.length * 0.75,
-          len = base64.length, i, p = 0,
-          encoded1, encoded2, encoded3, encoded4;
-
-        if (base64[base64.length - 1] === "=") {
-          bufferLength--;
-          if (base64[base64.length - 2] === "=") bufferLength--;
+      // 🚀 优化：使用可靠的 base64 转 Uint8Array 逻辑
+      const base64ToUint8Array = (b64: string) => {
+        const bin = atob(b64.replace(/\s/g, ''));
+        const len = bin.length;
+        const u8 = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          u8[i] = bin.charCodeAt(i);
         }
-
-        const bytes = new Uint8Array(bufferLength);
-
-        for (i = 0; i < len; i += 4) {
-          encoded1 = lookup[base64.charCodeAt(i)];
-          encoded2 = lookup[base64.charCodeAt(i + 1)];
-          encoded3 = lookup[base64.charCodeAt(i + 2)];
-          encoded4 = lookup[base64.charCodeAt(i + 3)];
-
-          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-        }
-
-        return bytes;
+        return u8;
       };
 
-      const bytes = decode(base64);
+      // 关键：在 React Native 中手动提供 atob
+      if (typeof atob === 'undefined') {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        global.atob = (input: string) => {
+          let str = String(input).replace(/[=]+$/, '');
+          if (str.length % 4 === 1) throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
+          let output = '';
+          for (let bc = 0, bs, buffer, i = 0; (buffer = str.charAt(i++)); ~buffer && ((bs = bc % 4 ? bs * 64 + buffer : buffer), bc++ % 4) ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))) : 0) {
+            buffer = chars.indexOf(buffer);
+          }
+          return output;
+        };
+      }
+
+      const bytes = base64ToUint8Array(base64);
 
       // 上传到 storage
       const { data, error } = await supabase.storage
