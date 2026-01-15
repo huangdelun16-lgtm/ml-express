@@ -1,8 +1,8 @@
 Manual rebuild trigger after fixing registration and virtual scrolling.
-Timestamp: 2026-01-01 20:00:00
+Timestamp: 2026-01-01 21:00:00
 Changes: 
-- Implemented selective salary generation for couriers
-- Added multi-selection modal with 'Select All' functionality
-- Displayed real-time stats (orders & KM) in the selection list
-- Enhanced precision for mileage-based fee calculation in the selection preview
-- Improved workflow for financial administrators when processing payroll
+- Implemented Recharge Management system for Admin Web
+- Added 'Recharge Management' card to Admin Dashboard
+- Created dedicated Recharge Management page for auditing requests
+- Integrated rechargeService for balance updates and history tracking
+- Enhanced financial control for customer account balances

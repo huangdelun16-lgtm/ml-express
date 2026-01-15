@@ -24,6 +24,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import { Vibration } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
@@ -1013,22 +1014,32 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 修改：执行最终充值确认逻辑
   const handleConfirmRecharge = async () => {
-    if (!selectedRechargeAmount || !userId) return;
+    Vibration.vibrate(50); // 🚀 点击反馈
+    console.log('🚀 开始提交充值申请...');
+    if (!selectedRechargeAmount || !userId) {
+      console.warn('缺少必要信息:', { selectedRechargeAmount, userId });
+      return;
+    }
     
     if (!rechargeProofUri) {
+      console.warn('未选择汇款凭证');
       Alert.alert('提示', t.pleaseUploadRecord);
       return;
     }
 
     try {
       showLoading(language === 'zh' ? '正在提交申请...' : 'Submitting...', 'package');
+      console.log('正在上传凭证到服务器...', rechargeProofUri);
       
       // 1. 上传图片到 Supabase Storage
       const proofUrl = await rechargeService.uploadProof(userId, rechargeProofUri);
       
       if (!proofUrl) {
+        console.error('凭证上传失败');
         throw new Error('Upload failed');
       }
+
+      console.log('凭证上传成功，准备创建数据库记录:', proofUrl);
 
       // 2. 创建充值记录申请
       const requestResult = await rechargeService.createRequest({
@@ -1041,8 +1052,11 @@ export default function ProfileScreen({ navigation }: any) {
       });
 
       if (!requestResult.success) {
+        console.error('数据库记录创建失败:', requestResult.error);
         throw new Error('Request creation failed');
       }
+
+      console.log('✅ 充值申请已成功存入数据库');
 
       hideLoading();
       showToast(language === 'zh' ? '申请已提交，等待管理员审核' : 'Request submitted, pending review', 'success');
@@ -1050,10 +1064,11 @@ export default function ProfileScreen({ navigation }: any) {
       setSelectedRechargeAmount(null);
       setRechargeProofUri(null);
       
-    } catch (error) {
+    } catch (error: any) {
       hideLoading();
-      LoggerService.error('充值失败:', error);
-      showToast(t.rechargeFailed, 'error');
+      console.error('充值流程出错:', error);
+      LoggerService.error('充值提交失败:', error?.message || error);
+      showToast(language === 'zh' ? `提交失败: ${error?.message || '未知错误'}` : `Failed: ${error?.message || 'Unknown error'}`, 'error');
     }
   };
 
@@ -2422,31 +2437,59 @@ export default function ProfileScreen({ navigation }: any) {
             </LinearGradient>
 
             <View style={{ padding: 20, alignItems: 'center' }}>
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                onLongPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
-                style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 10, justifyContent: 'center', alignItems: 'center' }}
-              >
-                {/* 🚀 使用预定义的映射显示二维码 */}
-                {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
-                  <Image 
-                    source={RECHARGE_QR_IMAGES[selectedRechargeAmount]} 
-                    style={{ width: '100%', height: '100%' }} 
-                    resizeMode="contain" 
-                  />
-                ) : (
-                  <View style={{ alignItems: 'center' }}>
-                    <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
-                    <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
-                      {language === 'zh' ? '加载中...' : 'Loading...'}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              <View style={{ position: 'relative' }}>
+                <TouchableOpacity 
+                  activeOpacity={0.8}
+                  onLongPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
+                  style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 10, justifyContent: 'center', alignItems: 'center' }}
+                >
+                  {/* 🚀 使用预定义的映射显示二维码 */}
+                  {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
+                    <Image 
+                      source={RECHARGE_QR_IMAGES[selectedRechargeAmount]} 
+                      style={{ width: '100%', height: '100%' }} 
+                      resizeMode="contain" 
+                    />
+                  ) : (
+                    <View style={{ alignItems: 'center' }}>
+                      <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
+                      <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+                        {language === 'zh' ? '加载中...' : 'Loading...'}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* 🚀 新增：显式的保存按钮图标 */}
+                <TouchableOpacity
+                  onPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 4
+                  }}
+                >
+                  <Ionicons name="download-outline" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
               
-              <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 20 }}>
-                {language === 'zh' ? '💡 长按二维码图片可保存到手机' : '💡 Long press image to save'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 }}>
+                <Ionicons name="information-circle-outline" size={14} color="#64748b" />
+                <Text style={{ color: '#64748b', fontSize: 12 }}>
+                  {language === 'zh' ? '点击右上角或长按图片可保存' : 'Tap icon or long press to save'}
+                </Text>
+              </View>
 
               <TouchableOpacity 
                 onPress={handleUploadPaymentProof}
