@@ -18,11 +18,16 @@ ALTER TABLE recharge_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public access for recharge_requests" ON recharge_requests
   FOR ALL USING (true) WITH CHECK (true);
 
--- 2. 创建支付凭证 Storage Bucket (如果尚未创建)
--- 注意：Bucket 的创建通常在 Supabase 控制台手动完成，
--- 或者通过以下 SQL（取决于 Supabase 版本和权限）
--- INSERT INTO storage.buckets (id, name, public) VALUES ('payment_proofs', 'payment_proofs', true);
+-- 2. 创建支付凭证 Storage Bucket (重要：请在 Supabase Dashboard 手动操作)
+-- 操作步骤：
+-- 1. 进入 Supabase 控制台 -> Storage
+-- 2. 点击 "New Bucket"，命名为 "payment_proofs"
+-- 3. 开启 "Public bucket" 选项（或者手动设置下面的 RLS 策略）
+-- 4. 点击 "Create bucket"
 
--- 设置 Storage 策略
+-- 3. 设置 Storage RLS 策略 (如果 Bucket 已设为 Public 可选)
+-- 允许所有人查看凭证（以便管理员在后台看到图片）
 -- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'payment_proofs');
--- CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'payment_proofs');
+-- 允许经过身份验证的用户上传凭证
+-- CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'payment_proofs');
+
