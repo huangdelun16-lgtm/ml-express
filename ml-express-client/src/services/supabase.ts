@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import * as FileSystem from 'expo-file-system/legacy';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
