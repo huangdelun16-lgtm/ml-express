@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import * as FileSystem from 'expo-file-system';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
@@ -1532,43 +1531,30 @@ export const rechargeService = {
   async uploadProof(userId: string, imageUri: string): Promise<string | null> {
     try {
       const fileName = `recharge_${userId}_${Date.now()}.jpg`;
+      console.log('开始准备上传凭证:', imageUri);
       
-      // 使用 FileSystem 读取图片
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: 'base64',
+      // 🚀 最终稳定性方案：使用 XMLHttpRequest 将 URI 转换为 Blob
+      // 这在 React Native 中是最兼容 local file URI 的方案
+      const blob: any = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+          resolve(xhr.response);
+        };
+        xhr.onerror = function (e) {
+          console.error('XHR Error:', e);
+          reject(new TypeError('Network request failed'));
+        };
+        xhr.responseType = 'blob';
+        xhr.open('GET', imageUri, true);
+        xhr.send(null);
       });
 
-      // 🚀 优化：使用可靠的 base64 转 Uint8Array 逻辑
-      const base64ToUint8Array = (b64: string) => {
-        const bin = atob(b64.replace(/\s/g, ''));
-        const len = bin.length;
-        const u8 = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          u8[i] = bin.charCodeAt(i);
-        }
-        return u8;
-      };
-
-      // 关键：在 React Native 中手动提供 atob
-      if (typeof atob === 'undefined') {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-        global.atob = (input: string) => {
-          let str = String(input).replace(/[=]+$/, '');
-          if (str.length % 4 === 1) throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
-          let output = '';
-          for (let bc = 0, bs, buffer, i = 0; (buffer = str.charAt(i++)); ~buffer && ((bs = bc % 4 ? bs * 64 + buffer : buffer), bc++ % 4) ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))) : 0) {
-            buffer = chars.indexOf(buffer);
-          }
-          return output;
-        };
-      }
-
-      const bytes = base64ToUint8Array(base64);
+      console.log('获取 Blob 成功，准备上传到 Supabase Storage...');
 
       // 上传到 storage
       const { data, error } = await supabase.storage
         .from('payment_proofs')
-        .upload(fileName, bytes, {
+        .upload(fileName, blob, {
           contentType: 'image/jpeg',
           upsert: true
         });
@@ -1578,15 +1564,18 @@ export const rechargeService = {
         throw error;
       }
 
+      console.log('文件上传成功，获取公共 URL...');
+
       // 获取公共 URL
       const { data: { publicUrl } } = supabase.storage
         .from('payment_proofs')
         .getPublicUrl(fileName);
 
+      console.log('获取 URL 成功:', publicUrl);
       return publicUrl;
     } catch (error: any) {
       LoggerService.error('上传凭证失败:', error?.message || '未知错误');
-      console.error('uploadProof Error Details:', error);
+      console.error('uploadProof 最终报错详情:', error);
       return null;
     }
   },
@@ -1722,23 +1711,13 @@ export const merchantService = {
     try {
       const fileName = `${storeId}/${Date.now()}.jpg`;
       
-      // 🚀 最终修复方案：使用 expo-file-system 读取为 base64，然后转换为 Uint8Array
-      // 直接使用 'base64' 字符串，避免某些环境下 EncodingType 枚举未定义的问题
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: 'base64',
-      });
-
-      // 将 base64 转换为 Uint8Array (Supabase 完美支持)
-      const binaryString = atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
+      // 🚀 现代方案：使用 fetch 获取 blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
 
       const { data, error } = await supabase.storage
         .from('product_images')
-        .upload(fileName, bytes, {
+        .upload(fileName, blob, {
           contentType: 'image/jpeg',
           upsert: true
         });
