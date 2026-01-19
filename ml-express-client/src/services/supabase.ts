@@ -1711,9 +1711,20 @@ export const merchantService = {
     try {
       const fileName = `${storeId}/${Date.now()}.jpg`;
       
-      // 🚀 现代方案：使用 fetch 获取 blob
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      // 🚀 最终稳定性方案：使用 XMLHttpRequest 将 URI 转换为 Blob
+      const blob: any = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+          resolve(xhr.response);
+        };
+        xhr.onerror = function (e) {
+          console.error('XHR Error:', e);
+          reject(new TypeError('Network request failed'));
+        };
+        xhr.responseType = 'blob';
+        xhr.open('GET', imageUri, true);
+        xhr.send(null);
+      });
 
       const { data, error } = await supabase.storage
         .from('product_images')

@@ -994,9 +994,28 @@ const UserManagement: React.FC = () => {
     });
   }, [users, searchTerm, activeTab, filterStatus]);
 
-  // 加载用户数据
+  // 🚀 核心优化：增加自动轮询，实时检测充值申请
   useEffect(() => {
+    // 首次加载
     loadUsers();
+    
+    // 每 10 秒轮询一次充值申请
+    const timer = setInterval(() => {
+      console.log('🔄 正在自动刷新充值申请状态...');
+      
+      // 只有在显示充值列表或需要显示警报时才轮询
+      supabase
+        .from('recharge_requests')
+        .select('user_id')
+        .eq('status', 'pending')
+        .then(({ data }) => {
+          if (data) {
+            setPendingRecharges(new Set(data.map(r => r.user_id)));
+          }
+        });
+    }, 10000);
+
+    return () => clearInterval(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadUsers = async () => {
