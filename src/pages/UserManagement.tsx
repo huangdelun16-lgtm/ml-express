@@ -126,7 +126,7 @@ const getVehicleIcon = (type: string) => {
 };
 
 // 列表行组件 - 用户
-const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUser, updateUserStatus, handleDeleteUser, handleOpenRecharge }: any) => {
+const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUser, updateUserStatus, handleDeleteUser, handleOpenRecharge, hasPendingRecharge }: any) => {
   if (!user) return null;
   
   const isSelected = selectedUsers.has(user.id);
@@ -139,13 +139,14 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
           background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.08)',
           borderRadius: '20px',
           padding: isMobile ? '20px' : '28px',
-          border: isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)',
+          border: hasPendingRecharge ? '2px solid #e74c3c' : (isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)'), // 🚀 充值中变红框
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
           backdropFilter: 'blur(12px)',
-          boxShadow: isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)',
+          boxShadow: hasPendingRecharge ? '0 0 20px rgba(231, 76, 60, 0.4)' : (isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)'), // 🚀 充值中发红光
           cursor: 'pointer',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          animation: hasPendingRecharge ? 'pulse-border 2s infinite' : 'none' // 🚀 充值中呼吸效果
         }}
         onClick={(e) => {
           if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).parentElement?.tagName !== 'BUTTON') {
@@ -153,6 +154,32 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
           }
         }}
       >
+        {/* 🚀 新增：充值警报器 */}
+        {hasPendingRecharge && (
+          <div style={{
+            position: 'absolute',
+            top: '-15px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+            color: 'white',
+            padding: '6px 20px',
+            borderRadius: '30px',
+            fontSize: '0.9rem',
+            fontWeight: 900,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 0 25px rgba(231, 76, 60, 0.8)',
+            zIndex: 100,
+            border: '2px solid rgba(255,255,255,0.3)',
+            animation: 'pulse-scale 1.5s infinite'
+          }}>
+            <span style={{ fontSize: '1.2rem', animation: 'blink 0.6s infinite alternate' }}>🚨</span>
+            <span style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>客户正在充值</span>
+          </div>
+        )}
+
         {/* Checkbox Badge */}
         <div 
           onClick={(e) => {
@@ -554,6 +581,25 @@ const StoreRow = ({ store, isMobile }: any) => {
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+
+  // 🚀 新增：注入动画样式
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes blink {
+        0%, 100% { opacity: 1; transform: scale(1.2); }
+        50% { opacity: 0.5; transform: scale(1); }
+      }
+      @keyframes pulse-border {
+        0% { border-color: rgba(231, 76, 60, 0.5); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+        70% { border-color: rgba(231, 76, 60, 1); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+        100% { border-color: rgba(231, 76, 60, 0.5); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'partner_store' | 'courier_management' | 'recharge_requests'>('customer_list');
 
   // ... (rest of the component)
@@ -736,6 +782,7 @@ const UserManagement: React.FC = () => {
   };
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [users, setUsers] = useState<User[]>([]);
+  const [pendingRecharges, setPendingRecharges] = useState<Set<string>>(new Set()); // 🚀 新增：存储有待处理充值申请的用户ID
   const [loading, setLoading] = useState(true);
   const [partnerStores, setPartnerStores] = useState<any[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -806,13 +853,17 @@ const UserManagement: React.FC = () => {
     totalOrders: 0
   });
 
-  // 🚀 获取真实统计数据
   const loadSummaryStats = async () => {
     try {
-      // 1. 获取客户统计
-      const { data: customers } = await supabase
+      console.log('📊 正在加载统计数据...');
+      // 1. 获取客户统计 - 增加错误处理
+      const { data: customers, error: custError } = await supabase
         .from('users')
         .select('status, balance, total_spent, user_type');
+      
+      if (custError) {
+        console.warn('⚠️ 获取客户统计失败 (可能是字段不存在):', custError.message);
+      }
       
       // 2. 获取管理员统计
       const { data: admins } = await supabase
@@ -835,10 +886,10 @@ const UserManagement: React.FC = () => {
         .select('*', { count: 'exact', head: true });
 
       const stats = {
-        totalCustomers: customers?.filter(u => u.user_type === 'customer').length || 0,
-        vipCustomers: customers?.filter(u => u.user_type === 'customer' && (u.balance > 0 || u.user_type === 'vip')).length || 0,
-        activeCustomers: customers?.filter(u => u.user_type === 'customer' && u.status === 'active').length || 0,
-        totalSpent: customers?.reduce((sum, u) => sum + (u.total_spent || 0), 0) || 0,
+        totalCustomers: customers?.filter(u => u.user_type === 'customer' || u.user_type === 'vip').length || 0,
+        vipCustomers: customers?.filter(u => (u.user_type === 'customer' || u.user_type === 'vip') && ((u.balance || 0) > 0 || u.user_type === 'vip')).length || 0,
+        activeCustomers: customers?.filter(u => (u.user_type === 'customer' || u.user_type === 'vip') && u.status === 'active').length || 0,
+        totalSpent: customers?.reduce((sum, u) => sum + (Number(u.total_spent) || 0), 0) || 0,
         
         totalAdmins: admins?.length || 0,
         activeAdmins: admins?.filter(a => a.status === 'active').length || 0,
@@ -852,14 +903,14 @@ const UserManagement: React.FC = () => {
         
         totalStores: stores?.length || 0,
         activeStores: stores?.filter(s => s.status === 'active').length || 0,
-        totalCOD: 0, // 待后续完善代收统计
+        totalCOD: 0, 
         
         totalOrders: orderCount || 0
       };
 
       setSummaryStats(stats);
     } catch (err) {
-      console.error('加载统计数据失败:', err);
+      console.error('❌ 加载统计数据异常:', err);
     }
   };
 
@@ -960,6 +1011,17 @@ const UserManagement: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (usersError) throw usersError;
+      
+      // 🚀 新增：获取所有待审核的充值申请
+      const { data: pendingRequests, error: pendingError } = await supabase
+        .from('recharge_requests')
+        .select('user_id')
+        .eq('status', 'pending');
+      
+      if (!pendingError && pendingRequests) {
+        const pendingIds = new Set(pendingRequests.map(r => r.user_id));
+        setPendingRecharges(pendingIds);
+      }
 
       // 2. 获取所有管理端账号并整合进管理员列表
       const adminAccounts = await adminAccountService.getAllAccounts();
@@ -1022,8 +1084,9 @@ const UserManagement: React.FC = () => {
   };
 
   const handleEditUser = (user: User) => {
+    console.log('🚀 开始编辑用户:', user);
     setEditingUser(user);
-    setUserForm({
+    const formData = {
       name: user.name || '',
       phone: user.phone || '',
       email: user.email || '',
@@ -1033,7 +1096,9 @@ const UserManagement: React.FC = () => {
       status: user.status || 'active',
       register_region: user.register_region || 'mandalay',
       notes: user.notes || ''
-    });
+    };
+    console.log('📋 准备填充表单数据:', formData);
+    setUserForm(formData);
     setShowAddUserForm(true);
   };
 
@@ -1432,6 +1497,23 @@ const UserManagement: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', padding: isMobile ? '10px' : '40px', color: 'white', fontFamily: "'Segoe UI', Roboto, sans-serif" }}>
+      {/* 🚀 新增全局动画样式 */}
+      <style>{`
+        @keyframes blink {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0.5; transform: scale(1.2); }
+        }
+        @keyframes pulse-scale {
+          0% { transform: translateX(-50%) scale(1); }
+          50% { transform: translateX(-50%) scale(1.05); }
+          100% { transform: translateX(-50%) scale(1); }
+        }
+        @keyframes pulse-border {
+          0% { border-color: rgba(231, 76, 60, 0.4); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+          70% { border-color: rgba(231, 76, 60, 1); box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); }
+          100% { border-color: rgba(231, 76, 60, 0.4); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+      `}</style>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
           <div>
@@ -1563,6 +1645,7 @@ const UserManagement: React.FC = () => {
                   updateUserStatus={updateUserStatus} 
                   handleDeleteUser={handleDeleteUser}
                   handleOpenRecharge={handleOpenRecharge} 
+                  hasPendingRecharge={pendingRecharges.has(user.id)}
                 />
               ))}
             </div>
@@ -1689,6 +1772,70 @@ const UserManagement: React.FC = () => {
                   handleDeleteCourier={handleDeleteCourier} 
                 />
               ))}
+            </div>
+          </div>
+        )}
+
+        {showAddUserForm && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px', fontSize: '1.8rem', fontWeight: 800 }}>{editingUser ? '编辑用户资料' : '新增用户账号'}</h2>
+              <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>姓名</label>
+                    <input type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>电话</label>
+                    <input type="tel" value={userForm.phone} onChange={e => setUserForm({...userForm, phone: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>邮箱</label>
+                    <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>登录密码 {editingUser && '(留空表示不修改)'}</label>
+                    <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} placeholder={editingUser ? '••••••' : '默认密码 123456'} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>注册领区</label>
+                    <select value={userForm.register_region} onChange={e => setUserForm({...userForm, register_region: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
+                      {REGIONS.map(region => (
+                        <option key={region.id} value={region.id}>{region.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>用户类型</label>
+                    <select value={userForm.user_type} onChange={e => setUserForm({...userForm, user_type: e.target.value as any})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
+                      <option value="customer">👤 普通客户</option>
+                      <option value="admin">🔐 管理员</option>
+                      <option value="courier">🛵 快递员</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>账号状态</label>
+                    <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as any})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
+                      <option value="active">✅ 活跃</option>
+                      <option value="inactive">💤 非活跃</option>
+                      <option value="suspended">🚫 已暂停</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>联系地址</label>
+                    <textarea value={userForm.address} onChange={e => setUserForm({...userForm, address: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white', minHeight: '80px' }} />
+                  </div>
+                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>备注信息</label>
+                    <textarea value={userForm.notes} onChange={e => setUserForm({...userForm, notes: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white', minHeight: '60px' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '15px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#27ae60', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>{editingUser ? '保存修改' : '确认创建'}</button>
+                  <button type="button" onClick={() => { setShowAddUserForm(false); setEditingUser(null); }} style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>取消</button>
+                </div>
+              </form>
             </div>
           </div>
         )}

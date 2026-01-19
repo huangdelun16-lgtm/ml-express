@@ -27,7 +27,6 @@ import * as Speech from 'expo-speech';
 import { Vibration } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
 import { Asset } from 'expo-asset';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -48,6 +47,7 @@ const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
   const { language, setLanguage } = useApp();
+  const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
   const appVersion = Constants.expoConfig?.version ?? '1.1.0';
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string>('');
@@ -981,30 +981,9 @@ export default function ProfileScreen({ navigation }: any) {
       const localUri = asset.localUri || asset.uri;
       
       if (localUri) {
-        const filename = `kbz_recharge_${amount}_${Date.now()}.png`;
-        const tempPath = `${FileSystem.cacheDirectory}${filename}`;
-        
-        console.log('正在复制到缓存...', localUri, '->', tempPath);
-        await FileSystem.copyAsync({
-          from: localUri,
-          to: tempPath
-        });
-
-        console.log('正在创建相册资产...');
-        const savedAsset = await MediaLibrary.createAssetAsync(tempPath);
-        
-        // 尝试保存到相册
-        try {
-          const albumName = 'ML Express';
-          const album = await MediaLibrary.getAlbumAsync(albumName);
-          if (album === null) {
-            await MediaLibrary.createAlbumAsync(albumName, savedAsset, false);
-          } else {
-            await MediaLibrary.addAssetsToAlbumAsync([savedAsset], album, false);
-          }
-        } catch (albumErr) {
-          console.warn('创建相册失败，但资产已创建，尝试直接保存完成');
-        }
+        console.log('正在直接保存到相册...', localUri);
+        // 🚀 最终优化方案：直接使用 MediaLibrary 保存，绕过 FileSystem 兼容性问题
+        await MediaLibrary.saveToLibraryAsync(localUri);
         
         hideLoading();
         Alert.alert(

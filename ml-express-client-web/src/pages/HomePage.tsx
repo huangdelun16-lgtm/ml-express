@@ -68,6 +68,7 @@ class ErrorBoundary extends React.Component<
 }
 
 const HomePage: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<any>(null); // 🚀 核心优化：提前声明，防止 Block-scoped variable 错误
   const navigate = useNavigate();
   const location = useLocation();
   const { clearCart } = useCart();
@@ -75,7 +76,6 @@ const HomePage: React.FC = () => {
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
   });
-  const [currentUser, setCurrentUser] = useState<any>(null); // 🚀 核心优化：提前声明，防止 Block-scoped variable 错误
   const [isVisible, setIsVisible] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
