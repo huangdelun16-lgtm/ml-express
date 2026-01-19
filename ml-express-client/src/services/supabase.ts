@@ -1533,28 +1533,52 @@ export const rechargeService = {
       const fileName = `recharge_${userId}_${Date.now()}.jpg`;
       console.log('开始准备上传凭证:', imageUri);
       
-      // 🚀 最终稳定性方案：使用 XMLHttpRequest 将 URI 转换为 Blob
-      // 这在 React Native 中是最兼容 local file URI 的方案
-      const blob: any = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = function () {
-          resolve(xhr.response);
-        };
-        xhr.onerror = function (e) {
-          console.error('XHR Error:', e);
-          reject(new TypeError('Network request failed'));
-        };
-        xhr.responseType = 'blob';
-        xhr.open('GET', imageUri, true);
-        xhr.send(null);
+      // 🚀 最终稳定性方案：使用 FileSystem 读取 base64，并手动转换为 Uint8Array
+      // 这种方式在 React Native / Expo 环境下最稳定，不依赖 XHR 或 fetch 的 blob 实现
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
       });
 
-      console.log('获取 Blob 成功，准备上传到 Supabase Storage...');
+      // 手动实现 base64 到 Uint8Array 的转换
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const lookup = new Uint8Array(256);
+      for (let i = 0; i < chars.length; i++) {
+        lookup[chars.charCodeAt(i)] = i;
+      }
+
+      const decode = (b64: string) => {
+        let bufferLength = b64.length * 0.75,
+          len = b64.length, i, p = 0,
+          encoded1, encoded2, encoded3, encoded4;
+
+        if (b64[b64.length - 1] === "=") {
+          bufferLength--;
+          if (b64[b64.length - 2] === "=") bufferLength--;
+        }
+
+        const bytes = new Uint8Array(bufferLength);
+
+        for (i = 0; i < len; i += 4) {
+          encoded1 = lookup[b64.charCodeAt(i)];
+          encoded2 = lookup[b64.charCodeAt(i + 1)];
+          encoded3 = lookup[b64.charCodeAt(i + 2)];
+          encoded4 = lookup[b64.charCodeAt(i + 3)];
+
+          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+        }
+
+        return bytes;
+      };
+
+      const bytes = decode(base64.replace(/\s/g, ''));
+      console.log('转换为二进制成功，大小:', bytes.length, '准备上传到 Supabase Storage...');
 
       // 上传到 storage
       const { data, error } = await supabase.storage
         .from('payment_proofs')
-        .upload(fileName, blob, {
+        .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: true
         });
@@ -1710,25 +1734,50 @@ export const merchantService = {
   async uploadProductImage(storeId: string, imageUri: string): Promise<string | null> {
     try {
       const fileName = `${storeId}/${Date.now()}.jpg`;
+      console.log('开始准备上传商品图片:', imageUri);
       
-      // 🚀 最终稳定性方案：使用 XMLHttpRequest 将 URI 转换为 Blob
-      const blob: any = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = function () {
-          resolve(xhr.response);
-        };
-        xhr.onerror = function (e) {
-          console.error('XHR Error:', e);
-          reject(new TypeError('Network request failed'));
-        };
-        xhr.responseType = 'blob';
-        xhr.open('GET', imageUri, true);
-        xhr.send(null);
+      // 🚀 最终稳定性方案：使用 FileSystem 读取 base64，并手动转换为 Uint8Array
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
       });
+
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const lookup = new Uint8Array(256);
+      for (let i = 0; i < chars.length; i++) {
+        lookup[chars.charCodeAt(i)] = i;
+      }
+
+      const decode = (b64: string) => {
+        let bufferLength = b64.length * 0.75,
+          len = b64.length, i, p = 0,
+          encoded1, encoded2, encoded3, encoded4;
+
+        if (b64[b64.length - 1] === "=") {
+          bufferLength--;
+          if (b64[b64.length - 2] === "=") bufferLength--;
+        }
+
+        const bytes = new Uint8Array(bufferLength);
+
+        for (i = 0; i < len; i += 4) {
+          encoded1 = lookup[b64.charCodeAt(i)];
+          encoded2 = lookup[b64.charCodeAt(i + 1)];
+          encoded3 = lookup[b64.charCodeAt(i + 2)];
+          encoded4 = lookup[b64.charCodeAt(i + 3)];
+
+          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+        }
+
+        return bytes;
+      };
+
+      const bytes = decode(base64.replace(/\s/g, ''));
 
       const { data, error } = await supabase.storage
         .from('product_images')
-        .upload(fileName, blob, {
+        .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: true
         });

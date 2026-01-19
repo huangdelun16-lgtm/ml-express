@@ -3,8 +3,22 @@ import { supabase, packageService } from '../services/supabase';
 
 const AbnormalAlertManager: React.FC = () => {
   const [abnormalCount, setAbnormalCount] = useState(0);
+  const [showActivateBtn, setShowActivateBtn] = useState(false); // 🚀 新增：激活提示音按钮状态
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const checkTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 🚀 核心优化：处理浏览器自动播放政策
+  const activateSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play()
+        .then(() => {
+          audioRef.current?.pause();
+          setShowActivateBtn(false);
+          console.log('✅ 音频已激活');
+        })
+        .catch(e => console.error('音频激活失败:', e));
+    }
+  };
 
   useEffect(() => {
     // 请求通知权限
@@ -28,7 +42,10 @@ const AbnormalAlertManager: React.FC = () => {
           // 播放提示音
           if (audioRef.current) {
             audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(e => console.error('播放提示音失败:', e));
+            audioRef.current.play().catch(e => {
+              console.warn('播放提示音被拦截:', e);
+              setShowActivateBtn(true); // 显示激活按钮
+            });
           }
 
           // 发送桌面通知
@@ -56,12 +73,35 @@ const AbnormalAlertManager: React.FC = () => {
   }, [abnormalCount]);
 
   return (
-    <audio 
-      ref={audioRef} 
-      src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
-      preload="auto"
-      style={{ display: 'none' }}
-    />
+    <>
+      {showActivateBtn && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          background: '#ef4444',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '30px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
+          cursor: 'pointer'
+        }}
+        onClick={activateSound}
+        >
+          <span>🔔 点击激活警报声音</span>
+        </div>
+      )}
+      <audio 
+        ref={audioRef} 
+        src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
+        preload="auto"
+        style={{ display: 'none' }}
+      />
+    </>
   );
 };
 
