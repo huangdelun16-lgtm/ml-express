@@ -126,10 +126,23 @@ const getVehicleIcon = (type: string) => {
 };
 
 // 列表行组件 - 用户
-const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUser, updateUserStatus, handleDeleteUser, handleOpenRecharge, hasPendingRecharge }: any) => {
+const UserRow = ({ 
+  user, 
+  selectedUsers, 
+  handleSelectUser, 
+  isMobile, 
+  handleEditUser, 
+  updateUserStatus, 
+  handleDeleteUser, 
+  handleOpenRecharge, 
+  pendingRecharge,
+  handleApproveRecharge,
+  handleRejectRecharge 
+}: any) => {
   if (!user) return null;
   
   const isSelected = selectedUsers.has(user.id);
+  const hasPendingRecharge = !!pendingRecharge;
   
   return (
     <div style={{ paddingBottom: '15px', boxSizing: 'border-box' }}>
@@ -336,6 +349,63 @@ const UserRow = ({ user, selectedUsers, handleSelectUser, isMobile, handleEditUs
           gap: '12px',
           flexWrap: 'wrap'
         }}>
+          {/* 🚀 新增：快捷处理充值申请按钮 */}
+          {pendingRecharge && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => handleApproveRecharge(pendingRecharge)}
+                style={{
+                  background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(46, 204, 113, 0.4)',
+                  animation: 'blink 1s infinite alternate'
+                }}
+              >
+                ✅ 同意充值 ({pendingRecharge.amount.toLocaleString()} MMK)
+              </button>
+              
+              {/* 查看凭证小图 */}
+              <a href={pendingRecharge.proof_url} target="_blank" rel="noreferrer">
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '2px solid #2ecc71',
+                  background: '#000'
+                }}>
+                  <img src={pendingRecharge.proof_url} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              </a>
+
+              <button
+                onClick={() => handleRejectRecharge(pendingRecharge)}
+                style={{
+                  background: 'rgba(231, 76, 60, 0.2)',
+                  color: '#e74c3c',
+                  border: '1px solid rgba(231, 76, 60, 0.3)',
+                  padding: '10px 15px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600'
+                }}
+              >
+                拒绝
+              </button>
+            </div>
+          )}
+
           {/* 🚀 仅非管理员账号显示 Credit 充值按钮 */}
           {user.user_type !== 'admin' && (
             <button
@@ -782,7 +852,7 @@ const UserManagement: React.FC = () => {
   };
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [users, setUsers] = useState<User[]>([]);
-  const [pendingRecharges, setPendingRecharges] = useState<Set<string>>(new Set()); // 🚀 新增：存储有待处理充值申请的用户ID
+  const [pendingRechargeRequests, setPendingRechargeRequests] = useState<Record<string, RechargeRequest>>({}); // 🚀 存储每个用户的待处理充值申请详情
   const [loading, setLoading] = useState(true);
   const [partnerStores, setPartnerStores] = useState<any[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -1003,14 +1073,17 @@ const UserManagement: React.FC = () => {
     const timer = setInterval(() => {
       console.log('🔄 正在自动刷新充值申请状态...');
       
-      // 只有在显示充值列表或需要显示警报时才轮询
       supabase
         .from('recharge_requests')
-        .select('user_id')
+        .select('*')
         .eq('status', 'pending')
         .then(({ data }) => {
           if (data) {
-            setPendingRecharges(new Set(data.map(r => r.user_id)));
+            const requestsMap: Record<string, RechargeRequest> = {};
+            data.forEach(req => {
+              requestsMap[req.user_id] = req;
+            });
+            setPendingRechargeRequests(requestsMap);
           }
         });
     }, 10000);
@@ -1034,12 +1107,15 @@ const UserManagement: React.FC = () => {
       // 🚀 新增：获取所有待审核的充值申请
       const { data: pendingRequests, error: pendingError } = await supabase
         .from('recharge_requests')
-        .select('user_id')
+        .select('*')
         .eq('status', 'pending');
       
       if (!pendingError && pendingRequests) {
-        const pendingIds = new Set(pendingRequests.map(r => r.user_id));
-        setPendingRecharges(pendingIds);
+        const requestsMap: Record<string, RechargeRequest> = {};
+        pendingRequests.forEach(req => {
+          requestsMap[req.user_id] = req;
+        });
+        setPendingRechargeRequests(requestsMap);
       }
 
       // 2. 获取所有管理端账号并整合进管理员列表
@@ -1473,6 +1549,7 @@ const UserManagement: React.FC = () => {
 
       window.alert('充值已到账！');
       await loadRechargeRequests();
+      await loadUsers(); // 🚀 同时也刷新用户列表，更新余额显示和警报消失
     } catch (error: any) {
       console.error('审批失败:', error);
       window.alert(`操作失败: ${error.message}`);
@@ -1500,6 +1577,7 @@ const UserManagement: React.FC = () => {
 
       window.alert('申请已拒绝');
       await loadRechargeRequests();
+      await loadUsers(); // 🚀 同时也刷新用户列表
     } catch (error: any) {
       window.alert(`操作失败: ${error.message}`);
     } finally {
@@ -1664,7 +1742,9 @@ const UserManagement: React.FC = () => {
                   updateUserStatus={updateUserStatus} 
                   handleDeleteUser={handleDeleteUser}
                   handleOpenRecharge={handleOpenRecharge} 
-                  hasPendingRecharge={pendingRecharges.has(user.id)}
+                  pendingRecharge={pendingRechargeRequests[user.id]}
+                  handleApproveRecharge={handleApproveRecharge}
+                  handleRejectRecharge={handleRejectRecharge}
                 />
               ))}
             </div>
