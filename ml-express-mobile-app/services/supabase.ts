@@ -189,87 +189,101 @@ export const adminAccountService = {
       // 准备尝试的 URL 列表
       const urlsToTry = [
         netlifyUrl, // 优先使用配置的域名 (可能是 admin-market-link-express.com)
+        'https://admin-market-link-express.com', // 确保包含顶级域名
         'https://admin-market-link-express.netlify.app' // 备用 Netlify 默认域名
       ].filter((v, i, a) => v && a.indexOf(v) === i); // 去重且过滤空值
 
       console.log('开始登录流程，尝试节点数量:', urlsToTry.length);
 
       for (const baseUrl of urlsToTry) {
-        try {
-          console.log(`🌐 正在尝试节点: ${baseUrl}...`);
-          
-        const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 进一步缩短单次超时到 10 秒
-        
-          const response = await fetch(`${baseUrl}/.netlify/functions/admin-password`, {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-          },
-            body: JSON.stringify({ action: 'login', username, password }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.account) {
-              console.log(`✅ 节点 ${baseUrl} 验证成功`);
-            const accountFromNetlify = result.account;
+        // 每个节点尝试最多 2 次
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // 移除末尾斜杠
+            console.log(`🌐 正在尝试节点 (第 ${attempt} 次): ${cleanBaseUrl}...`);
             
-              // 异步更新数据库中的最后登录时间（非阻塞）
-              try {
-                supabase
-                  .from('admin_accounts')
-                  .update({ last_login: new Date().toISOString() })
-                  .eq('id', accountFromNetlify.id)
-                  .then(({error}) => {
-                    if (error) console.warn('最后登录时间更新失败:', error.message);
-                  });
-              } catch (e) {}
+            const controller = new AbortController();
+            // 增加超时时间：第一次 10秒，第二次 20秒
+            const timeoutValue = attempt === 1 ? 10000 : 20000; 
+            const timeoutId = setTimeout(() => controller.abort(), timeoutValue);
+          
+            const response = await fetch(`${cleanBaseUrl}/.netlify/functions/admin-password`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+              },
+              body: JSON.stringify({ action: 'login', username, password }),
+              signal: controller.signal
+            });
 
-              // 获取数据库中的最新完整信息（尝试一次，失败则使用缓存或 function 返回值）
-            try {
-              const { data, error } = await supabase
-                .from('admin_accounts')
-                .select('*')
-                .eq('username', username)
-                .single();
+            clearTimeout(timeoutId);
 
-                if (!error && data) return data;
-              } catch (dbError) {
-                console.warn('获取数据库详细信息失败，使用基础信息');
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.account) {
+                console.log(`✅ 节点 ${cleanBaseUrl} 验证成功`);
+                const accountFromNetlify = result.account;
+                
+                // 异步更新数据库中的最后登录时间（非阻塞）
+                try {
+                  supabase
+                    .from('admin_accounts')
+                    .update({ last_login: new Date().toISOString() })
+                    .eq('id', accountFromNetlify.id)
+                    .then(({error}) => {
+                      if (error) console.warn('最后登录时间更新失败:', error.message);
+                    });
+                } catch (e) {}
+
+                // 获取数据库中的最新完整信息（尝试一次，失败则使用缓存或 function 返回值）
+                try {
+                  const { data, error } = await supabase
+                    .from('admin_accounts')
+                    .select('*')
+                    .eq('username', username)
+                    .single();
+
+                  if (!error && data) return data;
+                } catch (dbError) {
+                  console.warn('获取数据库详细信息失败，使用基础信息');
+                }
+                
+                return {
+                  ...accountFromNetlify,
+                  password: '',
+                  id: accountFromNetlify.id || '',
+                  status: accountFromNetlify.status || 'active'
+                } as AdminAccount;
+              } else {
+                lastLoginError = result.error || '用户名或密码错误';
+                console.warn(`❌ 验证失败:`, lastLoginError);
+                // 如果是明确的业务逻辑错误，不要重试
+                if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用') || lastLoginError.includes('不存在')) {
+                  throw new Error(lastLoginError);
+                }
               }
-              
-              return {
-                ...accountFromNetlify,
-                password: '',
-                id: accountFromNetlify.id || '',
-                status: accountFromNetlify.status || 'active'
-              } as AdminAccount;
-          } else {
-              lastLoginError = result.error || '用户名或密码错误';
-              console.warn(`❌ 验证失败:`, lastLoginError);
-              // 如果是明确的凭据错误，不要重试其他节点
-              if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用')) {
-                throw new Error(lastLoginError);
-              }
+            } else {
+              console.warn(`⚠️ 节点 ${cleanBaseUrl} 返回错误状态: ${response.status}`);
+              // 如果是 404，说明路径不对，不要重试该节点
+              if (response.status === 404) break;
+            }
+          } catch (err: any) {
+            if (err.name === 'AbortError') {
+              console.warn(`⏰ 节点 ${baseUrl} 请求超时 (尝试 ${attempt})`);
+            } else if (err.message && (err.message.includes('密码') || err.message.includes('用户名') || err.message.includes('不存在') || err.message.includes('停用'))) {
+              throw err; // 业务逻辑错误直接抛出
+            } else {
+              console.warn(`❌ 访问节点异常 (尝试 ${attempt}):`, err.message);
+            }
+            
+            // 如果是最后一次尝试且失败，则继续下一个 URL
+            if (attempt === 2) continue;
+            // 否则稍等一会重试
+            await new Promise(r => setTimeout(r, 1500));
           }
-        } else {
-            console.warn(`⚠️ 节点 ${baseUrl} 返回错误状态: ${response.status}`);
         }
-        } catch (err: any) {
-          if (err.name === 'AbortError') {
-            console.warn(`⏰ 节点 ${baseUrl} 请求超时`);
-          } else if (err.message && (err.message.includes('密码') || err.message.includes('用户名'))) {
-            // 业务逻辑错误直接抛出
-            throw err;
-        } else {
-            console.warn(`❌ 访问节点异常:`, err.message);
-        }
-      }
       }
 
       // 如果所有云函数节点都失败，尝试直接数据库验证（仅支持旧的非加密账户）
