@@ -181,10 +181,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               {/* 🚀 新增：支付方式选择 (开关形式) */}
               <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569', marginBottom: 12 }}>
-                  {cartTotal > 0 
-                    ? (language === 'zh' ? '商城订单结算 (商品仅支持余额支付)' : language === 'en' ? 'Mall Order (Items Balance Only)' : 'ဈေးဝယ်အော်ဒါ (ကုန်ပစ္စည်းအတွက် လက်ကျန်ငွေသာ)')
-                    : currentT.shippingFeePayment
-                  }
+                  {currentT.shippingFeePayment}
                 </Text>
                 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -196,29 +193,26 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'balance'}
-                    disabled={cartTotal > 0} // 🚀 商城订单禁止关闭余额支付
                     onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
                   />
                 </View>
 
-                {cartTotal === 0 && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
-                        {currentT.courierFeeCash}
-                      </Text>
-                      {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
-                    </View>
-                    <Switch
-                      value={paymentMethod === 'cash'}
-                      onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
-                      trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
-                      thumbColor="#ffffff"
-                    />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
+                      {currentT.courierFeeCash}
+                    </Text>
+                    {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
                   </View>
-                )}
+                  <Switch
+                    value={paymentMethod === 'cash'}
+                    onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
+                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
                 
                 {paymentMethod === 'balance' && (
                   <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>

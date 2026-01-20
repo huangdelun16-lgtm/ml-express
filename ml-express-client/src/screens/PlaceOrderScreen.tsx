@@ -199,13 +199,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   useEffect(() => {
     analytics.trackPageView('PlaceOrderScreen');
   }, []);
-
-  // 🚀 新增：如果是商城订单，强制切换为余额支付
-  useEffect(() => {
-    if (cartTotal > 0 && currentUser?.user_type !== 'partner') {
-      setPaymentMethod('balance');
-    }
-  }, [cartTotal, currentUser]);
   
   // 用户信息
   const [userId, setUserId] = useState('');
