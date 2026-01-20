@@ -38,6 +38,7 @@ interface PriceCalculationProps {
   paymentMethod: 'balance' | 'cash';
   onPaymentMethodChange: (method: 'balance' | 'cash') => void;
   accountBalance: number;
+  cartTotal?: number;
 }
 
 const PriceCalculation = memo<PriceCalculationProps>(({
@@ -56,6 +57,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
   paymentMethod,
   onPaymentMethodChange,
   accountBalance,
+  cartTotal = 0,
 }) => {
   // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
   const billingDistance = useMemo(() => Math.max(1, Math.ceil(calculatedDistance)), [calculatedDistance]);
@@ -179,7 +181,10 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               {/* 🚀 新增：支付方式选择 (开关形式) */}
               <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569', marginBottom: 12 }}>
-                  {language === 'zh' ? '结算方式控制' : language === 'en' ? 'Settlement Control' : 'ပေးချေမှုထိန်းချုပ်မှု'}
+                  {cartTotal > 0 
+                    ? (language === 'zh' ? '商城订单结算 (固定为余额支付)' : language === 'en' ? 'Mall Order Settlement (Fixed to Balance)' : 'ဈေးဝယ်အော်ဒါ ပေးချေမှု (လက်ကျန်ငွေဖြင့်သာ)')
+                    : (language === 'zh' ? '结算方式控制' : language === 'en' ? 'Settlement Control' : 'ပေးချေမှုထိန်းချုပ်မှု')
+                  }
                 </Text>
                 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -191,26 +196,29 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'balance'}
+                    disabled={cartTotal > 0} // 🚀 商城订单禁止关闭余额支付
                     onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
                   />
                 </View>
 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
-                      {currentT.cashPayment}
-                    </Text>
-                    {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
+                {cartTotal === 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
+                        {currentT.cashPayment}
+                      </Text>
+                      {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
+                    </View>
+                    <Switch
+                      value={paymentMethod === 'cash'}
+                      onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
+                      trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                      thumbColor="#ffffff"
+                    />
                   </View>
-                  <Switch
-                    value={paymentMethod === 'cash'}
-                    onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
-                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
-                    thumbColor="#ffffff"
-                  />
-                </View>
+                )}
                 
                 {paymentMethod === 'balance' && (
                   <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>

@@ -93,11 +93,11 @@ const PackageInfo = memo<PackageInfoProps>(({
           />
         </View>
 
-        {/* 平台支付 (从购物车结算时显示) */}
+        {/* 余额支付 (从购物车结算时显示) */}
         {cartTotal !== undefined && cartTotal > 0 && (
           <View style={[styles.inputGroup, { marginTop: 10 }]}>
             <Text style={styles.label}>
-              {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}
+              {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}
             </Text>
             <View style={[styles.input, { backgroundColor: '#f1f5f9', justifyContent: 'center' }]}>
               <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10b981' }}>

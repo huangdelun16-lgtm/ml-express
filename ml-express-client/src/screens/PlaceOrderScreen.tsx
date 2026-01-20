@@ -36,7 +36,6 @@ import LoggerService from '../services/LoggerService';
 // 导入拆分后的组件
 import SenderForm from '../components/placeOrder/SenderForm';
 import ReceiverForm from '../components/placeOrder/ReceiverForm';
-import PaymentMethodSelector from '../components/placeOrder/PaymentMethodSelector';
 import PackageInfo from '../components/placeOrder/PackageInfo';
 import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
 import PriceCalculation from '../components/placeOrder/PriceCalculation';
@@ -200,6 +199,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   useEffect(() => {
     analytics.trackPageView('PlaceOrderScreen');
   }, []);
+
+  // 🚀 新增：如果是商城订单，强制切换为余额支付
+  useEffect(() => {
+    if (cartTotal > 0 && currentUser?.user_type !== 'partner') {
+      setPaymentMethod('balance');
+    }
+  }, [cartTotal, currentUser]);
   
   // 用户信息
   const [userId, setUserId] = useState('');
@@ -1481,19 +1487,46 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       };
 
       // 🚀 核心逻辑：余额支付扣款校验
-      if (paymentMethod === 'balance' && !isGuest) {
-        const orderTotal = parseFloat(orderData.price);
-        if (accountBalance < orderTotal) {
+      const shippingFee = parseFloat(orderData.price);
+      let totalDeduction = 0;
+
+      // 1. 如果是商城订单，强制检查余额是否充足支付商品
+      if (cartTotal > 0 && !isGuest) {
+        if (accountBalance < cartTotal) {
           hideLoading();
-          Alert.alert(currentT.insufficientBalance, `${currentT.accountBalance}: ${accountBalance.toLocaleString()} MMK\n${currentT.totalPrice}: ${orderTotal.toLocaleString()} MMK`);
+          Alert.alert(
+            currentT.insufficientBalance, 
+            `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
+            `${language === 'zh' ? '商品总计' : 'Items Total'}: ${cartTotal.toLocaleString()} MMK\n\n` +
+            `${language === 'zh' ? '请先充值后再购买商场商品。' : 'Please recharge before buying mall items.'}`
+          );
           return;
         }
+        totalDeduction += cartTotal;
+      }
 
-        // 尝试从数据库扣除余额
+      // 2. 如果运费也选择余额支付
+      if (paymentMethod === 'balance' && !isGuest) {
+        totalDeduction += shippingFee;
+        
+        if (accountBalance < totalDeduction) {
+          hideLoading();
+          Alert.alert(
+            currentT.insufficientBalance, 
+            `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
+            `${language === 'zh' ? '总计费用' : 'Total Required'}: ${totalDeduction.toLocaleString()} MMK`
+          );
+          return;
+        }
+      }
+
+      // 3. 执行扣款 (如果有需要扣款的金额)
+      if (totalDeduction > 0 && !isGuest) {
+        console.log('💰 正在执行余额扣除:', totalDeduction);
         const { data: updatedUser, error: deductError } = await supabase
           .from('users')
           .update({ 
-            balance: accountBalance - orderTotal,
+            balance: accountBalance - totalDeduction,
             updated_at: new Date().toISOString()
           })
           .eq('id', userId)
@@ -1503,7 +1536,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         if (deductError) {
           hideLoading();
           LoggerService.error('余额扣除失败:', deductError);
-          Alert.alert('扣款失败', '由于余额扣除异常，请尝试使用现金支付或联系客服。');
+          Alert.alert('扣款失败', '由于余额扣除异常，请稍后重试或联系客服。');
           return;
         }
 
@@ -1627,15 +1660,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
       
-      // 🚀 优化：仅当非 Partner 账号时，才添加“平台支付”金额到描述中
+      // 🚀 优化：仅当非 Partner 账号时，才添加“余额支付”金额到描述中
       let payToMerchantTag = '';
       if (currentUser?.user_type !== 'partner') {
-        const payToMerchantText = language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း';
+        const payToMerchantText = language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း';
         payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
       }
 
       // 如果原先有描述，保留它（避免重复添加）
-      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]/g, '').trim();
+      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]/g, '').trim();
       setDescription(`${productsText}${payToMerchantTag} ${cleanDesc}`.trim());
     } else {
       setCartTotal(0);
@@ -1807,18 +1840,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onOpenAddressBook={() => openAddressBook('receiver')}
             onBlur={handleFieldBlur}
           />
-
-          {/* 🚀 新增：支付方式选择卡片 (仅限 Member/Partner 账号) */}
-          {!isGuest && (
-            <PaymentMethodSelector
-              language={language as any}
-              styles={styles}
-              currentT={currentT}
-              paymentMethod={paymentMethod}
-              onPaymentMethodChange={setPaymentMethod}
-              accountBalance={accountBalance}
-            />
-          )}
 
           {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
           {currentUser?.user_type === 'partner' && (
@@ -2007,6 +2028,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
             accountBalance={accountBalance}
+            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
           />
 
           {/* 提交按钮 */}
