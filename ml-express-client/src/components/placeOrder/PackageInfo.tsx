@@ -97,7 +97,7 @@ const PackageInfo = memo<PackageInfoProps>(({
         {cartTotal !== undefined && cartTotal > 0 && (
           <View style={[styles.inputGroup, { marginTop: 10 }]}>
             <Text style={styles.label}>
-              {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}
+              {currentT.itemBalancePayment}
             </Text>
             <View style={[styles.input, { backgroundColor: '#f1f5f9', justifyContent: 'center' }]}>
               <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10b981' }}>

@@ -450,6 +450,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       paymentMethod: '支付方式',
       balancePayment: '余额支付',
       cashPayment: '现金支付',
+      courierFeeBalance: '跑腿费 (余额支付)',
+      courierFeeCash: '跑腿费 (现金支付)',
+      shippingFeePayment: '跑腿费支付方式',
+      itemBalancePayment: '商品费用 (仅余额支付)',
       accountBalance: '账户余额',
       insufficientBalance: '余额不足',
       balanceDeducted: '支付成功，已从余额扣除',
@@ -562,6 +566,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       paymentMethod: 'Payment Method',
       balancePayment: 'Balance Payment',
       cashPayment: 'Cash Payment',
+      courierFeeBalance: 'Courier Fee (Balance Pay)',
+      courierFeeCash: 'Courier Fee (Cash Pay)',
+      shippingFeePayment: 'Shipping Fee Payment',
+      itemBalancePayment: 'Item Cost (Balance Only)',
       accountBalance: 'Account Balance',
       insufficientBalance: 'Insufficient Balance',
       balanceDeducted: 'Payment successful, deducted from balance',
@@ -671,6 +679,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       paymentMethod: 'ပေးချေမှုနည်းလမ်း',
       balancePayment: 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း',
       cashPayment: 'ငွေသားဖြင့် ပေးချေခြင်း',
+      courierFeeBalance: 'ပို့ဆောင်ခ (လက်ကျန်ငွေဖြင့်)',
+      courierFeeCash: 'ပို့ဆောင်ခ (ငွေသားဖြင့်)',
+      shippingFeePayment: 'ပို့ဆောင်ခ ပေးချေမှုနည်းလမ်း',
+      itemBalancePayment: 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)',
       accountBalance: 'အကောင့်လက်ကျန်ငွေ',
       insufficientBalance: 'လက်ကျန်ငွေမလုံလောက်ပါ',
       balanceDeducted: 'ပေးချေမှုအောင်မြင်ပါသည်၊ လက်ကျန်ငွေမှ နုတ်ယူပြီးပါပြီ',
@@ -1453,6 +1465,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         }
       }
 
+      // 🚀 优化：生成支付状态标签
+      let paymentTag = '';
+      if (paymentMethod === 'balance') {
+        paymentTag = cartTotal > 0 
+          ? (language === 'zh' ? '[总计已余额支付]' : language === 'en' ? '[Total Paid by Balance]' : '[စုစုပေါင်းအား လက်ကျန်ငွေဖြင့် ပေးချေပြီး]')
+          : (language === 'zh' ? '[跑腿费已余额支付]' : language === 'en' ? '[Courier Fee Paid by Balance]' : '[ပို့ဆောင်ခအား လက်ကျန်ငွေဖြင့် ပေးချေပြီး]');
+      } else if (cartTotal > 0) {
+        paymentTag = language === 'zh' ? '[商品已余额支付 | 跑腿费现金]' : language === 'en' ? '[Items Paid by Balance | Fee in Cash]' : '[ကုန်ပစ္စည်းအား လက်ကျန်ငွေဖြင့် ပေးချေပြီး | ပို့ဆောင်ခအား ငွေသားဖြင့်]';
+      }
+
       const orderData = {
         id: orderId,
         customer_id: userId,
@@ -1469,7 +1491,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         package_type: packageType,
         weight: weight,
         cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
-        description: `${typeTag} ${description || ''} ${paymentMethod === 'balance' ? '[余额已支付]' : ''}`.trim(),
+        description: `${typeTag} ${paymentTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
@@ -1663,7 +1685,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 🚀 优化：仅当非 Partner 账号时，才添加“余额支付”金额到描述中
       let payToMerchantTag = '';
       if (currentUser?.user_type !== 'partner') {
-        const payToMerchantText = language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း';
+        const payToMerchantText = currentT.itemBalancePayment;
         payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
       }
 

@@ -182,15 +182,15 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569', marginBottom: 12 }}>
                   {cartTotal > 0 
-                    ? (language === 'zh' ? '商城订单结算 (固定为余额支付)' : language === 'en' ? 'Mall Order Settlement (Fixed to Balance)' : 'ဈေးဝယ်အော်ဒါ ပေးချေမှု (လက်ကျန်ငွေဖြင့်သာ)')
-                    : (language === 'zh' ? '结算方式控制' : language === 'en' ? 'Settlement Control' : 'ပေးချေမှုထိန်းချုပ်မှု')
+                    ? (language === 'zh' ? '商城订单结算 (商品仅支持余额支付)' : language === 'en' ? 'Mall Order (Items Balance Only)' : 'ဈေးဝယ်အော်ဒါ (ကုန်ပစ္စည်းအတွက် လက်ကျန်ငွေသာ)')
+                    : currentT.shippingFeePayment
                   }
                 </Text>
                 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ fontSize: 14, color: paymentMethod === 'balance' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'balance' ? 'bold' : 'normal' }}>
-                      {currentT.balancePayment}
+                      {currentT.courierFeeBalance}
                     </Text>
                     {paymentMethod === 'balance' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
                   </View>
@@ -207,7 +207,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
-                        {currentT.cashPayment}
+                        {currentT.courierFeeCash}
                       </Text>
                       {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
                     </View>
