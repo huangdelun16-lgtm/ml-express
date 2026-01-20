@@ -188,9 +188,9 @@ export const adminAccountService = {
 
       // 准备尝试的 URL 列表
       const urlsToTry = [
-        netlifyUrl, // 优先使用配置的域名 (可能是 admin-market-link-express.com)
-        'https://admin-market-link-express.com', // 确保包含顶级域名
-        'https://admin-market-link-express.netlify.app' // 备用 Netlify 默认域名
+        'https://admin-market-link-express.netlify.app', // 🚀 调整：优先使用 Netlify 默认域名，通常更稳定
+        'https://admin-market-link-express.com',         // 顶级自定义域名
+        netlifyUrl                                       // 配置的域名
       ].filter((v, i, a) => v && a.indexOf(v) === i); // 去重且过滤空值
 
       console.log('开始登录流程，尝试节点数量:', urlsToTry.length);
@@ -203,8 +203,8 @@ export const adminAccountService = {
             console.log(`🌐 正在尝试节点 (第 ${attempt} 次): ${cleanBaseUrl}...`);
             
             const controller = new AbortController();
-            // 增加超时时间：第一次 10秒，第二次 20秒
-            const timeoutValue = attempt === 1 ? 10000 : 20000; 
+            // 🚀 大幅增加超时时间：第一次 15秒，第二次 30秒，适配缅甸极慢网络
+            const timeoutValue = attempt === 1 ? 15000 : 30000; 
             const timeoutId = setTimeout(() => controller.abort(), timeoutValue);
           
             const response = await fetch(`${cleanBaseUrl}/.netlify/functions/admin-password`, {
@@ -212,7 +212,8 @@ export const adminAccountService = {
               headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'no-cache',
+                'User-Agent': 'ML-Express-Rider-App'
               },
               body: JSON.stringify({ action: 'login', username, password }),
               signal: controller.signal
@@ -259,15 +260,14 @@ export const adminAccountService = {
               } else {
                 lastLoginError = result.error || '用户名或密码错误';
                 console.warn(`❌ 验证失败:`, lastLoginError);
-                // 如果是明确的业务逻辑错误，不要重试
+                // 如果是明确的业务逻辑错误（非超时/网络），不要重试
                 if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用') || lastLoginError.includes('不存在')) {
                   throw new Error(lastLoginError);
                 }
               }
             } else {
               console.warn(`⚠️ 节点 ${cleanBaseUrl} 返回错误状态: ${response.status}`);
-              // 如果是 404，说明路径不对，不要重试该节点
-              if (response.status === 404) break;
+              if (response.status === 404) break; // 路径不对，直接跳过此节点
             }
           } catch (err: any) {
             if (err.name === 'AbortError') {
@@ -280,7 +280,11 @@ export const adminAccountService = {
             
             // 如果是最后一次尝试且失败，则继续下一个 URL
             if (attempt === 2) continue;
-            // 否则稍等一会重试
+            // 否则稍等一会（1.5秒）后重试
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        }
+      }
             await new Promise(r => setTimeout(r, 1500));
           }
         }
