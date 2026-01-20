@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MoneyIcon } from '../Icon';
 import { ScaleInView } from '../Animations';
@@ -35,6 +35,9 @@ interface PriceCalculationProps {
   deliverySpeeds: DeliverySpeed[];
   pricingSettings: PricingSettings;
   onCalculate: () => void;
+  paymentMethod: 'balance' | 'cash';
+  onPaymentMethodChange: (method: 'balance' | 'cash') => void;
+  accountBalance: number;
 }
 
 const PriceCalculation = memo<PriceCalculationProps>(({
@@ -50,6 +53,9 @@ const PriceCalculation = memo<PriceCalculationProps>(({
   deliverySpeeds,
   pricingSettings,
   onCalculate,
+  paymentMethod,
+  onPaymentMethodChange,
+  accountBalance,
 }) => {
   // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
   const billingDistance = useMemo(() => Math.max(1, Math.ceil(calculatedDistance)), [calculatedDistance]);
@@ -168,6 +174,54 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   <Text style={styles.priceValue}>{foodFee} MMK</Text>
                 </View>
               )}
+              <View style={styles.priceDivider} />
+              
+              {/* 🚀 新增：支付方式选择 (开关形式) */}
+              <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569', marginBottom: 12 }}>
+                  {language === 'zh' ? '结算方式控制' : language === 'en' ? 'Settlement Control' : 'ပေးချေမှုထိန်းချုပ်မှု'}
+                </Text>
+                
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 14, color: paymentMethod === 'balance' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'balance' ? 'bold' : 'normal' }}>
+                      {currentT.balancePayment}
+                    </Text>
+                    {paymentMethod === 'balance' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
+                  </View>
+                  <Switch
+                    value={paymentMethod === 'balance'}
+                    onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
+                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
+                      {currentT.cashPayment}
+                    </Text>
+                    {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
+                  </View>
+                  <Switch
+                    value={paymentMethod === 'cash'}
+                    onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
+                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+                
+                {paymentMethod === 'balance' && (
+                  <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                    <Text style={{ fontSize: 11, color: accountBalance < parseFloat(calculatedPrice) ? '#ef4444' : '#10b981', textAlign: 'center' }}>
+                      {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 
+                      {accountBalance < parseFloat(calculatedPrice) ? ` (${currentT.insufficientBalance})` : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               <View style={styles.priceDivider} />
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabelTotal}>{currentT.totalPrice}:</Text>

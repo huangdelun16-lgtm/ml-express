@@ -36,6 +36,7 @@ import LoggerService from '../services/LoggerService';
 // 导入拆分后的组件
 import SenderForm from '../components/placeOrder/SenderForm';
 import ReceiverForm from '../components/placeOrder/ReceiverForm';
+import PaymentMethodSelector from '../components/placeOrder/PaymentMethodSelector';
 import PackageInfo from '../components/placeOrder/PackageInfo';
 import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
 import PriceCalculation from '../components/placeOrder/PriceCalculation';
@@ -155,6 +156,38 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       );
     }
   };
+
+  useEffect(() => {
+    const loadUserInfo = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('currentUser');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUser(user);
+          setUserId(user.id);
+          setUserName(user.name);
+          setUserPhone(user.phone);
+          setIsPartnerStore(user.user_type === 'partner');
+          
+          // 从数据库获取最新余额
+          const { data, error } = await supabase
+            .from('users')
+            .select('balance')
+            .eq('id', user.id)
+            .single();
+          
+          if (data && !error) {
+            setAccountBalance(data.balance || 0);
+          } else {
+            setAccountBalance(user.balance || 0);
+          }
+        }
+      } catch (error) {
+        LoggerService.error('加载用户信息失败:', error);
+      }
+    };
+    loadUserInfo();
+  }, []);
 
   useEffect(() => {
     analytics.trackPageView('PlaceOrderScreen');
@@ -309,7 +342,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [qrOrderPrice, setQrOrderPrice] = useState('');
   
   // 支付方式（默认现金，二维码开发中）
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
+  const [accountBalance, setAccountBalance] = useState<number>(0);
+  const [isPartnerStore, setIsPartnerStore] = useState(false);
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
   
   // 商品选择相关状态
@@ -397,6 +432,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         description: '如：衣服、食品等',
         scheduledTime: '如：今天18:00',
       },
+      paymentMethod: '支付方式',
+      balancePayment: '余额支付',
+      cashPayment: '现金支付',
+      accountBalance: '账户余额',
+      insufficientBalance: '余额不足',
+      balanceDeducted: '支付成功，已从余额扣除',
+      paymentMethodDesc: '请选择订单支付方式',
+      useBalance: '优先使用余额支付',
+      useCash: '使用现金支付',
       coordinates: '坐标',
       packageTypes: {
         document: '文件',
@@ -500,6 +544,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         description: 'e.g.: Clothes, Food, etc.',
         scheduledTime: 'e.g.: Today 18:00',
       },
+      paymentMethod: 'Payment Method',
+      balancePayment: 'Balance Payment',
+      cashPayment: 'Cash Payment',
+      accountBalance: 'Account Balance',
+      insufficientBalance: 'Insufficient Balance',
+      balanceDeducted: 'Payment successful, deducted from balance',
+      paymentMethodDesc: 'Please select a payment method',
+      useBalance: 'Pay with Balance',
+      useCash: 'Pay with Cash',
       coordinates: 'Coordinates',
       packageTypes: {
         document: 'Document',
@@ -600,6 +653,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         description: 'ဥပမာ: အဝတ်အစား, အစားအစာ',
         scheduledTime: 'ဥပမာ: ယနေ့ ၁၈:၀၀',
       },
+      paymentMethod: 'ပေးချေမှုနည်းလမ်း',
+      balancePayment: 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း',
+      cashPayment: 'ငွေသားဖြင့် ပေးချေခြင်း',
+      accountBalance: 'အကောင့်လက်ကျန်ငွေ',
+      insufficientBalance: 'လက်ကျန်ငွေမလုံလောက်ပါ',
+      balanceDeducted: 'ပေးချေမှုအောင်မြင်ပါသည်၊ လက်ကျန်ငွေမှ နုတ်ယူပြီးပါပြီ',
+      paymentMethodDesc: 'ပေးချေမှုနည်းလမ်းကို ရွေးချယ်ပါ',
+      useBalance: 'လက်ကျန်ငွေဖြင့် ပေးချေမည်',
+      useCash: 'ငွေသားဖြင့် ပေးချေမည်',
       coordinates: 'ကိုဩဒိနိတ်',
       packageTypes: {
         document: 'စာရွက်စာတမ်း',
@@ -1392,7 +1454,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         package_type: packageType,
         weight: weight,
         cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
-        description: `${typeTag} ${description || ''}`.trim(),
+        description: `${typeTag} ${description || ''} ${paymentMethod === 'balance' ? '[余额已支付]' : ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
@@ -1408,6 +1470,39 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         price: isCalculated ? calculatedPrice : price,
         payment_method: paymentMethod, // 添加支付方式字段
       };
+
+      // 🚀 核心逻辑：余额支付扣款校验
+      if (paymentMethod === 'balance' && !isGuest) {
+        const orderTotal = parseFloat(orderData.price);
+        if (accountBalance < orderTotal) {
+          hideLoading();
+          Alert.alert(currentT.insufficientBalance, `${currentT.accountBalance}: ${accountBalance.toLocaleString()} MMK\n${currentT.totalPrice}: ${orderTotal.toLocaleString()} MMK`);
+          return;
+        }
+
+        // 尝试从数据库扣除余额
+        const { data: updatedUser, error: deductError } = await supabase
+          .from('users')
+          .update({ 
+            balance: accountBalance - orderTotal,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId)
+          .select()
+          .single();
+
+        if (deductError) {
+          hideLoading();
+          LoggerService.error('余额扣除失败:', deductError);
+          Alert.alert('扣款失败', '由于余额扣除异常，请尝试使用现金支付或联系客服。');
+          return;
+        }
+
+        // 扣款成功，更新本地状态和缓存
+        setAccountBalance(updatedUser.balance);
+        await AsyncStorage.setItem('currentUser', JSON.stringify({ ...currentUser, balance: updatedUser.balance }));
+        feedbackService.success(currentT.balanceDeducted);
+      }
 
       offlinePayload = { ...orderData };
 
@@ -1704,6 +1799,18 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onBlur={handleFieldBlur}
           />
 
+          {/* 🚀 新增：支付方式选择卡片 (仅限 Member/Partner 账号) */}
+          {!isGuest && (
+            <PaymentMethodSelector
+              language={language as any}
+              styles={styles}
+              currentT={currentT}
+              paymentMethod={paymentMethod}
+              onPaymentMethodChange={setPaymentMethod}
+              accountBalance={accountBalance}
+            />
+          )}
+
           {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
           {currentUser?.user_type === 'partner' && (
             <FadeInView delay={250}>
@@ -1888,6 +1995,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             deliverySpeeds={deliverySpeeds}
             pricingSettings={pricingSettings as any}
             onCalculate={calculatePrice}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
+            accountBalance={accountBalance}
           />
 
           {/* 提交按钮 */}

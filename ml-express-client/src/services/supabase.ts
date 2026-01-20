@@ -163,6 +163,39 @@ export interface ProductCategory {
   display_order: number;
 }
 
+// 🚀 新增：通用的 Base64 转 Uint8Array 解码器（用于上传图片）
+const decodeBase64 = (b64: string): Uint8Array => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+  }
+
+  const cleanB64 = b64.replace(/\s/g, '');
+  const len = cleanB64.length;
+  let bufferLength = len * 0.75;
+  
+  if (cleanB64[len - 1] === '=') {
+    bufferLength--;
+    if (cleanB64[len - 2] === '=') bufferLength--;
+  }
+
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < len; i += 4) {
+    const encoded1 = lookup[cleanB64.charCodeAt(i)];
+    const encoded2 = lookup[cleanB64.charCodeAt(i + 1)];
+    const encoded3 = lookup[cleanB64.charCodeAt(i + 2)];
+    const encoded4 = lookup[cleanB64.charCodeAt(i + 3)];
+
+    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+    if (p < bufferLength) bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+    if (p < bufferLength) bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+  }
+
+  return bytes;
+};
+
 // 客户服务（使用users表）
 export const customerService = {
   // 注册客户
@@ -1072,18 +1105,19 @@ export const packageService = {
 
       if (error) throw error;
 
-      const totalCOD = data?.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
+      const statsData = (data || []) as any[];
+      const totalCOD = statsData.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
       
       // 如果没有 cod_settled 字段，data 中该属性为 undefined，!undefined 为 true，即默认未结清
-      const settledPackages = data?.filter(pkg => pkg.cod_settled) || [];
+      const settledPackages = statsData.filter(pkg => pkg.cod_settled) || [];
       const settledCOD = settledPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
       
-      const unclearedPackages = data?.filter(pkg => !pkg.cod_settled) || [];
+      const unclearedPackages = statsData.filter(pkg => !pkg.cod_settled) || [];
       const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
       const unclearedCount = unclearedPackages.length;
       
       // 计算最后结清日期
-      const settledWithDatePackages = data?.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
+      const settledWithDatePackages = statsData.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
       let lastSettledAt = null;
       if (settledWithDatePackages.length > 0) {
         settledWithDatePackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
@@ -1535,49 +1569,15 @@ export const rechargeService = {
       console.log('开始准备上传凭证:', imageUri);
       
       // 🚀 最终稳定性方案：使用 FileSystem 读取 base64，并手动转换为 Uint8Array
-      // 这种方式在 React Native / Expo 环境下最稳定，不依赖 XHR 或 fetch 的 blob 实现
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: 'base64',
       });
 
-      // 手动实现 base64 到 Uint8Array 的转换
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-      const lookup = new Uint8Array(256);
-      for (let i = 0; i < chars.length; i++) {
-        lookup[chars.charCodeAt(i)] = i;
-      }
-
-      const decode = (b64: string) => {
-        let bufferLength = b64.length * 0.75,
-          len = b64.length, i, p = 0,
-          encoded1, encoded2, encoded3, encoded4;
-
-        if (b64[b64.length - 1] === "=") {
-          bufferLength--;
-          if (b64[b64.length - 2] === "=") bufferLength--;
-        }
-
-        const bytes = new Uint8Array(bufferLength);
-
-        for (i = 0; i < len; i += 4) {
-          encoded1 = lookup[b64.charCodeAt(i)];
-          encoded2 = lookup[b64.charCodeAt(i + 1)];
-          encoded3 = lookup[b64.charCodeAt(i + 2)];
-          encoded4 = lookup[b64.charCodeAt(i + 3)];
-
-          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-        }
-
-        return bytes;
-      };
-
-      const bytes = decode(base64.replace(/\s/g, ''));
+      const bytes = decodeBase64(base64);
       console.log('转换为二进制成功，大小:', bytes.length, '准备上传到 Supabase Storage...');
 
       // 上传到 storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('payment_proofs')
         .upload(fileName, bytes, {
           contentType: 'image/jpeg',
@@ -1742,41 +1742,9 @@ export const merchantService = {
         encoding: 'base64',
       });
 
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-      const lookup = new Uint8Array(256);
-      for (let i = 0; i < chars.length; i++) {
-        lookup[chars.charCodeAt(i)] = i;
-      }
+      const bytes = decodeBase64(base64);
 
-      const decode = (b64: string) => {
-        let bufferLength = b64.length * 0.75,
-          len = b64.length, i, p = 0,
-          encoded1, encoded2, encoded3, encoded4;
-
-        if (b64[b64.length - 1] === "=") {
-          bufferLength--;
-          if (b64[b64.length - 2] === "=") bufferLength--;
-        }
-
-        const bytes = new Uint8Array(bufferLength);
-
-        for (i = 0; i < len; i += 4) {
-          encoded1 = lookup[b64.charCodeAt(i)];
-          encoded2 = lookup[b64.charCodeAt(i + 1)];
-          encoded3 = lookup[b64.charCodeAt(i + 2)];
-          encoded4 = lookup[b64.charCodeAt(i + 3)];
-
-          bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-          bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-          bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-        }
-
-        return bytes;
-      };
-
-      const bytes = decode(base64.replace(/\s/g, ''));
-
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('product_images')
         .upload(fileName, bytes, {
           contentType: 'image/jpeg',

@@ -25,9 +25,14 @@ CREATE POLICY "Public access for recharge_requests" ON recharge_requests
 -- 3. 开启 "Public bucket" 选项（或者手动设置下面的 RLS 策略）
 -- 4. 点击 "Create bucket"
 
--- 3. 设置 Storage RLS 策略 (如果 Bucket 已设为 Public 可选)
+-- 3. 设置 Storage RLS 策略
 -- 允许所有人查看凭证（以便管理员在后台看到图片）
--- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'payment_proofs');
--- 允许经过身份验证的用户上传凭证
--- CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'payment_proofs');
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'payment_proofs');
+
+-- 允许所有人上传凭证（开发阶段最简方案，后续可改为 authenticated）
+CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'payment_proofs');
+
+-- 允许用户更新自己的凭证（可选）
+CREATE POLICY "Public Update" ON storage.objects FOR UPDATE USING (bucket_id = 'payment_proofs');
+
 
