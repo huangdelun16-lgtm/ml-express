@@ -41,6 +41,8 @@ const RECHARGE_QR_IMAGES: Record<number, any> = {
   50000: require('../../assets/kbz_qr_50000.png'),
   100000: require('../../assets/kbz_qr_100000.png'),
   300000: require('../../assets/kbz_qr_300000.png'),
+  500000: require('../../assets/kbz_qr_500000.png'),
+  1000000: require('../../assets/kbz_qr_1000000.png'),
 };
 
 const { width } = Dimensions.get('window');
@@ -595,22 +597,37 @@ export default function ProfileScreen({ navigation }: any) {
       if (user.id && user.id !== 'guest') {
         // 🚀 实时从数据库同步最新余额和用户信息
         try {
+          console.log('🔄 正在同步数据库用户信息...', user.id);
           const { data: latestUser, error: userError } = await supabase
             .from('users')
-            .select('balance, user_type')
+            .select('balance, user_type, name, phone, email')
             .eq('id', user.id)
             .single();
           
           if (!userError && latestUser) {
-            setUserBalance(latestUser.balance || 0);
-            if (latestUser.user_type === 'customer' && (latestUser.balance || 0) > 0) {
-              setUserType('vip');
-            } else {
-              setUserType(latestUser.user_type || 'customer');
+            console.log('✅ 同步成功:', latestUser);
+            const updatedBalance = Number(latestUser.balance) || 0;
+            setAccountBalance(updatedBalance);
+            
+            // 如果余额 > 0 且是普通客户，自动升级为 VIP 显示
+            let finalType = latestUser.user_type || 'customer';
+            if (finalType === 'customer' && updatedBalance > 0) {
+              finalType = 'vip';
             }
+            setUserType(finalType);
+
+            // 🚀 同步更新本地缓存，防止下次打开显示旧数据
+            const currentUserStr = await AsyncStorage.getItem('currentUser');
+            if (currentUserStr) {
+              const localUser = JSON.parse(currentUserStr);
+              const mergedUser = { ...localUser, ...latestUser };
+              await AsyncStorage.setItem('currentUser', JSON.stringify(mergedUser));
+            }
+          } else if (userError) {
+            console.warn('⚠️ 同步用户信息失败:', userError.message);
           }
         } catch (error) {
-          console.warn('获取最新用户信息失败');
+          console.warn('❌ 获取最新用户信息异常:', error);
         }
 
         // 如果是合伙人，获取店铺名称（通常存储在user.name或AsyncStorage中）
@@ -2381,66 +2398,69 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>{t.rechargeDesc}</Text>
             </LinearGradient>
 
-            <View style={{ padding: 20 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#1e293b' }}>{t.rechargeCard}</Text>
-              
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
-                {[
-                  { amount: 10000, label: '10,000', tip: null },
-                  { amount: 50000, label: '50,000', tip: null },
-                  { amount: 100000, label: '100,000', tip: t.discount5 },
-                  { amount: 300000, label: '300,000', tip: t.discount10 },
-                ].map((item) => (
+            <View style={{ maxHeight: Dimensions.get('window').height * 0.7 }}>
+              <ScrollView bounces={false} showsVerticalScrollIndicator={true} contentContainerStyle={{ padding: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#1e293b' }}>{t.rechargeCard}</Text>
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
+                  {[
+                    { amount: 10000, label: '10,000', tip: null },
+                    { amount: 50000, label: '50,000', tip: null },
+                    { amount: 100000, label: '100,000', tip: null },
+                    { amount: 300000, label: '300,000', tip: null },
+                    { amount: 500000, label: '500,000', tip: null },
+                    { amount: 1000000, label: '1,000,000', tip: null },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.amount}
+                      onPress={() => {
+                        Vibration.vibrate(10);
+                        setSelectedRechargeAmount(item.amount);
+                      }}
+                      style={{
+                        width: (width * 0.9 - 52) / 2,
+                        padding: 16,
+                        borderRadius: 12,
+                        borderWidth: 2,
+                        borderColor: selectedRechargeAmount === item.amount ? '#3b82f6' : '#f1f5f9',
+                        backgroundColor: selectedRechargeAmount === item.amount ? '#eff6ff' : 'white',
+                        alignItems: 'center',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#3b82f6' : '#1e293b' }}>
+                        {item.label}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>MMK</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={[styles.modalButtons, { marginTop: 20 }]}>
                   <TouchableOpacity
-                    key={item.amount}
-                    onPress={() => setSelectedRechargeAmount(item.amount)}
-                    style={{
-                      width: (width * 0.9 - 52) / 2,
-                      padding: 16,
-                      borderRadius: 12,
-                      borderWidth: 2,
-                      borderColor: selectedRechargeAmount === item.amount ? '#3b82f6' : '#f1f5f9',
-                      backgroundColor: selectedRechargeAmount === item.amount ? '#eff6ff' : 'white',
-                      alignItems: 'center',
+                    style={[styles.modalButton, styles.modalButtonCancel]}
+                    onPress={() => {
+                      setShowRechargeModal(false);
+                      setSelectedRechargeAmount(null);
                     }}
                   >
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#3b82f6' : '#1e293b' }}>
-                      {item.label}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>MMK</Text>
-                    {item.tip && (
-                      <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 8 }}>
-                        <Text style={{ fontSize: 9, color: '#d97706', fontWeight: 'bold' }}>{item.tip}</Text>
-                      </View>
-                    )}
+                    <Text style={styles.modalButtonText}>{t.cancel}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonCancel]}
-                  onPress={() => {
-                    setShowRechargeModal(false);
-                    setSelectedRechargeAmount(null);
-                  }}
-                >
-                  <Text style={styles.modalButtonText}>{t.cancel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton, 
-                    styles.modalButtonConfirm,
-                    !selectedRechargeAmount && { opacity: 0.5 }
-                  ]}
-                  disabled={!selectedRechargeAmount || refreshing}
-                  onPress={handleOpenPaymentQR}
-                >
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                    {t.confirm}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalButton, 
+                      styles.modalButtonConfirm,
+                      !selectedRechargeAmount && { opacity: 0.5 }
+                    ]}
+                    disabled={!selectedRechargeAmount || refreshing}
+                    onPress={handleOpenPaymentQR}
+                  >
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                      {t.confirm}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </View>
         </View>
