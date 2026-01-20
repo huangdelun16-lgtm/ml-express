@@ -161,6 +161,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     const loadUserInfo = async () => {
       try {
         const userStr = await AsyncStorage.getItem('currentUser');
+        const guestMode = await AsyncStorage.getItem('isGuest');
+        
+        if (guestMode === 'true' || !userStr) {
+          setIsGuest(true);
+          return;
+        }
+
         if (userStr) {
           const user = JSON.parse(userStr);
           setCurrentUser(user);
@@ -168,6 +175,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           setUserName(user.name);
           setUserPhone(user.phone);
           setIsPartnerStore(user.user_type === 'partner');
+          setIsGuest(false);
           
           // 从数据库获取最新余额
           const { data, error } = await supabase
@@ -345,6 +353,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
   const [accountBalance, setAccountBalance] = useState<number>(0);
   const [isPartnerStore, setIsPartnerStore] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
   
   // 商品选择相关状态
