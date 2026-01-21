@@ -285,10 +285,6 @@ export const adminAccountService = {
           }
         }
       }
-            await new Promise(r => setTimeout(r, 1500));
-          }
-        }
-      }
 
       // 如果所有云函数节点都失败，尝试直接数据库验证（仅支持旧的非加密账户）
       console.log('🔄 所有云节点失败，尝试最后兜底验证...');
