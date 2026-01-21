@@ -184,9 +184,18 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             .single();
           
           if (data && !error) {
-            setAccountBalance(data.balance || 0);
+            const currentBalance = data.balance || 0;
+            setAccountBalance(currentBalance);
+            // 🚀 如果余额为 0，强制切换为现金支付跑腿费
+            if (currentBalance === 0) {
+              setPaymentMethod('cash');
+            }
           } else {
-            setAccountBalance(user.balance || 0);
+            const currentBalance = user.balance || 0;
+            setAccountBalance(currentBalance);
+            if (currentBalance === 0) {
+              setPaymentMethod('cash');
+            }
           }
         }
       } catch (error) {
@@ -1835,6 +1844,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onOpenMap={() => openMapSelector('sender')}
             onOpenAddressBook={() => openAddressBook('sender')}
             onBlur={handleFieldBlur}
+            disabled={cartTotal > 0 && currentUser?.user_type !== 'partner'} // 🚀 商城订单锁定寄件信息
           />
 
           {/* 收件人表单 */}
