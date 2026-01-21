@@ -221,53 +221,55 @@ export const adminAccountService = {
 
             clearTimeout(timeoutId);
 
-            if (response.ok) {
-              const result = await response.json();
-              if (result.success && result.account) {
-                console.log(`✅ 节点 ${cleanBaseUrl} 验证成功`);
-                const accountFromNetlify = result.account;
-                
-                // 异步更新数据库中的最后登录时间（非阻塞）
-                try {
-                  supabase
-                    .from('admin_accounts')
-                    .update({ last_login: new Date().toISOString() })
-                    .eq('id', accountFromNetlify.id)
-                    .then(({error}) => {
-                      if (error) console.warn('最后登录时间更新失败:', error.message);
-                    });
-                } catch (e) {}
+            // 🚀 核心修复：即使状态码不是 2xx (如 401)，也要尝试解析 JSON 获取具体错误原因
+            const result = await response.json().catch(() => null);
 
-                // 获取数据库中的最新完整信息（尝试一次，失败则使用缓存或 function 返回值）
-                try {
-                  const { data, error } = await supabase
-                    .from('admin_accounts')
-                    .select('*')
-                    .eq('username', username)
-                    .single();
+            if (response.ok && result?.success && result?.account) {
+              console.log(`✅ 节点 ${cleanBaseUrl} 验证成功`);
+              const accountFromNetlify = result.account;
+              
+              // 异步更新数据库中的最后登录时间（非阻塞）
+              try {
+                supabase
+                  .from('admin_accounts')
+                  .update({ last_login: new Date().toISOString() })
+                  .eq('id', accountFromNetlify.id)
+                  .then(({error}) => {
+                    if (error) console.warn('最后登录时间更新失败:', error.message);
+                  });
+              } catch (e) {}
 
-                  if (!error && data) return data;
-                } catch (dbError) {
-                  console.warn('获取数据库详细信息失败，使用基础信息');
-                }
-                
-                return {
-                  ...accountFromNetlify,
-                  password: '',
-                  id: accountFromNetlify.id || '',
-                  status: accountFromNetlify.status || 'active'
-                } as AdminAccount;
-              } else {
-                lastLoginError = result.error || '用户名或密码错误';
-                console.warn(`❌ 验证失败:`, lastLoginError);
-                // 如果是明确的业务逻辑错误（非超时/网络），不要重试
-                if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用') || lastLoginError.includes('不存在')) {
-                  throw new Error(lastLoginError);
-                }
+              // 获取数据库中的最新完整信息（尝试一次，失败则使用缓存或 function 返回值）
+              try {
+                const { data, error } = await supabase
+                  .from('admin_accounts')
+                  .select('*')
+                  .eq('username', username)
+                  .single();
+
+                if (!error && data) return data;
+              } catch (dbError) {
+                console.warn('获取数据库详细信息失败，使用基础信息');
+              }
+              
+              return {
+                ...accountFromNetlify,
+                password: '',
+                id: accountFromNetlify.id || '',
+                status: accountFromNetlify.status || 'active'
+              } as AdminAccount;
+            } else if (response.status === 401 || (result && !result.success)) {
+              // 处理业务逻辑错误 (如密码错误、账号停用等)
+              lastLoginError = result?.error || '用户名或密码错误';
+              console.warn(`❌ 验证失败 (${cleanBaseUrl}):`, lastLoginError);
+              
+              // 如果是明确的凭据错误，不要继续尝试其他节点，直接抛出异常
+              if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用') || lastLoginError.includes('不存在') || lastLoginError.includes('过期')) {
+                throw new Error(lastLoginError);
               }
             } else {
-              console.warn(`⚠️ 节点 ${cleanBaseUrl} 返回错误状态: ${response.status}`);
-              if (response.status === 404) break; // 路径不对，直接跳过此节点
+              console.warn(`⚠️ 节点 ${cleanBaseUrl} 返回异常状态: ${response.status}`);
+              if (response.status === 404) break; // 路径不对，跳过此节点
             }
           } catch (err: any) {
             if (err.name === 'AbortError') {
