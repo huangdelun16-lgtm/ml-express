@@ -926,34 +926,47 @@ const UserManagement: React.FC = () => {
   const loadSummaryStats = async () => {
     try {
       console.log('📊 正在加载统计数据...');
-      // 1. 获取客户统计 - 增加错误处理
+      
+      // 1. 获取客户统计 - 分开获取以确定哪个失败
       const { data: customers, error: custError } = await supabase
         .from('users')
         .select('status, balance, total_spent, user_type');
       
       if (custError) {
-        console.warn('⚠️ 获取客户统计失败 (可能是字段不存在):', custError.message);
+        console.error('❌ 获取客户表失败 (users):', custError.message, custError.details);
+        // 如果是 400 错误，说明表结构不对
+        if (custError.code === '42703' || custError.message.includes('column')) {
+          console.warn('⚠️ 数据库缺少必要字段 (balance 或 total_spent)，请运行 fix-users-table-columns.sql');
+        }
       }
       
       // 2. 获取管理员统计
-      const { data: admins } = await supabase
+      const { data: admins, error: adminError } = await supabase
         .from('admin_accounts')
         .select('status, role, last_login, position');
       
+      if (adminError) console.error('❌ 获取管理员表失败:', adminError.message);
+      
       // 3. 获取快递员统计
-      const { data: couriersData } = await supabase
+      const { data: couriersData, error: courierError } = await supabase
         .from('couriers')
         .select('status, total_deliveries, rating');
       
+      if (courierError) console.error('❌ 获取快递员表失败:', courierError.message);
+      
       // 4. 获取店铺统计
-      const { data: stores } = await supabase
+      const { data: stores, error: storeError } = await supabase
         .from('delivery_stores')
         .select('status');
       
+      if (storeError) console.error('❌ 获取店铺表失败:', storeError.message);
+      
       // 5. 获取订单总数
-      const { count: orderCount } = await supabase
+      const { count: orderCount, error: orderError } = await supabase
         .from('packages')
         .select('*', { count: 'exact', head: true });
+      
+      if (orderError) console.error('❌ 获取订单表失败:', orderError.message);
 
       const stats = {
         totalCustomers: customers?.filter(u => u.user_type === 'customer' || u.user_type === 'vip').length || 0,
