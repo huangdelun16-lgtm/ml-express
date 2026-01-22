@@ -856,66 +856,96 @@ export default function MapScreen({ navigation }: any) {
           </View>
           
           <View style={styles.cardBody}>
-          <View style={styles.pickupSection}>
-              <View style={styles.pointIndicator}>
-                <View style={[styles.pointDot, { backgroundColor: '#f59e0b' }]} />
-                <View style={styles.pointLine} />
-              </View>
-              <View style={styles.pointContent}>
-                <Text style={styles.sectionTitle}>
-                  {language === 'zh' ? '取货点' : language === 'en' ? 'Pickup' : 'ပစ္စည်းယူရန်'}
-                </Text>
-            <Text style={styles.senderName}>{item.sender_name}</Text>
-                <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
-            {item.pickupCoords && (
-                  <TouchableOpacity 
-                    style={styles.pointNavAction} 
-                    onPress={() => handleSingleNavigate(item.pickupCoords!.lat, item.pickupCoords!.lng)}
-                  >
-                    <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
-                    <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-          </View>
+            {(() => {
+              const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+              const identity = identityMatch ? identityMatch[1] : 'Member';
+              const isPartner = identity === '合伙人' || identity === 'Partner';
+              const isVIP = identity === 'VIP' || identity === 'VIP MEMBER' || identity === 'VIP အဖွဲ့ဝင်';
+              const isMember = identity === '会员' || identity === 'Member' || identity === 'အဖွဲ့ဝင်';
 
-          <View style={styles.deliverySection}>
-              <View style={styles.pointIndicator}>
-                <View style={[styles.pointDot, { backgroundColor: '#3b82f6' }]} />
-              </View>
-              <View style={styles.pointContent}>
-                <Text style={styles.sectionTitle}>
-                  {language === 'zh' ? '送货点' : language === 'en' ? 'Delivery' : 'ပစ္စည်းပို့ရန်'}
-                </Text>
-            <Text style={styles.receiverName}>{item.receiver_name}</Text>
-                <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
-                
-                {/* 🚀 新增：地图展示平台支付金额 */}
-                {(() => {
-                  const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-                  if (payMatch && payMatch[1]) {
-                    return (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                          💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
-                </Text>
-              </View>
-                    );
-                  }
-                  return null;
-                })()}
+              return (
+                <>
+                  {/* 取货点部分 */}
+                  <View style={styles.pickupSection}>
+                    <View style={styles.pointIndicator}>
+                      <View style={[styles.pointDot, { backgroundColor: '#f59e0b' }]} />
+                      <View style={styles.pointLine} />
+                    </View>
+                    <View style={styles.pointContent}>
+                      <Text style={styles.sectionTitle}>
+                        {language === 'zh' ? '取货点' : language === 'en' ? 'Pickup' : 'ပစ္စည်းယူရန်'}
+                      </Text>
+                      <Text style={styles.senderName}>{item.sender_name}</Text>
+                      <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
+                      
+                      {/* 🚀 规则 1：Partner 账号显示 COD 信息 */}
+                      {isPartner && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          {Number(item.cod_amount || 0) > 0 ? (
+                            <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>
+                              💰 {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collect COD' : 'COD ကောက်ခံရန်'}: {Number(item.cod_amount).toLocaleString()} MMK
+                            </Text>
+                          ) : (
+                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: 'bold' }}>
+                              💰 {language === 'zh' ? '无 (COD)' : language === 'en' ? 'No COD' : 'COD မရှိပါ'}
+                            </Text>
+                          )}
+                        </View>
+                      )}
 
-                {item.deliveryCoords && (
-                  <TouchableOpacity 
-                    style={styles.pointNavAction} 
-                    onPress={() => handleSingleNavigate(item.deliveryCoords!.lat, item.deliveryCoords!.lng)}
-                  >
-                    <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
-                    <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+                      {item.pickupCoords && (
+                        <TouchableOpacity 
+                          style={styles.pointNavAction} 
+                          onPress={() => handleSingleNavigate(item.pickupCoords!.lat, item.pickupCoords!.lng)}
+                        >
+                          <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
+                          <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* 送货点部分 */}
+                  <View style={styles.deliverySection}>
+                    <View style={styles.pointIndicator}>
+                      <View style={[styles.pointDot, { backgroundColor: '#3b82f6' }]} />
+                    </View>
+                    <View style={styles.pointContent}>
+                      <Text style={styles.sectionTitle}>
+                        {language === 'zh' ? '送货点' : language === 'en' ? 'Delivery' : 'ပစ္စည်းပို့ရန်'}
+                      </Text>
+                      <Text style={styles.receiverName}>{item.receiver_name}</Text>
+                      <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
+                      
+                      {/* 🚀 规则 2：VIP 账号强制显示余额支付金额 */}
+                      {isVIP && (() => {
+                        const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
+                        if (payMatch && payMatch[1]) {
+                          return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                              <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                                💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {item.deliveryCoords && (
+                        <TouchableOpacity 
+                          style={styles.pointNavAction} 
+                          onPress={() => handleSingleNavigate(item.deliveryCoords!.lat, item.deliveryCoords!.lng)}
+                        >
+                          <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
+                          <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </>
+              );
+            })()}
           </View>
 
           <View style={styles.actionRow}>
