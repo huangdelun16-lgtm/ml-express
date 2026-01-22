@@ -1988,6 +1988,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               setShowPackageTypeInfo(true);
             }}
             cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
+            accountBalance={accountBalance}
           />
 
           {/* 代收款 (仅限 VIP 账号，Partner 已移入商品卡片) */}
