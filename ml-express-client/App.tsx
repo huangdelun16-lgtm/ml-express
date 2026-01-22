@@ -77,7 +77,9 @@ function AppContent({ onLayoutRootView }: any) {
 
   const handleCloseAlert = () => {
     setShowOrderAlert(false);
-    Vibration.cancel(); // 🚀 关键：关闭弹窗时停止震动
+    Vibration.cancel(); 
+    const Speech = require('expo-speech');
+    Speech.stop(); // 🚀 停止语音
   };
 
   return (

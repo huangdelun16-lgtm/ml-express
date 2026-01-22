@@ -27,7 +27,65 @@ export function AppProvider({ children }: AppProviderProps) {
   const [showOrderAlert, setShowOrderAlert] = useState(false);
   const [newOrderData, setNewOrderData] = useState<any>(null);
   const subscriptionRef = useRef<any>(null);
+  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null); // 🚀 新增：报警循环引用
   const [userType, setUserType] = useState<string | null>(null);
+
+  // 🚀 核心优化：报警循环 (每 15 秒响一次)
+  useEffect(() => {
+    if (showOrderAlert && newOrderData) {
+      const playAlarm = () => {
+        // 1. 震动 (设置了重复，但为了保险每 15 秒重新触发一次)
+        Vibration.cancel();
+        Vibration.vibrate([0, 1000, 500, 1000], true);
+
+        // 2. 语音播报
+        const speakText = language === 'my' 
+          ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
+          : language === 'en' 
+          ? 'You have a new order, please accept' 
+          : '你有新的订单，请接单';
+        
+        Speech.stop();
+        Speech.speak(speakText, { 
+          language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+          rate: 0.9,
+          pitch: 1.0
+        });
+
+        // 3. 🚀 暗屏补偿：发送本地通知 (确保在锁屏时也能看到并听到)
+        try {
+          const ns = require('../services/notificationService').default.getInstance();
+          ns.sendSystemAnnouncementNotification({
+            title: language === 'zh' ? '📦 新订单提醒' : 'New Order',
+            message: `${language === 'zh' ? '订单号' : 'Order ID'}: ${newOrderData.id}`,
+            priority: 'high'
+          });
+        } catch (e) {
+          console.warn('发送本地通知失败:', e);
+        }
+      };
+
+      // 立即响一次
+      playAlarm();
+
+      // 每 15 秒循环一次
+      alarmIntervalRef.current = setInterval(playAlarm, 15000);
+    } else {
+      // 关闭报警
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+        alarmIntervalRef.current = null;
+      }
+      Vibration.cancel();
+      Speech.stop();
+    }
+
+    return () => {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+      }
+    };
+  }, [showOrderAlert, language, newOrderData]);
 
   // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
   // 修复：使用 useEffect 调用 API，而不是在渲染逻辑中条件性使用 Hook
@@ -101,26 +159,7 @@ export function AppProvider({ children }: AppProviderProps) {
               if (newOrder.status === '待确认') {
                 setNewOrderData(newOrder);
                 setShowOrderAlert(true);
-                
-                // 🚀 核心优化：震动 + 循环语音直到接单
-                Vibration.vibrate([0, 1000, 500, 1000], true); // 开启循环震动
-                
-                // 语音播报
-                const speakText = language === 'my' 
-                  ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
-                  : language === 'en' 
-                  ? 'You have a new order, please accept' 
-                  : '你有新的订单，请接单';
-                
-                Speech.speak(speakText, { 
-                  language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
-                  rate: 0.9,
-                  pitch: 1.0,
-                  onDone: () => {
-                    // 如果弹窗还没关闭，再播一遍
-                    // 这里由于是在 context 里的全局函数，可以递归或循环调用
-                  }
-                });
+                // 🚀 报警逻辑已移至独立的 useEffect 循环处理
               }
             })
             .subscribe((status) => {
@@ -160,19 +199,7 @@ export function AppProvider({ children }: AppProviderProps) {
             console.log('🔍 轮询发现未提醒订单:', missingOrders[0].id);
             setNewOrderData(missingOrders[0]);
             setShowOrderAlert(true);
-            
-            Vibration.vibrate([0, 1000, 500, 1000], true);
-            
-            const speakText = language === 'my' 
-              ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
-              : language === 'en' 
-              ? 'You have a new order, please accept' 
-              : '你有新的订单，请接单';
-            
-            Speech.speak(speakText, { 
-              language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
-              rate: 0.9
-            });
+            // 🚀 报警逻辑已移至独立的 useEffect 循环处理
           }
         }
       } catch (err) {

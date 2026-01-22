@@ -97,45 +97,58 @@ const RealTimeTracking: React.FC = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // 🚀 监听所有变更（包含 INSERT, UPDATE, DELETE）
           schema: 'public',
           table: 'packages'
         },
         (payload) => {
           const newPackage = payload.new as Package;
-          // 只有待处理的订单才提示
-          if (newPackage.status === '待取件' || newPackage.status === '待收款') {
-            console.log('🔔 收到新订单通知:', newPackage.id);
-            
-            // 刷新列表
-            loadPackages();
-            loadCouriers();
-            
-            // 播放声音
-            if (soundEnabledRef.current && audioRef.current) {
-              audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(e => console.error('播放提示音失败:', e));
-            }
-            
-            // 浏览器通知
-            if (Notification.permission === 'granted') {
-              try {
-                new Notification('📦 新订单提醒', {
-                  body: `收到新订单 ${newPackage.id}\n${newPackage.sender_address ? `从: ${newPackage.sender_address}` : ''}`,
-                  icon: '/favicon.ico'
-                });
-              } catch (e) {
-                console.error('通知发送失败:', e);
-              }
+          const oldPackage = payload.old as Package;
+          
+          console.log('📡 实时变化通知:', payload.eventType, newPackage?.id);
+
+          // 1. 如果是新订单
+          if (payload.eventType === 'INSERT') {
+            if (newPackage.status === '待取件' || newPackage.status === '待收款') {
+              triggerAlert(newPackage);
             }
           }
+          
+          // 2. 如果是订单状态更新 (特别处理商场订单确认)
+          if (payload.eventType === 'UPDATE') {
+            // 如果状态从 待确认 变为 待取件/待收款
+            if (oldPackage?.status === '待确认' && (newPackage.status === '待取件' || newPackage.status === '待收款')) {
+              console.log('✅ 商场订单已被商家接收，准备提醒管理员进行分配:', newPackage.id);
+              triggerAlert(newPackage);
+            }
+          }
+
+          // 无论什么变化，统一刷新数据
+          loadPackages();
+          loadCouriers();
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ 新订单监听已连接');
+      .subscribe();
+
+    const triggerAlert = (pkg: Package) => {
+      // 播放声音
+      if (soundEnabledRef.current && audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(e => console.error('播放提示音失败:', e));
+      }
+      
+      // 浏览器通知
+      if (Notification.permission === 'granted') {
+        try {
+          new Notification('📦 订单更新提醒', {
+            body: `订单 ${pkg.id} 状态: ${pkg.status}\n地址: ${pkg.sender_address || ''}`,
+            icon: '/favicon.ico'
+          });
+        } catch (e) {
+          console.error('通知发送失败:', e);
         }
-      });
+      }
+    };
 
     return () => {
       supabase.removeChannel(channel);
@@ -267,7 +280,8 @@ const RealTimeTracking: React.FC = () => {
     try {
       const data = await packageService.getAllPackages();
       
-      // 分离不同状态的包裹（包含待收款状态）
+      // 分离不同状态的包裹（待分配包裹仅包含 待取件 和 待收款，不包含 待确认）
+      // 🚀 逻辑修改：商城订单在商家确认前（待确认）不显示在管理员的待分配列表中
       const pendingPackages = data.filter(p => p.status === '待取件' || p.status === '待收款');
       const assignedPackages = data.filter(p => p.status === '已取件' || p.status === '配送中');
       
@@ -291,7 +305,7 @@ const RealTimeTracking: React.FC = () => {
   const getUnassignedPackages = () => {
     return packages.filter(pkg => 
       pkg.courier === '待分配' && 
-      (pkg.status === '待取件' || pkg.status === '待收款') && // 包含待收款状态
+      (pkg.status === '待取件' || pkg.status === '待收款') && // 🚀 逻辑修改：不再包含 待确认
       // 确保有坐标信息
       ((pkg.sender_latitude && pkg.sender_longitude) || (pkg.receiver_latitude && pkg.receiver_longitude))
     );
@@ -692,7 +706,7 @@ const RealTimeTracking: React.FC = () => {
             borderRadius: '8px',
             fontWeight: 'bold'
           }}>
-            📦 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件').length}
+            📦 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length}
           </div>
         </div>
       </div>
@@ -1205,6 +1219,30 @@ const RealTimeTracking: React.FC = () => {
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {/* 下单身份标识 */}
+                      {(() => {
+                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        if (identityMatch && identityMatch[1]) {
+                          const identity = identityMatch[1];
+                          const isPartner = identity === '合伙人' || identity === 'Partner';
+                          const isVIP = identity === 'VIP';
+                          return (
+                            <span style={{
+                              background: isPartner ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
+                              color: isPartner ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '5px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              border: `1px solid ${isPartner ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
+                            }}>
+                              👤 {identity}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {/* 支付方式标识 */}
                       {(pkg as any).payment_method === 'cash' && (
                         <span style={{
