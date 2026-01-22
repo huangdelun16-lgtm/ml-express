@@ -201,7 +201,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'balance'}
-                    disabled={cartTotal > 0 || accountBalance === 0} // 🚀 商城订单或余额为0时禁止开启/切换
+                    disabled={accountBalance === 0} // 🚀 仅余额为0时禁止开启，不再受商城订单限制
                     onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
@@ -217,7 +217,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'cash'}
-                    disabled={accountBalance === 0} // 🚀 余额为0时，现金支付开关也被锁定
+                    disabled={accountBalance === 0} // 🚀 余额为0时锁定为现金支付，禁止切换
                     onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
