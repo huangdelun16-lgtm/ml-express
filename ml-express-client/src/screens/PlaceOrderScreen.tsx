@@ -658,6 +658,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       fillRequired: 'လိုအပ်သောအကွက်များဖြည့်ပါ',
       orderSuccess: 'အမှာစာအောင်မြင်စွာဖန်တီးပြီး',
       orderFailed: 'အမှာစာဖန်တီးမှုမအောင်မြင်',
+      selectedProducts: 'ကုန်ပစ္စည်းများ',
       creating: 'အမှာစာဖန်တီးနေသည်...',
       kmUnit: 'ကီလိုမီတာ',
       orderNumber: 'အမှာစာနံပါတ်',

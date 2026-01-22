@@ -121,33 +121,116 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
 
   const handleDecline = async () => {
     if (!orderData || isProcessing) return;
+    
+    // 🚀 计算退款金额 (仅限会员订单，合伙人订单不涉及余额支付)
+    const isMemberOrder = orderData.description?.includes('[下单身份: 会员]') || orderData.description?.includes('[下单身份: VIP]');
+    let refundAmount = 0;
+    
+    if (isMemberOrder) {
+      // 1. 解析商品余额支付金额 (支持中英缅三语标签)
+      const itemPayMatch = orderData.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
+      if (itemPayMatch && itemPayMatch[1]) {
+        refundAmount += parseFloat(itemPayMatch[1].replace(/,/g, ''));
+      }
+      
+      // 2. 检查跑腿费是否也是余额支付
+      if (orderData.payment_method === 'balance') {
+        refundAmount += parseFloat(orderData.price?.replace(/[^0-9.]/g, '') || '0');
+      }
+    }
+
+    const confirmTitle = language === 'zh' ? '确认拒绝' : 'Confirm Decline';
+    const confirmMsg = language === 'zh' 
+      ? `确定要拒绝该订单吗？${refundAmount > 0 ? `\n\n💰 将退还余额: ${refundAmount.toLocaleString()} MMK` : ''}` 
+      : `Decline this order?${refundAmount > 0 ? `\n\n💰 Refund: ${refundAmount.toLocaleString()} MMK` : ''}`;
+
     Alert.alert(
-      language === 'zh' ? '确认取消' : 'Confirm Decline',
-      language === 'zh' ? '确定要拒绝该订单吗？' : 'Decline this order?',
+      confirmTitle,
+      confirmMsg,
       [
         { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
         { 
-          text: language === 'zh' ? '确定' : 'Confirm', 
+          text: language === 'zh' ? '确定拒绝' : 'Decline', 
           style: 'destructive',
           onPress: async () => {
             setIsProcessing(true);
             try {
-              const { error } = await supabase
+              // 1. 更新订单状态为已取消
+              const { error: orderError } = await supabase
                 .from('packages')
-                .update({ status: '已取消', updated_at: new Date().toISOString() })
+                .update({ 
+                  status: '已取消', 
+                  notes: (orderData.notes || '') + ' [商家拒绝接单]',
+                  updated_at: new Date().toISOString() 
+                })
                 .eq('id', orderData.id);
 
-              if (error) throw error;
+              if (orderError) throw orderError;
+
+              // 2. 执行退款逻辑 (如果涉及余额支付)
+              if (refundAmount > 0 && orderData.customer_id) {
+                console.log(`💰 正在为用户 ${orderData.customer_id} 退款: ${refundAmount}`);
+                
+                // 获取当前余额
+                const { data: userData } = await supabase
+                  .from('users')
+                  .select('balance')
+                  .eq('id', orderData.customer_id)
+                  .single();
+                
+                if (userData) {
+                  // 增加余额
+                  await supabase
+                    .from('users')
+                    .update({ 
+                      balance: (userData.balance || 0) + refundAmount,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', orderData.customer_id);
+                  
+                  console.log('✅ 余额已退还');
+                }
+              }
+
               onStatusUpdate?.();
               onClose();
             } catch (err) {
-              Alert.alert('错误', '操作失败');
+              console.error('拒绝接单失败:', err);
+              Alert.alert('错误', '操作失败，请重试');
             } finally {
               setIsProcessing(false);
             }
           }
         }
       ]
+    );
+  };
+
+  // 🚀 解析商品列表显示
+  const renderItems = () => {
+    if (!orderData?.description) return null;
+    
+    const itemsMatch = orderData.description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
+    if (!itemsMatch || !itemsMatch[1]) return null;
+    
+    const items = itemsMatch[1].split(', ');
+    
+    return (
+      <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Ionicons name="cart-outline" size={16} color="#1e3a8a" />
+          <Text style={[styles.label, { marginLeft: 4, color: '#1e3a8a', fontWeight: 'bold' }]}>
+            {language === 'zh' ? '商品清单' : 'Item List'}:
+          </Text>
+        </View>
+        <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: 10, padding: 10 }}>
+          {items.map((item: string, index: number) => (
+            <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={[styles.value, { flex: 1, fontSize: 13 }]}>• {item}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     );
   };
 
@@ -170,13 +253,18 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
                 <Text style={styles.value}>{orderData?.sender_name}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.label}>{language === 'zh' ? '总计' : 'Total'}:</Text>
-                <Text style={[styles.value, { color: '#ef4444' }]}>{orderData?.price}</Text>
+                <Text style={styles.label}>{language === 'zh' ? '总计金额' : 'Total'}:</Text>
+                <Text style={[styles.value, { color: '#ef4444', fontSize: 18 }]}>{orderData?.price} MMK</Text>
               </View>
               <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.label}>{language === 'zh' ? '支付方式' : 'Payment'}:</Text>
-                <Text style={styles.value}>{orderData?.payment_method === 'cash' ? '现金' : '在线'}</Text>
+                <Text style={[styles.value, { color: orderData?.payment_method === 'cash' ? '#f59e0b' : '#10b981' }]}>
+                  {orderData?.payment_method === 'cash' ? (language === 'zh' ? '现金支付' : 'Cash') : (language === 'zh' ? '余额支付' : 'Balance')}
+                </Text>
               </View>
+              
+              {/* 🚀 显示具体商品 */}
+              {renderItems()}
             </View>
 
             <SwipeAcceptDecline 
@@ -187,7 +275,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
           </View>
 
           {isProcessing && (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 100 }]}>
               <ActivityIndicator size="large" color="#3b82f6" />
             </View>
           )}
