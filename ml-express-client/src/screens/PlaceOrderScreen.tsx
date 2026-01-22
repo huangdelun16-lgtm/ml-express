@@ -1418,11 +1418,17 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const orderId = generateOrderId(senderAddress);
       const now = new Date();
       
-      // 🚀 优化：记录下单人身份
-      const ordererType = currentUser?.user_type === 'partner' ? '合伙人' : '会员';
+      // 🚀 优化：记录下单人身份 (识别 合伙人/VIP/普通会员)
+      let ordererType = '会员';
+      if (currentUser?.user_type === 'partner') {
+        ordererType = '合伙人';
+      } else if (currentUser?.user_type === 'vip' || accountBalance > 0) {
+        ordererType = 'VIP';
+      }
+
       const typeTag = language === 'zh' ? `[下单身份: ${ordererType}]` : 
-                     language === 'en' ? `[Orderer: ${currentUser?.user_type === 'partner' ? 'Partner' : 'Member'}]` : 
-                     `[အော်ဒါတင်သူ: ${currentUser?.user_type === 'partner' ? 'Partner' : 'Member'}]`;
+                     language === 'en' ? `[Orderer: ${ordererType === '合伙人' ? 'Partner' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]` : 
+                     `[အော်ဒါတင်သူ: ${ordererType === '合伙人' ? 'Partner' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]`;
 
       const createTime = now.toLocaleString('zh-CN', {
         year: 'numeric',

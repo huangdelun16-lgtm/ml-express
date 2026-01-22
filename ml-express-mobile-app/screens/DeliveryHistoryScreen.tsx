@@ -160,14 +160,14 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
             <Text style={styles.addressText} numberOfLines={1}>{item.receiver_address}</Text>
           </View>
           
-          {/* 🚀 新增：历史列表展示平台支付金额 */}
+          {/* 🚀 新增：历史列表展示余额支付金额 */}
           {(() => {
-            const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+            const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
             if (payMatch && payMatch[1]) {
               return (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
                   <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                    💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
+                    💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
                   </Text>
                 </View>
               );

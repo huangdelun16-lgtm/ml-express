@@ -78,11 +78,11 @@ export default function ProfileScreen({ navigation }: any) {
         // 🚀 优化：包含所有配送中的中间状态
         inProgress: myPackages.filter(p => ['已取件', '配送中', '配送进行中'].includes(p.status)).length,
         totalPlatformPayment: deliveredPackages.reduce((sum, p) => {
-          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
         }, 0),
         todayPlatformPayment: todayDelivered.reduce((sum, p) => {
-          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+          const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
         }, 0),
         todayDeliveryFee: todayDelivered.reduce((sum, p) => {
@@ -278,7 +278,7 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             <View style={styles.statDividerHorizontal} />
             <View style={styles.statRowVertical}>
-              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日平台支付' : language === 'my' ? 'ယနေ့ပလက်ဖောင်းမှပေးချေခြင်း' : 'Today Platform Pay'}</Text>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日余额支付' : language === 'my' ? 'ယနေ့ပလက်ဖောင်းမှပေးချေခြင်း' : 'Today Platform Pay'}</Text>
               <Text style={[styles.statNumberVertical, { color: '#10b981' }]}>{stats.todayPlatformPayment.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
             </View>
           </LinearGradient>

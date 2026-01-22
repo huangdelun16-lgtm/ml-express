@@ -534,8 +534,8 @@ const MyTasksScreen: React.FC = () => {
   const renderDetailModal = () => {
     if (!selectedPackage) return null;
 
-    // 🚀 解析“平台支付”金额
-    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+    // 🚀 解析“余额支付”金额
+    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
     const payToMerchantAmount = payMatch ? payMatch[1] : null;
 
     return (
@@ -580,11 +580,11 @@ const MyTasksScreen: React.FC = () => {
                     <Text style={styles.infoLineValue}>{selectedPackage.weight}kg</Text>
                   </View>
                   
-                  {/* 🚀 新增：显示平台支付金额 */}
+                  {/* 🚀 新增：显示余额支付金额 */}
                   {payToMerchantAmount && (
                     <View style={[styles.infoLine, { marginTop: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
                       <Text style={[styles.infoLineLabel, { color: '#10b981', fontWeight: 'bold' }]}>
-                        {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}
+                        {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}
                       </Text>
                       <Text style={[styles.infoLineValue, { color: '#10b981', fontWeight: 'bold', fontSize: 16 }]}>
                         {payToMerchantAmount} MMK
@@ -690,14 +690,14 @@ const MyTasksScreen: React.FC = () => {
                     <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>
                   </View>
                   
-                  {/* 🚀 新增：列表展示平台支付金额 */}
+                  {/* 🚀 新增：列表展示余额支付金额 */}
                   {(() => {
-                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
                     if (payMatch && payMatch[1]) {
                       return (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
                           <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                            💰 {language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}: {payMatch[1]} MMK
+                            💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
                           </Text>
                         </View>
                       );
