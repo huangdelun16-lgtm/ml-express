@@ -410,7 +410,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 🚀 新增：商家接单
-  const handleMERCHANTSAccept = async (orderId: string, paymentMethod: string) => {
+  const handleMerchantAccept = async (orderId: string, paymentMethod: string) => {
     try {
       showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
       const newStatus = paymentMethod === 'cash' ? '待收款' : '待取件';
@@ -432,7 +432,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 🚀 新增：商家拒绝
-  const handleMERCHANTSDecline = async (orderId: string) => {
+  const handleMerchantDecline = async (orderId: string) => {
     Alert.alert(
       language === 'zh' ? '拒绝订单' : 'Decline Order',
       language === 'zh' ? '确定要拒绝并取消此订单吗？' : 'Decline and cancel this order?',
@@ -738,7 +738,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 <View style={styles.merchantsActionRow}>
                   <TouchableOpacity 
                     style={[styles.merchantsButton, styles.merchantsDeclineButton]}
-                    onPress={() => handleMERCHANTSDecline(order.id)}
+                    onPress={() => handleMerchantDecline(order.id)}
                   >
                     <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
                     <Text style={styles.merchantsDeclineText}>{language === 'zh' ? '拒绝' : 'Decline'}</Text>
@@ -746,7 +746,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   
                   <TouchableOpacity 
                     style={[styles.merchantsButton, styles.merchantsAcceptButton]}
-                    onPress={() => handleMERCHANTSAccept(order.id, order.payment_method)}
+                    onPress={() => handleMerchantAccept(order.id, order.payment_method)}
                   >
                     <Ionicons name="checkmark-circle-outline" size={18} color="white" />
                     <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>

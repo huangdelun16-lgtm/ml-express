@@ -1313,7 +1313,7 @@ const UserManagement: React.FC = () => {
       const data = await deliveryStoreService.getAllStores();
       setMerchantStores(data || []);
     } catch (error) {
-      setMERCHANTSStores([]);
+      setMerchantStores([]);
     } finally {
       setLoadingStores(false);
     }

@@ -198,7 +198,7 @@ const FinanceManagement: React.FC = () => {
   const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
   // 新增：商家已结清和待结清弹窗状态
-  const [showMERCHANTSSettledModal, setShowMERCHANTSSettledModal] = useState<boolean>(false);
+  const [showMerchantSettledModal, setShowMerchantSettledModal] = useState<boolean>(false);
   const [showPendingOrdersModal, setShowPendingOrdersModal] = useState<boolean>(false);
   const [modalOrders, setModalOrders] = useState<Package[]>([]);
   const [modalTitle, setModalTitle] = useState<string>('');
@@ -517,9 +517,9 @@ const FinanceManagement: React.FC = () => {
           store.store_name === pkg.sender_name || 
           (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
         );
-        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+        const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
         
-        if (isMERCHANTS && pkg.rider_settled && !pkg.cod_settled) {
+        if (isMerchant && pkg.rider_settled && !pkg.cod_settled) {
           return sum + Number(pkg.cod_amount || 0);
         }
         return sum;
@@ -589,12 +589,12 @@ const FinanceManagement: React.FC = () => {
   }, [deliveryStores, packages, isRegionalUser, currentRegionPrefix]);
 
   // 结清合伙店铺代收款
-  const handleSettleMERCHANTS = async (storeId: string, storeName: string) => {
+  const handleSettleMerchant = async (storeId: string, storeName: string) => {
     if (!window.confirm(`确定要结清 "${storeName}" 的所有代收款吗？\n\n这将把该店铺所有 "已送达" 且 "未结清" 的代收款订单标记为已结清。`)) return;
 
     try {
       setLoading(true);
-      const result = await packageService.settleMERCHANTSCOD(storeId, storeName);
+      const result = await packageService.settleMerchantCOD(storeId, storeName);
       if (result.success) {
         window.alert('结清成功！');
         loadRecords(); // 刷新数据
@@ -969,7 +969,7 @@ const FinanceManagement: React.FC = () => {
   };
 
   // 新增：处理合伙代收款卡片点击
-  const handleMERCHANTSCollectionClick = (storeName?: string) => {
+  const handleMerchantCollectionClick = (storeName?: string) => {
     // 找出所有已送达且有代收款的合伙店铺订单（包括已结清和未结清）
     const codOrders = packages.filter(pkg => {
       // 如果指定了店铺名，只看该店铺的
@@ -980,9 +980,9 @@ const FinanceManagement: React.FC = () => {
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
-      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+      const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
       // 只要是已送达且代收款 > 0 的订单
-      return isMERCHANTS && pkg.status === '已送达' && Number(pkg.cod_amount || 0) > 0;
+      return isMerchant && pkg.status === '已送达' && Number(pkg.cod_amount || 0) > 0;
     }).sort((a, b) => {
       const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
       const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
@@ -991,7 +991,7 @@ const FinanceManagement: React.FC = () => {
 
     setModalOrders(codOrders);
     setModalTitle(storeName ? `${storeName} - 代收款订单明细` : '代收款订单明细');
-    setShowMERCHANTSSettledModal(true);
+    setShowMerchantSettledModal(true);
   };
 
   // 新增：处理待结清金额卡片点击
@@ -1006,8 +1006,8 @@ const FinanceManagement: React.FC = () => {
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
-      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-      return isMERCHANTS && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
+      const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
+      return isMerchant && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
     });
 
     setModalOrders(pendingOrders);
@@ -1287,7 +1287,7 @@ const FinanceManagement: React.FC = () => {
             }}
           >
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
-            {renderSummaryCard(t.totalMERCHANTSCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handleMERCHANTSCollectionClick())}
+            {renderSummaryCard(t.totalMerchantCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handleMerchantCollectionClick())}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handlePendingPaymentsClick())}
@@ -4595,8 +4595,8 @@ const FinanceManagement: React.FC = () => {
                     store.store_name === pkg.sender_name || 
                     (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                   );
-                  const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                  if (isMERCHANTS) {
+                  const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
+                  if (isMerchant) {
                     totalCOD += Number(pkg.cod_amount || 0);
                   }
                 });
@@ -5114,8 +5114,8 @@ const FinanceManagement: React.FC = () => {
                       store.store_name === pkg.sender_name || 
                       (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                     );
-                    const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                    if (isMERCHANTS) {
+                    const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
+                    if (isMerchant) {
                       visibleCOD += Number(pkg.cod_amount || 0);
                     }
                   });
@@ -5313,7 +5313,7 @@ const FinanceManagement: React.FC = () => {
                               store.store_name === pkg.sender_name || 
                               (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                             );
-                            const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+                            const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
                             const codVal = Number(pkg.cod_amount || 0);
 
                             return (
@@ -5405,7 +5405,7 @@ const FinanceManagement: React.FC = () => {
                                     }}>
                                       {price.toLocaleString()} MMK
                                     </div>
-                                    {isMERCHANTS && (
+                                    {isMerchant && (
                                       <div style={{
                                         background: '#fee2e2',
                                         color: '#b91c1c',
@@ -5546,7 +5546,7 @@ const FinanceManagement: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div 
-                    onClick={() => handleMERCHANTSCollectionClick(store.store_name)}
+                    onClick={() => handleMerchantCollectionClick(store.store_name)}
                     style={{ 
                       background: 'rgba(255, 255, 255, 0.08)', 
                       padding: '12px', 
@@ -5565,7 +5565,7 @@ const FinanceManagement: React.FC = () => {
                     }}
                   >
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>
-                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyMERCHANTSCollection}
+                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyMerchantCollection}
                     </div>
                     <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.totalAmount.toLocaleString()}
@@ -5611,7 +5611,7 @@ const FinanceManagement: React.FC = () => {
 
                 {store.unclearedAmount > 0 && (
                   <button
-                    onClick={() => !isRegionalUser && handleSettleMERCHANTS(store.id, store.store_name)}
+                    onClick={() => !isRegionalUser && handleSettleMerchant(store.id, store.store_name)}
                     disabled={isRegionalUser}
                     style={{
                       width: '100%',
@@ -5665,7 +5665,7 @@ const FinanceManagement: React.FC = () => {
       </div>
 
       {/* 订单明细弹窗 (已结清 / 待结清) */}
-      {(showMERCHANTSSettledModal || showPendingOrdersModal) && (
+      {(showMerchantSettledModal || showPendingOrdersModal) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
@@ -5685,14 +5685,14 @@ const FinanceManagement: React.FC = () => {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {showMERCHANTSSettledModal ? '🤝' : '⏳'} {modalTitle}
+                {showMerchantSettledModal ? '🤝' : '⏳'} {modalTitle}
                 <span style={{ fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', opacity: 0.8 }}>
                   {modalOrders.length} {language === 'zh' ? '单' : ''}
                 </span>
               </h2>
               <button
                 onClick={() => {
-                  setShowMERCHANTSSettledModal(false);
+                  setShowMerchantSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
                 style={{
@@ -5775,7 +5775,7 @@ const FinanceManagement: React.FC = () => {
             <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'right' }}>
               <button
                 onClick={() => {
-                  setShowMERCHANTSSettledModal(false);
+                  setShowMerchantSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
                 style={{

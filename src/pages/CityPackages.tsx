@@ -1438,10 +1438,10 @@ const CityPackages: React.FC = () => {
                         store.store_name === pkg.sender_name || 
                         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                       );
-                      const isMERCHANTSOrder = !!pkg.delivery_store_id || isStoreMatch;
+                      const isMerchantOrder = !!pkg.delivery_store_id || isStoreMatch;
                       const codAmount = Number(pkg.cod_amount || 0);
                       
-                      if (isMERCHANTSOrder) {
+                      if (isMerchantOrder) {
                         return (
                           <span style={{
                             background: '#fcd34d', // Amber-300

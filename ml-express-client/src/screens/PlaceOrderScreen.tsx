@@ -173,7 +173,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           setUserId(user.id);
           setUserName(user.name);
           setUserPhone(user.phone);
-          setIsMERCHANTSStore(user.user_type === 'merchant');
+          setIsMerchantStore(user.user_type === 'merchant');
           setIsGuest(false);
           
           // 从数据库获取最新余额
@@ -360,7 +360,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 支付方式（默认现金，二维码开发中）
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
   const [accountBalance, setAccountBalance] = useState<number>(0);
-  const [isMERCHANTSStore, setIsMERCHANTSStore] = useState(false);
+  const [isMerchantStore, setIsMerchantStore] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
   
@@ -818,7 +818,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     // 检查 currentUser 是否包含 user_type
     // 注意：App端 currentUser 是从 localStorage 加载的，可能需要检查结构
     if (currentUser?.user_type === 'merchants') {
-      const loadMERCHANTSStore = async () => {
+      const loadMerchantStore = async () => {
         try {
           // 在App端使用 supabase
           const { data: store } = await supabase
@@ -830,7 +830,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           
           if (store) {
             LoggerService.debug('✅ App端已加载合伙店铺信息:', store.store_name);
-            setMERCHANTSStore(store);
+            setMerchantStore(store);
             
             // 自动填充寄件人信息
             setSenderName(store.store_name);
@@ -857,9 +857,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           LoggerService.error('加载合伙店铺失败:', error);
         }
       };
-      loadMERCHANTSStore();
+      loadMerchantStore();
     } else {
-      setMERCHANTSStore(null);
+      setMerchantStore(null);
     }
   }, [currentUser]);
 

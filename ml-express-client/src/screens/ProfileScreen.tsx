@@ -149,7 +149,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [tempHour, setTempHour] = useState('09');
   const [tempMinute, setTempMinute] = useState('00');
 
-  const isMERCHANTSStore = userType === 'merchant';
+  const isMerchantStore = userType === 'merchant';
 
   // 🚀 新增：格式化函数（React Native 中 toLocaleString 可能不兼容）
   const formatMoney = (amount: number | string) => {
@@ -651,9 +651,9 @@ export default function ProfileScreen({ navigation }: any) {
 
           // 加载合伙店铺代收款统计
           try {
-            const codStats = await packageService.getMERCHANTSStats(user.id, storeName, selectedMonth);
+            const codStats = await packageService.getMerchantStats(user.id, storeName, selectedMonth);
             if (codStats) {
-              setMERCHANTSCODStats(prev => ({
+              setMerchantCODStats(prev => ({
                 ...prev,
                 ...codStats
               }));
@@ -679,7 +679,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：更新店铺营业状态
   const handleUpdateStoreStatus = async (updates: any) => {
-    if (!userId || !isMERCHANTSStore) return;
+    if (!userId || !isMerchantStore) return;
     try {
       const result = await deliveryStoreService.updateStoreInfo(userId, updates);
       if (result.success) {
@@ -797,8 +797,8 @@ export default function ProfileScreen({ navigation }: any) {
       }
       setCodOrdersPage(1);
       
-      // 注意：getMERCHANTSCODOrders 现在返回 { orders, total }
-      const result = await packageService.getMERCHANTSCODOrders(user.id, storeName, selectedMonth, settled, 1, 20);
+      // 注意：getMerchantCODOrders 现在返回 { orders, total }
+      const result = await packageService.getMerchantCODOrders(user.id, storeName, selectedMonth, settled, 1, 20);
       LoggerService.debug('COD Orders result:', result);
       setAllCodOrders(result.orders);
       setCodOrders(result.orders);
@@ -860,7 +860,7 @@ export default function ProfileScreen({ navigation }: any) {
       setCodOrdersLoadingMore(true);
       const nextPage = codOrdersPage + 1;
       
-      const result = await packageService.getMERCHANTSCODOrders(user.id, storeName, selectedMonth, codModalSettled, nextPage, 20);
+      const result = await packageService.getMerchantCODOrders(user.id, storeName, selectedMonth, codModalSettled, nextPage, 20);
       
       if (result.orders.length > 0) {
         const newOrders = [...allCodOrders, ...result.orders];
@@ -1255,7 +1255,7 @@ export default function ProfileScreen({ navigation }: any) {
                 (accountBalance > 0 || userType === 'vip') && styles.vipBadge,
                 userType === 'admin' && styles.adminBadge,
                 userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer' || userType === 'member') && !isMERCHANTSStore && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
+                (!userType || userType === 'customer' || userType === 'member') && !isMerchantStore && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
@@ -1263,7 +1263,7 @@ export default function ProfileScreen({ navigation }: any) {
                   (accountBalance > 0 || userType === 'vip') && styles.vipBadgeText,
                   userType === 'admin' && styles.adminBadgeText,
                   userType === 'courier' && styles.courierBadgeText,
-                  (!userType || userType === 'customer' || userType === 'member') && !isMERCHANTSStore && styles.memberBadgeText
+                  (!userType || userType === 'customer' || userType === 'member') && !isMerchantStore && styles.memberBadgeText
                 ]}>
                   {userType === 'merchant' ? 'MERCHANTS' : (
                     (accountBalance > 0 || userType === 'vip') ? 'VIP' : (
@@ -1340,7 +1340,7 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 
-  const renderMERCHANTSCODStats = () => (
+  const renderMerchantCODStats = () => (
     <View style={styles.section}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <Text style={styles.sectionTitle}>{t.codStats}</Text>
@@ -1725,7 +1725,7 @@ export default function ProfileScreen({ navigation }: any) {
       >
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
-        {!isGuest && userType === 'merchant' && renderMERCHANTSCODStats()}
+        {!isGuest && userType === 'merchant' && renderMerchantCODStats()}
         {!isGuest && userType === 'merchant' && renderBusinessManagement()}
         {!isGuest && userType === 'merchant' && renderMerchantServices()}
         {renderQuickActions()}
