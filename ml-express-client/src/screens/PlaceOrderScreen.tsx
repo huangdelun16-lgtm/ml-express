@@ -2066,7 +2066,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onCalculate={calculatePrice}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
-            accountBalance={currentUser?.user_type === 'partner' ? undefined : accountBalance}
+            accountBalance={currentUser?.user_type === 'partner' ? undefined : (accountBalance - cartTotal)}
             cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
           />
 
