@@ -586,11 +586,16 @@ export default function ProfileScreen({ navigation }: any) {
       setAccountBalance(user.balance || 0); // 🚀 获取余额
       setIsGuest(false);
 
-      // 检测用户类型
-      const detectedUserType = user.user_type || 'customer';
+      // 检测用户类型 (并进行规范化，兼容旧版数据中的 merchants 复数形式)
+      let detectedUserType = user.user_type || 'customer';
+      if (detectedUserType === 'merchants') detectedUserType = 'merchant';
       
       // 🚀 核心逻辑：如果余额 > 0 且是普通会员，则显示为 VIP MEMBER
-      const finalUserType = (detectedUserType === 'customer' && (user.balance || 0) > 0) ? 'vip' : detectedUserType;
+      // 但如果是商家 (merchant)，则保持商家身份
+      let finalUserType = detectedUserType;
+      if (detectedUserType === 'customer' && (user.balance || 0) > 0) {
+        finalUserType = 'vip';
+      }
       setUserType(finalUserType);
 
       // 加载订单统计
@@ -609,8 +614,10 @@ export default function ProfileScreen({ navigation }: any) {
             const updatedBalance = Number(latestUser.balance) || 0;
             setAccountBalance(updatedBalance);
             
-            // 如果余额 > 0 且是普通客户，自动升级为 VIP 显示
+            // 保持身份判断逻辑一致 (同样进行规范化处理)
             let finalType = latestUser.user_type || 'customer';
+            if (finalType === 'merchants') finalType = 'merchant';
+            
             if (finalType === 'customer' && updatedBalance > 0) {
               finalType = 'vip';
             }
@@ -1396,7 +1403,7 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#f87171' }]}>{t.unclearedCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
-              {formatMoney(merchantsCODStats.unclearedCOD)} <Text style={{fontSize: 12}}>MMK</Text>
+              {formatMoney(merchantCODStats.unclearedCOD)} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
               onPress={() => handleViewCODOrders(false)}
@@ -1417,19 +1424,19 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.codInfoContainer}>
           <View style={styles.codInfoRow}>
             <Text style={styles.codInfoLabel}>{t.unclearedCount}</Text>
-            <View style={[styles.codInfoBadge, { backgroundColor: merchantsCODStats.unclearedCount > 0 ? '#ef4444' : '#10b981' }]}>
-              <Text style={styles.codInfoBadgeText}>{merchantsCODStats.unclearedCount}</Text>
+            <View style={[styles.codInfoBadge, { backgroundColor: merchantCODStats.unclearedCount > 0 ? '#ef4444' : '#10b981' }]}>
+              <Text style={styles.codInfoBadgeText}>{merchantCODStats.unclearedCount}</Text>
             </View>
           </View>
-          {merchantsCODStats.lastSettledAt && (
+          {merchantCODStats.lastSettledAt && (
             <View style={styles.codInfoRow}>
               <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
               <Text style={styles.codInfoValue}>
-                {formatDateTime(merchantsCODStats.lastSettledAt)}
+                {formatDateTime(merchantCODStats.lastSettledAt)}
               </Text>
             </View>
           )}
-          {!merchantsCODStats.lastSettledAt && merchantsCODStats.totalCOD > 0 && (
+          {!merchantCODStats.lastSettledAt && merchantCODStats.totalCOD > 0 && (
             <View style={styles.codInfoRow}>
               <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
               <Text style={[styles.codInfoValue, { opacity: 0.6, fontStyle: 'italic' }]}>{t.noSettlement}</Text>

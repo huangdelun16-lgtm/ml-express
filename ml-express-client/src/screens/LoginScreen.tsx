@@ -24,7 +24,7 @@ import { feedbackService } from '../services/FeedbackService';
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
-  const [loginType, setLoginType] = useState<'customer' | 'merchants'>('customer');
+  const [loginType, setLoginType] = useState<'customer' | 'merchant'>('customer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -196,7 +196,7 @@ export default function LoginScreen({ navigation }: any) {
           email: store.email || store.store_code,
           phone: store.contact_phone || '',
           address: store.address || '',
-          user_type: 'merchants', // 标记为商家
+          user_type: 'merchant', // 标记为商家
           status: 'active',
           registration_date: store.created_at,
           last_login: new Date().toISOString(),
@@ -214,7 +214,7 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userEmail', store.email || store.store_code);
         await AsyncStorage.setItem('userName', store.store_name);
         await AsyncStorage.setItem('userPhone', store.contact_phone || '');
-        await AsyncStorage.setItem('userType', 'merchants');
+        await AsyncStorage.setItem('userType', 'merchant');
         await AsyncStorage.setItem('currentStoreCode', store.store_code);
 
         // 🚀 新增：注册并保存推送令牌（商家使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
@@ -302,14 +302,14 @@ export default function LoginScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tabButton, loginType === 'merchants' && styles.activeTabButton]}
+                style={[styles.tabButton, loginType === 'merchant' && styles.activeTabButton]}
                 onPress={() => {
-                  setLoginType('merchants');
+                  setLoginType('merchant');
                   setEmail('');
                   setPassword('');
                 }}
               >
-                <Text style={[styles.tabText, loginType === 'merchants' && styles.activeTabText]}>
+                <Text style={[styles.tabText, loginType === 'merchant' && styles.activeTabText]}>
                   {currentT.merchantsLogin}
                 </Text>
               </TouchableOpacity>

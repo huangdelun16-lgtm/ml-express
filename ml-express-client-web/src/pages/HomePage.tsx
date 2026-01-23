@@ -334,7 +334,7 @@ const HomePage: React.FC = () => {
   // 加载合伙店铺信息（当currentUser变化时）
   useEffect(() => {
     if (currentUser?.user_type === 'merchant') {
-      const loadMERCHANTSStore = async () => {
+      const loadMerchantStore = async () => {
         try {
           const { data: store } = await supabase
             .from('delivery_stores')
@@ -345,15 +345,15 @@ const HomePage: React.FC = () => {
           
           if (store) {
             console.log('✅ 已加载合伙店铺信息:', store.store_name);
-            setMERCHANTSStore(store);
+            setMerchantStore(store);
           }
         } catch (error) {
           console.error('加载合伙店铺失败:', error);
         }
       };
-      loadMERCHANTSStore();
+      loadMerchantStore();
     } else {
-      setMERCHANTSStore(null);
+      setMerchantStore(null);
     }
   }, [currentUser]);
 

@@ -47,7 +47,7 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   }); // 密码修改表单
   const [storeInfo, setStoreInfo] = useState<any>(null); // 合伙店铺信息
-  const [merchantsCODStats, setPartnerCODStats] = useState({
+  const [merchantCODStats, setMerchantCODStats] = useState({
     totalCOD: 0,
     unclearedCOD: 0,
     unclearedCount: 0,
@@ -436,7 +436,7 @@ const ProfilePage: React.FC = () => {
       
       if (userId) {
         const stats = await packageService.getPartnerStats(userId, storeName, selectedMonth);
-        setPartnerCODStats(stats);
+        setMerchantCODStats(stats);
       }
     } catch (error) {
       LoggerService.error('加载代收款统计失败:', error);
@@ -1589,7 +1589,7 @@ const ProfilePage: React.FC = () => {
                       }}>
                         <span>📅 {t.lastSettledAt}:</span>
                         <span style={{ color: '#10b981' }}>
-                          {merchantsCODStats.lastSettledAt ? formatDate(merchantsCODStats.lastSettledAt) : t.noSettlement}
+                          {merchantCODStats.lastSettledAt ? formatDate(merchantCODStats.lastSettledAt) : t.noSettlement}
                         </span>
                       </div>
                     </div>
@@ -1694,7 +1694,7 @@ const ProfilePage: React.FC = () => {
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.totalCOD}</span>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: 'white', flex: 1 }}>
-                      {merchantsCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
+                      {merchantCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
                     <button 
                       onClick={() => handleViewCODOrders(true)}
@@ -1734,11 +1734,11 @@ const ProfilePage: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.unclearedCOD}</span>
                       <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '900', background: 'rgba(251, 191, 36, 0.2)', padding: '4px 14px', borderRadius: '12px' }}>
-                        {merchantsCODStats.unclearedCount} 笔待结算
+                        {merchantCODStats.unclearedCount} 笔待结算
                       </div>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: '#fbbf24', flex: 1 }}>
-                      {merchantsCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
+                      {merchantCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
                     <button 
                       onClick={() => handleViewCODOrders(false)}

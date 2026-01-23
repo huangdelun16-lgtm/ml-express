@@ -61,7 +61,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
-  const [userType, setUserType] = useState<'customer' | 'merchants'>('customer');
+  const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
@@ -253,7 +253,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         
         // 检测用户类型：优先使用 AsyncStorage 中的 userType，否则从 user 对象中读取
         const detectedUserType = storedUserType || user.user_type || 'customer';
-        const finalUserType = detectedUserType === 'merchants' ? 'merchants' : 'customer';
+        const finalUserType = detectedUserType === 'merchant' ? 'merchant' : 'customer';
         setUserType(finalUserType);
         
         // 如果是访客，不加载订单
@@ -279,7 +279,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string, type: 'customer' | 'merchants' = 'customer') => {
+  const loadOrders = async (userId: string, type: 'customer' | 'merchant' = 'customer') => {
     try {
       setLoading(true);
       
@@ -291,7 +291,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       
       // 如果是商家，获取店铺名称用于匹配 sender_name（兼容旧数据）
       let storeName: string | undefined;
-      if (type === 'merchants') {
+      if (type === 'merchant') {
         const userName = await AsyncStorage.getItem('userName');
         if (userName) {
           storeName = userName;
@@ -704,7 +704,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               {/* 订单底部 */}
               <View style={styles.orderFooter}>
                 <View style={styles.orderFooterLeft}>
-                  {userType === 'merchants' ? (
+                  {userType === 'merchant' ? (
                     <View>
                       <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
                         {t.deliveryFee}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{order.price} MMK</Text>
@@ -734,7 +734,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               </View>
 
               {/* 🚀 新增：商家快捷接单/取消按钮 */}
-              {userType === 'merchants' && order.status === '待确认' && (
+              {userType === 'merchant' && order.status === '待确认' && (
                 <View style={styles.merchantsActionRow}>
                   <TouchableOpacity 
                     style={[styles.merchantsButton, styles.merchantsDeclineButton]}

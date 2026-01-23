@@ -86,11 +86,11 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       const userEmail = await AsyncStorage.getItem('userEmail');
       const userPhone = await AsyncStorage.getItem('userPhone');
       const storedUserType = await AsyncStorage.getItem('userType');
-      const finalUserType = storedUserType === 'merchants' ? 'merchants' : 'customer';
+      const finalUserType = storedUserType === 'merchant' ? 'merchant' : 'customer';
 
       // 🚀 新增：如果是商家，获取店铺名称用于匹配（与 MyOrdersScreen 同步）
       let storeName: string | undefined;
-      if (finalUserType === 'merchants') {
+      if (finalUserType === 'merchant') {
         const userName = await AsyncStorage.getItem('userName');
         if (userName) {
           storeName = userName;
