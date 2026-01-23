@@ -4777,7 +4777,7 @@ const HomePage: React.FC = () => {
                       }
                     }}
                   >
-                    {language === 'zh' ? 'Member' : language === 'en' ? 'Member' : 'အဖွဲ့ဝင်'}
+                    {language === 'zh' ? '会员' : language === 'en' ? 'Member' : 'အဖွဲ့ဝင်'}
                   </button>
                   <button
                     type="button"
@@ -4821,7 +4821,7 @@ const HomePage: React.FC = () => {
                       }
                     }}
                   >
-                    {language === 'zh' ? 'MERCHANTS' : language === 'en' ? 'MERCHANTS' : 'ကုန်သည်'}
+                    {language === 'zh' ? '商家' : language === 'en' ? 'MERCHANTS' : 'ကုန်သည်'}
                   </button>
                 </div>
               )}
