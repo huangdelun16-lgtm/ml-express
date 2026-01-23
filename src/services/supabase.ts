@@ -197,6 +197,7 @@ export interface RechargeRequest {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  register_region?: string; // 🚀 新增：用户所属地区
 }
 
 // 审计日志数据类型定义
@@ -2817,13 +2818,24 @@ export const rechargeService = {
   // 获取所有充值申请
   async getAllRequests(): Promise<RechargeRequest[]> {
     try {
+      // 🚀 优化：联表查询，获取用户所在的注册地区
       const { data, error } = await supabase
         .from('recharge_requests')
-        .select('*')
+        .select(`
+          *,
+          users:user_id (register_region)
+        `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // 转换数据格式
+      const formattedData = (data || []).map(req => ({
+        ...req,
+        register_region: req.users?.register_region || 'mandalay' // 默认曼德勒
+      }));
+
+      return formattedData;
     } catch (err) {
       console.error('获取充值申请失败:', err);
       return [];

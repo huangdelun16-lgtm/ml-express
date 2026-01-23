@@ -5,6 +5,17 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { errorHandler } from '../services/errorHandler';
 
+// 🚀 新增：地区定义
+const REGIONS = [
+  { id: 'mandalay', name: '曼德勒', nameEn: 'Mandalay' },
+  { id: 'yangon', name: '仰光', nameEn: 'Yangon' },
+  { id: 'maymyo', name: '彬乌伦', nameEn: 'Pyin Oo Lwin' },
+  { id: 'naypyidaw', name: '内比都', nameEn: 'Naypyidaw' },
+  { id: 'taunggyi', name: '东枝', nameEn: 'Taunggyi' },
+  { id: 'lashio', name: '腊戌', nameEn: 'Lashio' },
+  { id: 'muse', name: '木姐', nameEn: 'Muse' }
+];
+
 const RechargeManagement: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -197,8 +208,18 @@ const RechargeManagement: React.FC = () => {
                     <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fbbf24', marginBottom: '8px' }}>
                       {req.amount.toLocaleString()} <span style={{ fontSize: '0.9rem' }}>MMK</span>
                     </div>
-                    <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                      🕒 申请时间: {new Date(req.created_at!).toLocaleString()}
+                    {/* 信息详情分列 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>🕒 申请时间:</span>
+                        <span style={{ fontSize: '0.85rem' }}>{new Date(req.created_at!).toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>📍 申请地点:</span>
+                        <span style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: 'bold' }}>
+                          {REGIONS.find(r => r.id === req.register_region)?.name || req.register_region || '曼德勒'}
+                        </span>
+                      </div>
                     </div>
                     {req.notes && (
                       <div style={{ fontSize: '0.85rem', marginTop: '8px', color: '#cbd5e0' }}>
