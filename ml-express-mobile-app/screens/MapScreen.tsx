@@ -932,6 +932,15 @@ export default function MapScreen({ navigation }: any) {
                         return null;
                       })()}
 
+                      {/* 🚀 规则 3：通用规则 - 跑腿费现金支付提示 (针对 Member, VIP, Partner) */}
+                      {item.payment_method === 'cash' && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '900' }}>
+                            🛵 {language === 'zh' ? '跑腿费 (现金)' : language === 'en' ? 'Shipping Fee (Cash)' : 'ပို့ဆောင်ခ (ငွေသား)'}: {item.price} MMK
+                          </Text>
+                        </View>
+                      )}
+
                       {item.deliveryCoords && (
                         <TouchableOpacity 
                           style={styles.pointNavAction} 
