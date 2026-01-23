@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Dimensions,
   TextInput,
+  ScrollView,
+  Vibration,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,43 +40,57 @@ export default function CityMallScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
+
+  const regions = [
+    { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
+    { id: 'YGN', zh: '仰光', en: 'Yangon', my: 'ရန်ကုန်' },
+    { id: 'POL', zh: '彬乌伦', en: 'Pyin Oo Lwin', my: 'ပြင်ဦးလွင်' },
+    { id: 'NPW', zh: '内比都', en: 'Naypyidaw', my: 'နေပြည်တော်' },
+    { id: 'TGI', zh: '东枝', en: 'Taunggyi', my: 'တောင်ကြီး' },
+    { id: 'LSO', zh: '腊戌', en: 'Lashio', my: 'လားရှိုး' },
+    { id: 'MSE', zh: '木姐', en: 'Muse', my: 'မူဆယ်' }
+  ];
 
   const t = {
     zh: {
       title: '同城商场',
       searchPlaceholder: '搜索商户名称...',
       allStores: '全部分类',
-      noStores: '暂无商户',
+      noStores: '该区域暂无商户',
       operatingHours: '营业时间',
       contact: '联系电话',
       visitStore: '进入店铺',
       openNow: '正在营业',
       closedNow: '休息中',
-      closedToday: '今日暂停营业'
+      closedToday: '今日暂停营业',
+      selectRegion: '选择地区'
     },
     en: {
       title: 'City Mall',
       searchPlaceholder: 'Search store name...',
       allStores: 'All Categories',
-      noStores: 'No stores found',
+      noStores: 'No stores found in this region',
       operatingHours: 'Hours',
       contact: 'Phone',
       visitStore: 'Visit Store',
       openNow: 'Open Now',
       closedNow: 'Closed',
-      closedToday: 'Closed Today'
+      closedToday: 'Closed Today',
+      selectRegion: 'Select Region'
     },
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
       searchPlaceholder: 'ဆိုင်အမည်ရှာရန်...',
       allStores: 'ကဏ္ဍအားလုံး',
-      noStores: 'ဆိုင်များမရှိသေးပါ',
+      noStores: 'ဤဒေသတွင် ဆိုင်များမရှိသေးပါ',
       operatingHours: 'ဖွင့်ချိန်',
       contact: 'ဖုန်းနံပါတ်',
       visitStore: 'ဆိုင်သို့ဝင်ရန်',
       openNow: 'ဆိုင်ဖွင့်ထားသည်',
       closedNow: 'ဆိုင်ပိတ်ထားသည်',
-      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
+      selectRegion: 'ဒေသရွေးချယ်ပါ'
     },
   }[language] || {
     title: 'City Mall',
@@ -86,11 +102,34 @@ export default function CityMallScreen({ navigation }: any) {
     visitStore: 'Visit Store',
     openNow: 'Open Now',
     closedNow: 'Closed',
-    closedToday: 'Closed Today'
+    closedToday: 'Closed Today',
+    selectRegion: 'Select Region'
   };
 
   useEffect(() => {
-    loadStores();
+    const initializeData = async () => {
+      // 尝试从用户信息中获取默认地区
+      try {
+        const userStr = await AsyncStorage.getItem('currentUser');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          if (user.address) {
+            const addr = user.address.toUpperCase();
+            if (addr.includes('YANGON') || addr.includes('YGN')) setSelectedRegion('YGN');
+            else if (addr.includes('PYIN OO LWIN') || addr.includes('POL')) setSelectedRegion('POL');
+            else if (addr.includes('NAYPYIDAW') || addr.includes('NPW')) setSelectedRegion('NPW');
+            else if (addr.includes('TAUNGGYI') || addr.includes('TGI')) setSelectedRegion('TGI');
+            else if (addr.includes('LASHIO') || addr.includes('LSO')) setSelectedRegion('LSO');
+            else if (addr.includes('MUSE') || addr.includes('MSE')) setSelectedRegion('MSE');
+            else setSelectedRegion('MDY');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to detect user region');
+      }
+      loadStores();
+    };
+    initializeData();
   }, []);
 
   const loadStores = async () => {
@@ -151,10 +190,23 @@ export default function CityMallScreen({ navigation }: any) {
   };
 
   const filteredStores = stores
-    .filter(store =>
-      store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
-      (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase()))
-    )
+    .filter(store => {
+      const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
+        (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase()));
+      
+      const storeAddr = (store.address || '').toUpperCase();
+      let storeRegion = 'MDY';
+      
+      if (storeAddr.includes('YANGON') || storeAddr.includes('YGN')) storeRegion = 'YGN';
+      else if (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL')) storeRegion = 'POL';
+      else if (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW')) storeRegion = 'NPW';
+      else if (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI')) storeRegion = 'TGI';
+      else if (storeAddr.includes('LASHIO') || storeAddr.includes('LSO')) storeRegion = 'LSO';
+      else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
+      else storeRegion = 'MDY';
+
+      return matchesSearch && storeRegion === selectedRegion;
+    })
     .sort((a, b) => {
       const statusA = checkStoreOpenStatus(a);
       const statusB = checkStoreOpenStatus(b);
@@ -258,11 +310,25 @@ export default function CityMallScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb']}
+        colors={['#0f172a', '#1e3a8a', '#334155']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* 背景装饰性圆圈 */}
+      <View style={{
+        position: 'absolute',
+        top: -100,
+        right: -100,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        zIndex: 0
+      }} />
+
+      <View style={styles.header}>
         <BackToHomeButton navigation={navigation} color="white" />
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>{t.title}</Text>
@@ -271,13 +337,42 @@ export default function CityMallScreen({ navigation }: any) {
             <TextInput
               style={styles.searchInput}
               placeholder={t.searchPlaceholder}
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor="#9ca3af"
               value={searchText}
               onChangeText={setSearchText}
             />
           </View>
         </View>
-      </LinearGradient>
+      </View>
+
+      {/* 🚀 新增：地区选择滑动条 */}
+      <View style={styles.regionContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.regionScroll}>
+          {regions.map((region) => (
+            <TouchableOpacity
+              key={region.id}
+              onPress={() => {
+                Vibration.vibrate(10);
+                setSelectedRegion(region.id);
+              }}
+              style={[
+                styles.regionTab,
+                selectedRegion === region.id && styles.regionTabActive
+              ]}
+            >
+              <Text style={[
+                styles.regionTabText,
+                selectedRegion === region.id && styles.regionTabTextActive
+              ]}>
+                {language === 'zh' ? region.zh : (language === 'en' ? region.en : region.my)}
+              </Text>
+              {selectedRegion === region.id && (
+                <View style={styles.activeIndicator} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -290,12 +385,17 @@ export default function CityMallScreen({ navigation }: any) {
           renderItem={renderStoreItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🏢</Text>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="business-outline" size={60} color="rgba(255,255,255,0.2)" />
+              </View>
               <Text style={styles.emptyText}>{t.noStores}</Text>
+              <Text style={styles.emptySubtext}>
+                {language === 'zh' ? '请尝试切换到其他地区看看' : 'Try switching to another region'}
+              </Text>
             </View>
           }
         />
@@ -307,127 +407,175 @@ export default function CityMallScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0f172a',
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 15,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
   },
   headerContent: {
-    marginTop: 20,
+    marginTop: 10,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#ffffff',
     marginBottom: 16,
+    letterSpacing: -0.5,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
-    ...theme.shadows.small,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    height: 50,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 10,
     fontSize: 16,
-    color: '#1e293b',
+    color: '#ffffff',
+  },
+  regionContainer: {
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  regionScroll: {
+    paddingHorizontal: 20,
+    gap: 15,
+  },
+  regionTab: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  regionTabActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: '#3b82f6',
+  },
+  regionTabText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '600',
+  },
+  regionTabTextActive: {
+    color: '#3b82f6',
+    fontWeight: '800',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -4,
+    width: 20,
+    height: 3,
+    backgroundColor: '#3b82f6',
+    borderRadius: 2,
   },
   listContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
   storeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    ...theme.shadows.medium,
-    elevation: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 5,
   },
   storeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   storeIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   storeIcon: {
-    fontSize: 28,
+    fontSize: 30,
   },
   storeMainInfo: {
     flex: 1,
   },
   storeName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 6,
   },
   tagContainer: {
     flexDirection: 'row',
     gap: 8,
   },
   typeTag: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   typeTagText: {
     fontSize: 11,
-    color: '#64748b',
-    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '700',
   },
   statusTag: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   statusTagText: {
     fontSize: 11,
-    color: '#15803d',
-    fontWeight: '600',
+    fontWeight: '800',
   },
   storeDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-    gap: 8,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    paddingTop: 16,
+    gap: 10,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   detailText: {
-    fontSize: 13,
-    color: '#64748b',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
     flex: 1,
+    fontWeight: '500',
   },
   cardFooter: {
-    marginTop: 12,
+    marginTop: 16,
     alignItems: 'flex-end',
   },
   visitText: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,
@@ -438,16 +586,26 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 100,
+    marginTop: 80,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-    opacity: 0.5,
+  emptyIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#64748b',
-    fontWeight: '600',
+    fontSize: 20,
+    color: '#ffffff',
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
   },
 });
