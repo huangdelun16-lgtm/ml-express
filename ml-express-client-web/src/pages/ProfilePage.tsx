@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService } from '../services/supabase';
+import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService } from '../services/supabase';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
@@ -31,6 +31,11 @@ const ProfilePage: React.FC = () => {
   const [userBalance, setUserBalance] = useState<number>(0); // 🚀 新增：余额状态
   const [showRechargeModal, setShowRechargeModal] = useState(false); // 🚀 新增：充值模态框
   const [rechargeAmount, setRechargeAmount] = useState(''); // 🚀 新增：充值金额
+  const [showPaymentQRModal, setShowPaymentQRModal] = useState(false); // 🚀 新增：支付二维码模态框
+  const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
+  const [rechargeProof, setRechargeProof] = useState<File | null>(null);
+  const [rechargeProofPreview, setRechargeProofPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -965,40 +970,78 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：处理充值逻辑
-  const handleRecharge = async () => {
+  // 🚀 核心优化：充值流程
+  const handleOpenPaymentQR = () => {
     const amount = parseFloat(rechargeAmount);
     if (isNaN(amount) || amount <= 0) {
       alert(language === 'zh' ? '请输入有效的充值金额' : 'Please enter a valid amount');
       return;
     }
+    setSelectedRechargeAmount(amount);
+    setShowRechargeModal(false);
+    setShowPaymentQRModal(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setRechargeProof(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setRechargeProofPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleConfirmRecharge = async () => {
+    if (!selectedRechargeAmount || !currentUser?.id) return;
+    if (!rechargeProof) {
+      alert(language === 'zh' ? '请上传汇款凭证截图' : 'Please upload payment proof');
+      return;
+    }
 
     try {
       setLoading(true);
-      const newBalance = userBalance + amount;
       
-      // 更新数据库
-      const { error } = await supabase
-        .from('users')
-        .update({ 
-          balance: newBalance,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentUser.id);
+      // 1. 上传图片
+      const proofUrl = await rechargeService.uploadProof(currentUser.id, rechargeProof);
+      if (!proofUrl) throw new Error('Upload failed');
 
-      if (error) throw error;
+      // 2. 创建申请记录
+      const result = await rechargeService.createRequest({
+        user_id: currentUser.id,
+        user_name: currentUser.name || 'User',
+        amount: selectedRechargeAmount,
+        proof_url: proofUrl,
+        status: 'pending',
+        notes: `Web端充值申请: ${selectedRechargeAmount} MMK`
+      });
 
-      // 更新本地状态
-      setUserBalance(newBalance);
-      setShowRechargeModal(false);
-      setRechargeAmount('');
-      
-      alert(language === 'zh' ? `充值成功！新余额: ${newBalance.toLocaleString()} MMK` : `Recharge successful! New balance: ${newBalance.toLocaleString()} MMK`);
+      if (result.success) {
+        alert(language === 'zh' ? '提交成功！管理员审核通过后余额将自动到账。' : 'Submitted! Balance will be updated after admin review.');
+        setShowPaymentQRModal(false);
+        setRechargeAmount('');
+        setRechargeProof(null);
+        setRechargeProofPreview(null);
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
-      LoggerService.error('充值失败:', error);
-      alert(language === 'zh' ? '充值失败，请稍后重试' : 'Recharge failed, please try again');
+      console.error('Recharge failed:', error);
+      alert(language === 'zh' ? '提交失败，请稍后重试' : 'Submission failed, please try again');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveQRCode = () => {
+    const link = document.createElement('a');
+    link.href = `/kbz_qr_${selectedRechargeAmount}.png`;
+    link.download = `kbz_qr_${selectedRechargeAmount}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -3575,6 +3618,7 @@ const ProfilePage: React.FC = () => {
         </div>
       )}
       {/* 🚀 新增：充值余额模态框 */}
+      {/* 🚀 新增：充值余额模态框 */}
       {showRechargeModal && (
         <div style={{
           position: 'fixed',
@@ -3582,12 +3626,12 @@ const ProfilePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)', // 🚀 加深背景
+          backdropFilter: 'blur(15px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 2000,
+          zIndex: 99999, // 🚀 极高 Z-Index，确保在所有元素（包括 Header）上方
           padding: '20px'
         }}>
           <div style={{
@@ -3597,79 +3641,64 @@ const ProfilePage: React.FC = () => {
             width: '100%',
             maxWidth: '450px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
-            position: 'relative'
+            boxShadow: '0 30px 70px rgba(0, 0, 0, 0.6)',
+            position: 'relative',
+            animation: 'fadeInUp 0.4s ease-out'
           }}>
             <button 
               onClick={() => setShowRechargeModal(false)}
-              style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
             >✕</button>
 
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>💳</div>
+              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>💰</div>
               <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: 0 }}>
                 {language === 'zh' ? '账户充值' : language === 'en' ? 'Recharge Balance' : 'ငွေဖြည့်သွင်းခြင်း'}
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>
-                {language === 'zh' ? '请输入您要充值的金额' : language === 'en' ? 'Please enter the amount to recharge' : 'ဖြည့်သွင်းလိုသော ပမာဏကို ထည့်ပါ'}
+                {language === 'zh' ? '请选择充值卡金额' : language === 'en' ? 'Please select recharge amount' : 'ငွေဖြည့်ကတ် ပမာဏကို ရွေးချယ်ပါ'}
               </p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ position: 'relative' }}>
-                <input 
-                  type="number"
-                  value={rechargeAmount}
-                  onChange={(e) => setRechargeAmount(e.target.value)}
-                  placeholder="0.00"
-                  style={{ 
-                    width: '100%', 
-                    background: 'rgba(255,255,255,0.05)', 
-                    border: '2px solid rgba(255,255,255,0.1)', 
-                    borderRadius: '18px', 
-                    padding: '16px 20px', 
-                    paddingRight: '60px',
-                    color: 'white', 
-                    fontSize: '1.5rem',
-                    fontWeight: '800',
-                    textAlign: 'center',
-                    outline: 'none',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#10b981'}
-                  onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                />
-                <span style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontWeight: '800' }}>MMK</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-                {[5000, 10000, 20000, 50000, 100000, 200000].map(amount => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                {[10000, 50000, 100000, 300000, 500000, 1000000].map(amount => (
                   <button
                     key={amount}
                     onClick={() => setRechargeAmount(amount.toString())}
                     style={{
-                      padding: '10px',
-                      borderRadius: '12px',
-                      background: rechargeAmount === amount.toString() ? '#10b981' : 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      padding: '1.2rem',
+                      borderRadius: '18px',
+                      background: rechargeAmount === amount.toString() ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255,255,255,0.05)',
+                      border: '2px solid',
+                      borderColor: rechargeAmount === amount.toString() ? '#3b82f6' : 'rgba(255,255,255,0.1)',
                       color: 'white',
-                      fontSize: '0.85rem',
-                      fontWeight: '700',
+                      fontSize: '1.1rem',
+                      fontWeight: '800',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transform: rechargeAmount === amount.toString() ? 'scale(1.05)' : 'scale(1)',
+                      boxShadow: rechargeAmount === amount.toString() ? '0 10px 20px rgba(59, 130, 246, 0.3)' : 'none'
                     }}
                   >
-                    {amount.toLocaleString()}
+                    <span>{amount.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>MMK</span>
                   </button>
                 ))}
               </div>
 
               <button 
-                onClick={handleRecharge}
+                onClick={handleOpenPaymentQR}
                 disabled={loading || !rechargeAmount || parseFloat(rechargeAmount) <= 0}
                 style={{ 
                   marginTop: '1rem',
-                  padding: '16px', 
+                  padding: '18px', 
                   borderRadius: '18px', 
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
                   border: 'none', 
@@ -3682,15 +3711,134 @@ const ProfilePage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.8rem'
+                  gap: '0.8rem',
+                  transition: 'all 0.3s ease'
                 }}
+                onMouseOver={(e) => !loading && rechargeAmount && (e.currentTarget.style.transform = 'translateY(-2px)')}
+                onMouseOut={(e) => !loading && rechargeAmount && (e.currentTarget.style.transform = 'translateY(0)')}
               >
-                {loading ? <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div> : '确认充值'}
+                {language === 'zh' ? '下一步' : 'Next Step'}
               </button>
-              
-              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: '1.4' }}>
-                💡 {language === 'zh' ? '当前为模拟测试模式，确认后余额将直接增加' : language === 'en' ? 'Simulated test mode: balance will increase immediately after confirmation' : 'စမ်းသပ်မှုစနစ်ဖြစ်သောကြောင့် အတည်ပြုပြီးပါက လက်ကျန်ငွေ ချက်ချင်းတိုးပါမည်'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：支付二维码模态框 */}
+      {showPaymentQRModal && selectedRechargeAmount && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(15px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 100000, // 🚀 确保在最高层
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '32px',
+            padding: '2rem',
+            width: '100%',
+            maxWidth: '480px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 30px 70px rgba(0, 0, 0, 0.6)',
+            position: 'relative',
+            animation: 'fadeInUp 0.4s ease-out'
+          }}>
+            <button 
+              onClick={() => setShowPaymentQRModal(false)}
+              style={{ position: 'absolute', top: '20px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer' }}
+            >✕</button>
+
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>扫描二维码支付</h3>
+              <p style={{ color: '#10b981', fontSize: '1.2rem', fontWeight: '900', marginTop: '0.5rem' }}>
+                {selectedRechargeAmount.toLocaleString()} MMK
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
+              <div style={{ background: 'white', padding: '15px', borderRadius: '24px', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+                <img 
+                  src={`/kbz_qr_${selectedRechargeAmount}.png`} 
+                  alt="KBZPay QR" 
+                  style={{ width: '220px', height: '220px', objectFit: 'contain' }}
+                />
+                <button 
+                  onClick={handleSaveQRCode}
+                  style={{ position: 'absolute', top: '10px', right: '10px', background: '#3b82f6', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}
+                  title="保存图片"
+                >💾</button>
               </div>
+
+              <div style={{ width: '100%' }}>
+                <p style={{ color: 'white', fontSize: '0.9rem', marginBottom: '10px', fontWeight: '600' }}>上传支付凭证截图：</p>
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ 
+                    width: '100%', 
+                    height: '140px', 
+                    border: '2px dashed rgba(255,255,255,0.2)', 
+                    borderRadius: '18px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    background: rechargeProofPreview ? `url(${rechargeProofPreview}) center/contain no-repeat` : 'rgba(255,255,255,0.02)',
+                    backgroundColor: rechargeProofPreview ? '#000' : 'transparent',
+                    transition: 'all 0.3s ease',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {!rechargeProofPreview && (
+                    <>
+                      <span style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📸</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem', fontWeight: '600' }}>点击上传汇款记录</span>
+                    </>
+                  )}
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                />
+              </div>
+
+              <button 
+                onClick={handleConfirmRecharge}
+                disabled={loading || !rechargeProof}
+                style={{ 
+                  width: '100%', 
+                  padding: '18px', 
+                  borderRadius: '18px', 
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+                  border: 'none', 
+                  color: 'white', 
+                  fontSize: '1.1rem',
+                  fontWeight: '800', 
+                  cursor: (loading || !rechargeProof) ? 'not-allowed' : 'pointer', 
+                  boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+                  opacity: (loading || !rechargeProof) ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.8rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => !loading && rechargeProof && (e.currentTarget.style.transform = 'translateY(-2px)')}
+                onMouseOut={(e) => !loading && rechargeProof && (e.currentTarget.style.transform = 'translateY(0)')}
+              >
+                {loading ? <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div> : '确认已支付'}
+              </button>
             </div>
           </div>
         </div>

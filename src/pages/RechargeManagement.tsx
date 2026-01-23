@@ -115,55 +115,69 @@ const RechargeManagement: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: isMobile ? '12px' : '24px',
-      color: 'white'
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', // 🚀 优化：使用深邃的暗蓝色背景，更专业
+      padding: isMobile ? '15px' : '40px',
+      color: '#f8fafc',
+      fontFamily: "'Inter', -apple-system, sans-serif"
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            💳 {language === 'zh' ? '充值管理中心' : 'Recharge Management'}
-          </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, letterSpacing: '-1px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '15px' }}>💳</span>
+              {language === 'zh' ? '充值中心' : 'Recharge Center'}
+            </h1>
+            <p style={{ margin: '8px 0 0 65px', opacity: 0.6, fontSize: '1rem' }}>
+              {language === 'zh' ? '审核客户充值申请并管理账户余额' : 'Audit recharge requests and manage balances'}
+            </p>
+          </div>
           <button
             onClick={() => navigate('/admin/dashboard')}
             style={{
-              padding: '10px 20px',
-              borderRadius: '10px',
-              border: '1px solid rgba(255,255,255,0.3)',
-              background: 'rgba(255,255,255,0.1)',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.05)',
               color: 'white',
               cursor: 'pointer',
-              backdropFilter: 'blur(10px)'
+              fontWeight: '600',
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.3s ease'
             }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
           >
-            ← 返回后台
+            ← {language === 'zh' ? '返回后台' : 'Back'}
           </button>
         </div>
 
         {/* 过滤器 */}
         <div style={{
-          background: 'rgba(255,255,255,0.1)',
-          padding: '20px',
-          borderRadius: '16px',
-          marginBottom: '20px',
+          background: 'rgba(255,255,255,0.03)',
+          padding: '10px',
+          borderRadius: '20px',
+          marginBottom: '30px',
           display: 'flex',
-          gap: '15px',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          border: '1px solid rgba(255,255,255,0.05)',
           flexWrap: 'wrap',
-          alignItems: 'center'
+          gap: '15px'
         }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', padding: '5px' }}>
             {['all', 'pending', 'completed', 'rejected'].map(s => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '14px',
                   border: 'none',
-                  background: filterStatus === s ? '#3182ce' : 'rgba(255,255,255,0.1)',
-                  color: 'white',
+                  background: filterStatus === s ? '#3b82f6' : 'transparent',
+                  color: filterStatus === s ? 'white' : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
               >
                 {s === 'all' ? '全部' : getStatusStyle(s).label}
@@ -172,98 +186,145 @@ const RechargeManagement: React.FC = () => {
           </div>
           <button
             onClick={loadRequests}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#38a169', color: 'white', cursor: 'pointer' }}
+            style={{ 
+              padding: '10px 20px', 
+              borderRadius: '14px', 
+              border: 'none', 
+              background: 'rgba(16, 185, 129, 0.1)', 
+              color: '#10b981', 
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              marginRight: '5px'
+            }}
           >
-            🔄 刷新数据
+            🔄 {language === 'zh' ? '同步数据' : 'Sync'}
           </button>
         </div>
 
         {/* 申请列表 */}
-        <div style={{ display: 'grid', gap: '15px' }}>
+        <div style={{ display: 'grid', gap: '20px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '50px' }}>加载中...</div>
+            <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
+              <div style={{ fontSize: '2rem', marginBottom: '15px' }}>⏳</div>
+              {language === 'zh' ? '正在获取数据...' : 'Loading...'}
+            </div>
           ) : filteredRequests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>暂无申请记录</div>
+            <div style={{ textAlign: 'center', padding: '100px', background: 'rgba(255,255,255,0.02)', borderRadius: '30px', border: '2px dashed rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.2 }}>📭</div>
+              <p style={{ opacity: 0.4 }}>{language === 'zh' ? '暂无申请记录' : 'No records found'}</p>
+            </div>
           ) : (
             filteredRequests.map(req => {
               const style = getStatusStyle(req.status);
               return (
                 <div key={req.id} style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '24px',
+                  padding: '25px',
+                  border: '1px solid rgba(255,255,255,0.08)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
-                  gap: '20px'
+                  gap: '25px',
+                  transition: 'transform 0.3s ease'
                 }}>
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{req.user_name}</span>
-                      <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>ID: {req.user_id}</span>
+                  <div style={{ flex: 1, minWidth: '300px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+                      <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                        {req.user_name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '800', fontSize: '1.25rem', color: '#fff' }}>{req.user_name}</div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '2px' }}>ID: {req.user_id}</div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fbbf24', marginBottom: '8px' }}>
-                      {req.amount.toLocaleString()} <span style={{ fontSize: '0.9rem' }}>MMK</span>
+
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
+                      <span style={{ fontSize: '2rem', fontWeight: '900', color: '#fff' }}>{req.amount.toLocaleString()}</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#3b82f6', opacity: 0.8 }}>MMK</span>
                     </div>
+
                     {/* 信息详情分列 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>🕒 申请时间:</span>
-                        <span style={{ fontSize: '0.85rem' }}>{new Date(req.created_at!).toLocaleString()}</span>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+                      gap: '15px', 
+                      background: 'rgba(0,0,0,0.2)', 
+                      padding: '15px', 
+                      borderRadius: '16px' 
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', marginBottom: '4px' }}>Submission Time</div>
+                        <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{new Date(req.created_at!).toLocaleString()}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>📍 申请地点:</span>
-                        <span style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: 'bold' }}>
-                          {REGIONS.find(r => r.id === req.register_region)?.name || req.register_region || '曼德勒'}
-                        </span>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', marginBottom: '4px' }}>Location</div>
+                        <div style={{ fontSize: '0.9rem', color: '#3b82f6', fontWeight: 'bold' }}>
+                          📍 {REGIONS.find(r => r.id === req.register_region)?.name || req.register_region || '曼德勒'}
+                        </div>
                       </div>
                     </div>
+
                     {req.notes && (
-                      <div style={{ fontSize: '0.85rem', marginTop: '8px', color: '#cbd5e0' }}>
-                        📝 备注: {req.notes}
+                      <div style={{ fontSize: '0.85rem', marginTop: '15px', color: '#94a3b8', padding: '10px 15px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontStyle: 'italic' }}>
+                        “ {req.notes} ”
                       </div>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    {req.proof_url && (
-                      <button
-                        onClick={() => setShowProofModal(req.proof_url!)}
-                        style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', cursor: 'pointer' }}
-                      >
-                        🖼️ 查看凭证
-                      </button>
-                    )}
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: isMobile ? 'center' : 'flex-end', gap: '15px', minWidth: isMobile ? '100%' : 'auto' }}>
                     <div style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
+                      padding: '8px 16px',
+                      borderRadius: '10px',
                       background: style.background,
                       color: style.color,
-                      fontWeight: 'bold',
-                      fontSize: '0.9rem'
+                      fontWeight: '900',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px'
                     }}>
                       {style.label}
                     </div>
-                    
-                    {req.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '10px' }}>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {req.proof_url && (
                         <button
-                          onClick={() => handleApprove(req)}
-                          style={{ padding: '10px 20px', borderRadius: '8px', background: '#38a169', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
+                          onClick={() => setShowProofModal(req.proof_url!)}
+                          style={{ 
+                            padding: '12px', 
+                            borderRadius: '12px', 
+                            background: 'rgba(59, 130, 246, 0.1)', 
+                            border: '1px solid rgba(59, 130, 246, 0.2)', 
+                            color: '#3b82f6', 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          title="查看凭证"
                         >
-                          ✅ 通过
+                          <span style={{ fontSize: '1.2rem' }}>🖼️</span>
                         </button>
-                        <button
-                          onClick={() => handleReject(req)}
-                          style={{ padding: '10px 20px', borderRadius: '8px', background: '#e53e3e', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                          ❌ 拒绝
-                        </button>
-                      </div>
-                    )}
+                      )}
+                      
+                      {req.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(req)}
+                            style={{ padding: '12px 24px', borderRadius: '12px', background: '#10b981', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
+                          >
+                            {language === 'zh' ? '通过' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => handleReject(req)}
+                            style={{ padding: '12px 24px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            {language === 'zh' ? '拒绝' : 'Reject'}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

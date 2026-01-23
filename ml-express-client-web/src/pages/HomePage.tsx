@@ -2509,14 +2509,14 @@ const HomePage: React.FC = () => {
             </button>
 
             {/* 🚀 恢复：同城商场和购物车入口 (仅限非 MERCHANTS 账号) */}
-            (!currentUser || (currentUser?.user_type !== "merchant" && currentUser?.user_type !== "partner")) && (
+            {(!currentUser || (currentUser?.user_type !== 'merchant' && currentUser?.user_type !== 'partner')) ? (
               <>
                 <button
                   onClick={() => handleNavigation('/mall')}
                   style={{
-                    background: 'rgba(255,255,255,0.2)',
+                    background: 'rgba(255, 255, 255, 0.2)',
                     color: 'white',
-                    border: '2px solid rgba(255,255,255,0.4)',
+                    border: '2px solid rgba(255, 255, 255, 0.4)',
                     padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
                     borderRadius: '60px',
                     cursor: 'pointer',
@@ -2529,13 +2529,13 @@ const HomePage: React.FC = () => {
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
                   }}
                 >
                   🛍️ {t.hero.mall}
@@ -2544,9 +2544,9 @@ const HomePage: React.FC = () => {
                 <button
                   onClick={() => handleNavigation('/cart')}
                   style={{
-                    background: 'rgba(255,255,255,0.2)',
+                    background: 'rgba(255, 255, 255, 0.2)',
                     color: 'white',
-                    border: '2px solid rgba(255,255,255,0.4)',
+                    border: '2px solid rgba(255, 255, 255, 0.4)',
                     padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
                     borderRadius: '60px',
                     cursor: 'pointer',
@@ -2559,19 +2559,19 @@ const HomePage: React.FC = () => {
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
                   }}
                 >
                   🛒 {t.hero.cart}
                 </button>
               </>
-            )}
+            ) : null}
             </div>
 
           {/* 特色标签 */}

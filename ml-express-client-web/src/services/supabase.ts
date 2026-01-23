@@ -117,6 +117,19 @@ export interface ProductCategory {
   display_order: number;
 }
 
+// 充值申请接口
+export interface RechargeRequest {
+  id?: string;
+  user_id: string;
+  user_name: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'rejected';
+  proof_url: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
   // 获取所有包裹（用于跟踪页面）
@@ -1061,6 +1074,57 @@ export const systemSettingsService = {
         foodBeverageSurcharge: 300,
         freeKmThreshold: 3
       };
+    }
+  }
+};
+
+// 充值服务
+export const rechargeService = {
+  // 上传支付凭证 (Web版使用 File)
+  async uploadProof(userId: string, file: File): Promise<string | null> {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `recharge_${userId}_${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('payment_proofs')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // 获取公共 URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment_proofs')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传凭证失败:', error?.message || '未知错误');
+      return null;
+    }
+  },
+
+  // 创建充值申请
+  async createRequest(requestData: Omit<RechargeRequest, 'id' | 'created_at' | 'updated_at'>) {
+    try {
+      const { data, error } = await supabase
+        .from('recharge_requests')
+        .insert([{
+          ...requestData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('创建充值申请失败:', error?.message || '未知错误');
+      return { success: false, error };
     }
   }
 };
