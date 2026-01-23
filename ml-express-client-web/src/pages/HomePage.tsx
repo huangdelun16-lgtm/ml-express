@@ -2509,7 +2509,7 @@ const HomePage: React.FC = () => {
             </button>
 
             {/* 🚀 恢复：同城商场和购物车入口 (仅限非 MERCHANTS 账号) */}
-            {currentUser?.user_type !== 'merchant' && (
+            (!currentUser || (currentUser?.user_type !== "merchant" && currentUser?.user_type !== "partner")) && (
               <>
                 <button
                   onClick={() => handleNavigation('/mall')}

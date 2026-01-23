@@ -112,7 +112,9 @@ export function AppProvider({ children }: AppProviderProps) {
         const currentUserStr = await AsyncStorage.getItem('currentUser');
         if (currentUserStr) {
           const user = JSON.parse(currentUserStr);
-          setUserType(user.user_type || 'customer');
+          let finalUserType = user.user_type || 'customer';
+          if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
+          setUserType(finalUserType);
         }
       } catch (error) {
         LoggerService.error('加载初始设置失败:', error);
@@ -129,9 +131,11 @@ export function AppProvider({ children }: AppProviderProps) {
         if (!currentUserStr) return;
         
         const user = JSON.parse(currentUserStr);
-        setUserType(user.user_type || 'customer'); // 同步更新 userType 状态
+        let finalUserType = user.user_type || 'customer';
+        if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
+        setUserType(finalUserType); // 同步更新 userType 状态
 
-        if (user.user_type === 'merchant' && user.id) {
+        if (finalUserType === 'merchant' && user.id) {
           console.log('✅ 检测到商家账号，建立全局订单监听:', user.id);
           
           // 如果已有监听，先清理

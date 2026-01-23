@@ -269,14 +269,14 @@ const ProfilePage: React.FC = () => {
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
   // 判断逻辑：
-  // 1. 如果 user_type === 'merchants'，直接返回 true
+  // 1. 如果 user_type === 'merchant'，直接返回 true
   // 2. 如果用户有 store_code 或 store_id，返回 true
   // 3. 否则检查用户的邮箱或手机号是否在 delivery_stores 表中
   const checkIfPartnerStore = useCallback(async (user: any) => {
     if (!user) return false;
     
     // 方法1: 检查 user_type
-    if (user.user_type === 'merchants') {
+    if (user.user_type === 'merchant') {
       return true;
     }
     

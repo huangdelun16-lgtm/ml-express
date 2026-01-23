@@ -334,12 +334,18 @@ export default function HomeScreen({ navigation }: any) {
       
       setUserId(storedUserId);
       setUserName(storedUserName || '');
-      setUserType(storedUserType);
+      
+      // 🚀 规范化用户类型，确保识别 merchant
+      let finalUserType = storedUserType?.toLowerCase();
+      if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
+      console.log('🏠 [HomeScreen] 用户身份识别:', { 原始: storedUserType, 规范化: finalUserType, 是否显示商城: (isGuest || finalUserType === 'customer' || finalUserType === 'vip') });
+      setUserType(finalUserType || null);
+      
       setIsGuest(guestMode === 'true');
 
       // 如果是已登录用户（非访客），加载订单数据
       if (storedUserId && guestMode !== 'true') {
-        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, storedUserType || undefined);
+        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, finalUserType || undefined);
       }
     } catch (error) {
       errorService.handleError(error, { context: 'HomeScreen.loadUserData', silent: true });
@@ -758,7 +764,7 @@ export default function HomeScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* 2. City Mall */}
-            {userType !== 'merchants' && (
+            {(isGuest || userType === 'customer' || userType === 'vip') && (
               <TouchableOpacity
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('CityMall')}
@@ -803,7 +809,7 @@ export default function HomeScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* 4. Shopping Cart */}
-            {userType !== 'merchants' && (
+            {(isGuest || userType === 'customer' || userType === 'vip') && (
               <TouchableOpacity
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('Cart')}
