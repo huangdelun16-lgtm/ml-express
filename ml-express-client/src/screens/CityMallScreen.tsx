@@ -12,6 +12,7 @@ import {
   TextInput,
   ScrollView,
   Vibration,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
