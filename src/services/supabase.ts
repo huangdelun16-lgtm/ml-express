@@ -2818,24 +2818,35 @@ export const rechargeService = {
   // 获取所有充值申请
   async getAllRequests(): Promise<RechargeRequest[]> {
     try {
-      // 🚀 优化：联表查询，获取用户所在的注册地区
-      const { data, error } = await supabase
+      // 1. 获取所有充值申请
+      const { data: requests, error } = await supabase
         .from('recharge_requests')
-        .select(`
-          *,
-          users:user_id (register_region)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      
-      // 转换数据格式
-      const formattedData = (data || []).map(req => ({
-        ...req,
-        register_region: req.users?.register_region || 'mandalay' // 默认曼德勒
-      }));
+      if (!requests || requests.length === 0) return [];
 
-      return formattedData;
+      // 2. 获取所有相关的用户信息（用于提取地区）
+      const userIds = Array.from(new Set(requests.map(r => r.user_id)));
+      const { data: users, error: userError } = await supabase
+        .from('users')
+        .select('id, register_region')
+        .in('id', userIds);
+
+      // 3. 建立 ID 映射
+      const regionMap: Record<string, string> = {};
+      if (!userError && users) {
+        users.forEach(u => {
+          regionMap[u.id] = u.register_region || 'mandalay';
+        });
+      }
+      
+      // 4. 合并数据
+      return requests.map(req => ({
+        ...req,
+        register_region: regionMap[req.user_id] || 'mandalay'
+      }));
     } catch (err) {
       console.error('获取充值申请失败:', err);
       return [];
