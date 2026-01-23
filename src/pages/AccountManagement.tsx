@@ -283,7 +283,7 @@ const AccountManagement: React.FC = () => {
   const AVAILABLE_PERMISSIONS = [
     { id: 'city_packages', name: '同城订单', icon: '📦' },
     { id: 'users', name: '用户管理', icon: '👥' },
-    { id: 'partner_stores', name: '合伙店铺', icon: '🏪' },
+    { id: 'merchants_stores', name: '合伙店铺', icon: '🏪' },
     { id: 'finance', name: '财务管理', icon: '💰' },
     { id: 'tracking', name: '实时跟踪', icon: '📍' },
     { id: 'settings', name: '系统设置', icon: '⚙️' },

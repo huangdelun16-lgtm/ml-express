@@ -132,7 +132,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     const currentUserId = await AsyncStorage.getItem('userId');
     const userType = await AsyncStorage.getItem('userType');
     // 如果是商家查看自己的店铺，则非只读模式
-    if (userType === 'partner' && currentUserId === storeId) {
+    if (userType === 'merchants' && currentUserId === storeId) {
       setIsReadOnly(false);
     } else {
       setIsReadOnly(true);

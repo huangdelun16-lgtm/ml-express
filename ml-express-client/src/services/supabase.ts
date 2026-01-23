@@ -1064,7 +1064,7 @@ export const packageService = {
   },
 
   // 获取商家代收款统计
-  async getPartnerStats(userId: string, storeName?: string, month?: string) {
+  async getMERCHANTSStats(userId: string, storeName?: string, month?: string) {
     try {
       // 构建查询函数
       const runQuery = async (fields: string) => {
@@ -1144,7 +1144,7 @@ export const packageService = {
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getPartnerCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
+  async getMERCHANTSCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
@@ -1185,7 +1185,7 @@ export const packageService = {
       
       if (error) throw error;
       
-      LoggerService.debug(`[getPartnerCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
+      LoggerService.debug(`[getMERCHANTSCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
       
       const orders = (data || []).map(pkg => ({
         orderId: pkg.id,

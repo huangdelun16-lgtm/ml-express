@@ -758,7 +758,7 @@ export default function HomeScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* 2. City Mall */}
-            {userType !== 'partner' && (
+            {userType !== 'merchants' && (
               <TouchableOpacity
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('CityMall')}
@@ -803,7 +803,7 @@ export default function HomeScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* 4. Shopping Cart */}
-            {userType !== 'partner' && (
+            {userType !== 'merchants' && (
               <TouchableOpacity
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('Cart')}

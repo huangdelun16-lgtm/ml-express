@@ -61,7 +61,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
-  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
+  const [userType, setUserType] = useState<'customer' | 'merchants'>('customer');
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
@@ -253,7 +253,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         
         // 检测用户类型：优先使用 AsyncStorage 中的 userType，否则从 user 对象中读取
         const detectedUserType = storedUserType || user.user_type || 'customer';
-        const finalUserType = detectedUserType === 'partner' ? 'partner' : 'customer';
+        const finalUserType = detectedUserType === 'merchants' ? 'merchants' : 'customer';
         setUserType(finalUserType);
         
         // 如果是访客，不加载订单
@@ -279,7 +279,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string, type: 'customer' | 'partner' = 'customer') => {
+  const loadOrders = async (userId: string, type: 'customer' | 'merchants' = 'customer') => {
     try {
       setLoading(true);
       
@@ -291,7 +291,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       
       // 如果是商家，获取店铺名称用于匹配 sender_name（兼容旧数据）
       let storeName: string | undefined;
-      if (type === 'partner') {
+      if (type === 'merchants') {
         const userName = await AsyncStorage.getItem('userName');
         if (userName) {
           storeName = userName;
@@ -410,7 +410,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 🚀 新增：商家接单
-  const handlePartnerAccept = async (orderId: string, paymentMethod: string) => {
+  const handleMERCHANTSAccept = async (orderId: string, paymentMethod: string) => {
     try {
       showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
       const newStatus = paymentMethod === 'cash' ? '待收款' : '待取件';
@@ -432,7 +432,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 🚀 新增：商家拒绝
-  const handlePartnerDecline = async (orderId: string) => {
+  const handleMERCHANTSDecline = async (orderId: string) => {
     Alert.alert(
       language === 'zh' ? '拒绝订单' : 'Decline Order',
       language === 'zh' ? '确定要拒绝并取消此订单吗？' : 'Decline and cancel this order?',
@@ -704,7 +704,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               {/* 订单底部 */}
               <View style={styles.orderFooter}>
                 <View style={styles.orderFooterLeft}>
-                  {userType === 'partner' ? (
+                  {userType === 'merchants' ? (
                     <View>
                       <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
                         {t.deliveryFee}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{order.price} MMK</Text>
@@ -734,22 +734,22 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               </View>
 
               {/* 🚀 新增：商家快捷接单/取消按钮 */}
-              {userType === 'partner' && order.status === '待确认' && (
-                <View style={styles.partnerActionRow}>
+              {userType === 'merchants' && order.status === '待确认' && (
+                <View style={styles.merchantsActionRow}>
                   <TouchableOpacity 
-                    style={[styles.partnerButton, styles.partnerDeclineButton]}
-                    onPress={() => handlePartnerDecline(order.id)}
+                    style={[styles.merchantsButton, styles.merchantsDeclineButton]}
+                    onPress={() => handleMERCHANTSDecline(order.id)}
                   >
                     <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
-                    <Text style={styles.partnerDeclineText}>{language === 'zh' ? '拒绝' : 'Decline'}</Text>
+                    <Text style={styles.merchantsDeclineText}>{language === 'zh' ? '拒绝' : 'Decline'}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    style={[styles.partnerButton, styles.partnerAcceptButton]}
-                    onPress={() => handlePartnerAccept(order.id, order.payment_method)}
+                    style={[styles.merchantsButton, styles.merchantsAcceptButton]}
+                    onPress={() => handleMERCHANTSAccept(order.id, order.payment_method)}
                   >
                     <Ionicons name="checkmark-circle-outline" size={18} color="white" />
-                    <Text style={styles.partnerAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>
+                    <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1046,7 +1046,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   // 🚀 新增：商家动作行
-  partnerActionRow: {
+  merchantsActionRow: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 16,
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-  partnerButton: {
+  merchantsButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1063,20 +1063,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 6,
   },
-  partnerAcceptButton: {
+  merchantsAcceptButton: {
     backgroundColor: '#10b981',
   },
-  partnerDeclineButton: {
+  merchantsDeclineButton: {
     backgroundColor: '#fff1f2',
     borderWidth: 1,
     borderColor: '#fecdd3',
   },
-  partnerAcceptText: {
+  merchantsAcceptText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
   },
-  partnerDeclineText: {
+  merchantsDeclineText: {
     color: '#ef4444',
     fontWeight: 'bold',
     fontSize: 14,

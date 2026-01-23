@@ -247,7 +247,7 @@ export const testConnection = async () => {
 // 包裹数据库操作
 export const packageService = {
   // 结清合伙店铺代收款
-  async settlePartnerCOD(storeId: string, storeName: string) {
+  async settleMERCHANTSCOD(storeId: string, storeName: string) {
     try {
       const now = new Date().toISOString();
       

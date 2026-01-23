@@ -56,14 +56,14 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: '店铺代码不存在',
       storePasswordError: '密码错误',
       queryStoreFailed: '查询店铺失败，请稍后重试',
-      welcomePartner: '欢迎回来，',
+      welcomeMERCHANTS: '欢迎回来，',
     },
     en: {
       welcome: 'Welcome Back',
       title: 'Login',
       subtitle: 'Sign in to your account to continue',
       customerLogin: 'Member',
-      merchantsLogin: 'Partner',
+      merchantsLogin: 'MERCHANTS',
       email: 'Email/Phone',
       storeCode: 'Store Code',
       password: 'Password',
@@ -84,7 +84,7 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: 'Store code not found',
       storePasswordError: 'Incorrect password',
       queryStoreFailed: 'Failed to query store',
-      welcomePartner: 'Welcome back, ',
+      welcomeMERCHANTS: 'Welcome back, ',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
@@ -112,7 +112,7 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: 'ဆိုင်ကုဒ် မရှိပါ',
       storePasswordError: 'စကားဝှက်မှားနေပါသည်',
       queryStoreFailed: 'ဆိုင်ကို ရှာဖွေရန် မအောင်မြင်ပါ',
-      welcomePartner: 'ပြန်လည်ကြိုဆိုပါတယ် ',
+      welcomeMERCHANTS: 'ပြန်လည်ကြိုဆိုပါတယ် ',
     },
   };
 
@@ -234,7 +234,7 @@ export default function LoginScreen({ navigation }: any) {
           console.warn('推送注册失败，但不影响登录:', nsError);
         }
 
-        feedbackService.success(`${currentT.welcomePartner}${store.store_name}`);
+        feedbackService.success(`${currentT.welcomeMERCHANTS}${store.store_name}`);
         navigation.replace('Main');
       }
     } catch (error: any) {
