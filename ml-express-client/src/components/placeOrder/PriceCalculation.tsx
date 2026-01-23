@@ -37,7 +37,7 @@ interface PriceCalculationProps {
   onCalculate: () => void;
   paymentMethod: 'balance' | 'cash';
   onPaymentMethodChange: (method: 'balance' | 'cash') => void;
-  accountBalance: number;
+  accountBalance?: number;
   cartTotal?: number;
 }
 
@@ -184,29 +184,31 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   {currentT.shippingFeePayment}
                 </Text>
                 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ 
-                      fontSize: 14, 
-                      color: paymentMethod === 'balance' ? '#1e293b' : '#64748b', 
-                      fontWeight: paymentMethod === 'balance' ? 'bold' : 'normal',
-                      opacity: accountBalance === 0 ? 0.5 : 1
-                    }}>
-                      {currentT.courierFeeBalance}
-                    </Text>
-                    {paymentMethod === 'balance' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
-                    {accountBalance === 0 && (
-                      <Text style={{ fontSize: 10, color: '#ef4444' }}>({language === 'zh' ? '未充值' : 'No Balance'})</Text>
-                    )}
+                {accountBalance !== undefined && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ 
+                        fontSize: 14, 
+                        color: paymentMethod === 'balance' ? '#1e293b' : '#64748b', 
+                        fontWeight: paymentMethod === 'balance' ? 'bold' : 'normal',
+                        opacity: accountBalance === 0 ? 0.5 : 1
+                      }}>
+                        {currentT.courierFeeBalance}
+                      </Text>
+                      {paymentMethod === 'balance' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
+                      {accountBalance === 0 && (
+                        <Text style={{ fontSize: 10, color: '#ef4444' }}>({language === 'zh' ? '未充值' : 'No Balance'})</Text>
+                      )}
+                    </View>
+                    <Switch
+                      value={paymentMethod === 'balance'}
+                      disabled={accountBalance === 0} // 🚀 余额为0时禁止开启
+                      onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
+                      trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                      thumbColor="#ffffff"
+                    />
                   </View>
-                  <Switch
-                    value={paymentMethod === 'balance'}
-                    disabled={accountBalance === 0} // 🚀 仅余额为0时禁止开启，不再受商城订单限制
-                    onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
-                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
-                    thumbColor="#ffffff"
-                  />
-                </View>
+                )}
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -217,14 +219,14 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'cash'}
-                    disabled={accountBalance === 0} // 🚀 余额为0时锁定为现金支付，禁止切换
+                    disabled={accountBalance === 0} // 🚀 余额为0时锁定为现金支付
                     onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
                   />
                 </View>
                 
-                {paymentMethod === 'balance' && (
+                {paymentMethod === 'balance' && accountBalance !== undefined && (
                   <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
                     <Text style={{ fontSize: 11, color: accountBalance < parseFloat(calculatedPrice) ? '#ef4444' : '#10b981', textAlign: 'center' }}>
                       {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 

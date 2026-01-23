@@ -1289,8 +1289,8 @@ export default function ProfileScreen({ navigation }: any) {
                 <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.9)" />
                 <Text style={styles.userContact}>{userEmail || '未绑定邮箱'}</Text>
               </View>
-              {/* 🚀 新增：余额显示 */}
-              {!isGuest && (
+              {/* 🚀 新增：余额显示 (仅限非商家账号) */}
+              {!isGuest && userType !== 'partner' && (
                 <View style={[styles.contactRow, { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }]}>
                   <Ionicons name="wallet-outline" size={16} color="#fbbf24" />
                   <Text style={[styles.userContact, { color: '#fbbf24', fontWeight: 'bold' }]}>

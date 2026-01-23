@@ -116,12 +116,14 @@ const PackageInfo = memo<PackageInfoProps>(({
               </View>
             </View>
 
-            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-              <Text style={{ fontSize: 11, color: accountBalance < cartTotal ? '#ef4444' : '#10b981', textAlign: 'center' }}>
-                {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 
-                {accountBalance < cartTotal ? ` (${currentT.insufficientBalance})` : ''}
-              </Text>
-            </View>
+            {accountBalance !== undefined && (
+              <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, color: accountBalance < cartTotal ? '#ef4444' : '#10b981', textAlign: 'center' }}>
+                  {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 
+                  {accountBalance < cartTotal ? ` (${currentT.insufficientBalance})` : ''}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </View>

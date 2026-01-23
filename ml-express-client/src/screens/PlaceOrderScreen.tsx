@@ -1923,12 +1923,26 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
                       {/* 🚀 优化：代收款控制现在放在“总计”下面 */}
                       <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-                        <View style={styles.sectionHeader}>
+                        <View style={[styles.sectionHeader, { borderBottomWidth: 0, paddingBottom: 0 }]}>
                           <View style={styles.sectionTitleContainer}>
                             <MoneyIcon size={16} color="#475569" />
                             <Text style={[styles.sectionTitle, { fontSize: 14, color: '#475569' }]}> {currentT.codAmount}</Text>
                           </View>
-                          <View style={styles.codToggleContainer}>
+                        </View>
+
+                        <View style={{ marginTop: 10 }}>
+                          <TextInput
+                            style={[styles.input, { height: 40, paddingVertical: 8, background: '#fff' }]}
+                            value={codAmount}
+                            onChangeText={setCodAmount}
+                            placeholder={currentT.placeholders.codAmount}
+                            placeholderTextColor="#9ca3af"
+                            keyboardType="decimal-pad"
+                            editable={hasCOD} // 🚀 仅开启代收时可编辑
+                          />
+                          
+                          {/* 🚀 移动位置：无代收/有代收开关移动到金额输入框下方 */}
+                          <View style={[styles.codToggleContainer, { alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 0 }]}>
                             <Text style={[styles.codToggleLabel, { fontSize: 11 }, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
                             <Switch
                               value={hasCOD}
@@ -1939,23 +1953,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                             />
                             <Text style={[styles.codToggleLabel, { fontSize: 11 }, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
                           </View>
-                        </View>
 
-                        {hasCOD && (
-                          <View style={{ marginTop: 10 }}>
-                            <TextInput
-                              style={[styles.input, { height: 40, paddingVertical: 8, background: '#fff' }]}
-                              value={codAmount}
-                              onChangeText={setCodAmount}
-                              placeholder={currentT.placeholders.codAmount}
-                              placeholderTextColor="#9ca3af"
-                              keyboardType="decimal-pad"
-                            />
-                            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                          {hasCOD && (
+                            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
                               💡 {language === 'zh' ? '该金额将由骑手代收' : language === 'en' ? 'Courier will collect this' : 'ကူရီယာမှ ကောက်ခံမည်'}
                             </Text>
-                          </View>
-                        )}
+                          )}
+                        </View>
                       </View>
                     </View>
                   ) : (
@@ -1989,7 +1993,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               setShowPackageTypeInfo(true);
             }}
             cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
-            accountBalance={accountBalance}
+            accountBalance={currentUser?.user_type === 'partner' ? undefined : accountBalance}
           />
 
           {/* 代收款 (仅限 VIP 账号，Partner 已移入商品卡片) */}
@@ -2060,7 +2064,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onCalculate={calculatePrice}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
-            accountBalance={accountBalance}
+            accountBalance={currentUser?.user_type === 'partner' ? undefined : accountBalance}
             cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
           />
 
