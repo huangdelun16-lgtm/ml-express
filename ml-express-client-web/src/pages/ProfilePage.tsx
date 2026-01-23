@@ -82,7 +82,7 @@ const ProfilePage: React.FC = () => {
     is_available: true
   });
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const productFileInputRef = useRef<HTMLInputElement>(null);
 
   // 🚀 新增：店铺营业状态临时状态（用于保存前修改）
   const [businessStatus, setBusinessStatus] = useState({
@@ -3524,7 +3524,7 @@ const ProfilePage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* 图片上传区域 */}
               <div 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => productFileInputRef.current?.click()}
                 style={{
                   width: '100%',
                   aspectRatio: '16/9',
@@ -3552,7 +3552,7 @@ const ProfilePage: React.FC = () => {
                 )}
                 <input 
                   type="file" 
-                  ref={fileInputRef} 
+                  ref={productFileInputRef} 
                   onChange={handleImageUpload} 
                   style={{ display: 'none' }} 
                   accept="image/*"
