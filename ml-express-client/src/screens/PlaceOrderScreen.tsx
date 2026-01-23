@@ -1522,7 +1522,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       let totalDeduction = 0;
 
       // 1. 如果是商城订单，强制检查余额是否充足支付商品
-      if (cartTotal > 0 && !isGuest) {
+      // 🚀 修复：仅针对“买家”（Member/VIP），商家（Partner）录单不扣除自身余额
+      if (cartTotal > 0 && !isGuest && currentUser?.user_type !== 'partner') {
         if (accountBalance < cartTotal) {
           hideLoading();
           Alert.alert(
@@ -1537,7 +1538,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       }
 
       // 2. 如果运费也选择余额支付
-      if (paymentMethod === 'balance' && !isGuest) {
+      // 🚀 修复：仅针对非商家账号
+      if (paymentMethod === 'balance' && !isGuest && currentUser?.user_type !== 'partner') {
         totalDeduction += shippingFee;
         
         if (accountBalance < totalDeduction) {
