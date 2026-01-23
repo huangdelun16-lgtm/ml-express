@@ -671,9 +671,9 @@ const MyTasksScreen: React.FC = () => {
                         const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
                         if (identityMatch && identityMatch[1]) {
                           const identity = identityMatch[1];
-                          const isPartner = identity === '合伙人' || identity === 'Partner';
+                          const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
                           return (
-                            <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                            <View style={[styles.identityBadge, { backgroundColor: isMERCHANTS ? '#3b82f6' : '#f59e0b' }]}>
                               <Text style={styles.identityText}>{identity}</Text>
                             </View>
                           );

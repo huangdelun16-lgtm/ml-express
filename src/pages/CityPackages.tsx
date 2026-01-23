@@ -1438,10 +1438,10 @@ const CityPackages: React.FC = () => {
                         store.store_name === pkg.sender_name || 
                         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                       );
-                      const isPartnerOrder = !!pkg.delivery_store_id || isStoreMatch;
+                      const isMERCHANTSOrder = !!pkg.delivery_store_id || isStoreMatch;
                       const codAmount = Number(pkg.cod_amount || 0);
                       
-                      if (isPartnerOrder) {
+                      if (isMERCHANTSOrder) {
                         return (
                           <span style={{
                             background: '#fcd34d', // Amber-300
@@ -1457,7 +1457,7 @@ const CityPackages: React.FC = () => {
                           </span>
                         );
                       } else if (codAmount > 0) {
-                        // 非 Partner 但有金额，仍需显示以防遗漏
+                        // 非 MERCHANTS 但有金额，仍需显示以防遗漏
                         return (
                           <span style={{
                             background: '#fcd34d',
@@ -1637,7 +1637,7 @@ const CityPackages: React.FC = () => {
                         );
 
                         if (pkg.delivery_store_id || isStoreMatch) {
-                          userType = 'Partner';
+                          userType = 'MERCHANTS';
                           styleProps = {
                             background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
                             color: 'white',

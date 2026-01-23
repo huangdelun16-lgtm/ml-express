@@ -289,7 +289,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       const userEmail = await AsyncStorage.getItem('userEmail');
       const userPhone = await AsyncStorage.getItem('userPhone');
       
-      // 如果是合伙人，获取店铺名称用于匹配 sender_name（兼容旧数据）
+      // 如果是商家，获取店铺名称用于匹配 sender_name（兼容旧数据）
       let storeName: string | undefined;
       if (type === 'partner') {
         const userName = await AsyncStorage.getItem('userName');

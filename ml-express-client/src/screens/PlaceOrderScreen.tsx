@@ -173,7 +173,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           setUserId(user.id);
           setUserName(user.name);
           setUserPhone(user.phone);
-          setIsPartnerStore(user.user_type === 'partner');
+          setIsMERCHANTSStore(user.user_type === 'merchant');
           setIsGuest(false);
           
           // 从数据库获取最新余额
@@ -360,9 +360,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 支付方式（默认现金，二维码开发中）
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
   const [accountBalance, setAccountBalance] = useState<number>(0);
-  const [isPartnerStore, setIsPartnerStore] = useState(false);
+  const [isMERCHANTSStore, setIsMERCHANTSStore] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
+  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
   
   // 商品选择相关状态
   const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
@@ -817,8 +817,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   useEffect(() => {
     // 检查 currentUser 是否包含 user_type
     // 注意：App端 currentUser 是从 localStorage 加载的，可能需要检查结构
-    if (currentUser?.user_type === 'partner') {
-      const loadPartnerStore = async () => {
+    if (currentUser?.user_type === 'merchants') {
+      const loadMERCHANTSStore = async () => {
         try {
           // 在App端使用 supabase
           const { data: store } = await supabase
@@ -830,7 +830,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           
           if (store) {
             LoggerService.debug('✅ App端已加载合伙店铺信息:', store.store_name);
-            setPartnerStore(store);
+            setMERCHANTSStore(store);
             
             // 自动填充寄件人信息
             setSenderName(store.store_name);
@@ -857,9 +857,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           LoggerService.error('加载合伙店铺失败:', error);
         }
       };
-      loadPartnerStore();
+      loadMERCHANTSStore();
     } else {
-      setPartnerStore(null);
+      setMERCHANTSStore(null);
     }
   }, [currentUser]);
 
@@ -967,15 +967,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 切换使用我的信息
   useEffect(() => {
     if (useMyInfo) {
-      if (currentUser?.user_type === 'partner' && partnerStore) {
-        setSenderName(partnerStore.store_name);
-        setSenderPhone(partnerStore.contact_phone || partnerStore.manager_phone);
+      if (currentUser?.user_type === 'merchants' && merchantsStore) {
+        setSenderName(merchantsStore.store_name);
+        setSenderPhone(merchantsStore.contact_phone || merchantsStore.manager_phone);
         // 如果没有地址，则使用店铺地址
         if (!senderAddress) {
-            setSenderAddress(partnerStore.address);
+            setSenderAddress(merchantsStore.address);
             setSenderCoordinates({
-                lat: partnerStore.latitude,
-                lng: partnerStore.longitude
+                lat: merchantsStore.latitude,
+                lng: merchantsStore.longitude
             });
         }
       } else {
@@ -986,7 +986,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       setSenderName('');
       setSenderPhone('');
     }
-  }, [useMyInfo, userName, userPhone, currentUser, partnerStore]);
+  }, [useMyInfo, userName, userPhone, currentUser, merchantsStore]);
 
   // 计算价格
   // 使用当前位置（在地图Modal中）- 优化：使用缓存和超时
@@ -1069,16 +1069,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     try {
       setMapType(type);
 
-      // 如果是 Partner 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
-      if (currentUser?.user_type === 'partner' && type === 'sender' && partnerStore) {
-          LoggerService.debug('📍 Partner账号(App)，自动锁定店铺位置:', partnerStore.store_name);
+      // 如果是 MERCHANTS 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
+      if (currentUser?.user_type === 'merchants' && type === 'sender' && merchantsStore) {
+          LoggerService.debug('📍 MERCHANTS账号(App)，自动锁定店铺位置:', merchantsStore.store_name);
           setSelectedLocation({
-            latitude: partnerStore.latitude,
-            longitude: partnerStore.longitude,
+            latitude: merchantsStore.latitude,
+            longitude: merchantsStore.longitude,
           });
           // 可以在这里设置地址输入框的值，但App端MapModal可能处理方式不同
           // mapAddressInput 是 MapModal 的 prop，可以在这里设置
-          setMapAddressInput(partnerStore.address);
+          setMapAddressInput(merchantsStore.address);
           
           setShowMapModal(true);
           return; // 跳过后续的自动定位逻辑
@@ -1419,17 +1419,17 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const orderId = generateOrderId(senderAddress);
       const now = new Date();
       
-      // 🚀 优化：记录下单人身份 (识别 合伙人/VIP/普通会员)
+      // 🚀 优化：记录下单人身份 (识别 商家/VIP/普通会员)
       let ordererType = '会员';
-      if (currentUser?.user_type === 'partner') {
-        ordererType = '合伙人';
+      if (currentUser?.user_type === 'merchants') {
+        ordererType = '商家';
       } else if (currentUser?.user_type === 'vip' || accountBalance > 0) {
         ordererType = 'VIP';
       }
 
       const typeTag = language === 'zh' ? `[下单身份: ${ordererType}]` : 
-                     language === 'en' ? `[Orderer: ${ordererType === '合伙人' ? 'Partner' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]` : 
-                     `[အော်ဒါတင်သူ: ${ordererType === '合伙人' ? 'Partner' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]`;
+                     language === 'en' ? `[Orderer: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]` : 
+                     `[အော်ဒါတင်သူ: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]`;
 
       const createTime = now.toLocaleString('zh-CN', {
         year: 'numeric',
@@ -1452,10 +1452,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         deliveryStoreId = route.params.selectedProducts[0].store_id;
       }
 
-      // 如果是 Partner 账号，强制使用店铺信息
-      if (currentUser?.user_type === 'partner') {
+      // 如果是 MERCHANTS 账号，强制使用店铺信息
+      if (currentUser?.user_type === 'merchants') {
         try {
-          LoggerService.debug('正在查找合伙人店铺信息...', currentUser);
+          LoggerService.debug('正在查找商家店铺信息...', currentUser);
           const { data: store } = await supabase
             .from('delivery_stores')
             .select('*')
@@ -1464,13 +1464,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             .maybeSingle();
 
           if (store) {
-            LoggerService.debug('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
+            LoggerService.debug('找到商家店铺，强制使用店铺坐标:', store.store_name);
             finalSenderLat = store.latitude;
             finalSenderLng = store.longitude;
             // finalSenderAddr = store.address; // 可选：是否强制覆盖地址文本
           }
         } catch (err) {
-          LoggerService.error('查找合伙人店铺异常:', err);
+          LoggerService.error('查找商家店铺异常:', err);
         }
       }
 
@@ -1499,16 +1499,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
-        cod_amount: (currentUser?.user_type === 'partner' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
+        cod_amount: (currentUser?.user_type === 'merchants' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
         description: `${typeTag} ${paymentTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
-        // 🚀 优化：商城订单初始状态为“待确认”，合伙人订单直接为“待取件/待收款”
-        status: (deliveryStoreId && currentUser?.user_type !== 'partner') 
+        // 🚀 优化：商城订单初始状态为“待确认”，商家订单直接为“待取件/待收款”
+        status: (deliveryStoreId && currentUser?.user_type !== 'merchants') 
           ? '待确认' 
           : (paymentMethod === 'cash' ? '待收款' : '待取件'),
-        delivery_store_id: deliveryStoreId || (currentUser?.user_type === 'partner' ? userId : null),
+        delivery_store_id: deliveryStoreId || (currentUser?.user_type === 'merchants' ? userId : null),
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',
@@ -1522,8 +1522,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       let totalDeduction = 0;
 
       // 1. 如果是商城订单，强制检查余额是否充足支付商品
-      // 🚀 修复：仅针对“买家”（Member/VIP），商家（Partner）录单不扣除自身余额
-      if (cartTotal > 0 && !isGuest && currentUser?.user_type !== 'partner') {
+      // 🚀 修复：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不扣除自身余额
+      if (cartTotal > 0 && !isGuest && currentUser?.user_type !== 'merchants') {
         if (accountBalance < cartTotal) {
           hideLoading();
           Alert.alert(
@@ -1539,7 +1539,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
       // 2. 如果运费也选择余额支付
       // 🚀 修复：仅针对非商家账号
-      if (paymentMethod === 'balance' && !isGuest && currentUser?.user_type !== 'partner') {
+      if (paymentMethod === 'balance' && !isGuest && currentUser?.user_type !== 'merchants') {
         totalDeduction += shippingFee;
         
         if (accountBalance < totalDeduction) {
@@ -1693,9 +1693,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
       
-      // 🚀 优化：仅当非 Partner 账号时，才添加“余额支付”金额到描述中
+      // 🚀 优化：仅当非 MERCHANTS 账号时，才添加“余额支付”金额到描述中
       let payToMerchantTag = '';
-      if (currentUser?.user_type !== 'partner') {
+      if (currentUser?.user_type !== 'merchants') {
         const payToMerchantText = currentT.itemBalancePayment;
         payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
       }
@@ -1853,7 +1853,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onOpenMap={() => openMapSelector('sender')}
             onOpenAddressBook={() => openAddressBook('sender')}
             onBlur={handleFieldBlur}
-            disabled={cartTotal > 0 && currentUser?.user_type !== 'partner'} // 🚀 商城订单锁定寄件信息
+            disabled={cartTotal > 0 && currentUser?.user_type !== 'merchants'} // 🚀 商城订单锁定寄件信息
           />
 
           {/* 收件人表单 */}
@@ -1875,8 +1875,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onBlur={handleFieldBlur}
           />
 
-          {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
-          {currentUser?.user_type === 'partner' && (
+          {/* 🚀 新增：商家商品选择卡片 (仅限 MERCHANTS 账号，放在收件人后) */}
+          {currentUser?.user_type === 'merchants' && (
             <FadeInView delay={250}>
               <View style={styles.section}>
                 <View style={styles.sectionTitleContainer}>
@@ -1994,11 +1994,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               setSelectedPackageTypeInfo(type);
               setShowPackageTypeInfo(true);
             }}
-            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
-            accountBalance={currentUser?.user_type === 'partner' ? undefined : accountBalance}
+            cartTotal={currentUser?.user_type === 'merchants' ? 0 : cartTotal}
+            accountBalance={currentUser?.user_type === 'merchants' ? undefined : accountBalance}
           />
 
-          {/* 代收款 (仅限 VIP 账号，Partner 已移入商品卡片) */}
+          {/* 代收款 (仅限 VIP 账号，MERCHANTS 已移入商品卡片) */}
           {currentUser?.user_type === 'vip' && (
             <FadeInView delay={320}>
               <View style={styles.section}>
@@ -2066,8 +2066,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onCalculate={calculatePrice}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
-            accountBalance={currentUser?.user_type === 'partner' ? undefined : (accountBalance - cartTotal)}
-            cartTotal={currentUser?.user_type === 'partner' ? 0 : cartTotal}
+            accountBalance={currentUser?.user_type === 'merchants' ? undefined : (accountBalance - cartTotal)}
+            cartTotal={currentUser?.user_type === 'merchants' ? 0 : cartTotal}
           />
 
           {/* 提交按钮 */}

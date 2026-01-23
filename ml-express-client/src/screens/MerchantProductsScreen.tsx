@@ -131,7 +131,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const checkViewMode = async () => {
     const currentUserId = await AsyncStorage.getItem('userId');
     const userType = await AsyncStorage.getItem('userType');
-    // 如果是合伙人查看自己的店铺，则非只读模式
+    // 如果是商家查看自己的店铺，则非只读模式
     if (userType === 'partner' && currentUserId === storeId) {
       setIsReadOnly(false);
     } else {

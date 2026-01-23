@@ -236,7 +236,7 @@ const HomePage: React.FC = () => {
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
-  const [partnerStore, setPartnerStore] = useState<any>(null); // 合伙店铺信息
+  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
   
   // 🚀 新增：商家商品选择相关状态
   const [merchantProducts, setMerchantProducts] = useState<any[]>([]);
@@ -248,7 +248,7 @@ const HomePage: React.FC = () => {
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false); // true=登录模式, false=注册模式
-  const [loginType, setLoginType] = useState<'normal' | 'partner'>('normal'); // 登录类型：普通登录或合伙登录
+  const [loginType, setLoginType] = useState<'normal' | 'merchant'>('normal'); // 登录类型：普通登录或商家登录
   const [registerForm, setRegisterForm] = useState({
     name: '',
     phone: '',
@@ -333,8 +333,8 @@ const HomePage: React.FC = () => {
 
   // 加载合伙店铺信息（当currentUser变化时）
   useEffect(() => {
-    if (currentUser?.user_type === 'partner') {
-      const loadPartnerStore = async () => {
+    if (currentUser?.user_type === 'merchant') {
+      const loadMERCHANTSStore = async () => {
         try {
           const { data: store } = await supabase
             .from('delivery_stores')
@@ -345,15 +345,15 @@ const HomePage: React.FC = () => {
           
           if (store) {
             console.log('✅ 已加载合伙店铺信息:', store.store_name);
-            setPartnerStore(store);
+            setMERCHANTSStore(store);
           }
         } catch (error) {
           console.error('加载合伙店铺失败:', error);
         }
       };
-      loadPartnerStore();
+      loadMERCHANTSStore();
     } else {
-      setPartnerStore(null);
+      setMERCHANTSStore(null);
     }
   }, [currentUser]);
 
@@ -557,7 +557,7 @@ const HomePage: React.FC = () => {
         // ===== 登录模式 =====
         
         // 合伙登录
-        if (loginType === 'partner') {
+        if (loginType === 'merchant') {
           // 验证店铺代码和密码
         if (!registerForm.email) {
             alert(language === 'zh' ? '请输入店铺代码' : language === 'en' ? 'Please enter store code' : 'ဆိုင်ကုဒ် ထည့်ပါ');
@@ -595,19 +595,19 @@ const HomePage: React.FC = () => {
           }
 
           // 登录成功，创建用户对象（用于兼容现有系统）
-          const partnerUser = {
+          const merchantUser = {
             id: store.id,
             name: store.store_name,
             email: store.email || store.store_code,
             phone: store.phone,
-            user_type: 'partner',
+            user_type: 'merchant',
             address: store.address,
             store_code: store.store_code,
             store_id: store.id
           };
 
-          setCurrentUser(partnerUser);
-          localStorage.setItem('ml-express-customer', JSON.stringify(partnerUser));
+          setCurrentUser(merchantUser);
+          localStorage.setItem('ml-express-customer', JSON.stringify(merchantUser));
           setShowRegisterModal(false);
           alert(language === 'zh' ? `登录成功！欢迎回来，${store.store_name}` : 
                 language === 'en' ? `Login successful! Welcome back, ${store.store_name}` : 
@@ -910,27 +910,27 @@ const HomePage: React.FC = () => {
   const handleOpenMapModal = async (type: 'sender' | 'receiver') => {
     setMapSelectionType(type);
     
-    // 如果是 Partner 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
-    if (currentUser?.user_type === 'partner' && type === 'sender' && partnerStore) {
-        console.log('📍 Partner账号，自动锁定店铺位置:', partnerStore.store_name);
+    // 如果是 merchant 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
+    if (currentUser?.user_type === 'merchant' && type === 'sender' && merchantStore) {
+        console.log('📍 MERCHANTS账号，自动锁定店铺位置:', merchantStore.store_name);
         
         // 设置地图中心和选中位置
-        setMapCenter({ lat: partnerStore.latitude, lng: partnerStore.longitude });
+        setMapCenter({ lat: merchantStore.latitude, lng: merchantStore.longitude });
         setSelectedLocation({
-            lat: partnerStore.latitude,
-            lng: partnerStore.longitude,
-            address: partnerStore.address
+            lat: merchantStore.latitude,
+            lng: merchantStore.longitude,
+            address: merchantStore.address
         });
         
         // 根据店铺位置自动切换到对应城市
-        const detectedCity = detectCityFromLocation(partnerStore.latitude, partnerStore.longitude);
+        const detectedCity = detectCityFromLocation(merchantStore.latitude, merchantStore.longitude);
         setSelectedCity(detectedCity);
         
         // 自动填充地址输入框（如果存在）
         setTimeout(() => {
           const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
           if (addressInput) {
-            addressInput.value = partnerStore.address;
+            addressInput.value = merchantStore.address;
           }
         }, 100);
 
@@ -1964,10 +1964,10 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    // 如果是 Partner 账号，强制使用店铺信息（地址和经纬度）
-    if (currentUser?.user_type === 'partner') {
+    // 如果是 MERCHANTS 账号，强制使用店铺信息（地址和经纬度）
+    if (currentUser?.user_type === 'merchant') {
       try {
-        console.log('正在查找合伙人店铺信息...', currentUser);
+        console.log('正在查找商家店铺信息...', currentUser);
         // 尝试通过多种方式匹配店铺（优先匹配 store_code，即 name）
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { data: store } = await supabase
@@ -1978,7 +1978,7 @@ const HomePage: React.FC = () => {
           .maybeSingle();
 
         if (store) {
-          console.log('找到合伙人店铺，强制使用店铺坐标:', store.store_name);
+          console.log('找到商家店铺，强制使用店铺坐标:', store.store_name);
           // 覆盖 orderInfo 中的寄件经纬度
           orderInfo.senderLatitude = store.latitude;
           orderInfo.senderLongitude = store.longitude;
@@ -1991,7 +1991,7 @@ const HomePage: React.FC = () => {
           console.warn('未找到关联的合伙店铺');
         }
       } catch (err) {
-        console.error('查找合伙人店铺异常:', err);
+        console.error('查找商家店铺异常:', err);
       }
     }
     
@@ -2508,8 +2508,8 @@ const HomePage: React.FC = () => {
               📦 {t.ui.packageTracking}
             </button>
 
-            {/* 🚀 恢复：同城商场和购物车入口 (仅限非 Partner 账号) */}
-            {currentUser?.user_type !== 'partner' && (
+            {/* 🚀 恢复：同城商场和购物车入口 (仅限非 MERCHANTS 账号) */}
+            {currentUser?.user_type !== 'merchant' && (
               <>
                 <button
                   onClick={() => handleNavigation('/mall')}
@@ -2936,9 +2936,9 @@ const HomePage: React.FC = () => {
                       : (orderInfo.weight || '1'); // 默认重量为 1kg
                     
                     // 根据支付方式设置订单状态
-                    // 🚀 优化：商城订单初始状态为“待确认”，合伙人订单直接为“待收款/待取件”
+                    // 🚀 优化：商城订单初始状态为“待确认”，商家订单直接为“待收款/待取件”
                     let orderStatus = '待取件';
-                    if (isFromCart && currentUser?.user_type !== 'partner') {
+                    if (isFromCart && currentUser?.user_type !== 'merchant') {
                       orderStatus = '待确认';
                     } else if (currentPaymentMethod === 'cash') {
                       orderStatus = '待收款';
@@ -2976,7 +2976,7 @@ const HomePage: React.FC = () => {
                     let deliveryStoreIdToLink = null;
                     if (isFromCart && merchantProducts.length > 0) {
                       deliveryStoreIdToLink = merchantProducts[0].store_id;
-                    } else if (currentUser && currentUser.user_type === 'partner') {
+                    } else if (currentUser && currentUser.user_type === 'merchant') {
                       deliveryStoreIdToLink = currentUser.store_id || currentUser.id;
                     }
 
@@ -2985,7 +2985,7 @@ const HomePage: React.FC = () => {
                     }
 
                     // 如果是合伙店铺账号下单，补充更多关联信息
-                    if (currentUser && currentUser.user_type === 'partner') {
+                    if (currentUser && currentUser.user_type === 'merchant') {
                       // 添加店铺名称
                       if (currentUser.name) {
                         packageData.delivery_store_name = currentUser.name;
@@ -4782,18 +4782,18 @@ const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setLoginType('partner');
+                      setLoginType('merchant');
                       setRegisterForm({ ...registerForm, email: '', phone: '', password: '' });
                     }}
                     style={{
                       flex: 1,
                       maxWidth: '200px',
                       padding: '0.875rem 1.5rem',
-                      background: loginType === 'partner' 
+                      background: loginType === 'merchant' 
                         ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
                         : 'rgba(255, 255, 255, 0.9)',
-                      color: loginType === 'partner' ? 'white' : '#475569',
-                      border: loginType === 'partner' 
+                      color: loginType === 'merchant' ? 'white' : '#475569',
+                      border: loginType === 'merchant' 
                         ? '2px solid #2563eb' 
                         : '2px solid rgba(148, 163, 184, 0.5)',
                       borderRadius: '12px',
@@ -4801,27 +4801,27 @@ const HomePage: React.FC = () => {
                       fontWeight: '700',
                       cursor: 'pointer',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: loginType === 'partner' 
+                      boxShadow: loginType === 'merchant' 
                         ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
                         : '0 2px 8px rgba(0, 0, 0, 0.1)',
-                      transform: loginType === 'partner' ? 'translateY(-2px)' : 'translateY(0)'
+                      transform: loginType === 'merchant' ? 'translateY(-2px)' : 'translateY(0)'
                     }}
                     onMouseEnter={(e) => {
-                      if (loginType !== 'partner') {
+                      if (loginType !== 'merchant') {
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 1)';
                         e.currentTarget.style.borderColor = 'rgba(100, 116, 139, 0.7)';
                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (loginType !== 'partner') {
+                      if (loginType !== 'merchant') {
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
                         e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.5)';
                         e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
                       }
                     }}
                   >
-                    {language === 'zh' ? 'Partner' : language === 'en' ? 'Partner' : 'လုပ်ဖော်ကိုင်ဖက်'}
+                    {language === 'zh' ? 'MERCHANTS' : language === 'en' ? 'MERCHANTS' : 'ကုန်သည်'}
                   </button>
                 </div>
               )}
@@ -4908,7 +4908,7 @@ const HomePage: React.FC = () => {
                   )}
                   
                   {/* 合伙登录：店铺代码 */}
-                  {loginType === 'partner' && (
+                  {loginType === 'merchant' && (
                     <div style={{ marginBottom: '1.2rem' }}>
                       <label style={{ 
                         color: '#475569', 

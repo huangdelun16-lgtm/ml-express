@@ -34,7 +34,7 @@ const REGIONS = [
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
 
-type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection' | 'partner_collection';
+type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection' | 'merchants_collection';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
 
@@ -197,8 +197,8 @@ const FinanceManagement: React.FC = () => {
   const [selectedCashPackages, setSelectedCashPackages] = useState<Set<string>>(new Set()); // 选中的包裹ID集合
   const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
-  // 新增：合伙人已结清和待结清弹窗状态
-  const [showPartnerSettledModal, setShowPartnerSettledModal] = useState<boolean>(false);
+  // 新增：商家已结清和待结清弹窗状态
+  const [showMERCHANTSSettledModal, setShowMERCHANTSSettledModal] = useState<boolean>(false);
   const [showPendingOrdersModal, setShowPendingOrdersModal] = useState<boolean>(false);
   const [modalOrders, setModalOrders] = useState<Package[]>([]);
   const [modalTitle, setModalTitle] = useState<string>('');
@@ -463,7 +463,7 @@ const FinanceManagement: React.FC = () => {
     packageCount: 0, // 添加包裹数量
     courierKmCost: 0, // 快递员公里费用（仅送货距离）
     totalKm: 0, // 总送货公里数
-    partnerCollection: 0 // 总合伙店铺代收款
+    merchantsCollection: 0 // 总合伙店铺代收款
   });
 
   useEffect(() => {
@@ -512,14 +512,14 @@ const FinanceManagement: React.FC = () => {
       // 计算合伙店铺代收款余额 (已从骑手收回 - 已结给店铺)
       // 逻辑：总合伙店铺代收款 = 骑手已结清的代收款 - 已结算给合伙店铺的代收款
       // 即：rider_settled === true && cod_settled !== true
-      const partnerCollection = deliveredPackages.reduce((sum, pkg) => {
+      const merchantsCollection = deliveredPackages.reduce((sum, pkg) => {
         const isStoreMatch = deliveryStores.some(store => 
           store.store_name === pkg.sender_name || 
           (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
         );
-        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
         
-        if (isPartner && pkg.rider_settled && !pkg.cod_settled) {
+        if (isMERCHANTS && pkg.rider_settled && !pkg.cod_settled) {
           return sum + Number(pkg.cod_amount || 0);
         }
         return sum;
@@ -534,7 +534,7 @@ const FinanceManagement: React.FC = () => {
         packageCount,
         courierKmCost,
         totalKm,
-        partnerCollection
+        merchantsCollection
       });
     };
     
@@ -542,7 +542,7 @@ const FinanceManagement: React.FC = () => {
   }, [records, packages, deliveryStores]);
 
   // 计算合伙店铺代收款统计
-  const partnerCollectionStats = useMemo(() => {
+  const merchantsCollectionStats = useMemo(() => {
     if (!deliveryStores.length) return [];
 
     let filteredStores = [...deliveryStores];
@@ -562,7 +562,7 @@ const FinanceManagement: React.FC = () => {
       );
 
       // 3. 计算金额和订单数
-      // 只有骑手已结清 (rider_settled) 的订单才计入合伙人待结清列表
+      // 只有骑手已结清 (rider_settled) 的订单才计入商家待结清列表
       const validPackages = storePackages.filter(pkg => pkg.rider_settled);
       const totalAmount = validPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
       
@@ -589,12 +589,12 @@ const FinanceManagement: React.FC = () => {
   }, [deliveryStores, packages, isRegionalUser, currentRegionPrefix]);
 
   // 结清合伙店铺代收款
-  const handleSettlePartner = async (storeId: string, storeName: string) => {
+  const handleSettleMERCHANTS = async (storeId: string, storeName: string) => {
     if (!window.confirm(`确定要结清 "${storeName}" 的所有代收款吗？\n\n这将把该店铺所有 "已送达" 且 "未结清" 的代收款订单标记为已结清。`)) return;
 
     try {
       setLoading(true);
-      const result = await packageService.settlePartnerCOD(storeId, storeName);
+      const result = await packageService.settleMERCHANTSCOD(storeId, storeName);
       if (result.success) {
         window.alert('结清成功！');
         loadRecords(); // 刷新数据
@@ -969,7 +969,7 @@ const FinanceManagement: React.FC = () => {
   };
 
   // 新增：处理合伙代收款卡片点击
-  const handlePartnerCollectionClick = (storeName?: string) => {
+  const handleMERCHANTSCollectionClick = (storeName?: string) => {
     // 找出所有已送达且有代收款的合伙店铺订单（包括已结清和未结清）
     const codOrders = packages.filter(pkg => {
       // 如果指定了店铺名，只看该店铺的
@@ -980,9 +980,9 @@ const FinanceManagement: React.FC = () => {
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
-      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
       // 只要是已送达且代收款 > 0 的订单
-      return isPartner && pkg.status === '已送达' && Number(pkg.cod_amount || 0) > 0;
+      return isMERCHANTS && pkg.status === '已送达' && Number(pkg.cod_amount || 0) > 0;
     }).sort((a, b) => {
       const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
       const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
@@ -991,7 +991,7 @@ const FinanceManagement: React.FC = () => {
 
     setModalOrders(codOrders);
     setModalTitle(storeName ? `${storeName} - 代收款订单明细` : '代收款订单明细');
-    setShowPartnerSettledModal(true);
+    setShowMERCHANTSSettledModal(true);
   };
 
   // 新增：处理待结清金额卡片点击
@@ -1006,8 +1006,8 @@ const FinanceManagement: React.FC = () => {
         store.store_name === pkg.sender_name || 
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
-      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
-      return isPartner && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
+      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+      return isMERCHANTS && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
     });
 
     setModalOrders(pendingOrders);
@@ -1219,7 +1219,7 @@ const FinanceManagement: React.FC = () => {
             flexWrap: 'wrap'
           }}
         >
-          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'partner_collection'] as TabKey[])
+          {(['overview', 'records', 'analytics', 'package_records', 'courier_records', 'cash_collection', 'merchants_collection'] as TabKey[])
             .filter(key => {
               if (isRegionalUser) {
                 // 🌍 领区账号过滤：隐藏总览、数据分析，保留收支、收款等业务模块
@@ -1248,7 +1248,7 @@ const FinanceManagement: React.FC = () => {
               {key === 'package_records' && t.packageFinanceRecords}
               {key === 'courier_records' && t.courierFinanceRecords}
               {key === 'cash_collection' && t.dailyCollection}
-              {key === 'partner_collection' && t.partnerCollection}
+              {key === 'merchants_collection' && t.merchantsCollection}
             </button>
           ))}
           {(activeTab === 'records' || activeTab === 'package_records') && (
@@ -1287,7 +1287,7 @@ const FinanceManagement: React.FC = () => {
             }}
           >
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
-            {renderSummaryCard(t.totalPartnerCollection, summary.partnerCollection, t.partnerCollectionDesc, '#ef4444', () => handlePartnerCollectionClick())}
+            {renderSummaryCard(t.totalMERCHANTSCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handleMERCHANTSCollectionClick())}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
             {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handlePendingPaymentsClick())}
@@ -4590,13 +4590,13 @@ const FinanceManagement: React.FC = () => {
                   const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                   totalDeliveryFee += price;
                   
-                  // Check partner
+                  // Check merchants
                   const isStoreMatch = deliveryStores.some(store => 
                     store.store_name === pkg.sender_name || 
                     (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                   );
-                  const isPartner = !!pkg.delivery_store_id || isStoreMatch;
-                  if (isPartner) {
+                  const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+                  if (isMERCHANTS) {
                     totalCOD += Number(pkg.cod_amount || 0);
                   }
                 });
@@ -4637,7 +4637,7 @@ const FinanceManagement: React.FC = () => {
                         {totalCOD.toLocaleString()} MMK
                       </div>
                       <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
-                        Partner {language === 'my' ? 'ဆိုင်မှ ကောက်ခံငွေ' : '店铺代收'}
+                        MERCHANTS {language === 'my' ? 'ဆိုင်မှ ကောက်ခံငွေ' : '店铺代收'}
                       </div>
                     </div>
 
@@ -5114,8 +5114,8 @@ const FinanceManagement: React.FC = () => {
                       store.store_name === pkg.sender_name || 
                       (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                     );
-                    const isPartner = !!pkg.delivery_store_id || isStoreMatch;
-                    if (isPartner) {
+                    const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
+                    if (isMERCHANTS) {
                       visibleCOD += Number(pkg.cod_amount || 0);
                     }
                   });
@@ -5313,7 +5313,7 @@ const FinanceManagement: React.FC = () => {
                               store.store_name === pkg.sender_name || 
                               (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                             );
-                            const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                            const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
                             const codVal = Number(pkg.cod_amount || 0);
 
                             return (
@@ -5405,7 +5405,7 @@ const FinanceManagement: React.FC = () => {
                                     }}>
                                       {price.toLocaleString()} MMK
                                     </div>
-                                    {isPartner && (
+                                    {isMERCHANTS && (
                                       <div style={{
                                         background: '#fee2e2',
                                         color: '#b91c1c',
@@ -5481,13 +5481,13 @@ const FinanceManagement: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'partner_collection' && (
+        {activeTab === 'merchants_collection' && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
             gap: '20px'
           }}>
-            {partnerCollectionStats.map(store => (
+            {merchantsCollectionStats.map(store => (
               <div
                 key={store.id}
                 style={{
@@ -5546,7 +5546,7 @@ const FinanceManagement: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div 
-                    onClick={() => handlePartnerCollectionClick(store.store_name)}
+                    onClick={() => handleMERCHANTSCollectionClick(store.store_name)}
                     style={{ 
                       background: 'rgba(255, 255, 255, 0.08)', 
                       padding: '12px', 
@@ -5565,7 +5565,7 @@ const FinanceManagement: React.FC = () => {
                     }}
                   >
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>
-                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyPartnerCollection}
+                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyMERCHANTSCollection}
                     </div>
                     <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.totalAmount.toLocaleString()}
@@ -5611,7 +5611,7 @@ const FinanceManagement: React.FC = () => {
 
                 {store.unclearedAmount > 0 && (
                   <button
-                    onClick={() => !isRegionalUser && handleSettlePartner(store.id, store.store_name)}
+                    onClick={() => !isRegionalUser && handleSettleMERCHANTS(store.id, store.store_name)}
                     disabled={isRegionalUser}
                     style={{
                       width: '100%',
@@ -5650,14 +5650,14 @@ const FinanceManagement: React.FC = () => {
               </div>
             ))}
             
-            {partnerCollectionStats.length === 0 && (
+            {merchantsCollectionStats.length === 0 && (
               <div style={{ 
                 gridColumn: '1 / -1', 
                 textAlign: 'center', 
                 padding: '60px',
                 color: 'rgba(255,255,255,0.5)' 
               }}>
-                {language === 'zh' ? '暂无合伙店铺数据' : language === 'my' ? 'လုပ်ဖော်ကိုင်ဖက်ဆိုင် အချက်အလက် မရှိသေးပါ' : 'No partner store data'}
+                {language === 'zh' ? '暂无合伙店铺数据' : language === 'my' ? 'လုပ်ဖော်ကိုင်ဖက်ဆိုင် အချက်အလက် မရှိသေးပါ' : 'No merchants store data'}
               </div>
             )}
           </div>
@@ -5665,7 +5665,7 @@ const FinanceManagement: React.FC = () => {
       </div>
 
       {/* 订单明细弹窗 (已结清 / 待结清) */}
-      {(showPartnerSettledModal || showPendingOrdersModal) && (
+      {(showMERCHANTSSettledModal || showPendingOrdersModal) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
@@ -5685,14 +5685,14 @@ const FinanceManagement: React.FC = () => {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {showPartnerSettledModal ? '🤝' : '⏳'} {modalTitle}
+                {showMERCHANTSSettledModal ? '🤝' : '⏳'} {modalTitle}
                 <span style={{ fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', opacity: 0.8 }}>
                   {modalOrders.length} {language === 'zh' ? '单' : ''}
                 </span>
               </h2>
               <button
                 onClick={() => {
-                  setShowPartnerSettledModal(false);
+                  setShowMERCHANTSSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
                 style={{
@@ -5775,7 +5775,7 @@ const FinanceManagement: React.FC = () => {
             <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'right' }}>
               <button
                 onClick={() => {
-                  setShowPartnerSettledModal(false);
+                  setShowMERCHANTSSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
                 style={{

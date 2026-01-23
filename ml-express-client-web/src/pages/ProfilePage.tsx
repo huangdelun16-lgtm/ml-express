@@ -47,7 +47,7 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   }); // 密码修改表单
   const [storeInfo, setStoreInfo] = useState<any>(null); // 合伙店铺信息
-  const [partnerCODStats, setPartnerCODStats] = useState({
+  const [merchantsCODStats, setPartnerCODStats] = useState({
     totalCOD: 0,
     unclearedCOD: 0,
     unclearedCount: 0,
@@ -269,14 +269,14 @@ const ProfilePage: React.FC = () => {
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
   // 判断逻辑：
-  // 1. 如果 user_type === 'partner'，直接返回 true
+  // 1. 如果 user_type === 'merchants'，直接返回 true
   // 2. 如果用户有 store_code 或 store_id，返回 true
   // 3. 否则检查用户的邮箱或手机号是否在 delivery_stores 表中
   const checkIfPartnerStore = useCallback(async (user: any) => {
     if (!user) return false;
     
     // 方法1: 检查 user_type
-    if (user.user_type === 'partner') {
+    if (user.user_type === 'merchants') {
       return true;
     }
     
@@ -496,7 +496,7 @@ const ProfilePage: React.FC = () => {
   const handlePasswordChange = async () => {
     if (!isPartnerStore || !storeInfo) {
       alert(language === 'zh' ? '只有合伙店铺账户可以修改密码' : 
-            language === 'en' ? 'Only partner store accounts can change password' : 
+            language === 'en' ? 'Only merchants store accounts can change password' : 
             'လုပ်ဖော်ကိုင်ဖက်ဆိုင်အကောင့်သာ စကားဝှက်ကို ပြောင်းလဲနိုင်သည်');
       return;
     }
@@ -1589,7 +1589,7 @@ const ProfilePage: React.FC = () => {
                       }}>
                         <span>📅 {t.lastSettledAt}:</span>
                         <span style={{ color: '#10b981' }}>
-                          {partnerCODStats.lastSettledAt ? formatDate(partnerCODStats.lastSettledAt) : t.noSettlement}
+                          {merchantsCODStats.lastSettledAt ? formatDate(merchantsCODStats.lastSettledAt) : t.noSettlement}
                         </span>
                       </div>
                     </div>
@@ -1694,7 +1694,7 @@ const ProfilePage: React.FC = () => {
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.totalCOD}</span>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: 'white', flex: 1 }}>
-                      {partnerCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
+                      {merchantsCODStats.settledCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
                     <button 
                       onClick={() => handleViewCODOrders(true)}
@@ -1734,11 +1734,11 @@ const ProfilePage: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                       <span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', fontWeight: '800' }}>{t.unclearedCOD}</span>
                       <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '900', background: 'rgba(251, 191, 36, 0.2)', padding: '4px 14px', borderRadius: '12px' }}>
-                        {partnerCODStats.unclearedCount} 笔待结算
+                        {merchantsCODStats.unclearedCount} 笔待结算
                       </div>
                     </div>
                     <div style={{ fontSize: '2.8rem', fontWeight: '950', color: '#fbbf24', flex: 1 }}>
-                      {partnerCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
+                      {merchantsCODStats.unclearedCOD.toLocaleString()} <span style={{ fontSize: '1rem', opacity: 0.6 }}>MMK</span>
                     </div>
                     <button 
                       onClick={() => handleViewCODOrders(false)}

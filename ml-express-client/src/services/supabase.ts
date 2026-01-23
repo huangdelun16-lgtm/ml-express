@@ -429,7 +429,7 @@ export const customerService = {
   // 修改密码
   async changePassword(userId: string, oldPassword: string, newPassword: string, userType: string = 'customer') {
     try {
-      const table = userType === 'partner' ? 'delivery_stores' : 'users';
+      const table = userType === 'merchant' ? 'delivery_stores' : 'users';
       
       // 1. 验证旧密码
       const { data: user, error: findError } = await supabase
@@ -939,7 +939,7 @@ export const packageService = {
     });
   },
 
-  // 获取客户最近的订单（支持合伙人和普通客户）
+  // 获取客户最近的订单（支持商家和普通客户）
   async getRecentOrders(userId: string, limit: number = 5, email?: string, phone?: string, userType?: string) {
     try {
       let query = supabase
@@ -948,8 +948,8 @@ export const packageService = {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (userType === 'partner') {
-        // 合伙人：检查 delivery_store_id 或 customer_email (等于store_code)
+      if (userType === 'merchant') {
+        // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (email) conditions.push(`customer_email.eq.${email}`);
         
@@ -991,8 +991,8 @@ export const packageService = {
         .select('status')
         .order('created_at', { ascending: false });
 
-      if (userType === 'partner') {
-        // 合伙人：检查 delivery_store_id 或 customer_email (等于store_code)
+      if (userType === 'merchant') {
+        // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
         // 与 getAllOrders 保持完全一致
         const conditions: string[] = [];
         conditions.push(`delivery_store_id.eq.${userId}`);
@@ -1063,7 +1063,7 @@ export const packageService = {
     }
   },
 
-  // 获取合伙人代收款统计
+  // 获取商家代收款统计
   async getPartnerStats(userId: string, storeName?: string, month?: string) {
     try {
       // 构建查询函数
@@ -1132,7 +1132,7 @@ export const packageService = {
         lastSettledAt: lastSettledAt
       };
     } catch (error) {
-      LoggerService.error('获取合伙人统计失败:', error);
+      LoggerService.error('获取商家统计失败:', error);
       return {
         totalCOD: 0,
         settledCOD: 0,
@@ -1354,7 +1354,7 @@ export const packageService = {
   },
 
   // 获取所有订单（带筛选和分页，通过description匹配）
-  // 获取所有订单（支持分页和筛选，支持合伙人）
+  // 获取所有订单（支持分页和筛选，支持商家）
   async getAllOrders(userId: string, options?: {
     status?: string;
     limit?: number;
@@ -1362,7 +1362,7 @@ export const packageService = {
     email?: string;
     phone?: string;
     userType?: string;
-    storeName?: string; // 合伙人店铺名称，用于匹配 sender_name
+    storeName?: string; // 商家店铺名称，用于匹配 sender_name
   }) {
     try {
       let query = supabase
@@ -1370,8 +1370,8 @@ export const packageService = {
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      if (options?.userType === 'partner') {
-        // 合伙人订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
+      if (options?.userType === 'merchant') {
+        // 商家订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
         const conditions: string[] = [];
         
         // 通过 delivery_store_id 匹配

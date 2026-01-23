@@ -65,7 +65,7 @@ export default function ProfileScreen({ navigation }: any) {
     inTransit: 0,
     delivered: 0,
   });
-  const [partnerCODStats, setPartnerCODStats] = useState({
+  const [merchantCODStats, setMerchantCODStats] = useState({
     totalCOD: 0,
     settledCOD: 0,
     unclearedCOD: 0,
@@ -149,7 +149,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [tempHour, setTempHour] = useState('09');
   const [tempMinute, setTempMinute] = useState('00');
 
-  const isPartnerStore = userType === 'partner';
+  const isMERCHANTSStore = userType === 'merchant';
 
   // 🚀 新增：格式化函数（React Native 中 toLocaleString 可能不兼容）
   const formatMoney = (amount: number | string) => {
@@ -276,7 +276,7 @@ export default function ProfileScreen({ navigation }: any) {
       paymentQRTitle: '扫描二维码支付',
       pleaseUploadRecord: '请在支付后上传汇款凭证截图',
       // 身份标识
-      partner: '合伙人',
+      merchants: '商家',
       vipMember: 'VIP 会员',
       admin: '管理员',
       courier: '快递员',
@@ -403,7 +403,7 @@ export default function ProfileScreen({ navigation }: any) {
       paymentQRTitle: 'Scan QR to Pay',
       pleaseUploadRecord: 'Please upload payment proof after paying',
       // Badges
-      partner: 'Partner',
+      merchants: 'MERCHANTS',
       vipMember: 'VIP Member',
       admin: 'Admin',
       courier: 'Courier',
@@ -530,7 +530,7 @@ export default function ProfileScreen({ navigation }: any) {
       paymentQRTitle: 'QR စကင်ဖတ်၍ ငွေပေးချေပါ',
       pleaseUploadRecord: 'ငွေပေးချေပြီးနောက် ငွေလွှဲအထောက်အထားကို တင်ပေးပါ',
       // အဆင့်အတန်းများ
-      partner: 'မိတ်ဖက်',
+      merchants: 'ကုန်သည်',
       vipMember: 'VIP အဖွဲ့၀င်',
       admin: 'စီမံခန့်ခွဲသူ',
       courier: 'ပို့ဆောင်သူ',
@@ -630,9 +630,9 @@ export default function ProfileScreen({ navigation }: any) {
           console.warn('❌ 获取最新用户信息异常:', error);
         }
 
-        // 如果是合伙人，获取店铺名称（通常存储在user.name或AsyncStorage中）
+        // 如果是商家，获取店铺名称（通常存储在user.name或AsyncStorage中）
         let storeName: string | undefined = undefined;
-        if (detectedUserType === 'partner') {
+        if (detectedUserType === 'merchant') {
           storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
           
           // 🚀 加载店铺详细信息
@@ -651,9 +651,9 @@ export default function ProfileScreen({ navigation }: any) {
 
           // 加载合伙店铺代收款统计
           try {
-            const codStats = await packageService.getPartnerStats(user.id, storeName, selectedMonth);
+            const codStats = await packageService.getMERCHANTSStats(user.id, storeName, selectedMonth);
             if (codStats) {
-              setPartnerCODStats(prev => ({
+              setMERCHANTSCODStats(prev => ({
                 ...prev,
                 ...codStats
               }));
@@ -679,7 +679,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：更新店铺营业状态
   const handleUpdateStoreStatus = async (updates: any) => {
-    if (!userId || !isPartnerStore) return;
+    if (!userId || !isMERCHANTSStore) return;
     try {
       const result = await deliveryStoreService.updateStoreInfo(userId, updates);
       if (result.success) {
@@ -732,7 +732,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 当月份改变时重新加载数据
   useEffect(() => {
-    if (userType === 'partner' && userId && userId !== 'guest') {
+    if (userType === 'merchant' && userId && userId !== 'guest') {
       loadUserData();
     }
   }, [selectedMonth]);
@@ -786,7 +786,7 @@ export default function ProfileScreen({ navigation }: any) {
       
       const user = JSON.parse(currentUser);
       let storeName: string | undefined = undefined;
-      if (userType === 'partner') {
+      if (userType === 'merchant') {
         storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
       }
       
@@ -797,8 +797,8 @@ export default function ProfileScreen({ navigation }: any) {
       }
       setCodOrdersPage(1);
       
-      // 注意：getPartnerCODOrders 现在返回 { orders, total }
-      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, settled, 1, 20);
+      // 注意：getMERCHANTSCODOrders 现在返回 { orders, total }
+      const result = await packageService.getMERCHANTSCODOrders(user.id, storeName, selectedMonth, settled, 1, 20);
       LoggerService.debug('COD Orders result:', result);
       setAllCodOrders(result.orders);
       setCodOrders(result.orders);
@@ -853,14 +853,14 @@ export default function ProfileScreen({ navigation }: any) {
       
       const user = JSON.parse(currentUser);
       let storeName: string | undefined = undefined;
-      if (userType === 'partner') {
+      if (userType === 'merchant') {
         storeName = user.name || await AsyncStorage.getItem('userName') || undefined;
       }
       
       setCodOrdersLoadingMore(true);
       const nextPage = codOrdersPage + 1;
       
-      const result = await packageService.getPartnerCODOrders(user.id, storeName, selectedMonth, codModalSettled, nextPage, 20);
+      const result = await packageService.getMERCHANTSCODOrders(user.id, storeName, selectedMonth, codModalSettled, nextPage, 20);
       
       if (result.orders.length > 0) {
         const newOrders = [...allCodOrders, ...result.orders];
@@ -1134,7 +1134,7 @@ export default function ProfileScreen({ navigation }: any) {
         userId, 
         passwordForm.currentPassword, 
         passwordForm.newPassword,
-        userType // 传入用户类型 (customer 或 partner)
+        userType // 传入用户类型 (customer 或 merchants)
       );
 
       if (result.success) {
@@ -1251,21 +1251,21 @@ export default function ProfileScreen({ navigation }: any) {
             {!isGuest && (
               <View style={[
                 styles.userBadge,
-                userType === 'partner' && styles.partnerBadge,
+                userType === 'merchant' && styles.merchantsBadge,
                 (accountBalance > 0 || userType === 'vip') && styles.vipBadge,
                 userType === 'admin' && styles.adminBadge,
                 userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
+                (!userType || userType === 'customer' || userType === 'member') && !isMERCHANTSStore && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
               ]}>
                 <Text style={[
                   styles.userBadgeText,
-                  userType === 'partner' && styles.partnerBadgeText,
+                  userType === 'merchant' && styles.merchantsBadgeText,
                   (accountBalance > 0 || userType === 'vip') && styles.vipBadgeText,
                   userType === 'admin' && styles.adminBadgeText,
                   userType === 'courier' && styles.courierBadgeText,
-                  (!userType || userType === 'customer' || userType === 'member') && !isPartnerStore && styles.memberBadgeText
+                  (!userType || userType === 'customer' || userType === 'member') && !isMERCHANTSStore && styles.memberBadgeText
                 ]}>
-                  {userType === 'partner' ? 'PARTNER' : (
+                  {userType === 'merchant' ? 'MERCHANTS' : (
                     (accountBalance > 0 || userType === 'vip') ? 'VIP' : (
                       userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : 'MEMBER')
                     )
@@ -1290,7 +1290,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text style={styles.userContact}>{userEmail || '未绑定邮箱'}</Text>
               </View>
               {/* 🚀 新增：余额显示 (仅限非商家账号) */}
-              {!isGuest && userType !== 'partner' && (
+              {!isGuest && userType !== 'merchant' && (
                 <View style={[styles.contactRow, { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }]}>
                   <Ionicons name="wallet-outline" size={16} color="#fbbf24" />
                   <Text style={[styles.userContact, { color: '#fbbf24', fontWeight: 'bold' }]}>
@@ -1340,7 +1340,7 @@ export default function ProfileScreen({ navigation }: any) {
     </View>
   );
 
-  const renderPartnerCODStats = () => (
+  const renderMERCHANTSCODStats = () => (
     <View style={styles.section}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <Text style={styles.sectionTitle}>{t.codStats}</Text>
@@ -1373,7 +1373,7 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#60a5fa' }]}>{t.totalCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#3b82f6' }]}>
-              {formatMoney(partnerCODStats.settledCOD)} <Text style={{fontSize: 12}}>MMK</Text>
+              {formatMoney(merchantCODStats.settledCOD)} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
               onPress={() => handleViewCODOrders(true)}
@@ -1396,7 +1396,7 @@ export default function ProfileScreen({ navigation }: any) {
           >
             <Text style={[styles.codStatLabel, { color: '#f87171' }]}>{t.unclearedCOD}</Text>
             <Text style={[styles.codStatValue, { color: '#ef4444' }]}>
-              {formatMoney(partnerCODStats.unclearedCOD)} <Text style={{fontSize: 12}}>MMK</Text>
+              {formatMoney(merchantsCODStats.unclearedCOD)} <Text style={{fontSize: 12}}>MMK</Text>
             </Text>
             <TouchableOpacity
               onPress={() => handleViewCODOrders(false)}
@@ -1417,19 +1417,19 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.codInfoContainer}>
           <View style={styles.codInfoRow}>
             <Text style={styles.codInfoLabel}>{t.unclearedCount}</Text>
-            <View style={[styles.codInfoBadge, { backgroundColor: partnerCODStats.unclearedCount > 0 ? '#ef4444' : '#10b981' }]}>
-              <Text style={styles.codInfoBadgeText}>{partnerCODStats.unclearedCount}</Text>
+            <View style={[styles.codInfoBadge, { backgroundColor: merchantsCODStats.unclearedCount > 0 ? '#ef4444' : '#10b981' }]}>
+              <Text style={styles.codInfoBadgeText}>{merchantsCODStats.unclearedCount}</Text>
             </View>
           </View>
-          {partnerCODStats.lastSettledAt && (
+          {merchantsCODStats.lastSettledAt && (
             <View style={styles.codInfoRow}>
               <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
               <Text style={styles.codInfoValue}>
-                {formatDateTime(partnerCODStats.lastSettledAt)}
+                {formatDateTime(merchantsCODStats.lastSettledAt)}
               </Text>
             </View>
           )}
-          {!partnerCODStats.lastSettledAt && partnerCODStats.totalCOD > 0 && (
+          {!merchantsCODStats.lastSettledAt && merchantsCODStats.totalCOD > 0 && (
             <View style={styles.codInfoRow}>
               <Text style={styles.codInfoLabel}>{t.lastSettledAt}</Text>
               <Text style={[styles.codInfoValue, { opacity: 0.6, fontStyle: 'italic' }]}>{t.noSettlement}</Text>
@@ -1725,9 +1725,9 @@ export default function ProfileScreen({ navigation }: any) {
       >
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
-        {!isGuest && userType === 'partner' && renderPartnerCODStats()}
-        {!isGuest && userType === 'partner' && renderBusinessManagement()}
-        {!isGuest && userType === 'partner' && renderMerchantServices()}
+        {!isGuest && userType === 'merchant' && renderMERCHANTSCODStats()}
+        {!isGuest && userType === 'merchant' && renderBusinessManagement()}
+        {!isGuest && userType === 'merchant' && renderMerchantServices()}
         {renderQuickActions()}
         {renderSettings()}
 
@@ -2687,12 +2687,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  partnerBadge: {
+  merchantsBadge: {
     backgroundColor: '#3b82f6', // 蓝色背景
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  partnerBadgeText: {
+  merchantsBadgeText: {
     color: '#ffffff',
     fontWeight: '800',
   },

@@ -24,7 +24,7 @@ import { feedbackService } from '../services/FeedbackService';
 export default function LoginScreen({ navigation }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
-  const [loginType, setLoginType] = useState<'customer' | 'partner'>('customer');
+  const [loginType, setLoginType] = useState<'customer' | 'merchants'>('customer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function LoginScreen({ navigation }: any) {
       title: '登录',
       subtitle: '登录您的账户继续使用服务',
       customerLogin: '会员登录',
-      partnerLogin: '合伙登录',
+      merchantsLogin: '合伙登录',
       email: '邮箱/手机号',
       storeCode: '店铺代码',
       password: '密码',
@@ -63,7 +63,7 @@ export default function LoginScreen({ navigation }: any) {
       title: 'Login',
       subtitle: 'Sign in to your account to continue',
       customerLogin: 'Member',
-      partnerLogin: 'Partner',
+      merchantsLogin: 'Partner',
       email: 'Email/Phone',
       storeCode: 'Store Code',
       password: 'Password',
@@ -91,7 +91,7 @@ export default function LoginScreen({ navigation }: any) {
       title: 'ဝင်ရောက်ရန်',
       subtitle: 'သင့်အကောင့်သို့ဝင်ရောက်ပါ',
       customerLogin: 'အဖွဲ့၀င်',
-      partnerLogin: 'မိတ်ဖက်',
+      merchantsLogin: 'မိတ်ဖက်',
       email: 'အီးမေးလ်/ဖုန်း',
       storeCode: 'ဆိုင်ကုဒ်',
       password: 'စကားဝှက်',
@@ -189,14 +189,14 @@ export default function LoginScreen({ navigation }: any) {
           return;
         }
 
-        // 构造合伙人用户对象（兼容 User 接口）
-        const partnerUser = {
+        // 构造商家用户对象（兼容 User 接口）
+        const merchantsUser = {
           id: store.id,
           name: store.store_name,
           email: store.email || store.store_code,
           phone: store.contact_phone || '',
           address: store.address || '',
-          user_type: 'partner', // 标记为合伙人
+          user_type: 'merchants', // 标记为商家
           status: 'active',
           registration_date: store.created_at,
           last_login: new Date().toISOString(),
@@ -208,17 +208,17 @@ export default function LoginScreen({ navigation }: any) {
           store_id: store.id // 额外字段
         };
 
-        // 保存合伙人信息
-        await AsyncStorage.setItem('currentUser', JSON.stringify(partnerUser));
+        // 保存商家信息
+        await AsyncStorage.setItem('currentUser', JSON.stringify(merchantsUser));
         await AsyncStorage.setItem('userId', store.id);
         await AsyncStorage.setItem('userEmail', store.email || store.store_code);
         await AsyncStorage.setItem('userName', store.store_name);
         await AsyncStorage.setItem('userPhone', store.contact_phone || '');
-        await AsyncStorage.setItem('userType', 'partner');
+        await AsyncStorage.setItem('userType', 'merchants');
         await AsyncStorage.setItem('currentStoreCode', store.store_code);
 
-        // 🚀 新增：注册并保存推送令牌（合伙人使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
-        // 如果合伙人也需要推送，建议将推送令牌也保存到 delivery_stores 表
+        // 🚀 新增：注册并保存推送令牌（商家使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
+        // 如果商家也需要推送，建议将推送令牌也保存到 delivery_stores 表
         try {
           const NotificationService = require('../services/notificationService').default;
           const ns = NotificationService.getInstance();
@@ -302,15 +302,15 @@ export default function LoginScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tabButton, loginType === 'partner' && styles.activeTabButton]}
+                style={[styles.tabButton, loginType === 'merchants' && styles.activeTabButton]}
                 onPress={() => {
-                  setLoginType('partner');
+                  setLoginType('merchants');
                   setEmail('');
                   setPassword('');
                 }}
               >
-                <Text style={[styles.tabText, loginType === 'partner' && styles.activeTabText]}>
-                  {currentT.partnerLogin}
+                <Text style={[styles.tabText, loginType === 'merchants' && styles.activeTabText]}>
+                  {currentT.merchantsLogin}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -90,7 +90,7 @@ export function AppProvider({ children }: AppProviderProps) {
   // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
   // 修复：使用 useEffect 调用 API，而不是在渲染逻辑中条件性使用 Hook
   useEffect(() => {
-    if (userType === 'partner') {
+    if (userType === 'merchant') {
       console.log('商家账号登录，激活屏幕常亮');
       KeepAwake.activateKeepAwakeAsync();
       return () => {
@@ -131,7 +131,7 @@ export function AppProvider({ children }: AppProviderProps) {
         const user = JSON.parse(currentUserStr);
         setUserType(user.user_type || 'customer'); // 同步更新 userType 状态
 
-        if (user.user_type === 'partner' && user.id) {
+        if (user.user_type === 'merchant' && user.id) {
           console.log('✅ 检测到商家账号，建立全局订单监听:', user.id);
           
           // 如果已有监听，先清理
@@ -186,7 +186,7 @@ export function AppProvider({ children }: AppProviderProps) {
         if (!currentUserStr) return;
         const user = JSON.parse(currentUserStr);
         
-        if (user.user_type === 'partner' && user.id && !showOrderAlert) {
+        if (user.user_type === 'merchant' && user.id && !showOrderAlert) {
           const { data: missingOrders, error } = await supabase
             .from('packages')
             .select('*')

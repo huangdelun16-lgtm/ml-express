@@ -122,7 +122,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
   const handleDecline = async () => {
     if (!orderData || isProcessing) return;
     
-    // 🚀 计算退款金额 (仅限会员订单，合伙人订单不涉及余额支付)
+    // 🚀 计算退款金额 (仅限会员订单，商家订单不涉及余额支付)
     const isMemberOrder = orderData.description?.includes('[下单身份: 会员]') || orderData.description?.includes('[下单身份: VIP]');
     let refundAmount = 0;
     

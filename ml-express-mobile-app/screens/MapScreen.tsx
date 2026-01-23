@@ -837,9 +837,9 @@ export default function MapScreen({ navigation }: any) {
                 const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
                 if (identityMatch && identityMatch[1]) {
                   const identity = identityMatch[1];
-                  const isPartner = identity === '合伙人' || identity === 'Partner';
+                  const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
                   return (
-                    <View style={[styles.identityBadge, { backgroundColor: isPartner ? '#3b82f6' : '#f59e0b' }]}>
+                    <View style={[styles.identityBadge, { backgroundColor: isMERCHANTS ? '#3b82f6' : '#f59e0b' }]}>
                       <Text style={styles.identityText}>{identity}</Text>
                     </View>
                   );
@@ -859,7 +859,7 @@ export default function MapScreen({ navigation }: any) {
             {(() => {
               const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
               const identity = identityMatch ? identityMatch[1] : 'Member';
-              const isPartner = identity === '合伙人' || identity === 'Partner';
+              const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
               const isVIP = identity === 'VIP' || identity === 'VIP MEMBER' || identity === 'VIP အဖွဲ့ဝင်';
               const isMember = identity === '会员' || identity === 'Member' || identity === 'အဖွဲ့ဝင်';
 
@@ -878,8 +878,8 @@ export default function MapScreen({ navigation }: any) {
                       <Text style={styles.senderName}>{item.sender_name}</Text>
                       <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
                       
-                      {/* 🚀 规则 1：Partner 账号显示 COD 信息 */}
-                      {isPartner && (
+                      {/* 🚀 规则 1：MERCHANTS 账号显示 COD 信息 */}
+                      {isMERCHANTS && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                           {Number(item.cod_amount || 0) > 0 ? (
                             <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>
@@ -932,7 +932,7 @@ export default function MapScreen({ navigation }: any) {
                         return null;
                       })()}
 
-                      {/* 🚀 规则 3：通用规则 - 跑腿费现金支付提示 (针对 Member, VIP, Partner) */}
+                      {/* 🚀 规则 3：通用规则 - 跑腿费现金支付提示 (针对 Member, VIP, MERCHANTS) */}
                       {item.payment_method === 'cash' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                           <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '900' }}>

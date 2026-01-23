@@ -78,7 +78,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerId, setCustomerId] = useState('');
-  const [userType, setUserType] = useState<'customer' | 'partner'>('customer');
+  const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
 
   // 评价相关
   const [showRateModal, setShowRateModal] = useState(false);
@@ -343,7 +343,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         setCustomerId(user.id);
         // 检测用户类型
         const detectedUserType = storedUserType || user.user_type || 'customer';
-        setUserType(detectedUserType === 'partner' ? 'partner' : 'customer');
+        setUserType(detectedUserType === 'merchant' ? 'merchant' : 'customer');
       }
 
       // 加载订单详情
@@ -612,7 +612,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
               return (
                 <View style={[styles.infoRow, { borderBottomColor: '#f1f5f9' }]}>
                   <Text style={[styles.infoLabel, { fontWeight: 'bold' }]}>{t.ordererIdentity}:</Text>
-                  <View style={{ backgroundColor: identity === '合伙人' || identity === 'Partner' ? '#3b82f6' : '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                  <View style={{ backgroundColor: identity === '商家' || identity === 'MERCHANTS' ? '#3b82f6' : '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                     <Text style={{ color: 'white', fontSize: 13, fontWeight: '800' }}>{identity}</Text>
                   </View>
                 </View>
@@ -741,8 +741,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         {/* 价格信息 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>💰 {t.priceInfo}</Text>
-          {userType === 'partner' ? (
-            <View style={styles.partnerPriceContainer}>
+          {userType === 'merchant' ? (
+            <View style={styles.merchantsPriceContainer}>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>{t.deliveryFee} =</Text>
                 <Text style={styles.priceValue}>{order.price} MMK</Text>
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '500',
   },
-  partnerPriceContainer: {
+  merchantsPriceContainer: {
     gap: 12,
   },
   priceRow: {

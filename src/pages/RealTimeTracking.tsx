@@ -1224,17 +1224,17 @@ const RealTimeTracking: React.FC = () => {
                         const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
                         if (identityMatch && identityMatch[1]) {
                           const identity = identityMatch[1];
-                          const isPartner = identity === '合伙人' || identity === 'Partner';
+                          const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
                           const isVIP = identity === 'VIP';
                           return (
                             <span style={{
-                              background: isPartner ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
-                              color: isPartner ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
+                              background: isMERCHANTS ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
+                              color: isMERCHANTS ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
                               padding: '0.2rem 0.6rem',
                               borderRadius: '5px',
                               fontSize: '0.7rem',
                               fontWeight: 'bold',
-                              border: `1px solid ${isPartner ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
+                              border: `1px solid ${isMERCHANTS ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
                             }}>
                               👤 {identity}
                             </span>
@@ -1295,16 +1295,16 @@ const RealTimeTracking: React.FC = () => {
                         {pkg.status === '待收款' ? '待取件' : pkg.status}
                       </span>
                       
-                      {/* 代收款显示 - Partner订单显示代收款 */}
+                      {/* 代收款显示 - MERCHANTS订单显示代收款 */}
                       {(() => {
                         const isStoreMatch = stores.some(store => 
                           store.store_name === pkg.sender_name || 
                           (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                         );
-                        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
                         const codVal = Number(pkg.cod_amount || 0);
                         
-                        if (isPartner) {
+                        if (isMERCHANTS) {
                           return (
                             <span style={{
                               background: '#fee2e2',
@@ -1434,9 +1434,9 @@ const RealTimeTracking: React.FC = () => {
                         store.store_name === pkg.sender_name || 
                         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                       );
-                      const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
                       
-                      if (isPartner) {
+                      if (isMERCHANTS) {
                         const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                         const codVal = Number(pkg.cod_amount || 0);
                         const totalVal = priceVal + codVal;
@@ -1609,16 +1609,16 @@ const RealTimeTracking: React.FC = () => {
                           {pkg.status === '待收款' ? '待取件' : pkg.status}
                         </span>
 
-                        {/* 代收款显示 - Partner订单显示代收款 */}
+                        {/* 代收款显示 - MERCHANTS订单显示代收款 */}
                         {(() => {
                           const isStoreMatch = stores.some(store => 
                             store.store_name === pkg.sender_name || 
                             (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                           );
-                          const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                          const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
                           const codVal = Number(pkg.cod_amount || 0);
                           
-                          if (isPartner) {
+                          if (isMERCHANTS) {
                             return (
                               <span style={{
                                 background: '#fee2e2',
@@ -1741,9 +1741,9 @@ const RealTimeTracking: React.FC = () => {
                           store.store_name === pkg.sender_name || 
                           (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
                         );
-                        const isPartner = !!pkg.delivery_store_id || isStoreMatch;
+                        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
                         
-                        if (isPartner) {
+                        if (isMERCHANTS) {
                           const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                           const codVal = Number(pkg.cod_amount || 0);
                           const totalVal = priceVal + codVal;

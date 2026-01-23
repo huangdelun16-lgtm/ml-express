@@ -91,9 +91,9 @@ const getStatusText = (status: string) => {
 };
 
 const getUserTypeText = (user: any) => {
-  if (user.user_type === 'admin') return 'Admin';
+  if (user.user_type === 'merchant') return 'MERCHANTS';
   if (user.user_type === 'courier') return 'Courier';
-  if (user.user_type === 'partner') return 'PARTNER';
+  if (user.user_type === 'admin') return 'Admin';
   
   // 对于客户类型进行细分
   if (user.balance > 0 || user.user_type === 'vip') {
@@ -105,7 +105,7 @@ const getUserTypeText = (user: any) => {
 const getUserTypeColor = (user: any) => {
   if (user.user_type === 'admin') return '#e67e22';
   if (user.user_type === 'courier') return '#9b59b6';
-  if (user.user_type === 'partner') return '#3498db';
+  if (user.user_type === 'merchant') return '#3498db';
   
   if (user.balance > 0 || user.user_type === 'vip') {
     return 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)';
@@ -517,7 +517,7 @@ const UserRow = ({
   );
 };
 
-// 列表行组件 - 合伙店铺
+// 列表行组件 - 商家店铺
 const StoreRow = ({ store, isMobile }: any) => {
   if (!store) return null;
   
@@ -670,7 +670,7 @@ const UserManagement: React.FC = () => {
     return () => { document.head.removeChild(style); };
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'partner_store' | 'courier_management' | 'recharge_requests'>('customer_list');
+  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'>('customer_list');
 
   // ... (rest of the component)
   const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
@@ -854,7 +854,7 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [pendingRechargeRequests, setPendingRechargeRequests] = useState<Record<string, RechargeRequest>>({}); // 🚀 存储每个用户的待处理充值申请详情
   const [loading, setLoading] = useState(true);
-  const [partnerStores, setPartnerStores] = useState<any[]>([]);
+  const [merchantStores, setMerchantStores] = useState<any[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   
   // 快递员管理状态
@@ -1307,13 +1307,13 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const loadPartnerStores = async () => {
+  const loadMerchantStores = async () => {
     try {
       setLoadingStores(true);
       const data = await deliveryStoreService.getAllStores();
-      setPartnerStores(data || []);
+      setMerchantStores(data || []);
     } catch (error) {
-      setPartnerStores([]);
+      setMERCHANTSStores([]);
     } finally {
       setLoadingStores(false);
     }
@@ -1600,7 +1600,7 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'courier_management') loadCouriers();
-    else if (activeTab === 'partner_store') loadPartnerStores();
+    else if (activeTab === 'merchant_store') loadMerchantStores();
     else if (activeTab === 'recharge_requests') loadRechargeRequests();
     else loadUsers();
   }, [activeTab]);
@@ -1634,18 +1634,18 @@ const UserManagement: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-          {['customer_list', 'admin_list', 'partner_store', 'courier_management', 'recharge_requests'].map(tab => (
+          {['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '12px 24px', borderRadius: '12px', border: 'none', background: activeTab === tab ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)', color: 'white', cursor: 'pointer', fontWeight: activeTab === tab ? '600' : '400', transition: 'all 0.3s ease' }}>
               {tab === 'customer_list' ? '客户列表' : 
                tab === 'admin_list' ? '管理员列表' : 
-               tab === 'partner_store' ? '合伙店铺' : 
+               tab === 'merchant_store' ? 'MERCHANTS' : 
                tab === 'courier_management' ? '快递员管理' : 
                '充值申请审核'}
             </button>
           ))}
         </div>
 
-        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'partner_store' || activeTab === 'courier_management') && !showAddUserForm && (
+        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'merchant_store' || activeTab === 'courier_management') && !showAddUserForm && (
           <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)', marginBottom: '30px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px' }}>
               {activeTab === 'customer_list' ? (
@@ -1686,7 +1686,7 @@ const UserManagement: React.FC = () => {
                     <p style={{ margin: 0, fontSize: '0.9rem' }}>今日活跃</p>
                   </div>
                 </>
-              ) : activeTab === 'partner_store' ? (
+              ) : activeTab === 'merchant_store' ? (
                 <>
                   <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
                     <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalStores}</h3>
@@ -1861,10 +1861,10 @@ const UserManagement: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'partner_store' && (
+        {activeTab === 'merchant_store' && (
           <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
             <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
-              {partnerStores.map(store => (
+              {merchantStores.map(store => (
                 <StoreRow key={store.id} store={store} isMobile={isMobile} />
               ))}
             </div>
