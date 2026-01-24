@@ -490,12 +490,12 @@ const ProfilePage: React.FC = () => {
       try {
         const storeId = currentUser.store_id || currentUser.id;
         
-        // 查询该商家的待处理订单（待取件或待收款）
-        const { count, error } = await supabase
+        // 🚀 修正：仅查询该商家的“待确认”订单（从商城进来的新订单）
+        const { data, count, error } = await supabase
           .from('packages')
-          .select('id', { count: 'exact', head: true })
+          .select('id', { count: 'exact' })
           .eq('delivery_store_id', storeId)
-          .in('status', ['待取件', '待收款']);
+          .eq('status', '待确认');
 
         if (!error && count !== null) {
           setPendingMerchantOrdersCount(count);
@@ -506,14 +506,16 @@ const ProfilePage: React.FC = () => {
             
             // 情况1：有新订单进来（数量增加）
             if (count > lastBroadcastCountRef.current) {
-              console.log('🚨 检测到新订单!', count);
+              console.log('🚨 检测到新待确认订单!', count);
               if (isVoiceEnabled) {
                 speakNotification('你有新的订单 请接单');
               }
+              // 🚀 核心：自动刷新包裹列表，让新订单“弹出来”显示在卡片里
+              loadUserPackages();
             } 
-            // 情况2：仍然有待处理订单，且距离上次播报超过 30 秒
-            else if (isVoiceEnabled && (now - lastVoiceTimeRef.current >= 30000)) {
-              console.log('📢 30秒周期性播报提醒...');
+            // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒 (放宽频率，避免一直呼叫)
+            else if (isVoiceEnabled && (now - lastVoiceTimeRef.current >= 60000)) {
+              console.log('📢 60秒周期性播报提醒...');
               speakNotification('你有新的订单 请接单');
             }
           }
@@ -1759,8 +1761,8 @@ const ProfilePage: React.FC = () => {
                         <button
                           onClick={() => {
                             if (!isVoiceEnabled) {
-                              speakNotification(t.voiceActive);
-                              alert(language === 'zh' ? '✅ 语音接单已激活！当有新订单进入时，系统将为您自动播报提醒。' : t.voiceActive);
+                              speakNotification('语音提醒功能已开启');
+                              alert(language === 'zh' ? '✅ 语音提醒已开启！当有“待确认”新订单时，系统将自动为您播放播报并刷新列表。' : 'Voice Alert Active! List will auto-refresh on new orders.');
                             }
                             setIsVoiceEnabled(!isVoiceEnabled);
                           }}
@@ -1779,7 +1781,7 @@ const ProfilePage: React.FC = () => {
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {isVoiceEnabled ? '🔔' : '🔕'} {isVoiceEnabled ? t.voiceActive : t.enableVoice}
+                          {isVoiceEnabled ? '🔔' : '🔕'} {isVoiceEnabled ? (language === 'zh' ? '语音监控中' : t.voiceActive) : t.enableVoice}
                         </button>
                       </div>
                     </div>
