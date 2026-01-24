@@ -494,7 +494,7 @@ const ProfilePage: React.FC = () => {
         const storeId = currentUser.store_id || currentUser.id;
         
         // 🚀 修正：仅查询该商家的“待确认”订单（从商城进来的新订单）
-        const { data, count, error } = await supabase
+        const { count, error } = await supabase
           .from('packages')
           .select('id', { count: 'exact' })
           .eq('delivery_store_id', storeId)
@@ -503,28 +503,32 @@ const ProfilePage: React.FC = () => {
         if (!error && count !== null) {
           setPendingMerchantOrdersCount(count);
 
-          // 🚀 播报与自动关闭逻辑
-          if (count > 0) {
+          // 🚀 核心优化：检测到有待接单订单时，自动开启语音提醒功能
+          if (count > 0 && !isVoiceEnabled) {
+            console.log('🚨 检测到待确认订单，自动开启语音提醒状态');
+            setIsVoiceEnabled(true);
+          }
+
+          // 🚀 播报逻辑
+          if (count > 0 && isVoiceEnabled) {
             const now = Date.now();
             
             // 情况1：有新订单进来（数量增加）
             if (count > lastBroadcastCountRef.current) {
               console.log('🚨 检测到新待确认订单!', count);
-              if (isVoiceEnabled) {
-                speakNotification('你有新的订单 请接单');
-              }
+              speakNotification('你有新的订单 请接单');
               // 🚀 核心：自动刷新包裹列表，让新订单“弹出来”显示在卡片里
               loadUserPackages();
             } 
-            // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒 (放宽频率，避免一直呼叫)
-            else if (isVoiceEnabled && (now - lastVoiceTimeRef.current >= 60000)) {
+            // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒
+            else if (now - lastVoiceTimeRef.current >= 60000) {
               console.log('📢 60秒周期性播报提醒...');
               speakNotification('你有新的订单 请接单');
             }
           } 
-          // 🚀 核心逻辑优化：假如没有了 “待确认” 状态的订单，且之前是有订单的，则语音播报功能自动关闭
-          else if (count === 0 && isVoiceEnabled && lastBroadcastCountRef.current > 0) {
-            console.log('✅ 所有订单已接单，自动关闭语音提醒');
+          // 🚀 核心逻辑：假如没有了 “待确认” 状态的订单，且之前是开启状态，则语音播报功能自动关闭
+          else if (count === 0 && isVoiceEnabled) {
+            console.log('✅ 所有订单已处理，自动关闭语音提醒');
             setIsVoiceEnabled(false);
             speakNotification(language === 'zh' ? '订单已全部接单 语音提醒已关闭' : 'All orders accepted, voice alert disabled');
           }
@@ -537,7 +541,7 @@ const ProfilePage: React.FC = () => {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [isPartnerStore, currentUser, isVoiceEnabled]);
+  }, [isPartnerStore, currentUser, isVoiceEnabled, language]);
 
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
