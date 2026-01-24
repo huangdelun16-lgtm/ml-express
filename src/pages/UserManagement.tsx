@@ -712,19 +712,29 @@ const UserManagement: React.FC = () => {
   const prevPendingCountRef = useRef<number>(0);
   const lastVoiceBroadcastRef = useRef<number>(0); // 🚀 新增：记录上次语音播报时间
   const [hasNewRequest, setHasNewRequest] = useState(false);
+  const activeTabRef = useRef(activeTab);
+
+  // 同步 activeTab 到 ref
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   // 🚀 新增：语音播报函数
   const speakNotification = (text: string) => {
     if ('speechSynthesis' in window) {
-      // 先取消之前的播报
+      // 停止当前的，防止堆叠
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-CN';
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      // 修复 Chrome 兼容性问题：有时需要再次触发
       window.speechSynthesis.speak(utterance);
       lastVoiceBroadcastRef.current = Date.now();
+      console.log('🗣️ 正在播报:', text);
     }
   };
 
@@ -1134,9 +1144,23 @@ const UserManagement: React.FC = () => {
     // 首次加载
     loadUsers();
     
+    // 计数器用于 1 分钟自动刷新
+    let refreshCounter = 0;
+
     // 每 10 秒轮询一次充值申请
     const timer = setInterval(() => {
-      console.log('🔄 正在自动刷新充值申请状态...');
+      console.log('🔄 正在自动检测充值状态...');
+      refreshCounter += 10;
+
+      // 每 60 秒强制刷新一次列表
+      if (refreshCounter >= 60) {
+        console.log('⏱️ 1分钟自动刷新列表...');
+        refreshCounter = 0;
+        loadUsers(); // 刷新用户列表和统计
+        if (activeTabRef.current === 'recharge_requests') {
+          loadRechargeRequests(); // 刷新充值申请列表
+        }
+      }
       
       supabase
         .from('recharge_requests')
@@ -1153,22 +1177,22 @@ const UserManagement: React.FC = () => {
             // 🚀 触发报警音：如果当前待审核数量 > 之前记录的数量
             const currentCount = data.length;
             if (currentCount > prevPendingCountRef.current) {
-              console.log('🚨 检测到新充值申请，正在播放报警音...');
-              alertAudioRef.current?.play().catch(e => console.log('播放失败:', e));
+              console.log('🚨 检测到新充值申请:', currentCount);
+              alertAudioRef.current?.play().catch(e => console.log('音频播放失败:', e));
               
               // 立即进行一次语音播报
               speakNotification('你有新的充值 请审核');
               setHasNewRequest(true);
               
               // 自动刷新当前列表（如果在充值页面）
-              if (activeTab === 'recharge_requests') {
+              if (activeTabRef.current === 'recharge_requests') {
                 loadRechargeRequests();
               }
             } else if (currentCount > 0) {
               // 🚀 周期性语音提醒：如果仍有待处理申请，每 30 秒播报一次
               const now = Date.now();
               if (now - lastVoiceBroadcastRef.current >= 30000) {
-                console.log('📢 周期性提醒：你有新的充值 请审核');
+                console.log('📢 30秒周期性播报提醒...');
                 speakNotification('你有新的充值 请审核');
               }
             } else if (currentCount === 0) {
@@ -1879,8 +1903,9 @@ const UserManagement: React.FC = () => {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
                   onClick={() => {
-                    speakNotification('声音提醒已开启');
-                    alert('声音播报已开启，如果有新的充值申请，系统将每隔30秒提醒您。');
+                    // 🚀 核心：用户必须点击一次来“解锁”浏览器的语音引擎
+                    speakNotification('声音提醒功能已开启');
+                    window.alert('✅ 声音播报已激活！\n\n系统现在将自动检测充值申请，并每隔 30 秒为您进行语音提醒。请确保您的设备没有开启静音模式。');
                   }} 
                   style={{ 
                     background: 'rgba(46, 204, 113, 0.2)', 
@@ -1892,7 +1917,8 @@ const UserManagement: React.FC = () => {
                     fontWeight: 'bold',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px'
+                    gap: '5px',
+                    boxShadow: '0 4px 15px rgba(46, 204, 113, 0.2)'
                   }}
                 >
                   🔔 开启语音提醒
