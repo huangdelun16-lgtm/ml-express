@@ -2800,34 +2800,16 @@ const ProfilePage: React.FC = () => {
                 <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>
                   {t.status}
                 </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    display: 'inline-block',
-                    background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
-                    color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '20px',
-                    fontSize: '0.9rem',
-                    fontWeight: 'bold'
-                  }}>
-                    {selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}
-                  </div>
-
-                  {/* 🚀 新增：跑腿费支付方式小框框 */}
-                  {selectedPackage.payment_method && (
-                    <div style={{
-                      display: 'inline-block',
-                      background: getPaymentMethodColor(selectedPackage.payment_method),
-                      color: 'white',
-                      border: `1px solid ${getPaymentMethodBorderColor(selectedPackage.payment_method)}`,
-                      padding: '0.4rem 0.9rem',
-                      borderRadius: '12px',
-                      fontSize: '0.8rem',
-                      fontWeight: '800'
-                    }}>
-                      跑腿费: {getPaymentMethodText(selectedPackage.payment_method)}
-                    </div>
-                  )}
+                <div style={{
+                  display: 'inline-block',
+                  background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
+                  color: 'white',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold'
+                }}>
+                  {selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}
                 </div>
               </div>
 
