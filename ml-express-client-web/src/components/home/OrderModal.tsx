@@ -476,169 +476,89 @@ const OrderModal: React.FC<OrderModalProps> = ({
             </div>
           </div>
 
-          {/* 🚀 新增：商家商品选择卡片 (仅限 Partner 账号，放在收件人后) */}
-          {currentUser?.user_type === 'partner' && (
-            <div style={{ 
-              marginBottom: '1.5rem',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              padding: '1.25rem',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>🛒 {language === 'zh' ? '已选商品' : language === 'en' ? 'Selected Products' : 'ရွေးချယ်ထားသောပစ္စည်း'}</h3>
-                {!isFromCart && (
-                  <button 
-                    type="button"
-                    onClick={() => setShowProductSelector(true)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      border: 'none',
-                      color: 'white',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
-                    }}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ color: 'white', marginBottom: '1rem' }}>
+              📦 {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
+            </h3>
+
+            {/* 🚀 新增：商家商品选择按钮 (仅限 MERCHANTS 账号，放在包裹类型标题下) */}
+            {currentUser?.user_type === 'merchant' && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ color: 'white', fontSize: '0.9rem', fontWeight: '700' }}>
+                    🛍️ {language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ကုန်ပစ္စည်းရွေးရန်'}
+                  </label>
+                  {!isFromCart && (
+                    <button 
+                      type="button"
+                      onClick={() => setShowProductSelector(true)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {language === 'zh' ? '+ 从库中选择' : language === 'en' ? '+ From Library' : '+ ပစ္စည်းရွေးရန်'}
+                    </button>
+                  )}
+                </div>
+
+                {/* 已选商品列表 */}
+                {Object.keys(selectedProducts).length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    {Object.entries(selectedProducts).map(([id, qty]) => {
+                      const product = merchantProducts.find(p => p.id === id);
+                      if (!product) return null;
+                      return (
+                        <div key={id} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '10px'
+                        }}>
+                          <div style={{ flex: 1, marginRight: '10px' }}>
+                            <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{product.name}</div>
+                            <div style={{ color: '#10b981', fontSize: '0.8rem' }}>{product.price.toLocaleString()} MMK</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <button 
+                              type="button"
+                              onClick={() => handleProductQuantityChange(id, -1)}
+                              style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
+                            >-</button>
+                            <span style={{ color: 'white', fontWeight: 'bold' }}>{qty}</span>
+                            <button 
+                              type="button"
+                              onClick={() => handleProductQuantityChange(id, 1)}
+                              style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
+                            >+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', color: 'white' }}>
+                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '商品小计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
+                      <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    onClick={() => !isFromCart && setShowProductSelector(true)}
+                    style={{ textAlign: 'center', padding: '1rem', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem', cursor: isFromCart ? 'default' : 'pointer' }}
                   >
-                    {language === 'zh' ? '+ 选择商品' : language === 'en' ? '+ Select Product' : '+ ပစ္စည်းရွေးရန်'}
-                  </button>
+                    {language === 'zh' ? '未选择商品' : language === 'en' ? 'No items selected' : 'ပစ္စည်းမရွေးချယ်ရသေးပါ'}
+                  </div>
                 )}
               </div>
-
-              {/* 已选商品列表 */}
-              {Object.keys(selectedProducts).length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {Object.entries(selectedProducts).map(([id, qty]) => {
-                    const product = merchantProducts.find(p => p.id === id);
-                    if (!product) return null;
-                    return (
-                      <div key={id} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center',
-                        padding: '8px 12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '10px'
-                      }}>
-                        <div style={{ flex: 1, marginRight: '10px' }}>
-                          <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{product.name}</div>
-                          <div style={{ color: '#10b981', fontSize: '0.8rem' }}>{product.price.toLocaleString()} MMK</div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <button 
-                            type="button"
-                            onClick={() => handleProductQuantityChange(id, -1)}
-                            style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
-                          >-</button>
-                          <span style={{ color: 'white', fontWeight: 'bold' }}>{qty}</span>
-                          <button 
-                            type="button"
-                            onClick={() => handleProductQuantityChange(id, 1)}
-                            style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
-                          >+</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', color: 'white' }}>
-                    <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '选货合计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
-                    <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
-                  </div>
-
-                  {/* 🚀 优化：Web端代收款移动到“总计”下面 */}
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <label style={{ 
-                        fontWeight: 'bold', 
-                        color: 'white',
-                        fontSize: '0.9rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        💰 {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collection Amount (COD)' : 'ငွေကောက်ခံရန် (COD)'}
-                      </label>
-                      
-                      {/* 开关按钮 */}
-                      <div 
-                        onClick={() => setHasCOD(!hasCOD)}
-                        style={{
-                          width: '44px',
-                          height: '24px',
-                          borderRadius: '12px',
-                          backgroundColor: hasCOD ? '#10b981' : 'rgba(255,255,255,0.2)',
-                          position: 'relative',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '9px',
-                          backgroundColor: 'white',
-                          position: 'absolute',
-                          top: '3px',
-                          left: hasCOD ? '23px' : '3px',
-                          transition: 'all 0.3s ease',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }} />
-                      </div>
-                    </div>
-
-                    {hasCOD && (
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="number"
-                          name="codAmount"
-                          value={codAmount}
-                          onChange={(e) => setCodAmount(e.target.value)}
-                          placeholder={language === 'zh' ? '请输入代收金额' : language === 'en' ? 'Enter amount' : 'ပမာဏထည့်ပါ'}
-                          style={{
-                            width: '100%',
-                            padding: '10px 15px',
-                            paddingRight: '3.5rem',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            borderRadius: '10px',
-                            fontSize: '0.95rem',
-                            background: 'white',
-                            color: '#1e293b',
-                            outline: 'none'
-                          }}
-                        />
-                        <span style={{
-                          position: 'absolute',
-                          right: '1rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: '#64748b',
-                          fontWeight: 'bold',
-                          fontSize: '0.8rem'
-                        }}>
-                          MMK
-                        </span>
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '8px' }}>
-                      💡 {hasCOD 
-                        ? (language === 'zh' ? '该金额将由骑手代收' : language === 'en' ? 'Courier will collect this' : 'ကူရီယာမှ ကောက်ခံမည်')
-                        : (language === 'zh' ? '不开启代收模式' : language === 'en' ? 'Collection disabled' : 'ငွေကောက်ခံမှု ပိတ်ထားသည်')}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '1rem', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
-                  {language === 'zh' ? '暂未选择任何商品' : language === 'en' ? 'No items selected' : 'ပစ္စည်းမရွေးချယ်ရသေးပါ'}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.packageInfo}</h3>
+            )}
             
             {/* 自定义包裹类型下拉框 */}
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>

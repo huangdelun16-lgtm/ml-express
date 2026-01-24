@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService } from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService, merchantService } from '../services/supabase';
 import { useCart } from '../contexts/CartContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
@@ -330,6 +330,25 @@ const HomePage: React.FC = () => {
     loadPricingSettings();
     loadUserFromStorage();
   }, []);
+
+  // 🚀 新增：当商家打开下单窗口时，自动加载其商品
+  useEffect(() => {
+    if (showOrderForm && currentUser?.user_type === 'merchant' && !isFromCart) {
+      const loadMerchantProducts = async () => {
+        try {
+          const storeId = currentUser.store_id || currentUser.id;
+          console.log('正在加载商家商品，storeId:', storeId);
+          const products = await merchantService.getStoreProducts(storeId);
+          // 仅显示上架的商品
+          setMerchantProducts(products.filter(p => p.is_available));
+          console.log(`✅ 已加载商家商品: ${products.length} 个`);
+        } catch (error) {
+          console.error('加载商家商品失败:', error);
+        }
+      };
+      loadMerchantProducts();
+    }
+  }, [showOrderForm, currentUser, isFromCart]);
 
   // 当打开订单表单且用户已登录时，自动填充信息
   useEffect(() => {
