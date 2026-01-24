@@ -59,6 +59,31 @@ const ProfilePage: React.FC = () => {
     settledCOD: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
+  const [lastOrderCheckTime, setLastOrderCheckTime] = useState<number>(Date.now()); // 🚀 新增：上次订单检测时间
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
+  const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
+  const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
+  const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
+  const voiceActivationRef = useRef<HTMLAudioElement | null>(null); // 🚀 新增：用于激活音频上下文的引用
+
+  // 🚀 新增：语音播报函数
+  const speakNotification = (text: string) => {
+    if ('speechSynthesis' in window) {
+      // 停止当前的，防止堆叠
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      window.speechSynthesis.speak(utterance);
+      lastVoiceTimeRef.current = Date.now();
+      console.log('🗣️ 正在播报:', text);
+    }
+  };
+
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -456,6 +481,53 @@ const ProfilePage: React.FC = () => {
     }
   }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
 
+  // 🚀 新增：商家订单实时监控逻辑
+  useEffect(() => {
+    if (!isPartnerStore || !currentUser?.id) return;
+
+    // 每 15 秒轮询一次新订单
+    const timer = setInterval(async () => {
+      try {
+        const storeId = currentUser.store_id || currentUser.id;
+        
+        // 查询该商家的待处理订单（待取件或待收款）
+        const { count, error } = await supabase
+          .from('packages')
+          .select('id', { count: 'exact', head: true })
+          .eq('delivery_store_id', storeId)
+          .in('status', ['待取件', '待收款']);
+
+        if (!error && count !== null) {
+          setPendingMerchantOrdersCount(count);
+
+          // 🚀 播报逻辑
+          if (count > 0) {
+            const now = Date.now();
+            
+            // 情况1：有新订单进来（数量增加）
+            if (count > lastBroadcastCountRef.current) {
+              console.log('🚨 检测到新订单!', count);
+              if (isVoiceEnabled) {
+                speakNotification('你有新的订单 请接单');
+              }
+            } 
+            // 情况2：仍然有待处理订单，且距离上次播报超过 30 秒
+            else if (isVoiceEnabled && (now - lastVoiceTimeRef.current >= 30000)) {
+              console.log('📢 30秒周期性播报提醒...');
+              speakNotification('你有新的订单 请接单');
+            }
+          }
+          
+          lastBroadcastCountRef.current = count;
+        }
+      } catch (err) {
+        console.error('监控商家订单失败:', err);
+      }
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [isPartnerStore, currentUser, isVoiceEnabled]);
+
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
     if (!currentUser || !isPartnerStore) return;
@@ -685,6 +757,10 @@ const ProfilePage: React.FC = () => {
       closingTime: '打烊时间',
       statusUpdated: '营业状态已更新',
       lastUpdated: '最后更改时间',
+      balance: '账户余额',
+      recharge: '立即充值',
+      enableVoice: '开启语音接单',
+      voiceActive: '接单语音已激活'
     },
     en: {
       nav: {
@@ -764,6 +840,10 @@ const ProfilePage: React.FC = () => {
       closingTime: 'Closing Time',
       statusUpdated: 'Business status updated',
       lastUpdated: 'Last Updated',
+      balance: 'Balance',
+      recharge: 'Recharge',
+      enableVoice: 'Enable Voice Alert',
+      voiceActive: 'Voice Alert Active'
     },
     my: {
       nav: {
@@ -843,6 +923,10 @@ const ProfilePage: React.FC = () => {
       closingTime: 'ဆိုင်ပိတ်ချိန်',
       statusUpdated: 'ဆိုင်အခြေအနေ ပြောင်းလဲပြီးပါပြီ',
       lastUpdated: 'နောက်ဆုံးပြင်ဆင်ချိန်',
+      balance: 'လက်ကျန်ငွေ',
+      recharge: 'ငွေဖြည့်ရန်',
+      enableVoice: 'အသံသတိပေးချက် ဖွင့်ရန်',
+      voiceActive: 'အသံသတိပေးချက် ဖွင့်ထားသည်'
     }
   };
 
@@ -1628,12 +1712,41 @@ const ProfilePage: React.FC = () => {
                         fontWeight: '700',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '15px'
                       }}>
-                        <span>📅 {t.lastSettledAt}:</span>
-                        <span style={{ color: '#10b981' }}>
-                          {merchantCODStats.lastSettledAt ? formatDate(merchantCODStats.lastSettledAt) : t.noSettlement}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>📅 {t.lastSettledAt}:</span>
+                          <span style={{ color: '#10b981' }}>
+                            {merchantCODStats.lastSettledAt ? formatDate(merchantCODStats.lastSettledAt) : t.noSettlement}
+                          </span>
+                        </div>
+
+                        {/* 🚀 新增：语音播报开启按钮 */}
+                        <button
+                          onClick={() => {
+                            if (!isVoiceEnabled) {
+                              speakNotification(t.voiceActive);
+                              alert(language === 'zh' ? '✅ 语音接单已激活！当有新订单进入时，系统将为您自动播报提醒。' : t.voiceActive);
+                            }
+                            setIsVoiceEnabled(!isVoiceEnabled);
+                          }}
+                          style={{
+                            background: isVoiceEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                            color: isVoiceEnabled ? '#10b981' : 'white',
+                            border: `1px solid ${isVoiceEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
+                            padding: '6px 15px',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          {isVoiceEnabled ? '🔔' : '🔕'} {isVoiceEnabled ? t.voiceActive : t.enableVoice}
+                        </button>
                       </div>
                     </div>
                   </div>
