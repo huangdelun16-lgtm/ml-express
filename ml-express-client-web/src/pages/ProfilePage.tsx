@@ -503,7 +503,7 @@ const ProfilePage: React.FC = () => {
         if (!error && count !== null) {
           setPendingMerchantOrdersCount(count);
 
-          // 🚀 播报逻辑
+          // 🚀 播报与自动关闭逻辑
           if (count > 0) {
             const now = Date.now();
             
@@ -521,6 +521,12 @@ const ProfilePage: React.FC = () => {
               console.log('📢 60秒周期性播报提醒...');
               speakNotification('你有新的订单 请接单');
             }
+          } 
+          // 🚀 核心逻辑优化：假如没有了 “待确认” 状态的订单，且之前是有订单的，则语音播报功能自动关闭
+          else if (count === 0 && isVoiceEnabled && lastBroadcastCountRef.current > 0) {
+            console.log('✅ 所有订单已接单，自动关闭语音提醒');
+            setIsVoiceEnabled(false);
+            speakNotification(language === 'zh' ? '订单已全部接单 语音提醒已关闭' : 'All orders accepted, voice alert disabled');
           }
           
           lastBroadcastCountRef.current = count;
