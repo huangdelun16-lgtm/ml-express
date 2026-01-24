@@ -1034,6 +1034,8 @@ const ProfilePage: React.FC = () => {
       return language === 'zh' ? '转账' : language === 'en' ? 'Transfer' : 'ငွေလွှဲ';
     } else if (paymentMethod === 'cash') {
       return language === 'zh' ? '现金支付' : language === 'en' ? 'Cash' : 'ငွေသား';
+    } else if (paymentMethod === 'balance') {
+      return language === 'zh' ? '余额支付' : language === 'en' ? 'Balance' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း';
     }
     return language === 'zh' ? '未知' : language === 'en' ? 'Unknown' : 'မသိရှိရ';
   };
@@ -1044,6 +1046,8 @@ const ProfilePage: React.FC = () => {
       return 'rgba(34, 197, 94, 0.3)'; // 绿色
     } else if (paymentMethod === 'cash') {
       return 'rgba(251, 191, 36, 0.3)'; // 黄色
+    } else if (paymentMethod === 'balance') {
+      return 'rgba(59, 130, 246, 0.3)'; // 蓝色
     }
     return 'rgba(156, 163, 175, 0.3)'; // 灰色
   };
@@ -1054,6 +1058,8 @@ const ProfilePage: React.FC = () => {
       return 'rgba(34, 197, 94, 0.5)';
     } else if (paymentMethod === 'cash') {
       return 'rgba(251, 191, 36, 0.5)';
+    } else if (paymentMethod === 'balance') {
+      return 'rgba(59, 130, 246, 0.5)';
     }
     return 'rgba(156, 163, 175, 0.5)';
   };
@@ -2450,7 +2456,7 @@ const ProfilePage: React.FC = () => {
                         {t.price}:
                       </span>
                       <span style={{ color: 'white', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                        {pkg.price ? `${pkg.price} MMK` : '-'}
+                        {pkg.price ? `${pkg.price.replace('MMK', '').trim()} MMK` : '-'}
                       </span>
                     </div>
 
@@ -2505,8 +2511,30 @@ const ProfilePage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* 代收款 - 仅当是合伙店铺或有代收款时显示 */}
-                    {(isPartnerStore || (pkg.cod_amount && pkg.cod_amount > 0)) && (
+                    {/* 🚀 新增：商品费用 - 仅限 VIP/普通账号显示 */}
+                    {!isPartnerStore && (() => {
+                      const itemMatch = pkg.description?.match(/\[(?:商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)): (.*?) MMK\]/);
+                      if (itemMatch && itemMatch[1]) {
+                        return (
+                          <div style={{
+                            background: 'rgba(251, 191, 36, 0.2)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            padding: '0.4rem 0.9rem',
+                            borderRadius: '20px',
+                            fontSize: '0.85rem',
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            🛍️ {language === 'zh' ? '商品费用' : language === 'en' ? 'Item Cost' : 'ကုန်ပစ္စည်းဖိုး'}: {itemMatch[1]} MMK ({language === 'zh' ? '余额支付' : language === 'en' ? 'Balance' : 'လက်ကျန်ငွေ'})
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
+                    {isPartnerStore && (pkg.cod_amount && pkg.cod_amount > 0) && (
                       <div style={{
                         background: 'rgba(239, 68, 68, 0.2)',
                         color: '#fca5a5',
@@ -2517,7 +2545,7 @@ const ProfilePage: React.FC = () => {
                         fontWeight: 'bold',
                         whiteSpace: 'nowrap'
                       }}>
-                        {t.cod}: {pkg.cod_amount > 0 ? `${pkg.cod_amount} MMK` : t.none}
+                        💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
                       </div>
                     )}
                   </div>
