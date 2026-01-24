@@ -77,6 +77,7 @@ const HomePage: React.FC = () => {
   const [cartTotal, setCartTotal] = useState(0);
   const [hasCOD, setHasCOD] = useState(true);
   const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
+  const isFromCartRef = React.useRef(false); // 🚀 新增：使用 ref 确保在异步闭包中能获取最新值
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -122,9 +123,10 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     if (location.state && (location.state as any).selectedProducts) {
       const incomingProducts = (location.state as any).selectedProducts as any[];
-      console.log('📦 收到购物车商品:', incomingProducts);
+      console.log('📦 收到购物车商品，设置 isFromCart 为 true:', incomingProducts);
       
       setIsFromCart(true);
+      isFromCartRef.current = true; // 🚀 同时更新 ref
       setShowOrderForm(true);
       
       // 转换商品格式为 Record<string, number>
@@ -345,11 +347,8 @@ const HomePage: React.FC = () => {
         setSenderPhone(currentUser.phone || currentUser.email || '');
         setSenderAddressText(currentUser.address || '');
       }
-    } else if (!showOrderForm) {
-      // 🚀 关闭表单时重置购物车标志
-      setIsFromCart(false);
     }
-  }, [showOrderForm, currentUser, isFromCart]);
+  }, [showOrderForm, currentUser]);
 
   // 验证码倒计时
   useEffect(() => {
@@ -1973,6 +1972,14 @@ const HomePage: React.FC = () => {
     });
   };
 
+  const handleCancelOrder = () => {
+    setShowOrderForm(false);
+    setIsFromCart(false);
+    isFromCartRef.current = false; // 🚀 同时更新 ref
+    setOrderConfirmationStatus('idle');
+    setOrderConfirmationMessage('');
+  };
+
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget as HTMLFormElement);
@@ -2051,7 +2058,6 @@ const HomePage: React.FC = () => {
     
     // 关闭订单表单并重置确认状态
     setShowOrderForm(false);
-    setIsFromCart(false); // 🚀 新增：关闭表单时重置购物车模式标志
     setOrderConfirmationStatus('idle');
     setOrderConfirmationMessage('');
     
@@ -2696,6 +2702,7 @@ const HomePage: React.FC = () => {
       <OrderModal
         showOrderForm={showOrderForm}
         setShowOrderForm={setShowOrderForm}
+        handleCancelOrder={handleCancelOrder}
         language={language}
         t={t}
         currentUser={currentUser}
@@ -3152,11 +3159,16 @@ const HomePage: React.FC = () => {
                       setShowOrderSuccessModal(true);
                       
                       // 🚀 新增：下单成功后清空购物车和商品选择
-                      if (isFromCart) {
+                      if (isFromCart || isFromCartRef.current) {
+                        console.log('🛒 检测到购物车下单流程，正在清空购物车...');
                         clearCart();
+                        // 强制清除 localStorage 确保万无一失
+                        localStorage.removeItem('ml-express-cart');
+                        
                         setSelectedProducts({});
                         setMerchantProducts([]);
                         setIsFromCart(false);
+                        isFromCartRef.current = false;
                         console.log('✅ 已清空购物车和商品选择');
                       }
                     } else {
@@ -3238,7 +3250,11 @@ const HomePage: React.FC = () => {
                 )}
               </button>
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setIsFromCart(false); // 🚀 优化：取消支付时重置购物车流程标志
+                  isFromCartRef.current = false; // 🚀 同时更新 ref
+                }}
                 style={{
                   background: '#e2e8f0',
                   color: '#4a5568',

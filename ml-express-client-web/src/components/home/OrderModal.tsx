@@ -34,6 +34,7 @@ interface OrderModalProps {
   handleOpenMapModal: (type: 'sender' | 'receiver') => void;
   calculatePriceEstimate: () => void;
   handleOrderSubmit: (e: React.FormEvent) => void;
+  handleCancelOrder?: () => void; // 🚀 新增：取消订单处理
   // 🚀 优化：坐标自动选择相关
   setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
   setSelectedReceiverLocation?: (loc: {lat: number, lng: number} | null) => void;
@@ -82,6 +83,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleOpenMapModal,
   calculatePriceEstimate,
   handleOrderSubmit,
+  handleCancelOrder = () => setShowOrderForm(false),
   setSelectedSenderLocation = () => {},
   setSelectedReceiverLocation = () => {},
   merchantProducts = [],
@@ -1229,7 +1231,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
           }}>
             <button
               type="button"
-              onClick={() => setShowOrderForm(false)}
+              onClick={handleCancelOrder}
               style={{
                 background: '#e2e8f0',
                 color: '#4a5568',
