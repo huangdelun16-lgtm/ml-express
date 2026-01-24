@@ -625,11 +625,6 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         </div>
                       )}
                     </div>
-
-                    <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', color: 'white' }}>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '商品小计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
-                      <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
-                    </div>
                   </div>
                 ) : (
                   <div 

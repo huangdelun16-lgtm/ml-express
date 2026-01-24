@@ -9,10 +9,13 @@ import {
   Animated, 
   PanResponder,
   ActivityIndicator,
-  Alert
+  Alert,
+  ScrollView,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { supabase } from '../services/supabase';
 import { theme } from '../config/theme';
 
@@ -216,18 +219,14 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
     const items = itemsMatch[1].split(', ');
     
     return (
-      <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Ionicons name="cart-outline" size={16} color="#1e3a8a" />
-          <Text style={[styles.label, { marginLeft: 4, color: '#1e3a8a', fontWeight: 'bold' }]}>
-            {language === 'zh' ? '商品清单' : 'Item List'}:
-          </Text>
+      <View style={styles.infoSection}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="basket" size={18} color="#3b82f6" />
+          <Text style={styles.sectionTitle}>{language === 'zh' ? '商品信息' : 'Items'}</Text>
         </View>
-        <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: 10, padding: 10 }}>
+        <View style={styles.itemBox}>
           {items.map((item: string, index: number) => (
-            <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={[styles.value, { flex: 1, fontSize: 13 }]}>• {item}</Text>
-            </View>
+            <Text key={index} style={styles.itemText}>• {item}</Text>
           ))}
         </View>
       </View>
@@ -237,36 +236,116 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', maxWidth: 360 }]}>
-          <LinearGradient colors={['#1e3a8a', '#2563eb']} style={{ padding: 24, alignItems: 'center' }}>
+        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '85%' }]}>
+          <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
             <View style={styles.iconContainer}>
-              <Ionicons name="notifications" size={40} color="#fbbf24" />
+              <Ionicons name="notifications" size={32} color="#fbbf24" />
             </View>
             <Text style={styles.modalTitle}>{language === 'zh' ? '您有新的订单！' : 'New Order!'}</Text>
-            <Text style={styles.orderId}>{orderData?.id}</Text>
+            <View style={styles.badgeContainer}>
+              <Text style={styles.orderIdBadge}>
+                {language === 'zh' ? '订单编号：' : 'Order No: '}
+                <Text style={{ fontWeight: '900', fontSize: 18 }}>#{orderData?.id?.slice(-5)}</Text>
+              </Text>
+            </View>
           </LinearGradient>
 
-          <View style={{ padding: 24 }}>
-            <View style={styles.detailContainer}>
-              <View style={styles.detailRow}>
-                <Text style={styles.label}>{language === 'zh' ? '寄件人' : 'Sender'}:</Text>
-                <Text style={styles.value}>{orderData?.sender_name}</Text>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={{ padding: 20 }}>
+              {/* 二维码寄件码 */}
+              <View style={styles.qrSection}>
+                <Text style={styles.qrLabel}>{language === 'zh' ? '订单寄件码' : 'Pickup Code'}</Text>
+                <View style={styles.qrContainer}>
+                  {orderData?.id && (
+                    <QRCode 
+                      value={orderData.id} 
+                      size={140}
+                      color="#1e293b"
+                      backgroundColor="white"
+                    />
+                  )}
+                </View>
+                <Text style={styles.qrHint}>{language === 'zh' ? '由骑手扫描此码取件' : 'Scan for pickup'}</Text>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.label}>{language === 'zh' ? '总计金额' : 'Total'}:</Text>
-                <Text style={[styles.value, { color: '#ef4444', fontSize: 18 }]}>{orderData?.price} MMK</Text>
-              </View>
-              <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-                <Text style={styles.label}>{language === 'zh' ? '支付方式' : 'Payment'}:</Text>
-                <Text style={[styles.value, { color: orderData?.payment_method === 'cash' ? '#f59e0b' : '#10b981' }]}>
-                  {orderData?.payment_method === 'cash' ? (language === 'zh' ? '现金支付' : 'Cash') : (language === 'zh' ? '余额支付' : 'Balance')}
-                </Text>
-              </View>
-              
-              {/* 🚀 显示具体商品 */}
-              {renderItems()}
-            </View>
 
+              {/* 商家信息 (寄件人) */}
+              <View style={styles.infoSection}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="business" size={18} color="#3b82f6" />
+                  <Text style={styles.sectionTitle}>{language === 'zh' ? '商家信息' : 'Merchant'}</Text>
+                </View>
+                <View style={styles.infoCard}>
+                  <Text style={styles.cardValue}>{orderData?.sender_name}</Text>
+                  <Text style={styles.cardSubValue}>{orderData?.sender_phone}</Text>
+                  <Text style={styles.cardSubValue}>{orderData?.sender_address}</Text>
+                </View>
+              </View>
+
+              {/* 商品信息 */}
+              {renderItems()}
+
+              {/* 客户信息 (收件人) */}
+              <View style={styles.infoSection}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="person" size={18} color="#3b82f6" />
+                  <Text style={styles.sectionTitle}>{language === 'zh' ? '客户信息' : 'Customer'}</Text>
+                </View>
+                <View style={styles.infoCard}>
+                  <Text style={styles.cardValue}>{orderData?.receiver_name}</Text>
+                  <Text style={styles.cardSubValue}>{orderData?.receiver_phone}</Text>
+                  <Text style={styles.cardSubValue}>{orderData?.receiver_address}</Text>
+                </View>
+              </View>
+
+              {/* 支付状态 */}
+              <View style={styles.infoSection}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="card" size={18} color="#3b82f6" />
+                  <Text style={styles.sectionTitle}>{language === 'zh' ? '支付状态' : 'Payment'}</Text>
+                </View>
+                <View style={[styles.infoCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <Text style={styles.cardLabel}>{language === 'zh' ? '配送费' : 'Delivery Fee'}</Text>
+                  <View style={[styles.paymentBadge, { backgroundColor: orderData?.payment_method === 'cash' ? '#f59e0b' : '#10b981' }]}>
+                    <Text style={styles.paymentText}>
+                      {orderData?.payment_method === 'cash' ? (language === 'zh' ? '现金支付' : 'Cash') : (language === 'zh' ? '余额支付' : 'Balance')}
+                    </Text>
+                  </View>
+                </View>
+                {/* 如果包含商品金额解析 */}
+                {(() => {
+                  const itemPayMatch = orderData?.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                  if (itemPayMatch) {
+                    return (
+                      <View style={[styles.infoCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }]}>
+                        <Text style={styles.cardLabel}>{language === 'zh' ? '商品货款' : 'Item Price'}</Text>
+                        <View style={[styles.paymentBadge, { backgroundColor: '#3b82f6' }]}>
+                          <Text style={styles.paymentText}>{language === 'zh' ? '已支付 (余额)' : 'Paid (Balance)'}</Text>
+                        </View>
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
+              </View>
+
+              {/* 顾客备注 */}
+              {orderData?.notes ? (
+                <View style={styles.infoSection}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="chatbox-ellipses" size={18} color="#3b82f6" />
+                    <Text style={styles.sectionTitle}>{language === 'zh' ? '顾客备注' : 'Notes'}</Text>
+                  </View>
+                  <View style={styles.notesCard}>
+                    <Text style={styles.notesText}>{orderData.notes}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={{ height: 20 }} />
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
             <SwipeAcceptDecline 
               language={language}
               onAccept={handleAccept}
@@ -286,23 +365,47 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
 };
 
 const swipeStyles = StyleSheet.create({
-  container: { height: 60, width: width - 80, borderRadius: 30, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginVertical: 10 },
+  container: { height: 64, width: width - 60, borderRadius: 32, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', alignSelf: 'center' },
   track: { flexDirection: 'row', width: '100%', height: '100%', position: 'absolute' },
-  declineZone: { flex: 1, backgroundColor: '#ef4444', flexDirection: 'row', alignItems: 'center', paddingLeft: 15, gap: 8 },
-  acceptZone: { flex: 1, backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 15, gap: 8 },
-  zoneText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  handle: { width: 100, height: 50, borderRadius: 25, backgroundColor: 'white', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, zIndex: 10 },
-  handleGradient: { width: '100%', height: '100%', borderRadius: 25, justifyContent: 'center', alignItems: 'center' }
+  declineZone: { flex: 1, backgroundColor: '#ef4444', flexDirection: 'row', alignItems: 'center', paddingLeft: 20, gap: 8 },
+  acceptZone: { flex: 1, backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20, gap: 8 },
+  zoneText: { color: 'white', fontSize: 14, fontWeight: '900' },
+  handle: { width: 110, height: 54, borderRadius: 27, backgroundColor: 'white', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, zIndex: 10 },
+  handleGradient: { width: '100%', height: '100%', borderRadius: 27, justifyContent: 'center', alignItems: 'center' }
 });
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: 'white', borderRadius: 24, width: '90%', ...theme.shadows.large },
-  iconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 2, borderColor: '#fbbf24' },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', textAlign: 'center' },
-  orderId: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 8 },
-  detailContainer: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#f8fafc', borderRadius: 32, width: '92%', ...theme.shadows.large },
+  header: { padding: 24, alignItems: 'center', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  iconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 2, borderColor: '#fbbf24' },
+  modalTitle: { fontSize: 20, fontWeight: '900', color: 'white', textAlign: 'center' },
+  badgeContainer: { marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
+  orderIdBadge: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
+  
+  qrSection: { alignItems: 'center', marginBottom: 20, backgroundColor: 'white', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
+  qrLabel: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 12 },
+  qrContainer: { padding: 10, backgroundColor: 'white', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  qrHint: { marginTop: 12, fontSize: 12, color: '#64748b', fontWeight: '600' },
+
+  infoSection: { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#1e3a8a', textTransform: 'uppercase' },
+  infoCard: { backgroundColor: 'white', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  cardValue: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 4 },
+  cardSubValue: { fontSize: 13, color: '#64748b', marginTop: 2, lineHeight: 18 },
+  cardLabel: { fontSize: 14, color: '#64748b', fontWeight: '600' },
+
+  itemBox: { backgroundColor: 'white', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  itemText: { fontSize: 14, color: '#1e293b', fontWeight: '600', marginBottom: 6 },
+
+  paymentBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  paymentText: { color: 'white', fontSize: 12, fontWeight: '900' },
+
+  notesCard: { backgroundColor: '#fff7ed', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#ffedd5' },
+  notesText: { fontSize: 14, color: '#9a3412', fontWeight: '600', lineHeight: 20 },
+
+  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: 'white' },
   label: { fontSize: 14, color: '#64748b' },
   value: { fontSize: 14, fontWeight: 'bold', color: '#1e293b' },
 });

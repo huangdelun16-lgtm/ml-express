@@ -89,7 +89,6 @@ const HomePage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [trackingNumber] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trackingResult, setTrackingResult] = useState<any>(null);
@@ -2046,9 +2045,6 @@ const HomePage: React.FC = () => {
           // 覆盖 orderInfo 中的寄件经纬度
           orderInfo.senderLatitude = store.latitude;
           orderInfo.senderLongitude = store.longitude;
-          // 可选：覆盖地址文本，确保一致性
-          // orderInfo.senderAddress = store.address; 
-          
           // 更新状态，确保后续逻辑（如距离计算）使用新坐标
           setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
         } else {
@@ -2069,108 +2065,174 @@ const HomePage: React.FC = () => {
       return;
     }
     
-    // 关闭订单表单并重置确认状态
+    // 🚀 核心优化：直接进入正式提交流程，不再显示“选择支付方式”窗口
+    setOrderSubmitStatus('processing');
     setShowOrderForm(false);
     setOrderConfirmationStatus('idle');
     setOrderConfirmationMessage('');
     
     try {
-      console.log('开始处理订单...');
+      console.log('🚀 开始提交订单...');
       
-      // 1. 等待Google Maps API加载
+      // 1. 等待Google Maps API加载 (如果未加载)
       let retryCount = 0;
       while (!isMapLoaded && retryCount < 10) {
         await new Promise(resolve => setTimeout(resolve, 500));
         retryCount++;
       }
       
-      // 2. 计算距离
-      console.log('计算配送距离...');
-      const distance = await calculateDistance(
-        orderInfo.senderAddress,
-        orderInfo.receiverAddress
-      );
-      console.log('距离:', distance, 'km');
-      setDeliveryDistance(distance);
-      
-      // 3. 计算价格
-      console.log('计算配送价格...');
-      const price = isCalculated ? calculatedPriceDetail : calculatePrice(
+      // 2. 计算距离和价格
+      const distance = await calculateDistance(orderInfo.senderAddress, orderInfo.receiverAddress);
+      const finalDistance = distance || 5; 
+      setDeliveryDistance(finalDistance);
+
+      const finalPrice = isCalculated ? calculatedPriceDetail : calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
-        distance
+        finalDistance
       );
-      console.log('价格:', price, 'MMK');
-      setCalculatedPrice(price);
+      setCalculatedPrice(finalPrice);
+
+      // 3. 生成最终订单 ID
+      const packageId = generateMyanmarPackageId(orderInfo.senderAddress);
+      setGeneratedOrderId(packageId);
+
+      // 4. 余额扣款逻辑 (仅限会员/VIP，且针对商城订单)
+      let totalDeduction = 0;
+      if (isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant') {
+        totalDeduction += cartTotal;
+      }
+
+      // 如果跑腿费也选择余额支付
+      if (paymentMethod === 'balance' && currentUser?.user_type !== 'merchant') {
+        totalDeduction += finalPrice;
+      }
+
+      // 检查余额
+      if (totalDeduction > 0) {
+        const currentBalance = currentUser?.balance || 0;
+        if (currentBalance < totalDeduction) {
+          setOrderSubmitStatus('failed');
+          setOrderError(language === 'zh' ? `余额不足！当前余额: ${currentBalance.toLocaleString()} MMK，需要支付: ${totalDeduction.toLocaleString()} MMK` : 
+                       `Insufficient balance! Current: ${currentBalance.toLocaleString()} MMK, Required: ${totalDeduction.toLocaleString()} MMK`);
+          setShowOrderSuccessModal(true);
+          return;
+        }
+
+        // 执行余额扣除
+        console.log('💰 正在执行余额扣除:', totalDeduction);
+        const { data: updatedUser, error: deductError } = await supabase
+          .from('users')
+          .update({ 
+            balance: currentBalance - totalDeduction,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentUser.id)
+          .select()
+          .single();
+
+        if (deductError) {
+          throw new Error(language === 'zh' ? '由于余额扣除异常，订单无法提交' : 'Balance deduction failed, order cannot be submitted');
+        }
+
+        // 更新本地状态
+        const newUserData = { ...currentUser, balance: updatedUser.balance };
+        setCurrentUser(newUserData);
+        localStorage.setItem('ml-express-customer', JSON.stringify(newUserData));
+      }
+
+      // 5. 身份标记与描述准备
+      let ordererTypeTag = '';
+      if (currentUser) {
+        const type = currentUser.user_type === 'merchant' ? '商家' : 
+                    ((currentUser.balance > 0 || currentUser.user_type === 'vip') ? 'VIP' : '会员');
+        const zhTag = `[下单身份: ${type}]`;
+        const enTag = `[Orderer: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
+        const myTag = `[အော်ဒါတင်သူ: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
+        ordererTypeTag = language === 'zh' ? zhTag : (language === 'en' ? enTag : myTag);
+      }
+
+      const finalDescription = `${ordererTypeTag} ${orderInfo.description || description || ''}`.trim();
       
-      // 4. 生成临时订单ID（根据寄件地址自动识别城市）
-      const tempOrderId = generateMyanmarPackageId(orderInfo.senderAddress);
-      console.log('订单ID:', tempOrderId);
-      
-      // 5. 存储订单信息到Supabase数据库（替代localStorage）
-      console.log('保存临时订单到数据库...');
-      const pendingOrderData = {
-        temp_order_id: tempOrderId,
+      // 决定状态
+      let orderStatus = '待取件';
+      if (isFromCart && currentUser?.user_type !== 'merchant') {
+        orderStatus = '待确认';
+      } else if (paymentMethod === 'cash') {
+        orderStatus = '待收款';
+      }
+
+      // 6. 构建并保存包裹记录
+      const packageData: any = {
+        id: packageId,
         sender_name: orderInfo.senderName,
         sender_phone: orderInfo.senderPhone,
         sender_address: orderInfo.senderAddress,
-        sender_latitude: orderInfo.senderLatitude || null,
-        sender_longitude: orderInfo.senderLongitude || null,
+        sender_latitude: orderInfo.senderLatitude,
+        sender_longitude: orderInfo.senderLongitude,
         receiver_name: orderInfo.receiverName,
         receiver_phone: orderInfo.receiverPhone,
         receiver_address: orderInfo.receiverAddress,
-        receiver_latitude: orderInfo.receiverLatitude || null,
-        receiver_longitude: orderInfo.receiverLongitude || null,
+        receiver_latitude: orderInfo.receiverLatitude,
+        receiver_longitude: orderInfo.receiverLongitude,
         package_type: orderInfo.packageType,
-        weight: orderInfo.weight || '1',
-        delivery_speed: orderInfo.deliverySpeed || null,
+        weight: (needWeight && orderInfo.weight) ? orderInfo.weight : '1',
+        description: finalDescription,
+        delivery_speed: orderInfo.deliverySpeed,
         scheduled_delivery_time: orderInfo.scheduledTime || null,
-        price: price,
-        distance: distance,
+        delivery_distance: finalDistance,
+        status: orderStatus,
+        create_time: new Date().toLocaleString('zh-CN'),
+        pickup_time: '',
+        delivery_time: '',
+        courier: '待分配',
+        price: `${finalPrice} MMK`,
         payment_method: paymentMethod,
-        cod_amount: orderInfo.codAmount, // 添加代收款金额
-        description: orderInfo.description, // 🚀 新增：保存物品描述
+        cod_amount: orderInfo.codAmount || 0,
+        customer_id: currentUser?.id || null,
         customer_email: currentUser?.email || null,
-        customer_name: currentUser?.name || orderInfo.senderName || null
+        customer_name: currentUser?.name || orderInfo.senderName
       };
-      
-      const savedPendingOrder = await pendingOrderService.createPendingOrder(pendingOrderData);
-      if (!savedPendingOrder) {
-        console.warn('保存临时订单到数据库失败，回退到localStorage');
-        // 如果数据库保存失败，回退到localStorage
-      const orderWithPrice = {
-        ...orderInfo,
-        price: price,
-        distance: distance,
-        tempOrderId: tempOrderId,
-          codAmount: orderInfo.codAmount, // 添加代收款金额
-        customerEmail: currentUser?.email || '',
-          customerName: currentUser?.name || orderInfo.senderName,
-          paymentMethod: paymentMethod
-      };
-      localStorage.setItem('pendingOrder', JSON.stringify(orderWithPrice));
-        setTempOrderId(tempOrderId); // 保存到状态中
-      } else {
-        console.log('临时订单已保存到数据库:', savedPendingOrder.temp_order_id);
-        // 保存tempOrderId到状态中，用于后续获取订单信息
-        setTempOrderId(savedPendingOrder.temp_order_id);
-        // 清除localStorage中的旧数据（如果存在）
-        localStorage.removeItem('pendingOrder');
+
+      if (isFromCart && merchantProducts.length > 0) {
+        packageData.delivery_store_id = merchantProducts[0].store_id;
+      } else if (currentUser && currentUser.user_type === 'merchant') {
+        packageData.delivery_store_id = currentUser.store_id || currentUser.id;
+        packageData.delivery_store_name = currentUser.name;
+        packageData.sender_code = currentUser.store_code;
       }
+
+      console.log('准备保存包裹数据:', packageData);
+      const result = await packageService.createPackage(packageData);
       
-      // 7. 读取或设置支付方式
-      const savedPaymentMethod = savedPendingOrder?.payment_method || paymentMethod || 'cash';
-      setPaymentMethod(savedPaymentMethod);
-      
-      // 8. 显示支付模态框
-      console.log('显示支付页面');
-    setShowPaymentModal(true);
+      if (result) {
+        await saveCustomerToUsers(orderInfo);
+        
+        // 生成二维码并成功显示
+        const qrDataUrl = await generateQRCode(packageId);
+        setQrCodeDataUrl(qrDataUrl || '');
+
+        // 清理
+        if (isFromCart || isFromCartRef.current) {
+          clearCart();
+          localStorage.removeItem('ml-express-cart');
+          setSelectedProducts({});
+          setMerchantProducts([]);
+          setIsFromCart(false);
+          isFromCartRef.current = false;
+        }
+
+        setOrderSubmitStatus('success');
+        setShowOrderSuccessModal(true);
+      } else {
+        throw new Error('创建包裹记录失败');
+      }
     } catch (error) {
-      console.error('订单处理失败:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
-      alert(`订单处理失败: ${errorMessage}\n\n请检查：\n1. 地址是否填写完整\n2. 网络连接是否正常\n3. 稍后重试`);
-      setShowOrderForm(true);
+      console.error('订单提交失败:', error);
+      setOrderSubmitStatus('failed');
+      setOrderError(error instanceof Error ? error.message : '订单提交失败，请稍后重试');
+      setShowOrderSuccessModal(true);
     }
   };
 
@@ -2763,534 +2825,6 @@ const HomePage: React.FC = () => {
         setPaymentMethod={setPaymentMethod}
       />
 
-      {/* 支付二维码模态窗口 */}
-      {showPaymentModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(26, 54, 93, 0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999999,
-          backdropFilter: 'blur(5px)'
-        }}>
-          <div style={{
-            background: 'white',
-            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
-            borderRadius: '15px',
-            maxWidth: '500px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)',
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💳</div>
-              <h2 style={{ color: '#2c5282', margin: 0 }}>
-                {t.ui.selectPaymentMethod}
-            </h2>
-            </div>
-            
-            {/* 配送距离 */}
-            <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              padding: '1rem',
-              borderRadius: '10px',
-              marginBottom: '1rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>📍 {t.ui.deliveryDistance}</div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 'bold', marginTop: '0.3rem' }}>
-                {deliveryDistance} km
-              </div>
-            </div>
-
-            {/* 应付金额 */}
-            <div style={{
-              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-              padding: '1.5rem',
-              borderRadius: '10px',
-              marginBottom: '1.5rem',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '1rem', opacity: 0.9 }}>💰 {t.ui.totalAmount}</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
-                {calculatedPrice.toLocaleString()} MMK
-              </div>
-            </div>
-
-            {/* 支付方式选择 */}
-            <div style={{
-              background: '#f8f9fa',
-              padding: '1.5rem',
-              borderRadius: '10px',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{ fontSize: '1rem', color: '#2c5282', marginBottom: '1rem', fontWeight: 'bold', textAlign: 'center' }}>
-                💳 {t.ui.selectPaymentMethod}
-              </div>
-              <div style={{
-                display: 'flex',
-                gap: '1rem',
-                justifyContent: 'center',
-                flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-                marginBottom: '1rem'
-              }}>
-                {/* 现金支付选项 */}
-                <button
-                  onClick={async () => {
-                    setPaymentMethod('cash');
-                    // 更新数据库中的支付方式
-                    if (tempOrderId) {
-                      try {
-                        const dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(tempOrderId);
-                        if (dbPendingOrder) {
-                          // 更新数据库中的支付方式
-                          const { error } = await supabase
-                            .from('pending_orders')
-                            .update({ payment_method: 'cash' })
-                            .eq('temp_order_id', tempOrderId);
-                          if (error) {
-                            console.error('更新支付方式失败:', error);
-                          }
-                        }
-                      } catch (err) {
-                        console.error('更新支付方式异常:', err);
-                      }
-                    }
-                    // 同时更新localStorage（向后兼容）
-                    const pendingOrder = localStorage.getItem('pendingOrder');
-                    if (pendingOrder) {
-                      const orderInfo = JSON.parse(pendingOrder);
-                      orderInfo.paymentMethod = 'cash';
-                      localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    border: paymentMethod === 'cash' ? '3px solid #27ae60' : '2px solid #dee2e6',
-                    background: paymentMethod === 'cash' ? '#e8f5e9' : 'white',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-              display: 'flex',
-                    flexDirection: 'column',
-              alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseOver={(e) => {
-                    if (paymentMethod !== 'cash') {
-                      e.currentTarget.style.background = '#f8f9fa';
-                      e.currentTarget.style.borderColor = '#27ae60';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (paymentMethod !== 'cash') {
-                      e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.borderColor = '#dee2e6';
-                    }
-                  }}
-                >
-                  <div style={{ fontSize: '2rem' }}>💵</div>
-                  <div style={{ fontWeight: 'bold', color: '#27ae60' }}>{t.ui.cashPayment}</div>
-                </button>
-                
-              </div>
-              
-              {/* 现金支付说明 */}
-              {paymentMethod === 'cash' && (
-                <div style={{
-                  background: '#fff3cd',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  marginTop: '1rem',
-                  fontSize: '0.9rem',
-                  color: '#856404',
-                  textAlign: 'center'
-                }}>
-                  💡 {t.ui.cashPaymentDesc}
-                </div>
-              )}
-            </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              gap: '1rem', 
-              justifyContent: 'center',
-              flexDirection: window.innerWidth < 768 ? 'column' : 'row'
-            }}>
-              <button
-                onClick={async () => {
-                  // 设置处理中状态
-                  setOrderSubmitStatus('processing');
-                  
-                  try {
-                    // 获取存储的订单信息（优先从数据库获取，如果失败则从localStorage获取）
-                    let orderInfo: any = null;
-                    let dbPendingOrder: any = null;
-                    const currentTempOrderId = tempOrderId || (() => {
-                      // 尝试从localStorage获取tempOrderId
-                      const localPendingOrder = localStorage.getItem('pendingOrder');
-                      if (localPendingOrder) {
-                        const localData = JSON.parse(localPendingOrder);
-                        return localData.tempOrderId;
-                      }
-                      return '';
-                    })();
-                    
-                    // 优先从数据库获取订单信息
-                    if (currentTempOrderId) {
-                      dbPendingOrder = await pendingOrderService.getPendingOrderByTempId(currentTempOrderId);
-                      if (dbPendingOrder) {
-                        orderInfo = {
-                          senderName: dbPendingOrder.sender_name,
-                          senderPhone: dbPendingOrder.sender_phone,
-                          senderAddress: dbPendingOrder.sender_address,
-                          senderLatitude: dbPendingOrder.sender_latitude,
-                          senderLongitude: dbPendingOrder.sender_longitude,
-                          receiverName: dbPendingOrder.receiver_name,
-                          receiverPhone: dbPendingOrder.receiver_phone,
-                          receiverAddress: dbPendingOrder.receiver_address,
-                          receiverLatitude: dbPendingOrder.receiver_latitude,
-                          receiverLongitude: dbPendingOrder.receiver_longitude,
-                          packageType: dbPendingOrder.package_type,
-                          weight: dbPendingOrder.weight,
-                          deliverySpeed: dbPendingOrder.delivery_speed,
-                          scheduledTime: dbPendingOrder.scheduled_delivery_time,
-                          price: dbPendingOrder.price,
-                          distance: dbPendingOrder.distance,
-                          paymentMethod: dbPendingOrder.payment_method,
-                          codAmount: dbPendingOrder.cod_amount, // 读取代收款
-                          tempOrderId: dbPendingOrder.temp_order_id,
-                          description: dbPendingOrder.description // 🚀 新增：读取描述
-                        };
-                      }
-                    }
-                    
-                    // 如果数据库中没有，尝试从localStorage获取（向后兼容）
-                    if (!orderInfo) {
-                      const localPendingOrder = localStorage.getItem('pendingOrder');
-                      if (localPendingOrder) {
-                        orderInfo = JSON.parse(localPendingOrder);
-                      }
-                    }
-                    
-                    if (!orderInfo) {
-                      setOrderSubmitStatus('failed');
-                      setOrderError(t.errors.orderInfoLost || '订单信息丢失，请重新下单');
-                      setShowPaymentModal(false);
-                      setShowOrderSuccessModal(true);
-                      return;
-                    }
-
-                    // 🚀 优化：增加余额扣款逻辑 (对齐 App)
-                    // 如果是 Member/VIP 账号，且从商城下单，必须通过余额扣除商品货款
-                    let totalDeduction = 0;
-                    if (isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant') {
-                      totalDeduction += cartTotal;
-                    }
-
-                    // 检查余额是否足够
-                    if (totalDeduction > 0) {
-                      const currentBalance = currentUser?.balance || 0;
-                      if (currentBalance < totalDeduction) {
-                        setOrderSubmitStatus('failed');
-                        setOrderError(language === 'zh' ? `余额不足！当前余额: ${currentBalance.toLocaleString()} MMK，需要扣除: ${totalDeduction.toLocaleString()} MMK` : 
-                                     `Insufficient balance! Current: ${currentBalance.toLocaleString()} MMK, Required: ${totalDeduction.toLocaleString()} MMK`);
-                        setShowPaymentModal(false);
-                        setShowOrderSuccessModal(true);
-                        return;
-                      }
-
-                      // 执行余额扣除
-                      console.log('💰 正在执行余额扣除:', totalDeduction);
-                      const { data: updatedUser, error: deductError } = await supabase
-                        .from('users')
-                        .update({ 
-                          balance: currentBalance - totalDeduction,
-                          updated_at: new Date().toISOString()
-                        })
-                        .eq('id', currentUser.id)
-                        .select()
-                        .single();
-
-                      if (deductError) {
-                        throw new Error(language === 'zh' ? '由于余额扣除异常，订单无法提交' : 'Balance deduction failed, order cannot be submitted');
-                      }
-
-                      // 更新本地状态
-                      const newUserData = { ...currentUser, balance: updatedUser.balance };
-                      setCurrentUser(newUserData);
-                      localStorage.setItem('ml-express-customer', JSON.stringify(newUserData));
-                    }
-
-                    // 🚀 优化：身份标记 (对齐 App)
-                    let ordererTypeTag = '';
-                    if (currentUser) {
-                      const type = currentUser.user_type === 'merchant' ? '商家' : 
-                                  ((currentUser.balance > 0 || currentUser.user_type === 'vip') ? 'VIP' : '会员');
-                      
-                      const zhTag = `[下单身份: ${type}]`;
-                      const enTag = `[Orderer: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
-                      const myTag = `[အော်ဒါတင်သူ: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
-                      
-                      ordererTypeTag = language === 'zh' ? zhTag : (language === 'en' ? enTag : myTag);
-                    }
-
-                    const finalDescription = `${ordererTypeTag} ${orderInfo.description || description || ''}`.trim();
-                    
-                    const packageId = orderInfo.tempOrderId || generateMyanmarPackageId(orderInfo.senderAddress);
-                    
-                    // 获取当前选择的支付方式（优先使用当前状态，如果没有则使用存储的）
-                    const currentPaymentMethod = paymentMethod || orderInfo.paymentMethod || (dbPendingOrder?.payment_method) || 'cash';
-                    
-                    // 创建包裹数据 - 使用数据库字段名
-                    // 确保 weight 字段始终有值（数据库要求非空）
-                    // 对于不需要重量的包裹类型，使用默认值 '1'
-                    const needWeight = orderInfo.packageType === t.ui.overweightPackageDetail || 
-                                      orderInfo.packageType === t.ui.oversizedPackageDetail ||
-                                      orderInfo.packageType === '超重件（5KG）以上' || 
-                                      orderInfo.packageType === '超规件（45x60x15cm）以上';
-                    const packageWeight = needWeight && orderInfo.weight 
-                      ? orderInfo.weight 
-                      : (orderInfo.weight || '1'); // 默认重量为 1kg
-                    
-                    // 根据支付方式设置订单状态
-                    // 🚀 核心优化：确保 VIP/会员从商城购买商家商品时，初始状态必须是“待确认”
-                    let orderStatus = '待取件';
-                    
-                    if (isFromCart && currentUser?.user_type !== 'merchant') {
-                      // 商城订单：VIP/会员 -> 商家
-                      orderStatus = '待确认';
-                      console.log('✅ 商城订单流程：设置初始状态为 [待确认]');
-                    } else if (currentPaymentMethod === 'cash') {
-                      // 普通现金订单：默认待收款
-                      orderStatus = '待收款';
-                    }
-                    
-                    // 构建包裹数据，只包含数据库表中存在的字段
-                    const packageData: any = {
-                      id: packageId,
-                      sender_name: orderInfo.senderName,
-                      sender_phone: orderInfo.senderPhone,
-                      sender_address: orderInfo.senderAddress,
-                      sender_latitude: orderInfo.senderLatitude,
-                      sender_longitude: orderInfo.senderLongitude,
-                      receiver_name: orderInfo.receiverName,
-                      receiver_phone: orderInfo.receiverPhone,
-                      receiver_address: orderInfo.receiverAddress,
-                      receiver_latitude: orderInfo.receiverLatitude,
-                      receiver_longitude: orderInfo.receiverLongitude,
-                      package_type: orderInfo.packageType,
-                      weight: packageWeight, // 确保始终有值
-                      description: finalDescription, // 🚀 新增：包含身份标记和物品描述
-                      delivery_speed: orderInfo.deliverySpeed,
-                      scheduled_delivery_time: orderInfo.scheduledTime || null,
-                      delivery_distance: orderInfo.distance || deliveryDistance,
-                      status: orderStatus, // 根据支付方式设置状态
-                      create_time: new Date().toLocaleString('zh-CN'),
-                      pickup_time: '',
-                      delivery_time: '',
-                      courier: '待分配',
-                      price: `${orderInfo.price || calculatedPrice} MMK`,
-                      payment_method: currentPaymentMethod, // 添加支付方式字段
-                      cod_amount: orderInfo.codAmount || 0 // 添加代收款金额
-                    };
-
-                    // 🚀 优化：关联配送店ID（供实时接单监听使用）
-                    let deliveryStoreIdToLink = null;
-                    if (isFromCart && merchantProducts.length > 0) {
-                      deliveryStoreIdToLink = merchantProducts[0].store_id;
-                    } else if (currentUser && currentUser.user_type === 'merchant') {
-                      deliveryStoreIdToLink = currentUser.store_id || currentUser.id;
-                    }
-
-                    if (deliveryStoreIdToLink) {
-                      packageData.delivery_store_id = deliveryStoreIdToLink;
-                    }
-
-                    // 如果是合伙店铺账号下单，补充更多关联信息
-                    if (currentUser && currentUser.user_type === 'merchant') {
-                      // 添加店铺名称
-                      if (currentUser.name) {
-                        packageData.delivery_store_name = currentUser.name;
-                      }
-                      
-                      // 添加店铺代码作为 sender_code
-                      if (currentUser.store_code) {
-                        packageData.sender_code = currentUser.store_code;
-                      }
-                    }
-
-                    // 只有在用户登录时才添加 customer_email 和 customer_name
-                    // 如果数据库表中没有这些字段，这些值会被忽略
-                    if (currentUser?.id) {
-                      packageData.customer_id = currentUser.id;
-                    }
-                    
-                    if (currentUser?.email) {
-                      packageData.customer_email = currentUser.email;
-                    } else if (orderInfo.customerEmail) {
-                      packageData.customer_email = orderInfo.customerEmail;
-                    }
-
-                    if (currentUser?.name) {
-                      packageData.customer_name = currentUser.name;
-                    } else if (orderInfo.customerName) {
-                      packageData.customer_name = orderInfo.customerName;
-                    } else if (orderInfo.senderName) {
-                      packageData.customer_name = orderInfo.senderName;
-                    }
-                    
-                    // 保存到数据库
-                    console.log('准备保存包裹数据:', packageData);
-                    const result = await packageService.createPackage(packageData);
-                    
-                    if (result) {
-                      // 自动保存客户信息到用户管理
-                      await saveCustomerToUsers(orderInfo);
-
-                      // 清除临时订单信息（数据库和localStorage）
-                      if (orderInfo.tempOrderId) {
-                        await pendingOrderService.deletePendingOrder(orderInfo.tempOrderId);
-                      }
-                      localStorage.removeItem('pendingOrder');
-
-                      // 使用包裹ID作为订单号，并生成二维码
-                      const orderId = result.id || packageId;
-                      setGeneratedOrderId(orderId);
-                      const qrDataUrl = await generateQRCode(orderId);
-                      setQrCodeDataUrl(qrDataUrl || ''); // 确保二维码状态已设置
-
-                      // 设置成功状态，显示订单成功模态框
-                      setOrderSubmitStatus('success');
-                      setShowPaymentModal(false);
-                      setShowOrderSuccessModal(true);
-                      
-                      // 🚀 新增：下单成功后清空购物车和商品选择
-                      if (isFromCart || isFromCartRef.current) {
-                        console.log('🛒 检测到购物车下单流程，正在清空购物车...');
-                        clearCart();
-                        // 强制清除 localStorage 确保万无一失
-                        localStorage.removeItem('ml-express-cart');
-                        
-                        setSelectedProducts({});
-                        setMerchantProducts([]);
-                        setIsFromCart(false);
-                        isFromCartRef.current = false;
-                        console.log('✅ 已清空购物车和商品选择');
-                      }
-                    } else {
-                      // 包裹创建失败
-                      setOrderSubmitStatus('failed');
-                      setOrderError('包裹创建失败，请检查网络连接或联系客服。');
-                      setShowPaymentModal(false);
-                      setShowOrderSuccessModal(true);
-                    }
-                  } catch (error) {
-                    // 捕获所有异常
-                    console.error('订单提交异常:', error);
-                    setOrderSubmitStatus('failed');
-                    
-                    let errorMessage = '订单提交失败，请稍后重试或联系客服。';
-                    if (error instanceof Error) {
-                      errorMessage = error.message;
-                      // 如果是 API key 错误，提供更友好的提示
-                      if (error.message.includes('API Key') || error.message.includes('Invalid API key')) {
-                        errorMessage = `配置错误：${error.message}\n\n` +
-                          `请联系管理员检查系统配置，或稍后重试。`;
-                      }
-                    }
-                    
-                    setOrderError(errorMessage);
-                    setShowPaymentModal(false);
-                    setShowOrderSuccessModal(true);
-                  }
-                }}
-                disabled={orderSubmitStatus === 'processing'}
-                style={{
-                  background: orderSubmitStatus === 'processing' 
-                    ? '#94a3b8' 
-                    : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '8px',
-                  cursor: orderSubmitStatus === 'processing' ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  width: window.innerWidth < 768 ? '100%' : 'auto',
-                  boxShadow: orderSubmitStatus === 'processing' 
-                    ? 'none' 
-                    : '0 4px 15px rgba(39, 174, 96, 0.3)',
-                  transition: 'all 0.3s ease',
-                  opacity: orderSubmitStatus === 'processing' ? 0.7 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-                onMouseOver={(e) => {
-                  if (orderSubmitStatus !== 'processing') {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (orderSubmitStatus !== 'processing') {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
-                  }
-                }}
-              >
-                {orderSubmitStatus === 'processing' ? (
-                  <>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      border: '2px solid rgba(255, 255, 255, 0.3)',
-                      borderTop: '2px solid white',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }}></div>
-                    {language === 'zh' ? '正在提交订单...' : language === 'en' ? 'Submitting order...' : 'အော်ဒါတင်နေသည်...'}
-                  </>
-                ) : (
-                  t.ui.confirmPayment
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setIsFromCart(false); // 🚀 优化：取消支付时重置购物车流程标志
-                  isFromCartRef.current = false; // 🚀 同时更新 ref
-                }}
-                style={{
-                  background: '#e2e8f0',
-                  color: '#4a5568',
-                  border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  width: window.innerWidth < 768 ? '100%' : 'auto',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
-              >
-                {t.ui.cancelPayment}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 订单成功模态框 */}
       {showOrderSuccessModal && (
         <div style={{
@@ -3596,7 +3130,7 @@ const HomePage: React.FC = () => {
                       setShowOrderSuccessModal(false);
                       setOrderSubmitStatus('idle');
                       setOrderError('');
-                      setShowPaymentModal(true);
+                      setShowOrderForm(true); // 🚀 优化：失败后回到订单详情页重试
                     }}
                     style={{
                       background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
