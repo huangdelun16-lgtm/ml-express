@@ -2835,11 +2835,28 @@ const ProfilePage: React.FC = () => {
               <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '12px',
-                padding: '1.5rem'
+                padding: '1.5rem',
+                position: 'relative'
               }}>
-                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
-                  {t.sender}
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>
+                    {t.sender}
+                  </h3>
+                  {/* 🚀 新增：寄件人卡片中的身份标识 */}
+                  {selectedPackage.description?.includes('[下单身份: 商家]') && (
+                    <div style={{ 
+                      background: 'rgba(59, 130, 246, 0.2)', 
+                      color: '#93c5fd', 
+                      padding: '4px 12px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: '800',
+                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                    }}>
+                      {language === 'zh' ? '下单账号：MERCHANTS' : 'Order Account: MERCHANTS'}
+                    </div>
+                  )}
+                </div>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
@@ -2876,11 +2893,28 @@ const ProfilePage: React.FC = () => {
               <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '12px',
-                padding: '1.5rem'
+                padding: '1.5rem',
+                position: 'relative'
               }}>
-                <h3 style={{ color: 'white', fontSize: '1.1rem', marginBottom: '1rem' }}>
-                  {t.receiver}
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>
+                    {t.receiver}
+                  </h3>
+                  {/* 🚀 新增：收件人卡片中的身份标识 */}
+                  {selectedPackage.description?.includes('[下单身份: VIP]') && (
+                    <div style={{ 
+                      background: 'rgba(251, 191, 36, 0.2)', 
+                      color: '#fbbf24', 
+                      padding: '4px 12px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: '800',
+                      border: '1px solid rgba(251, 191, 36, 0.3)'
+                    }}>
+                      {language === 'zh' ? '下单账号：VIP' : 'Order Account: VIP'}
+                    </div>
+                  )}
+                </div>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
