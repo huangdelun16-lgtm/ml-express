@@ -69,6 +69,15 @@ class ErrorBoundary extends React.Component<
 
 const HomePage: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null); // 🚀 核心优化：提前声明，防止 Block-scoped variable 错误
+  
+  // 🚀 新增：商家商品选择相关状态 (移至顶部以解决作用域问题)
+  const [merchantProducts, setMerchantProducts] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  const [isFromCart, setIsFromCart] = useState(false);
+  const [cartTotal, setCartTotal] = useState(0);
+  const [hasCOD, setHasCOD] = useState(true);
+  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
+
   const navigate = useNavigate();
   const location = useLocation();
   const { clearCart } = useCart();
@@ -278,14 +287,6 @@ const HomePage: React.FC = () => {
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
-  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
-  
-  // 🚀 新增：商家商品选择相关状态
-  const [merchantProducts, setMerchantProducts] = useState<any[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
-  const [isFromCart, setIsFromCart] = useState(false);
-  const [cartTotal, setCartTotal] = useState(0);
-  const [hasCOD, setHasCOD] = useState(true);
   
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
