@@ -427,14 +427,17 @@ const ProfilePage: React.FC = () => {
         email: currentUser.email,
         phone: currentUser.phone,
         name: currentUser.name,
-        created_at: currentUser.created_at
+        created_at: currentUser.created_at,
+        isPartner: isPartnerStore,
+        storeId: currentUser.store_id || currentUser.id
       });
       
       // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone,
-        currentUser.created_at // 传入注册时间
+        currentUser.created_at, // 传入注册时间
+        isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined // 🚀 商家账号同时加载关联订单
       );
       
       LoggerService.debug('查询到的包裹数量:', packages.length);
@@ -753,6 +756,7 @@ const ProfilePage: React.FC = () => {
       none: '无',
       totalOrders: '全部订单',
       accountDate: '开户日期',
+      pendingAccept: '待接单',
       pendingPickup: '待取件',
       inTransit: '配送中',
       completed: '已完成',
@@ -836,6 +840,7 @@ const ProfilePage: React.FC = () => {
       none: 'None',
       totalOrders: 'Total Orders',
       accountDate: 'Account Created',
+      pendingAccept: 'Pending Accept',
       pendingPickup: 'Pending Pickup',
       inTransit: 'In Transit',
       completed: 'Completed',
@@ -919,6 +924,7 @@ const ProfilePage: React.FC = () => {
       none: 'မရှိ',
       totalOrders: 'စုစုပေါင်းအော်ဒါ',
       accountDate: 'အကောင့်ဖွင့်ထားသောရက်စွဲ',
+      pendingAccept: 'လက်ခံရန်စောင့်ဆိုင်းနေသည်',
       pendingPickup: 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်',
       inTransit: 'ပို့ဆောင်နေသည်',
       completed: 'ပြီးစီးပြီး',
@@ -994,6 +1000,7 @@ const ProfilePage: React.FC = () => {
   // 获取状态颜色
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: string } = {
+      '待确认': '#fbbf24', // 🚀 琥珀色
       '待取件': '#f59e0b',
       '已取件': '#3b82f6',
       '运输中': '#8b5cf6',
@@ -1007,6 +1014,7 @@ const ProfilePage: React.FC = () => {
   // 获取状态文本
   const getStatusText = (status: string) => {
     if (status === '待收款') return language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်';
+    if (status === '待确认') return language === 'zh' ? '待接单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်းနေသည်';
     return status;
   };
 
@@ -1043,6 +1051,7 @@ const ProfilePage: React.FC = () => {
   // 计算订单统计
   const orderStats = {
     total: userPackages.length,
+    pendingConfirmation: userPackages.filter(pkg => pkg.status === '待确认').length, // 🚀 待确认
     pendingPickup: userPackages.filter(pkg => pkg.status === '待取件' || pkg.status === '待收款').length,
     inTransit: userPackages.filter(pkg => pkg.status === '运输中' || pkg.status === '已取件').length,
     completed: userPackages.filter(pkg => pkg.status === '已送达' || pkg.status === '已完成').length
@@ -1568,7 +1577,9 @@ const ProfilePage: React.FC = () => {
           {/* 订单统计卡片 */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gridTemplateColumns: window.innerWidth < 768 
+              ? 'repeat(2, 1fr)' 
+              : (orderStats.pendingConfirmation > 0 ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)'),
             gap: '1.5rem',
             marginBottom: '3rem'
           }}>
@@ -1600,6 +1611,45 @@ const ProfilePage: React.FC = () => {
                 {t.totalOrders}
               </div>
             </div>
+
+            {/* 待接单 (仅当有待接单订单时显示) */}
+            {orderStats.pendingConfirmation > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(217, 119, 6, 0.1) 100%)',
+                borderRadius: '24px',
+                padding: '1.75rem',
+                border: '2px solid #fbbf24',
+                textAlign: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                boxShadow: '0 0 20px rgba(251, 191, 36, 0.3)',
+                animation: 'pulse-border 2s infinite',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onClick={() => {
+                // 自动搜索或过滤出待接单订单（后续可增强）
+                window.scrollTo({ top: document.getElementById('packages-section')?.offsetTop || 1000, behavior: 'smooth' });
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 15px 30px rgba(251, 191, 36, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.3)';
+              }}
+              >
+                <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '1.2rem' }}>🚨</div>
+                <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>🔔</div>
+                <div style={{ color: '#fbbf24', fontSize: '2.2rem', fontWeight: '950', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+                  {orderStats.pendingConfirmation}
+                </div>
+                <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {t.pendingAccept}
+                </div>
+              </div>
+            )}
 
             {/* 待取件 */}
             <div style={{
@@ -2301,7 +2351,7 @@ const ProfilePage: React.FC = () => {
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease 0.4s'
         }}>
-          <h2 style={{
+          <h2 id="packages-section" style={{
             color: 'white',
             fontSize: '1.5rem',
             marginBottom: '1.5rem',

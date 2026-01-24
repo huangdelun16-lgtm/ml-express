@@ -305,18 +305,18 @@ export const packageService = {
   },
 
   // 根据用户邮箱或手机号获取该用户的所有包裹
-  // startDate: 可选，如果有值，只查询该时间之后的订单（用于解决新账户看到旧手机号关联的历史订单问题）
-  async getPackagesByUser(email?: string, phone?: string, startDate?: string): Promise<Package[]> {
+  // startDate: 可选，如果有值，只查询该时间之后的订单
+  // storeId: 可选，如果是商家账号，同时查询该商家关联的订单
+  async getPackagesByUser(email?: string, phone?: string, startDate?: string, storeId?: string): Promise<Package[]> {
     try {
-      if (!email && !phone) {
-        LoggerService.debug('getPackagesByUser: 没有邮箱和手机号，返回空数组');
+      if (!email && !phone && !storeId) {
+        LoggerService.debug('getPackagesByUser: 没有查询标识，返回空数组');
         return [];
       }
 
-      LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate);
+      LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate, 'storeId:', storeId);
 
-      // 构建查询条件：根据邮箱或手机号查询
-      // 查询条件：customer_email 匹配 OR sender_phone 匹配 OR receiver_phone 匹配
+      // 构建查询条件
       let query = supabase.from('packages').select('*');
 
       // 如果有开始时间，添加时间过滤
@@ -326,12 +326,15 @@ export const packageService = {
 
       const conditions: string[] = [];
       
-      // 优先使用手机号查询（因为 customer_email 字段可能不存在）
+      // 1. 根据手机号查询（寄件人或收件人）
       if (phone) {
-        // 同时查询 sender_phone 和 receiver_phone
         conditions.push(`sender_phone.eq.${phone}`);
         conditions.push(`receiver_phone.eq.${phone}`);
-        LoggerService.debug('添加查询条件: sender_phone =', phone, '和 receiver_phone =', phone);
+      }
+
+      // 2. 如果是商家账号，根据 delivery_store_id 查询
+      if (storeId) {
+        conditions.push(`delivery_store_id.eq.${storeId}`);
       }
 
       if (conditions.length > 0) {
@@ -340,7 +343,6 @@ export const packageService = {
         LoggerService.debug('最终查询条件:', orCondition);
         query = query.or(orCondition);
       } else {
-        LoggerService.debug('没有查询条件，返回空数组');
         return [];
       }
 
