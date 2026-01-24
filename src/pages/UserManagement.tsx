@@ -710,7 +710,23 @@ const UserManagement: React.FC = () => {
   // 🚀 新增：通知和警报逻辑
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevPendingCountRef = useRef<number>(0);
+  const lastVoiceBroadcastRef = useRef<number>(0); // 🚀 新增：记录上次语音播报时间
   const [hasNewRequest, setHasNewRequest] = useState(false);
+
+  // 🚀 新增：语音播报函数
+  const speakNotification = (text: string) => {
+    if ('speechSynthesis' in window) {
+      // 先取消之前的播报
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+      lastVoiceBroadcastRef.current = Date.now();
+    }
+  };
 
   // 列表行组件 - 快递员 (移动到内部以确保闭包正确)
   const CourierRow = ({ courier, isMobile, handleEditCourier, handleCourierStatusChange, handleDeleteCourier }: any) => {
@@ -1139,11 +1155,21 @@ const UserManagement: React.FC = () => {
             if (currentCount > prevPendingCountRef.current) {
               console.log('🚨 检测到新充值申请，正在播放报警音...');
               alertAudioRef.current?.play().catch(e => console.log('播放失败:', e));
+              
+              // 立即进行一次语音播报
+              speakNotification('你有新的充值 请审核');
               setHasNewRequest(true);
               
               // 自动刷新当前列表（如果在充值页面）
               if (activeTab === 'recharge_requests') {
                 loadRechargeRequests();
+              }
+            } else if (currentCount > 0) {
+              // 🚀 周期性语音提醒：如果仍有待处理申请，每 30 秒播报一次
+              const now = Date.now();
+              if (now - lastVoiceBroadcastRef.current >= 30000) {
+                console.log('📢 周期性提醒：你有新的充值 请审核');
+                speakNotification('你有新的充值 请审核');
               }
             } else if (currentCount === 0) {
               setHasNewRequest(false);
@@ -1850,7 +1876,29 @@ const UserManagement: React.FC = () => {
           <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ color: 'white', margin: 0 }}>💰 充值申请审核</h2>
-              <button onClick={loadRechargeRequests} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>🔄 刷新列表</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => {
+                    speakNotification('声音提醒已开启');
+                    alert('声音播报已开启，如果有新的充值申请，系统将每隔30秒提醒您。');
+                  }} 
+                  style={{ 
+                    background: 'rgba(46, 204, 113, 0.2)', 
+                    color: '#2ecc71', 
+                    border: '1px solid rgba(46, 204, 113, 0.4)', 
+                    padding: '8px 16px', 
+                    borderRadius: '10px', 
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  🔔 开启语音提醒
+                </button>
+                <button onClick={loadRechargeRequests} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>🔄 刷新列表</button>
+              </div>
             </div>
 
             {loadingRequests ? (
