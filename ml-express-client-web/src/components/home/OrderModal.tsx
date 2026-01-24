@@ -45,6 +45,8 @@ interface OrderModalProps {
   hasCOD?: boolean;
   setHasCOD?: (val: boolean) => void;
   isFromCart?: boolean;
+  description?: string; // 🚀 新增：物品描述
+  setDescription?: (val: string) => void; // 🚀 新增：设置描述
 }
 
 const OrderModal: React.FC<OrderModalProps> = ({
@@ -88,7 +90,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
   cartTotal = 0,
   hasCOD = true,
   setHasCOD = () => {},
-  isFromCart = false
+  isFromCart = false,
+  description = '',
+  setDescription = () => {}
 }) => {
   const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
@@ -144,6 +148,58 @@ const OrderModal: React.FC<OrderModalProps> = ({
         <h2 style={{ color: 'white', marginBottom: '2rem', textAlign: 'center' }}>
           {t.order.title}
         </h2>
+
+        {/* 🚀 新增：身份识别标签 (对齐 App) */}
+        {currentUser && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', gap: '10px' }}>
+            {currentUser.user_type === 'merchant' ? (
+              <div style={{ 
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+                color: 'white', 
+                padding: '6px 16px', 
+                borderRadius: '20px', 
+                fontSize: '0.85rem', 
+                fontWeight: '900',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                🏪 {language === 'zh' ? '合伙人' : 'PARTNER'}
+              </div>
+            ) : (currentUser.balance > 0 || currentUser.user_type === 'vip') ? (
+              <div style={{ 
+                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', 
+                color: 'white', 
+                padding: '6px 16px', 
+                borderRadius: '20px', 
+                fontSize: '0.85rem', 
+                fontWeight: '900',
+                boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                👑 VIP MEMBER
+              </div>
+            ) : (
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.2)', 
+                color: 'white', 
+                padding: '6px 16px', 
+                borderRadius: '20px', 
+                fontSize: '0.85rem', 
+                fontWeight: '700',
+                backdropFilter: 'blur(5px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                👤 {language === 'zh' ? '普通会员' : 'MEMBER'}
+              </div>
+            )}
+          </div>
+        )}
         
         <form onSubmit={handleOrderSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
@@ -725,6 +781,42 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </div>
             )}
 
+            {/* 🚀 新增：物品描述 (对齐 App) */}
+            <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+              <label style={{ color: 'white', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
+                📝 {language === 'zh' ? '物品描述' : language === 'en' ? 'Description' : 'ပစ္စည်းဖော်ပြချက်'}
+              </label>
+              <textarea
+                name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={language === 'zh' ? '如：衣服、食品等' : language === 'en' ? 'e.g. Clothes, Food...' : 'ဥပမာ- အဝတ်အစား၊ အစားအစာ...'}
+                style={{
+                  width: '100%',
+                  padding: 'var(--spacing-3) var(--spacing-4)',
+                  border: '2px solid var(--color-border-dark)',
+                  borderRadius: 'var(--radius-md)',
+                  height: '80px',
+                  fontSize: 'var(--font-size-base)',
+                  lineHeight: 'var(--line-height-normal)',
+                  textAlign: 'left',
+                  transition: 'all var(--transition-base)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(5px)',
+                  fontFamily: 'var(--font-family-base)',
+                  resize: 'vertical'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 140, 201, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+
             {/* 速度部分 */}
             <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.ui.speed || '速度'}</h3>
             
@@ -1077,14 +1169,52 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     paddingTop: '0.5rem', 
                     marginTop: '0.5rem', 
                     display: 'flex', 
-                    justifyContent: 'space-between' 
+                    flexDirection: 'column',
+                    gap: '0.5rem'
                   }}>
-                    <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                      {language === 'zh' ? '总费用' : language === 'en' ? 'Total Cost' : 'စုစုပေါင်းကုန်ကျစရိတ်'}:
-                    </span>
-                    <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      {Math.round(calculatedPriceDetail)} MMK
-                    </span>
+                    {/* 🚀 配送费总计 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1rem' }}>
+                        🚚 {language === 'zh' ? '预估跑腿费' : language === 'en' ? 'Est. Delivery Fee' : 'ခန့်မှန်းပို့ဆောင်ခ'}:
+                      </span>
+                      <span style={{ color: 'white', fontWeight: '950', fontSize: '1.2rem' }}>
+                        {Math.round(calculatedPriceDetail).toLocaleString()} MMK
+                      </span>
+                    </div>
+
+                    {/* 🚀 平台支付 (仅限商城下单) */}
+                    {isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
+                        <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '1rem' }}>
+                          🛍️ {language === 'zh' ? '平台支付 (商品)' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}:
+                        </span>
+                        <span style={{ color: '#fbbf24', fontWeight: '950', fontSize: '1.2rem' }}>
+                          {cartTotal.toLocaleString()} MMK
+                        </span>
+                      </div>
+                    )}
+
+                    {/* 🚀 余额信息 (仅限会员) */}
+                    {currentUser && currentUser.user_type !== 'merchant' && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        marginTop: '0.5rem',
+                        padding: '0.75rem',
+                        background: 'rgba(0,0,0,0.2)',
+                        borderRadius: '10px'
+                      }}>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                          💰 {language === 'zh' ? '账户余额' : language === 'en' ? 'Your Balance' : 'လက်ကျန်ငွေ'}:
+                        </span>
+                        <span style={{ 
+                          color: currentUser.balance >= (isFromCart ? cartTotal : 0) ? '#4ade80' : '#f87171', 
+                          fontWeight: 'bold' 
+                        }}>
+                          {currentUser.balance?.toLocaleString() || 0} MMK
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

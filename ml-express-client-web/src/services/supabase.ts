@@ -749,6 +749,7 @@ export interface PendingOrder {
   distance: number;
   payment_method: 'qr' | 'cash';
   cod_amount?: number; // 代收款金额
+  description?: string; // 🚀 新增：物品描述
   customer_email?: string | null;
   customer_name?: string | null;
   created_at?: string;

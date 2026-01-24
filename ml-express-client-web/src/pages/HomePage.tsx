@@ -94,6 +94,7 @@ const HomePage: React.FC = () => {
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
   const [receiverAddressText, setReceiverAddressText] = useState('');
+  const [description, setDescription] = useState(''); // 🚀 新增：物品描述状态
   const [codAmount, setCodAmount] = useState(''); // 代收款金额
   const [mapClickPosition, setMapClickPosition] = useState<{lat: number, lng: number} | null>(null);
 
@@ -185,6 +186,47 @@ const HomePage: React.FC = () => {
     }
   }, [location.state, supabase, currentUser]);
   
+  // 🚀 新增：自动更新物品描述和代收金额 (对齐 App 逻辑)
+  useEffect(() => {
+    if (Object.keys(selectedProducts).length > 0) {
+      let totalProductPrice = 0;
+      let productDetails: string[] = [];
+      
+      Object.entries(selectedProducts).forEach(([id, qty]) => {
+        const product = merchantProducts.find(p => p.id === id);
+        if (product) {
+          totalProductPrice += product.price * qty;
+          productDetails.push(`${product.name} x${qty}`);
+        }
+      });
+
+      if (totalProductPrice > 0) {
+        setCartTotal(totalProductPrice);
+        // 只有在开启代收时才设置金额，否则设为 0
+        setCodAmount(hasCOD ? totalProductPrice.toString() : '0');
+        
+        // 自动把选中的商品添加到物品描述中
+        const selectedProductsText = language === 'zh' ? '已选商品' : language === 'en' ? 'Selected' : 'ရွေးချယ်ထားသောပစ္စည်း';
+        const productsText = `[${selectedProductsText}: ${productDetails.join(', ')}]`;
+        
+        // 🚀 优化：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不添加此标签
+        let platformPaymentTag = '';
+        if (currentUser?.user_type !== 'merchant') {
+          const platformPaymentText = language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း';
+          platformPaymentTag = ` [${platformPaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
+        }
+
+        // 如果原先有描述，保留它（避免重复添加）
+        // 移除所有可能的系统自动添加的标签
+        const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]/g, '').trim();
+        setDescription(`${productsText}${platformPaymentTag} ${cleanDesc}`.trim());
+      }
+    } else {
+      setCartTotal(0);
+      setCodAmount('0');
+    }
+  }, [selectedProducts, hasCOD, currentUser, language]);
+
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -1956,6 +1998,7 @@ const HomePage: React.FC = () => {
       receiverLatitude: selectedReceiverLocation?.lat || null,
       receiverLongitude: selectedReceiverLocation?.lng || null,
       codAmount: codAmount ? parseFloat(codAmount) : 0,
+      description: description // 🚀 新增：传递物品描述
     };
     
     // 验证必填字段
@@ -2067,6 +2110,7 @@ const HomePage: React.FC = () => {
         distance: distance,
         payment_method: paymentMethod,
         cod_amount: orderInfo.codAmount, // 添加代收款金额
+        description: orderInfo.description, // 🚀 新增：保存物品描述
         customer_email: currentUser?.email || null,
         customer_name: currentUser?.name || orderInfo.senderName || null
       };
@@ -2692,6 +2736,8 @@ const HomePage: React.FC = () => {
         hasCOD={hasCOD}
         setHasCOD={setHasCOD}
         isFromCart={isFromCart}
+        description={description}
+        setDescription={setDescription}
       />
 
       {/* 支付二维码模态窗口 */}
@@ -2898,7 +2944,8 @@ const HomePage: React.FC = () => {
                           distance: dbPendingOrder.distance,
                           paymentMethod: dbPendingOrder.payment_method,
                           codAmount: dbPendingOrder.cod_amount, // 读取代收款
-                          tempOrderId: dbPendingOrder.temp_order_id
+                          tempOrderId: dbPendingOrder.temp_order_id,
+                          description: dbPendingOrder.description // 🚀 新增：读取描述
                         };
                       }
                     }
@@ -2918,6 +2965,62 @@ const HomePage: React.FC = () => {
                       setShowOrderSuccessModal(true);
                       return;
                     }
+
+                    // 🚀 优化：增加余额扣款逻辑 (对齐 App)
+                    // 如果是 Member/VIP 账号，且从商城下单，必须通过余额扣除商品货款
+                    let totalDeduction = 0;
+                    if (isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant') {
+                      totalDeduction += cartTotal;
+                    }
+
+                    // 检查余额是否足够
+                    if (totalDeduction > 0) {
+                      const currentBalance = currentUser?.balance || 0;
+                      if (currentBalance < totalDeduction) {
+                        setOrderSubmitStatus('failed');
+                        setOrderError(language === 'zh' ? `余额不足！当前余额: ${currentBalance.toLocaleString()} MMK，需要扣除: ${totalDeduction.toLocaleString()} MMK` : 
+                                     `Insufficient balance! Current: ${currentBalance.toLocaleString()} MMK, Required: ${totalDeduction.toLocaleString()} MMK`);
+                        setShowPaymentModal(false);
+                        setShowOrderSuccessModal(true);
+                        return;
+                      }
+
+                      // 执行余额扣除
+                      console.log('💰 正在执行余额扣除:', totalDeduction);
+                      const { data: updatedUser, error: deductError } = await supabase
+                        .from('users')
+                        .update({ 
+                          balance: currentBalance - totalDeduction,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('id', currentUser.id)
+                        .select()
+                        .single();
+
+                      if (deductError) {
+                        throw new Error(language === 'zh' ? '由于余额扣除异常，订单无法提交' : 'Balance deduction failed, order cannot be submitted');
+                      }
+
+                      // 更新本地状态
+                      const newUserData = { ...currentUser, balance: updatedUser.balance };
+                      setCurrentUser(newUserData);
+                      localStorage.setItem('ml-express-customer', JSON.stringify(newUserData));
+                    }
+
+                    // 🚀 优化：身份标记 (对齐 App)
+                    let ordererTypeTag = '';
+                    if (currentUser) {
+                      const type = currentUser.user_type === 'merchant' ? '商家' : 
+                                  ((currentUser.balance > 0 || currentUser.user_type === 'vip') ? 'VIP' : '会员');
+                      
+                      const zhTag = `[下单身份: ${type}]`;
+                      const enTag = `[Orderer: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
+                      const myTag = `[အော်ဒါတင်သူ: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
+                      
+                      ordererTypeTag = language === 'zh' ? zhTag : (language === 'en' ? enTag : myTag);
+                    }
+
+                    const finalDescription = `${ordererTypeTag} ${orderInfo.description || description || ''}`.trim();
                     
                     const packageId = orderInfo.tempOrderId || generateMyanmarPackageId(orderInfo.senderAddress);
                     
@@ -2959,6 +3062,7 @@ const HomePage: React.FC = () => {
                       receiver_longitude: orderInfo.receiverLongitude,
                       package_type: orderInfo.packageType,
                       weight: packageWeight, // 确保始终有值
+                      description: finalDescription, // 🚀 新增：包含身份标记和物品描述
                       delivery_speed: orderInfo.deliverySpeed,
                       scheduled_delivery_time: orderInfo.scheduledTime || null,
                       delivery_distance: orderInfo.distance || deliveryDistance,
