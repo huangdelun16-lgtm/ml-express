@@ -502,6 +502,7 @@ const CityPackages: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case '待确认': return '待接单'; // 🚀 统一状态显示
       case '待取件': return '待取件';
       case '已取件': return '已取件';
       case '配送中': return '配送中';
@@ -509,6 +510,26 @@ const CityPackages: React.FC = () => {
       case '已取消': return '已取消';
       default: return status;
     }
+  };
+
+  // 🚀 获取下单人身份 (识别 商家/VIP/普通会员)
+  const getOrdererType = (description: string = '') => {
+    if (description.includes('[下单身份: 商家]') || description.includes('[Orderer: MERCHANTS]')) {
+      return 'MERCHANTS';
+    }
+    if (description.includes('[下单身份: VIP]') || description.includes('[Orderer: VIP]')) {
+      return 'VIP';
+    }
+    return 'Member';
+  };
+
+  // 🚀 从描述中提取商品费用 (针对 VIP)
+  const getItemCost = (description: string = '') => {
+    const match = description.match(/\[(?:商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+    if (match && match[1]) {
+      return parseFloat(match[1].replace(/,/g, ''));
+    }
+    return 0;
   };
 
   const handleViewDetail = async (pkg: Package) => {
@@ -2989,25 +3010,18 @@ const CityPackages: React.FC = () => {
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>创建时间:</span>
                     <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.create_time}</span>
                   </div>
-                  {selectedPackage.cod_amount && Number(selectedPackage.cod_amount) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#fcd34d', fontWeight: '500' }}>代收款 (COD):</span>
-                      <span style={{ color: '#fcd34d', fontWeight: 'bold' }}>{selectedPackage.cod_amount} MMK</span>
-                    </div>
-                  )}
-                  {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
-                  {(() => {
-                    const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-                    if (payMatch && payMatch[1]) {
-                      return (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                          <span style={{ color: '#10b981', fontWeight: 'bold' }}>平台支付:</span>
-                          <span style={{ color: '#10b981', fontWeight: '900', fontSize: '1.1rem' }}>{payMatch[1]} MMK</span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {/* 🚀 优化：下单账号展示 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px', paddingTop: '5px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>下单账号:</span>
+                    <span style={{ 
+                      color: getOrdererType(selectedPackage.description) === 'MERCHANTS' ? '#A5C7FF' : 
+                             (getOrdererType(selectedPackage.description) === 'VIP' ? '#fbbf24' : 'white'),
+                      fontWeight: 'bold',
+                      fontSize: '1rem'
+                    }}>
+                      {getOrdererType(selectedPackage.description)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -3018,9 +3032,25 @@ const CityPackages: React.FC = () => {
                 padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
-                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
-                  📤 寄件人信息
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h3 style={{ margin: 0, color: '#A5C7FF', fontSize: '1.1rem' }}>
+                    📤 寄件人信息
+                  </h3>
+                  {/* 🚀 新增：商家订单显示代收状态 */}
+                  {getOrdererType(selectedPackage.description) === 'MERCHANTS' && (
+                    <div style={{ 
+                      background: selectedPackage.cod_amount ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                      color: selectedPackage.cod_amount ? '#fbbf24' : 'rgba(255,255,255,0.5)',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      border: `1px solid ${selectedPackage.cod_amount ? '#fbbf2444' : 'rgba(255,255,255,0.1)'}`
+                    }}>
+                      {selectedPackage.cod_amount ? `COD = ${selectedPackage.cod_amount} MMK` : '无代收款'}
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>姓名:</span>
@@ -3038,15 +3068,31 @@ const CityPackages: React.FC = () => {
             </div>
 
               {/* 收件人信息 */}
-            <div style={{
+              <div style={{
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '10px',
-              padding: isMobile ? '12px' : '20px',
+                padding: isMobile ? '12px' : '20px',
                 border: '1px solid rgba(255, 255, 255, 0.2)'
               }}>
-                <h3 style={{ margin: '0 0 15px 0', color: '#A5C7FF', fontSize: '1.1rem' }}>
-                  📥 收件人信息
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h3 style={{ margin: 0, color: '#A5C7FF', fontSize: '1.1rem' }}>
+                    📥 收件人信息
+                  </h3>
+                  {/* 🚀 新增：VIP订单显示余额支付标识 */}
+                  {getOrdererType(selectedPackage.description) === 'VIP' && (
+                    <div style={{ 
+                      background: 'rgba(16, 185, 129, 0.2)',
+                      color: '#10b981',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      border: '1px solid #10b98144'
+                    }}>
+                      余额支付
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255,255,255,0.8)' }}>姓名:</span>
@@ -3088,10 +3134,71 @@ const CityPackages: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'rgba(255,255,255,0.8)' }}>送达时间:</span>
                       <span style={{ color: 'white', fontWeight: '500' }}>{selectedPackage.delivery_time}</span>
-                </div>
-              )}
+                    </div>
+                  )}
+                  {/* 🚀 新增：跑腿费支付方式 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px', paddingTop: '5px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>跑腿费支付:</span>
+                    <span style={{ 
+                      color: (getOrdererType(selectedPackage.description) === 'MERCHANTS' || selectedPackage.payment_method === 'cash') ? '#f59e0b' : '#10b981', 
+                      fontWeight: 'bold' 
+                    }}>
+                      {getOrdererType(selectedPackage.description) === 'MERCHANTS' ? '现金支付' : 
+                       (selectedPackage.payment_method === 'balance' ? '余额支付' : '现金支付')}
+                    </span>
+                  </div>
                 </div>
             </div>
+
+              {/* 🚀 新增：统计费用卡片 */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                borderRadius: '10px',
+                padding: isMobile ? '12px' : '20px',
+                border: '2px solid rgba(16, 185, 129, 0.3)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#10b981', fontSize: '1.1rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📊 费用统计
+                </h3>
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {getOrdererType(selectedPackage.description) === 'VIP' ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.8)' }}>商品费用 (余额已付):</span>
+                        <span style={{ color: 'white', fontWeight: 'bold' }}>{getItemCost(selectedPackage.description).toLocaleString()} MMK</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.8)' }}>跑腿费:</span>
+                        <span style={{ color: 'white', fontWeight: 'bold' }}>{parseFloat(selectedPackage.price?.replace(/[^0-9.]/g, '') || '0').toLocaleString()} MMK</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ color: '#10b981', fontWeight: '900', fontSize: '1rem' }}>费用总计:</span>
+                        <span style={{ color: '#10b981', fontWeight: '950', fontSize: '1.2rem' }}>
+                          {(getItemCost(selectedPackage.description) + parseFloat(selectedPackage.price?.replace(/[^0-9.]/g, '') || '0')).toLocaleString()} MMK
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.8)' }}>代收款 COD (待收):</span>
+                        <span style={{ color: 'white', fontWeight: 'bold' }}>{(selectedPackage.cod_amount || 0).toLocaleString()} MMK</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.8)' }}>跑腿费:</span>
+                        <span style={{ color: 'white', fontWeight: 'bold' }}>{parseFloat(selectedPackage.price?.replace(/[^0-9.]/g, '') || '0').toLocaleString()} MMK</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ color: '#10b981', fontWeight: '900', fontSize: '1rem' }}>金额总计:</span>
+                        <span style={{ color: '#10b981', fontWeight: '950', fontSize: '1.2rem' }}>
+                          {((selectedPackage.cod_amount || 0) + parseFloat(selectedPackage.price?.replace(/[^0-9.]/g, '') || '0')).toLocaleString()} MMK
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
 
               {/* 📜 操作痕迹追踪 (Timeline) */}
               <div style={{
