@@ -518,8 +518,10 @@ const UserRow = ({
 };
 
 // 列表行组件 - 商家店铺
-const StoreRow = ({ store, isMobile }: any) => {
+const StoreRow = ({ store, isMobile, pendingRecharge }: any) => {
   if (!store) return null;
+  
+  const hasPendingRecharge = !!pendingRecharge;
   
   return (
     <div style={{ paddingBottom: '20px', boxSizing: 'border-box' }}>
@@ -529,25 +531,56 @@ const StoreRow = ({ store, isMobile }: any) => {
           background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
           borderRadius: '24px',
           padding: '28px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
+          border: hasPendingRecharge ? '2px solid #e74c3c' : '1px solid rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(15px)',
           transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
+          boxShadow: hasPendingRecharge ? '0 0 20px rgba(231, 76, 60, 0.4)' : '0 12px 36px rgba(0,0,0,0.2)',
           position: 'relative',
           overflow: 'hidden',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          animation: hasPendingRecharge ? 'pulse-border 2s infinite' : 'none'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-          e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
+          if (!hasPendingRecharge) {
+            e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
+          }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-          e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
+          if (!hasPendingRecharge) {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
+          }
         }}
       >
+        {/* 🚀 新增：充值警报器 */}
+        {hasPendingRecharge && (
+          <div style={{
+            position: 'absolute',
+            top: '-15px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+            color: 'white',
+            padding: '6px 20px',
+            borderRadius: '30px',
+            fontSize: '0.9rem',
+            fontWeight: 900,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 0 25px rgba(231, 76, 60, 0.8)',
+            zIndex: 100,
+            border: '2px solid rgba(255,255,255,0.3)',
+            animation: 'pulse-scale 1.5s infinite'
+          }}>
+            <span style={{ fontSize: '1.2rem', animation: 'blink 0.6s infinite alternate' }}>🚨</span>
+            <span style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>商户正在充值</span>
+          </div>
+        )}
+
         {/* 背景装饰光晕 */}
         <div style={{
           position: 'absolute',
@@ -671,10 +704,13 @@ const UserManagement: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'>('customer_list');
-
-  // ... (rest of the component)
   const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+
+  // 🚀 新增：通知和警报逻辑
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prevPendingCountRef = useRef<number>(0);
+  const [hasNewRequest, setHasNewRequest] = useState(false);
 
   // 列表行组件 - 快递员 (移动到内部以确保闭包正确)
   const CourierRow = ({ courier, isMobile, handleEditCourier, handleCourierStatusChange, handleDeleteCourier }: any) => {
@@ -1097,6 +1133,22 @@ const UserManagement: React.FC = () => {
               requestsMap[req.user_id] = req;
             });
             setPendingRechargeRequests(requestsMap);
+
+            // 🚀 触发报警音：如果当前待审核数量 > 之前记录的数量
+            const currentCount = data.length;
+            if (currentCount > prevPendingCountRef.current) {
+              console.log('🚨 检测到新充值申请，正在播放报警音...');
+              alertAudioRef.current?.play().catch(e => console.log('播放失败:', e));
+              setHasNewRequest(true);
+              
+              // 自动刷新当前列表（如果在充值页面）
+              if (activeTab === 'recharge_requests') {
+                loadRechargeRequests();
+              }
+            } else if (currentCount === 0) {
+              setHasNewRequest(false);
+            }
+            prevPendingCountRef.current = currentCount;
           }
         });
     }, 10000);
@@ -1634,15 +1686,45 @@ const UserManagement: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
-          {['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '12px 24px', borderRadius: '12px', border: 'none', background: activeTab === tab ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)', color: 'white', cursor: 'pointer', fontWeight: activeTab === tab ? '600' : '400', transition: 'all 0.3s ease' }}>
-              {tab === 'customer_list' ? '客户列表' : 
-               tab === 'admin_list' ? '管理员列表' : 
-               tab === 'merchant_store' ? 'MERCHANTS' : 
-               tab === 'courier_management' ? '快递员管理' : 
-               '充值申请审核'}
-            </button>
-          ))}
+          {['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].map(tab => {
+            const isRechargeTab = tab === 'recharge_requests';
+            const hasPending = Object.keys(pendingRechargeRequests).length > 0;
+            
+            return (
+              <button 
+                key={tab} 
+                onClick={() => {
+                  setActiveTab(tab as any);
+                  if (isRechargeTab) setHasNewRequest(false);
+                }} 
+                style={{ 
+                  padding: '12px 24px', 
+                  borderRadius: '12px', 
+                  border: isRechargeTab && hasPending ? '2px solid #e74c3c' : 'none', 
+                  background: activeTab === tab ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)', 
+                  color: 'white', 
+                  cursor: 'pointer', 
+                  fontWeight: activeTab === tab ? '600' : '400', 
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: isRechargeTab && hasPending ? '0 0 15px rgba(231, 76, 60, 0.3)' : 'none',
+                  animation: isRechargeTab && hasPending ? 'pulse-border 2s infinite' : 'none'
+                }}
+              >
+                {isRechargeTab && hasPending && (
+                  <span style={{ animation: 'blink 0.6s infinite alternate' }}>🚨</span>
+                )}
+                {tab === 'customer_list' ? '客户列表' : 
+                 tab === 'admin_list' ? '管理员列表' : 
+                 tab === 'merchant_store' ? 'MERCHANTS' : 
+                 tab === 'courier_management' ? '快递员管理' : 
+                 '充值申请审核'}
+              </button>
+            );
+          })}
         </div>
 
         {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'merchant_store' || activeTab === 'courier_management') && !showAddUserForm && (
@@ -1785,12 +1867,36 @@ const UserManagement: React.FC = () => {
                     background: 'rgba(255, 255, 255, 0.08)',
                     borderRadius: '20px',
                     padding: '24px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    border: request.status === 'pending' ? '2px solid #e74c3c' : '1px solid rgba(255, 255, 255, 0.12)',
                     display: 'grid',
                     gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr 1.5fr 1.5fr',
                     gap: '20px',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    boxShadow: request.status === 'pending' ? '0 0 15px rgba(231, 76, 60, 0.2)' : 'none',
+                    animation: request.status === 'pending' ? 'pulse-border 2s infinite' : 'none',
+                    position: 'relative'
                   }}>
+                    {/* 🚀 新增：待审核项的闪烁警报 */}
+                    {request.status === 'pending' && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '-12px',
+                        left: '20px',
+                        background: '#e74c3c',
+                        color: 'white',
+                        padding: '2px 12px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        animation: 'pulse-scale 1.5s infinite',
+                        zIndex: 10
+                      }}>
+                        <span style={{ animation: 'blink 0.6s infinite alternate' }}>🚨</span> 新申请
+                      </div>
+                    )}
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                         <span style={{ fontSize: '1.5rem' }}>👤</span>
@@ -1865,7 +1971,12 @@ const UserManagement: React.FC = () => {
           <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
             <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
               {merchantStores.map(store => (
-                <StoreRow key={store.id} store={store} isMobile={isMobile} />
+                <StoreRow 
+                  key={store.id} 
+                  store={store} 
+                  isMobile={isMobile} 
+                  pendingRecharge={pendingRechargeRequests[store.id] || (store.user_id && pendingRechargeRequests[store.user_id])}
+                />
               ))}
             </div>
           </div>
@@ -2082,6 +2193,12 @@ const UserManagement: React.FC = () => {
           </div>
         )}
       </div>
+      {/* 🚀 警报提示音 */}
+      <audio 
+        ref={alertAudioRef}
+        src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
+        preload="auto"
+      />
     </div>
   );
 };
