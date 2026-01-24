@@ -49,7 +49,7 @@ export interface Package {
   store_receive_code?: string;
   sender_code?: string;
   transfer_code?: string;
-  payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  payment_method?: 'qr' | 'cash' | 'balance'; // 🚀 支付方式：qr=二维码支付，cash=现金支付, balance=余额支付
   cod_amount?: number; // 代收款金额 (Cash on Delivery)
   customer_id?: string; // 客户ID
   customer_email?: string; // 客户邮箱
@@ -769,7 +769,7 @@ export interface PendingOrder {
   scheduled_delivery_time?: string | null;
   price: number;
   distance: number;
-  payment_method: 'qr' | 'cash';
+  payment_method: 'qr' | 'cash' | 'balance';
   cod_amount?: number; // 代收款金额
   description?: string; // 🚀 新增：物品描述
   customer_email?: string | null;

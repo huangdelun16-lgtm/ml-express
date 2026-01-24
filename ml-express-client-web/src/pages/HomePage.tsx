@@ -223,7 +223,7 @@ const HomePage: React.FC = () => {
         // 🚀 优化：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不添加此标签
         let platformPaymentTag = '';
         if (currentUser?.user_type !== 'merchant') {
-          const platformPaymentText = language === 'zh' ? '平台支付' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း';
+          const platformPaymentText = language === 'zh' ? '商品费用（仅余额支付）' : language === 'en' ? 'Item Cost (Balance Only)' : 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)';
           platformPaymentTag = ` [${platformPaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
         }
 
@@ -287,7 +287,7 @@ const HomePage: React.FC = () => {
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('cash'); // 支付方式：二维码或现金（默认现金，二维码开发中）
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash' | 'balance'>('cash'); // 🚀 支付方式：二维码、现金或余额
   const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
   
   // 用户认证相关状态
@@ -2746,6 +2746,8 @@ const HomePage: React.FC = () => {
         isFromCart={isFromCart}
         description={description}
         setDescription={setDescription}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
       />
 
       {/* 支付二维码模态窗口 */}

@@ -48,6 +48,8 @@ interface OrderModalProps {
   isFromCart?: boolean;
   description?: string; // 🚀 新增：物品描述
   setDescription?: (val: string) => void; // 🚀 新增：设置描述
+  paymentMethod?: 'qr' | 'cash' | 'balance'; // 🚀 新增：支付方式
+  setPaymentMethod?: (val: 'qr' | 'cash' | 'balance') => void; // 🚀 新增：设置支付方式
 }
 
 const OrderModal: React.FC<OrderModalProps> = ({
@@ -94,7 +96,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
   setHasCOD = () => {},
   isFromCart = false,
   description = '',
-  setDescription = () => {}
+  setDescription = () => {},
+  paymentMethod = 'cash',
+  setPaymentMethod = () => {}
 }) => {
   const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
@@ -819,6 +823,32 @@ const OrderModal: React.FC<OrderModalProps> = ({
               />
             </div>
 
+            {/* 🚀 新增：商品费用 (仅余额支付) - 对齐 App */}
+            {isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant' && (
+              <div style={{ 
+                marginBottom: '1rem',
+                background: 'rgba(251, 191, 36, 0.1)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                    🛍️ {language === 'zh' ? '商品费用（仅余额支付）' : language === 'en' ? 'Item Cost (Balance Only)' : 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)'}
+                  </span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                    {language === 'zh' ? '该金额将从账户余额中预扣' : language === 'en' ? 'Deducted from balance' : 'လက်ကျန်ငွေမှ နုတ်ယူမည်'}
+                  </span>
+                </div>
+                <span style={{ color: '#fbbf24', fontWeight: '900', fontSize: '1.2rem' }}>
+                  {cartTotal.toLocaleString()} MMK
+                </span>
+              </div>
+            )}
+
             {/* 速度部分 */}
             <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.ui.speed || '速度'}</h3>
             
@@ -1174,27 +1204,53 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     flexDirection: 'column',
                     gap: '0.5rem'
                   }}>
-                    {/* 🚀 配送费总计 */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    {/* 🚀 配送费总计与支付方式选择 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1rem' }}>
-                        🚚 {language === 'zh' ? '预估跑腿费' : language === 'en' ? 'Est. Delivery Fee' : 'ခန့်မှန်းပို့ဆောင်ခ'}:
+                        🚚 {language === 'zh' ? '跑腿费' : language === 'en' ? 'Delivery Fee' : 'ပို့ဆောင်ခ'}:
                       </span>
-                      <span style={{ color: 'white', fontWeight: '950', fontSize: '1.2rem' }}>
-                        {Math.round(calculatedPriceDetail).toLocaleString()} MMK
-                      </span>
-                    </div>
-
-                    {/* 🚀 平台支付 (仅限商城下单) */}
-                    {isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant' && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
-                        <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '1rem' }}>
-                          🛍️ {language === 'zh' ? '平台支付 (商品)' : language === 'en' ? 'Platform Payment' : 'ပလက်ဖောင်းမှ ပေးချေခြင်း'}:
-                        </span>
-                        <span style={{ color: '#fbbf24', fontWeight: '950', fontSize: '1.2rem' }}>
-                          {cartTotal.toLocaleString()} MMK
+                      
+                      {/* 🚀 新增：跑腿费支付方式切换 */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('balance')}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            background: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.1)',
+                            color: paymentMethod === 'balance' ? '#1e293b' : 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {language === 'zh' ? '余额支付' : 'Balance'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('cash')}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            background: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.1)',
+                            color: paymentMethod === 'cash' ? 'white' : 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {language === 'zh' ? '现金支付' : 'Cash'}
+                        </button>
+                        <span style={{ color: 'white', fontWeight: '950', fontSize: '1.2rem', marginLeft: '8px' }}>
+                          {Math.round(calculatedPriceDetail).toLocaleString()} MMK
                         </span>
                       </div>
-                    )}
+                    </div>
 
                     {/* 🚀 余额信息 (仅限会员) */}
                     {currentUser && currentUser.user_type !== 'merchant' && (
