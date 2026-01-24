@@ -5121,35 +5121,43 @@ const HomePage: React.FC = () => {
                   fontWeight: '400'
                 }}>
                   {isLoginMode ? (
-                    <>
-                      {language === 'zh' ? '还没有账户？' : language === 'en' ? "Don't have an account? " : 'အကောင့်မရှိသေးဘူးလား? '}
-                      <span 
-                  onClick={() => {
-                          setIsLoginMode(false);
-                          setLoginType('normal'); // 切换到注册模式时重置登录类型
-                  }}
-                  style={{
-                          color: '#2563eb', 
-                          fontWeight: '700', 
-                    cursor: 'pointer',
-                          textDecoration: 'none',
-                          marginLeft: '0.5rem',
-                          transition: 'all 0.2s ease',
-                          borderBottom: '2px solid transparent',
-                          paddingBottom: '2px'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = '#1d4ed8';
-                          e.currentTarget.style.borderBottomColor = '#1d4ed8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = '#2563eb';
-                          e.currentTarget.style.borderBottomColor = 'transparent';
-                        }}
-                      >
-                        {language === 'zh' ? '去注册' : language === 'en' ? 'Register' : 'မှတ်ပုံတင်ပါ'}
-                      </span>
-                    </>
+                    loginType === 'normal' ? (
+                      <>
+                        {language === 'zh' ? '还没有账户？' : language === 'en' ? "Don't have an account? " : 'အကောင့်မရှိသေးဘူးလား? '}
+                        <span 
+                          onClick={() => {
+                            setIsLoginMode(false);
+                            setLoginType('normal'); // 切换到注册模式时重置登录类型
+                          }}
+                          style={{
+                            color: '#2563eb', 
+                            fontWeight: '700', 
+                            cursor: 'pointer',
+                            textDecoration: 'none',
+                            marginLeft: '0.5rem',
+                            transition: 'all 0.2s ease',
+                            borderBottom: '2px solid transparent',
+                            paddingBottom: '2px'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#1d4ed8';
+                            e.currentTarget.style.borderBottomColor = '#1d4ed8';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#2563eb';
+                            e.currentTarget.style.borderBottomColor = 'transparent';
+                          }}
+                        >
+                          {language === 'zh' ? '去注册' : language === 'en' ? 'Register' : 'မှတ်ပုံတင်ပါ'}
+                        </span>
+                      </>
+                    ) : (
+                      <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>
+                        {language === 'zh' ? '商家账号请联系平台开设' : 
+                         language === 'en' ? 'Merchant account please contact platform' : 
+                         'ကုန်သည်အကောင့်အတွက် ပလက်ဖောင်းသို့ ဆက်သွယ်ပါ'}
+                      </p>
+                    )
                   ) : (
                     <>
                       {language === 'zh' ? '已有账户？' : language === 'en' ? 'Already have an account? ' : 'အကောင့်ရှိပြီးသားလား? '}
