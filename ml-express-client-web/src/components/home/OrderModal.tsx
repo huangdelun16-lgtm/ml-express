@@ -165,7 +165,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                🏪 {language === 'zh' ? '合伙人' : 'PARTNER'}
+                🏪 {language === 'zh' ? '商家' : 'MERCHANTS'}
               </div>
             ) : (currentUser.balance > 0 || currentUser.user_type === 'vip') ? (
               <div style={{ 

@@ -1261,7 +1261,7 @@ const ProfilePage: React.FC = () => {
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase'
                   }}>
-                    {isPartnerStore ? 'PARTNER' : (
+                    {isPartnerStore ? 'MERCHANTS' : (
                       (userBalance > 0 || currentUser.user_type === 'vip') 
                         ? 'VIP'
                         : (currentUser.user_type === 'admin' 
