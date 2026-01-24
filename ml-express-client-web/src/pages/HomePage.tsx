@@ -218,19 +218,13 @@ const HomePage: React.FC = () => {
         
         // 自动把选中的商品添加到物品描述中
         const selectedProductsText = language === 'zh' ? '已选商品' : language === 'en' ? 'Selected' : 'ရွေးချယ်ထားသောပစ္စည်း';
-        const productsText = `[${selectedProductsText}: ${productDetails.join(', ')}]`;
+        const balancePaymentText = language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း';
+        const productsText = `[${selectedProductsText}: ${productDetails.join(', ')}][${balancePaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
         
-        // 🚀 优化：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不添加此标签
-        let platformPaymentTag = '';
-        if (currentUser?.user_type !== 'merchant') {
-          const platformPaymentText = language === 'zh' ? '商品费用（仅余额支付）' : language === 'en' ? 'Item Cost (Balance Only)' : 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)';
-          platformPaymentTag = ` [${platformPaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
-        }
-
         // 如果原先有描述，保留它（避免重复添加）
         // 移除所有可能的系统自动添加的标签
         const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[商品费用（仅余额支付）:.*?\]|\[Item Cost \(Balance Only\):.*?\]|\[ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\):.*?\]/g, '').trim();
-        setDescription(`${productsText}${platformPaymentTag} ${cleanDesc}`.trim());
+        setDescription(`${productsText} ${cleanDesc}`.trim());
       }
     } else {
       setCartTotal(0);

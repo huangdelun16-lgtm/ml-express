@@ -544,6 +544,88 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         </div>
                       );
                     })}
+                    {/* 🚀 新增：Web端代收款移动到“商品小计”上面 (仅限 MERCHANTS) */}
+                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <label style={{ 
+                          fontWeight: 'bold', 
+                          color: 'white',
+                          fontSize: '0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          💰 {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collection Amount (COD)' : 'ငွေကောက်ခံရန် (COD)'}
+                        </label>
+                        
+                        {/* 开关按钮 */}
+                        <div 
+                          onClick={() => setHasCOD(!hasCOD)}
+                          style={{
+                            width: '44px',
+                            height: '24px',
+                            borderRadius: '12px',
+                            backgroundColor: hasCOD ? '#10b981' : 'rgba(255,255,255,0.2)',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '9px',
+                            backgroundColor: 'white',
+                            position: 'absolute',
+                            top: '3px',
+                            left: hasCOD ? '23px' : '3px',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                          }} />
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '10px' }}>
+                        💡 {hasCOD 
+                          ? (language === 'zh' ? '有代收' : language === 'en' ? 'With collection' : 'ငွေကောက်ခံမည်')
+                          : (language === 'zh' ? '无代收' : language === 'en' ? 'No collection' : 'ငွေမကောက်ခံပါ')}
+                      </div>
+
+                      {hasCOD && (
+                        <div style={{ position: 'relative', marginBottom: '10px' }}>
+                          <input
+                            type="number"
+                            name="codAmount"
+                            value={codAmount}
+                            onChange={(e) => setCodAmount(e.target.value)}
+                            placeholder={language === 'zh' ? '请输入代收金额' : language === 'en' ? 'Enter amount' : 'ပမာဏထည့်ပါ'}
+                            style={{
+                              width: '100%',
+                              padding: '10px 15px',
+                              paddingRight: '3.5rem',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              borderRadius: '10px',
+                              fontSize: '0.95rem',
+                              background: 'white',
+                              color: '#1e293b',
+                              outline: 'none'
+                            }}
+                          />
+                          <span style={{
+                            position: 'absolute',
+                            right: '1rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: '#64748b',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem'
+                          }}>
+                            MMK
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', color: 'white' }}>
                       <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{language === 'zh' ? '商品小计' : language === 'en' ? 'Subtotal' : 'စုစုပေါင်း'}:</span>
                       <span style={{ fontWeight: '900', color: '#fbbf24' }}>{cartTotal.toLocaleString()} MMK</span>
