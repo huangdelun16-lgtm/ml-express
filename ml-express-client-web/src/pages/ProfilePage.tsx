@@ -648,6 +648,40 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：商家接单功能
+  const handleAcceptOrder = async () => {
+    if (!selectedPackage?.id) return;
+    
+    try {
+      setLoading(true);
+      
+      // 检查当前状态是否是待确认
+      if (selectedPackage.status !== '待确认') {
+        alert(language === 'zh' ? '该订单状态已变更，无法接单' : 'Order status has changed, cannot accept');
+        return;
+      }
+
+      // 更新状态为“待取件”
+      // 因为商城订单如果是 VIP 下单，货款已经从余额扣除了，所以接单后直接进入待取件状态
+      const success = await packageService.updatePackageStatus(selectedPackage.id, '待取件');
+      
+      if (success) {
+        alert(language === 'zh' ? '接单成功！请等待快递员取件。' : 'Order accepted! Please wait for courier pickup.');
+        // 刷新本地数据
+        const updatedPackage = { ...selectedPackage, status: '待取件' };
+        setSelectedPackage(updatedPackage);
+        setUserPackages(prev => prev.map(p => p.id === selectedPackage.id ? updatedPackage : p));
+      } else {
+        throw new Error('Update failed');
+      }
+    } catch (error) {
+      LoggerService.error('接单失败:', error);
+      alert(language === 'zh' ? '接单失败，请重试' : 'Accept failed, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage);
@@ -2841,6 +2875,50 @@ const ProfilePage: React.FC = () => {
                   </>
                 )}
               </div>
+
+              {/* 🚀 新增：商家接单功能按钮 */}
+              {isPartnerStore && selectedPackage.status === '待确认' && (
+                <button
+                  onClick={handleAcceptOrder}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1rem 2rem',
+                    borderRadius: '12px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '1.1rem',
+                    fontWeight: '900',
+                    transition: 'all 0.3s ease',
+                    width: '100%',
+                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    marginBottom: '0.5rem'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.4)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)';
+                    }
+                  }}
+                >
+                  {loading ? (
+                    <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
+                  ) : (
+                    <>✅ {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept Order' : 'အော်ဒါလက်ခံရန်'}</>
+                  )}
+                </button>
+              )}
 
               {/* 关闭按钮 */}
               <button

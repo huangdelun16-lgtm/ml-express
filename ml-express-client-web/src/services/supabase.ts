@@ -545,6 +545,26 @@ export const packageService = {
       LoggerService.error('获取代收款订单列表失败:', error);
       return { orders: [], total: 0 };
     }
+  },
+
+  // 🚀 新增：更新包裹状态
+  async updatePackageStatus(packageId: string, status: string, additionalData: any = {}): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('packages')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString(),
+          ...additionalData
+        })
+        .eq('id', packageId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      LoggerService.error('更新包裹状态失败:', err);
+      return false;
+    }
   }
 };
 
