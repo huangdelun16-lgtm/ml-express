@@ -13,7 +13,7 @@ interface User {
   email: string;
   address: string;
   password?: string;
-  user_type: 'customer' | 'courier' | 'admin';
+  user_type: 'customer' | 'courier' | 'admin' | 'merchant' | 'vip';
   status: 'active' | 'inactive' | 'suspended';
   registration_date: string;
   last_login: string;
@@ -1113,7 +1113,7 @@ const UserManagement: React.FC = () => {
     email: '',
     address: '',
     password: '123456',  // 默认密码
-    user_type: 'customer' as 'customer' | 'courier' | 'admin',
+    user_type: 'customer' as 'customer' | 'courier' | 'admin' | 'merchant' | 'vip',
     status: 'active' as 'active' | 'inactive' | 'suspended',
     register_region: 'mandalay',
     notes: ''
@@ -1267,29 +1267,41 @@ const UserManagement: React.FC = () => {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const newId = `USR${String(Date.now()).slice(-6)}`;
-    const newUser: User = {
+    
+    // 🚀 优化：只发送必要的字段
+    const newUser = {
       id: newId,
-      ...userForm,
+      name: userForm.name,
+      phone: userForm.phone,
       email: userForm.email.trim() || '',
+      address: userForm.address,
+      password: userForm.password || '123456',
+      user_type: userForm.user_type,
+      status: userForm.status,
+      register_region: userForm.register_region,
+      notes: userForm.notes,
       registration_date: new Date().toLocaleDateString('zh-CN'),
       last_login: '从未登录',
       total_orders: 0,
       total_spent: 0,
       rating: 0,
-      register_region: userForm.register_region
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     try {
       const { error } = await supabase.from('users').insert([newUser]);
       if (error) {
+        console.error('❌ 创建用户详细错误:', error.message, error.details, error.hint);
         window.alert(`创建用户失败: ${error.message}`);
       } else {
         await loadUsers();
         window.alert('用户创建成功！');
         setShowAddUserForm(false);
       }
-    } catch (error) {
-      window.alert('创建用户异常');
+    } catch (error: any) {
+      console.error('❌ 创建用户异常:', error);
+      window.alert(`创建用户异常: ${error.message || '未知错误'}`);
     }
   };
 
@@ -1370,23 +1382,47 @@ const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!editingUser) return;
 
-    const updateData: any = { ...userForm };
-    if (!updateData.password || updateData.password.trim() === '') {
-      delete updateData.password;
+    // 🚀 优化：清理更新数据，只发送数据库支持且必要的字段
+    // 排除前端本地计算的字段 (如 registration_date, last_login, total_orders 等)
+    const updateData: any = {
+      name: userForm.name,
+      phone: userForm.phone,
+      email: userForm.email,
+      address: userForm.address,
+      user_type: userForm.user_type,
+      status: userForm.status,
+      register_region: userForm.register_region,
+      notes: userForm.notes,
+      updated_at: new Date().toISOString()
+    };
+
+    // 只有在填写了密码时才更新密码
+    if (userForm.password && userForm.password.trim() !== '') {
+      updateData.password = userForm.password;
     }
 
+    console.log('📡 正在更新用户数据:', updateData);
+
     try {
-      const { error } = await supabase.from('users').update(updateData).eq('id', editingUser.id);
+      const { data, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', editingUser.id)
+        .select();
+
       if (error) {
-        window.alert('更新用户失败');
+        console.error('❌ 更新用户详细错误:', error.message, error.details, error.hint);
+        window.alert(`更新用户失败: ${error.message}${error.hint ? '\n提示: ' + error.hint : ''}`);
       } else {
+        console.log('✅ 用户更新成功:', data);
         await loadUsers();
         window.alert('用户更新成功！');
         setShowAddUserForm(false);
         setEditingUser(null);
       }
-    } catch (error) {
-      window.alert('更新用户异常');
+    } catch (error: any) {
+      console.error('❌ 更新用户异常:', error);
+      window.alert(`更新用户异常: ${error.message || '未知错误'}`);
     }
   };
 
@@ -2107,6 +2143,8 @@ const UserManagement: React.FC = () => {
                     <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>用户类型</label>
                     <select value={userForm.user_type} onChange={e => setUserForm({...userForm, user_type: e.target.value as any})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
                       <option value="customer">👤 普通客户</option>
+                      <option value="vip">👑 VIP 会员</option>
+                      <option value="merchant">🏪 商家/合伙人</option>
                       <option value="admin">🔐 管理员</option>
                       <option value="courier">🛵 快递员</option>
                     </select>
