@@ -6,7 +6,7 @@ import { useResponsive } from '../hooks/useResponsive';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
 
   // 🚀 新增：注入动画样式
   useEffect(() => {
