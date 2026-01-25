@@ -1,13 +1,98 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { adminAccountService } from '../services/supabase';
+import { adminAccountService, supabase, Package } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { language, setLanguage } = useLanguage();
+  const { language } = useLanguage();
+
+  // 🚀 新增：注入动画样式
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes pulse-alert {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+        70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
   
+  // 🚀 新增：通知和警报逻辑
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prevRechargeCountRef = useRef<number>(0);
+  const lastVoiceBroadcastRef = useRef<number>(0);
+  const [pendingRechargeCount, setPendingRechargeCount] = useState(0);
+  const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0);
+
+  // 🚀 新增：语音播报函数
+  const speakNotification = (text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      window.speechSynthesis.speak(utterance);
+      lastVoiceBroadcastRef.current = Date.now();
+    }
+  };
+
+  // 🚀 新增：轮询逻辑 (充值申请 + 待分配包裹)
+  useEffect(() => {
+    const pollData = async () => {
+      try {
+        // 1. 获取待审核充值申请
+        const { data: rechargeData, error: rechargeError } = await supabase
+          .from('recharge_requests')
+          .select('id')
+          .eq('status', 'pending');
+        
+        if (!rechargeError && rechargeData) {
+          const currentCount = rechargeData.length;
+          setPendingRechargeCount(currentCount);
+
+          // 触发语音播报
+          if (currentCount > prevRechargeCountRef.current) {
+            alertAudioRef.current?.play().catch(() => {});
+            speakNotification('你有新的充值 请审核');
+          } else if (currentCount > 0) {
+            // 每 30 秒周期性提醒
+            const now = Date.now();
+            if (now - lastVoiceBroadcastRef.current >= 30000) {
+              speakNotification('你有新的充值 请审核');
+            }
+          }
+          prevRechargeCountRef.current = currentCount;
+        }
+
+        // 2. 获取待分配包裹数量
+        const { count: assignmentCount, error: pkgError } = await supabase
+          .from('packages')
+          .select('*', { count: 'exact', head: true })
+          .eq('courier', '待分配')
+          .in('status', ['待取件', '待收款']);
+        
+        if (!pkgError) {
+          setPendingAssignmentCount(assignmentCount || 0);
+        }
+      } catch (err) {
+        console.error('📊 Dashboard 轮询失败:', err);
+      }
+    };
+
+    // 初始执行
+    pollData();
+    // 每 15 秒轮询一次
+    const timer = setInterval(pollData, 15000);
+    return () => clearInterval(timer);
+  }, [language]);
+
   // 获取当前用户角色（从 sessionStorage 读取，因为 saveToken 保存到 sessionStorage）
   const currentUserRole = sessionStorage.getItem('currentUserRole') || localStorage.getItem('currentUserRole') || 'operator';
   const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
@@ -310,6 +395,30 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       }}>
         <Logo size="medium" />
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* 🚀 新增：解锁语音引擎按钮 */}
+          <button 
+            onClick={() => {
+              speakNotification('语音提醒功能已开启');
+              alert('✅ 语音播报已激活！\n\n系统现在将自动在后台为您监控新充值申请和待分配包裹。');
+            }}
+            style={{
+              background: 'rgba(46, 204, 113, 0.2)',
+              color: '#2ecc71',
+              border: '1px solid rgba(46, 204, 113, 0.4)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            🔔 开启播报
+          </button>
+
           {/* 语言切换器 */}
           <select
             value={language}
@@ -413,7 +522,90 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
           </button>
         </div>
       </div>
+      
+      {/* 🚀 新增：核心指标警报栏 */}
+      {(pendingRechargeCount > 0 || pendingAssignmentCount > 0) && (
+        <div style={{
+          display: 'flex',
+          gap: '15px',
+          maxWidth: '1200px',
+          margin: '0 auto 30px',
+          flexWrap: 'wrap',
+          position: 'relative',
+          zIndex: 2
+        }}>
+          {pendingRechargeCount > 0 && (
+            <div 
+              onClick={() => navigate('/admin/users')}
+              style={{
+                flex: 1,
+                minWidth: '280px',
+                background: 'rgba(231, 76, 60, 0.15)',
+                backdropFilter: 'blur(15px)',
+                borderRadius: '20px',
+                padding: '15px 25px',
+                border: '2px solid #e74c3c',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                animation: 'pulse-alert 2s infinite',
+                boxShadow: '0 8px 25px rgba(231, 76, 60, 0.3)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span style={{ fontSize: '2rem' }}>💰</span>
+                <div>
+                  <div style={{ color: '#e74c3c', fontWeight: '900', fontSize: '1.1rem' }}>
+                    {language === 'zh' ? '待审核充值' : 'Pending Recharges'}
+                  </div>
+                  <div style={{ color: 'white', fontSize: '0.85rem', opacity: 0.8 }}>
+                    {language === 'zh' ? '有客户提交了充值凭证' : 'Customers submitted proof'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: '#e74c3c', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
+                {pendingRechargeCount}
+              </div>
+            </div>
+          )}
 
+          {pendingAssignmentCount > 0 && (
+            <div 
+              onClick={() => navigate('/admin/tracking')}
+              style={{
+                flex: 1,
+                minWidth: '280px',
+                background: 'rgba(52, 152, 219, 0.15)',
+                backdropFilter: 'blur(15px)',
+                borderRadius: '20px',
+                padding: '15px 25px',
+                border: '2px solid #3498db',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(52, 152, 219, 0.3)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span style={{ fontSize: '2rem' }}>📦</span>
+                <div>
+                  <div style={{ color: '#3498db', fontWeight: '900', fontSize: '1.1rem' }}>
+                    {language === 'zh' ? '待分配包裹' : 'Pending Assignment'}
+                  </div>
+                  <div style={{ color: 'white', fontSize: '0.85rem', opacity: 0.8 }}>
+                    {language === 'zh' ? '有新订单等待分配骑手' : 'New orders waiting for riders'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: '#3498db', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
+                {pendingAssignmentCount}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 卡片网格 */}
       <div style={{
@@ -780,6 +972,13 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
           </div>
         </div>
       )}
+
+      {/* 🚀 警报提示音 */}
+      <audio 
+        ref={alertAudioRef}
+        src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
+        preload="auto"
+      />
     </div>
   );
 };
