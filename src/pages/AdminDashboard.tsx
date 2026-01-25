@@ -28,6 +28,7 @@ const AdminDashboard: React.FC = () => {
   const lastVoiceBroadcastRef = useRef<number>(0);
   const [pendingRechargeCount, setPendingRechargeCount] = useState(0);
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0);
+  const prevPendingAssignmentCountRef = useRef<number>(0); // 🚀 新增：记录上次待分配数量
 
   // 🚀 新增：语音播报函数
   const speakNotification = (text: string) => {
@@ -53,6 +54,7 @@ const AdminDashboard: React.FC = () => {
           .select('id')
           .eq('status', 'pending');
         
+        let hasRechargeNotification = false;
         if (!rechargeError && rechargeData) {
           const currentCount = rechargeData.length;
           setPendingRechargeCount(currentCount);
@@ -61,11 +63,13 @@ const AdminDashboard: React.FC = () => {
           if (currentCount > prevRechargeCountRef.current) {
             alertAudioRef.current?.play().catch(() => {});
             speakNotification('你有新的充值 请审核');
+            hasRechargeNotification = true;
           } else if (currentCount > 0) {
             // 每 30 秒周期性提醒
             const now = Date.now();
             if (now - lastVoiceBroadcastRef.current >= 30000) {
               speakNotification('你有新的充值 请审核');
+              hasRechargeNotification = true;
             }
           }
           prevRechargeCountRef.current = currentCount;
@@ -79,7 +83,22 @@ const AdminDashboard: React.FC = () => {
           .in('status', ['待取件', '待收款']);
         
         if (!pkgError) {
-          setPendingAssignmentCount(assignmentCount || 0);
+          const currentAssignCount = assignmentCount || 0;
+          setPendingAssignmentCount(currentAssignCount);
+
+          // 🚀 逻辑优化：如果有待分配订单且没有正在进行的充值提醒，播报待分配提醒
+          if (currentAssignCount > prevPendingAssignmentCountRef.current && !hasRechargeNotification) {
+            console.log('🚨 检测到新待分配订单:', currentAssignCount);
+            // 这里也可以加一个独立的音频或者使用语音
+            speakNotification(`你有 ${currentAssignCount} 件新订单等待分配`);
+          } else if (currentAssignCount > 0 && !hasRechargeNotification) {
+            const now = Date.now();
+            // 如果只有待分配订单，也进行周期性提醒（每 60 秒一次，优先级低于充值）
+            if (now - lastVoiceBroadcastRef.current >= 60000) {
+              speakNotification(`你有 ${currentAssignCount} 件订单等待分配`);
+            }
+          }
+          prevPendingAssignmentCountRef.current = currentAssignCount;
         }
       } catch (err) {
         console.error('📊 Dashboard 轮询失败:', err);
