@@ -48,6 +48,8 @@ import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时exp
 import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
+import Toast from '../components/Toast';
+
 export default function PlaceOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
@@ -175,6 +177,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           setUserPhone(user.phone);
           setIsMerchantStore(user.user_type === 'merchant');
           setIsGuest(false);
+          if (user.user_type === 'merchant') {
+            setPaymentMethod('cash');
+          }
           
           // 从数据库获取最新余额
           const { data, error } = await supabase
@@ -363,6 +368,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [isMerchantStore, setIsMerchantStore] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
+
+  useEffect(() => {
+    if (currentUser?.user_type === 'merchant' && paymentMethod !== 'cash') {
+      setPaymentMethod('cash');
+    }
+  }, [currentUser, paymentMethod]);
   
   // 商品选择相关状态
   const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
@@ -1634,7 +1645,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
-  // 处理商品选择变化
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   const handleProductQuantityChange = (productId: string, delta: number) => {
     setSelectedProducts(prev => {
       const product = merchantProducts.find(p => p.id === productId);
@@ -1887,13 +1907,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <Text style={styles.label}>{language === 'zh' ? '从我的店铺选货' : 'Select from my store'}</Text>
-                    <TouchableOpacity 
-                      style={styles.selectProductBtn}
-                      onPress={() => setShowProductSelector(true)}
-                    >
-                      <Ionicons name="add-circle-outline" size={16} color="#3b82f6" />
-                      <Text style={styles.selectProductBtnText}>{currentT.selectProduct}</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.selectProductBtn}
+                        onPress={() => setShowProductSelector(true)}
+                      >
+                        <Ionicons name="add-circle-outline" size={16} color="#3b82f6" />
+                        <Text style={styles.selectProductBtnText}>{language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ကုန်ပစ္စည်းရွေးချယ်ပါ'}</Text>
+                      </TouchableOpacity>
                   </View>
 
                   {/* 已选商品列表 */}
@@ -1934,7 +1954,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
                         <View style={{ marginTop: 10 }}>
                           <TextInput
-                            style={[styles.input, { height: 40, paddingVertical: 8, background: '#fff' }]}
+                            style={[styles.input, { height: 40, paddingVertical: 8, backgroundColor: '#fff' }]}
                             value={codAmount}
                             onChangeText={setCodAmount}
                             placeholder={currentT.placeholders.codAmount}
@@ -2068,6 +2088,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onPaymentMethodChange={setPaymentMethod}
             accountBalance={currentUser?.user_type === 'merchant' ? undefined : (accountBalance - cartTotal)}
             cartTotal={currentUser?.user_type === 'merchant' ? 0 : cartTotal}
+            isMerchant={currentUser?.user_type === 'merchant'}
           />
 
           {/* 提交按钮 */}
@@ -2256,10 +2277,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{currentT.selectProduct}</Text>
-              <TouchableOpacity onPress={() => setShowProductSelector(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={20} color="#64748b" />
+            <View style={styles.qrModalHeader}>
+              <Text style={styles.modalTitle}>{language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ကုန်ပစ္စည်းရွေးချယ်ပါ'}</Text>
+              <TouchableOpacity onPress={() => setShowProductSelector(false)} style={styles.timePickerCloseButton}>
+                <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
 
@@ -2291,7 +2312,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                             styles.selectorStockText,
                             item.stock === 0 && { color: '#ef4444' }
                           ]}>
-                            {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
+                            {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {item.stock === -1 ? (language === 'zh' ? '无限' : language === 'en' ? 'Infinite' : 'အကန့်အသတ်မရှိ') : item.stock}
                           </Text>
                         </View>
                         
@@ -2330,7 +2351,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               onPress={() => setShowProductSelector(false)}
             >
               <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.modalConfirmGradient}>
-                <Text style={styles.modalConfirmText}>{currentT.timePicker.confirm}</Text>
+                <Text style={styles.modalConfirmText}>{language === 'zh' ? '确定' : language === 'en' ? 'Confirm' : 'အတည်ပြုသည်'}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -2436,6 +2457,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           </View>
         </View>
       </Modal>
+      {/* 🚀 移除多余的空 Modal */}
+      <Toast 
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setToastVisible(false)}
+      />
     </View>
   );
 }

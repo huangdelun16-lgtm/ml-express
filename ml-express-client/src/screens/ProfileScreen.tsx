@@ -27,7 +27,7 @@ import * as Speech from 'expo-speech';
 import { Vibration } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { customerService, packageService, deliveryStoreService, rechargeService, supabase } from '../services/supabase';
@@ -35,14 +35,15 @@ import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
 
-// 🚀 新增：充值二维码图片资源映射
-const RECHARGE_QR_IMAGES: Record<number, any> = {
-  10000: require('../../assets/kbz_qr_10000.png'),
-  50000: require('../../assets/kbz_qr_50000.png'),
-  100000: require('../../assets/kbz_qr_100000.png'),
-  300000: require('../../assets/kbz_qr_300000.png'),
-  500000: require('../../assets/kbz_qr_500000.png'),
-  1000000: require('../../assets/kbz_qr_1000000.png'),
+// 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
+const RECHARGE_QR_BASE_URL = 'https://market-link-express.com';
+const RECHARGE_QR_IMAGES: Record<number, string> = {
+  10000: `${RECHARGE_QR_BASE_URL}/kbz_qr_10000.png`,
+  50000: `${RECHARGE_QR_BASE_URL}/kbz_qr_50000.png`,
+  100000: `${RECHARGE_QR_BASE_URL}/kbz_qr_100000.png`,
+  300000: `${RECHARGE_QR_BASE_URL}/kbz_qr_300000.png`,
+  500000: `${RECHARGE_QR_BASE_URL}/kbz_qr_500000.png`,
+  1000000: `${RECHARGE_QR_BASE_URL}/kbz_qr_1000000.png`,
 };
 
 const { width } = Dimensions.get('window');
@@ -991,23 +992,25 @@ export default function ProfileScreen({ navigation }: any) {
       }
 
       // 获取图片资源
-      const imageAsset = RECHARGE_QR_IMAGES[amount];
-      if (!imageAsset) {
+      const imageUrl = RECHARGE_QR_IMAGES[amount];
+      if (!imageUrl) {
         hideLoading();
         Alert.alert('错误', '找不到对应金额的二维码资源');
         return;
       }
 
-      console.log('正在解析 local 资源...');
-      const asset = Asset.fromModule(imageAsset);
-      await asset.downloadAsync();
+      console.log('正在下载二维码...', imageUrl);
+      if (!FileSystem.cacheDirectory) {
+        throw new Error('无法访问缓存目录');
+      }
+
+      const fileName = `kbz_qr_${amount}.png`;
+      const downloadPath = `${FileSystem.cacheDirectory}${fileName}`;
+      const downloadResult = await FileSystem.downloadAsync(imageUrl, downloadPath);
       
-      const localUri = asset.localUri || asset.uri;
-      
-      if (localUri) {
-        console.log('正在直接保存到相册...', localUri);
-        // 🚀 最终优化方案：直接使用 MediaLibrary 保存，绕过 FileSystem 兼容性问题
-        await MediaLibrary.saveToLibraryAsync(localUri);
+      if (downloadResult?.uri) {
+        console.log('正在保存到相册...', downloadResult.uri);
+        await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
         
         hideLoading();
         Alert.alert(
@@ -2502,7 +2505,7 @@ export default function ProfileScreen({ navigation }: any) {
                   {/* 🚀 使用预定义的映射显示二维码 */}
                   {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
                     <Image 
-                      source={RECHARGE_QR_IMAGES[selectedRechargeAmount]} 
+                      source={{ uri: RECHARGE_QR_IMAGES[selectedRechargeAmount] }} 
                       style={{ width: '100%', height: '100%' }} 
                       resizeMode="contain" 
                     />

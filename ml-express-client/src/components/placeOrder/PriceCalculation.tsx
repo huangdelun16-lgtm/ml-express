@@ -39,6 +39,7 @@ interface PriceCalculationProps {
   onPaymentMethodChange: (method: 'balance' | 'cash') => void;
   accountBalance?: number;
   cartTotal?: number;
+  isMerchant?: boolean;
 }
 
 const PriceCalculation = memo<PriceCalculationProps>(({
@@ -58,7 +59,9 @@ const PriceCalculation = memo<PriceCalculationProps>(({
   onPaymentMethodChange,
   accountBalance,
   cartTotal = 0,
+  isMerchant = false,
 }) => {
+  const isCashLocked = isMerchant;
   // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
   const billingDistance = useMemo(() => Math.max(1, Math.ceil(calculatedDistance)), [calculatedDistance]);
 
@@ -219,8 +222,13 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                   </View>
                   <Switch
                     value={paymentMethod === 'cash'}
-                    disabled={accountBalance === 0} // 🚀 余额为0时锁定为现金支付
-                    onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
+                    disabled={isCashLocked || accountBalance === 0} // 🚀 余额为0或商家账号时锁定为现金支付
+                    onValueChange={(val) => {
+                      if (isCashLocked) {
+                        return;
+                      }
+                      onPaymentMethodChange(val ? 'cash' : 'balance');
+                    }}
                     trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
                     thumbColor="#ffffff"
                   />

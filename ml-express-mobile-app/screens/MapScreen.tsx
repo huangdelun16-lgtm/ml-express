@@ -917,26 +917,11 @@ export default function MapScreen({ navigation }: any) {
                       <Text style={styles.receiverName}>{item.receiver_name}</Text>
                       <Text style={styles.address} numberOfLines={1}>{item.receiver_address}</Text>
                       
-                      {/* 🚀 规则 2：VIP 账号强制显示余额支付金额 */}
-                      {isVIP && (() => {
-                        const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-                        if (payMatch && payMatch[1]) {
-                          return (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                              <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                                💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
-                              </Text>
-                            </View>
-                          );
-                        }
-                        return null;
-                      })()}
-
                       {/* 🚀 规则 3：通用规则 - 跑腿费现金支付提示 (针对 Member, VIP, MERCHANTS) */}
                       {item.payment_method === 'cash' && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                           <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '900' }}>
-                            🛵 {language === 'zh' ? '跑腿费 (现金)' : language === 'en' ? 'Shipping Fee (Cash)' : 'ပို့ဆောင်ခ (ငွေသား)'}: {item.price} MMK
+                            🛵 {language === 'zh' ? '跑腿费 (现金)' : language === 'en' ? 'Shipping Fee (Cash)' : 'ပို့ဆောင်ခ (ငွေသား)'}: {item.price?.replace('MMK', '').trim()} MMK
                           </Text>
                         </View>
                       )}

@@ -5105,6 +5105,7 @@ const FinanceManagement: React.FC = () => {
                   
                   let visibleDeliveryFee = 0;
                   let visibleCOD = 0;
+                  let visiblePlatformPayment = 0;
 
                   visiblePackages.forEach(pkg => {
                     const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
@@ -5118,9 +5119,15 @@ const FinanceManagement: React.FC = () => {
                     if (isMerchant) {
                       visibleCOD += Number(pkg.cod_amount || 0);
                     }
+
+                    // 🚀 新增：累加平台支付金额
+                    const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                    if (payMatch && payMatch[1]) {
+                      visiblePlatformPayment += parseFloat(payMatch[1].replace(/[^\d.]/g, '') || '0');
+                    }
                   });
                   
-                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD;
+                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD - visiblePlatformPayment;
                   
                   // 检查是否全选
                   const allSelected = visiblePackages.length > 0 && visiblePackages.every(pkg => selectedCashPackages.has(pkg.id));
@@ -5168,7 +5175,7 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ marginBottom: '20px' }}>
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
                           gap: '12px',
                           marginBottom: '16px'
                         }}>
@@ -5201,14 +5208,27 @@ const FinanceManagement: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* 总金额 */}
+                          {/* 🚀 新增：总平台支付 */}
                           <div style={{
                             background: 'rgba(167, 243, 208, 0.2)',
                             borderRadius: '12px',
                             padding: '16px',
                             border: '1px solid rgba(167, 243, 208, 0.3)'
                           }}>
-                            <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '4px' }}>总金额 (未结清)</div>
+                            <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '4px' }}>总平台支付 (余额支付)</div>
+                            <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>
+                              {visiblePlatformPayment.toLocaleString()} MMK
+                            </div>
+                          </div>
+
+                          {/* 总金额 */}
+                          <div style={{
+                            background: 'rgba(191, 219, 254, 0.2)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            border: '1px solid rgba(191, 219, 254, 0.3)'
+                          }}>
+                            <div style={{ color: '#bfdbfe', fontSize: '0.9rem', marginBottom: '4px' }}>总金额 (未结清)</div>
                             <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>
                               {visibleTotalAmount.toLocaleString()} MMK
                             </div>

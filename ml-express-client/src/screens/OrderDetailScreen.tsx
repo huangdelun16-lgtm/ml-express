@@ -58,6 +58,7 @@ interface Order {
   transfer_code?: string;
   store_receive_code?: string;
   cod_amount?: number;
+  payment_method?: 'qr' | 'cash' | 'balance';
 }
 
 interface TrackingEvent {
@@ -156,6 +157,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       priceInfo: '价格信息',
       totalPrice: '总价',
       deliveryFee: '跑腿费',
+      itemFee: '商品费',
+      balancePayment: '余额支付',
+      cashPayment: '现金支付',
       cod: '代收款',
       totalAmount: '总金额',
       none: '无',
@@ -214,6 +218,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       priceInfo: 'Price',
       totalPrice: 'Total',
       deliveryFee: 'Delivery Fee',
+      itemFee: 'Item Fee',
+      balancePayment: 'Balance Payment',
+      cashPayment: 'Cash Payment',
       cod: 'COD',
       totalAmount: 'Total Amount',
       none: 'None',
@@ -272,6 +279,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       priceInfo: 'စျေးနှုန်း',
       totalPrice: 'စုစုပေါင်း',
       deliveryFee: 'ပို့ဆောင်ခ',
+      itemFee: 'ကုန်ပစ္စည်းဖိုး',
+      balancePayment: 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း',
+      cashPayment: 'ငွေသားဖြင့် ပေးချေခြင်း',
       cod: 'ငွေကောက်ခံရန်',
       totalAmount: 'စုစုပေါင်း',
       none: 'မရှိ',
@@ -467,6 +477,16 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     return speedMap[speed] || speed;
   };
 
+  // 🚀 从描述中提取商品费用
+  const getItemCost = (description: string = '') => {
+    // 增强型正则，支持更多变体和空格
+    const match = description.match(/\[(?:商品费用|Item Cost|ကုန်ပစ္စည်းဖိုး|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း)\s*[\(（]?.*?[\)）]?\s*:\s*(.*?)\s*MMK\]/i);
+    if (match && match[1]) {
+      return parseFloat(match[1].replace(/,/g, ''));
+    }
+    return 0;
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -608,11 +628,16 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           {(() => {
             const identityMatch = order.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
             if (identityMatch && identityMatch[1]) {
-              const identity = identityMatch[1];
+              let identity = identityMatch[1];
+              // 🚀 核心优化：如果是商家身份，统一显示为 MERCHANTS
+              if (identity === '商家' || identity === 'merchant') {
+                identity = 'MERCHANTS';
+              }
+              
               return (
                 <View style={[styles.infoRow, { borderBottomColor: '#f1f5f9' }]}>
                   <Text style={[styles.infoLabel, { fontWeight: 'bold' }]}>{t.ordererIdentity}:</Text>
-                  <View style={{ backgroundColor: identity === '商家' || identity === 'MERCHANTS' ? '#3b82f6' : '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                  <View style={{ backgroundColor: identity === 'MERCHANTS' ? '#3b82f6' : '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                     <Text style={{ color: 'white', fontSize: 13, fontWeight: '800' }}>{identity}</Text>
                   </View>
                 </View>
@@ -740,32 +765,117 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
         {/* 价格信息 */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>💰 {t.priceInfo}</Text>
-          {userType === 'merchant' ? (
-            <View style={styles.merchantsPriceContainer}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>{t.deliveryFee} =</Text>
-                <Text style={styles.priceValue}>{order.price} MMK</Text>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>{t.cod} =</Text>
-                <Text style={styles.priceValue}>{Number(order.cod_amount || 0) > 0 ? `${order.cod_amount} MMK` : t.none}</Text>
-              </View>
-              <View style={[styles.priceRow, styles.totalPriceRow]}>
-                <Text style={styles.totalPriceLabel}>
-                  {t.totalAmount} = {t.deliveryFee} + {t.cod}
-                </Text>
-                <Text style={styles.totalPriceValue}>
-                  {(parseFloat(order.price?.replace(/[^\d.]/g, '') || '0') + Number(order.cod_amount || 0)).toLocaleString()} MMK
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{t.totalPrice}</Text>
-              <Text style={styles.priceValue}>{order.price} MMK</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={styles.cardTitle}>💰 {t.priceInfo}</Text>
+            <Ionicons name="receipt-outline" size={20} color="#64748b" />
+          </View>
+          
+          {(() => {
+            const description = order.description || '';
+            const isVIP = description.includes('[下单身份: VIP]') || description.includes('[Orderer: VIP]');
+            const itemCost = getItemCost(description);
+            const deliveryFee = parseFloat(order.price?.replace(/[^0-9.]/g, '') || '0');
+            const total = itemCost + deliveryFee;
+
+            if (userType === 'merchant') {
+              return (
+                <View style={styles.merchantsPriceContainer}>
+                  <View style={styles.priceRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="bicycle-outline" size={16} color="#3b82f6" style={{ marginRight: 8 }} />
+                      <Text style={styles.priceLabel}>{t.deliveryFee}</Text>
+                    </View>
+                    <Text style={styles.priceValue}>{deliveryFee.toLocaleString()} MMK</Text>
+                  </View>
+                  <View style={styles.priceRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="cash-outline" size={16} color="#f59e0b" style={{ marginRight: 8 }} />
+                      <Text style={styles.priceLabel}>{t.cod}</Text>
+                    </View>
+                    <Text style={styles.priceValue}>{Number(order.cod_amount || 0) > 0 ? `${Number(order.cod_amount).toLocaleString()} MMK` : t.none}</Text>
+                  </View>
+                  
+                  <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 12, borderStyle: 'dashed', borderRadius: 1 }} />
+                  
+                  <View style={[styles.priceRow, styles.totalPriceRow, { backgroundColor: '#eff6ff', borderTopWidth: 0 }]}>
+                    <Text style={[styles.totalPriceLabel, { fontSize: 18 }]}>{t.totalAmount}</Text>
+                    <Text style={[styles.totalPriceValue, { fontSize: 24 }]}>{(deliveryFee + Number(order.cod_amount || 0)).toLocaleString()} MMK</Text>
+                  </View>
+                </View>
+              );
+            } else if (isVIP && itemCost > 0) {
+              return (
+                <View style={styles.merchantsPriceContainer}>
+                  {/* 商品费项目 */}
+                  <View style={styles.priceRow}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Ionicons name="bag-handle-outline" size={16} color="#fbbf24" style={{ marginRight: 8 }} />
+                        <Text style={[styles.priceLabel, { fontWeight: '700' }]}>{t.itemFee}</Text>
+                      </View>
+                      <View style={{ backgroundColor: '#ecfdf5', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginLeft: 24 }}>
+                        <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>✨ {t.balancePayment}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.priceValue, { color: '#1e293b' }]}>{itemCost.toLocaleString()} MMK</Text>
+                  </View>
+
+                  {/* 跑腿费项目 */}
+                  <View style={[styles.priceRow, { marginTop: 12 }]}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Ionicons name="flash-outline" size={16} color="#3b82f6" style={{ marginRight: 8 }} />
+                        <Text style={[styles.priceLabel, { fontWeight: '700' }]}>{t.deliveryFee}</Text>
+                      </View>
+                      <View style={{ 
+                        backgroundColor: order.payment_method === 'balance' ? '#ecfdf5' : '#fff7ed', 
+                        alignSelf: 'flex-start', 
+                        paddingHorizontal: 8, 
+                        paddingVertical: 2, 
+                        borderRadius: 6,
+                        marginLeft: 24,
+                        borderWidth: 1,
+                        borderColor: order.payment_method === 'balance' ? '#10b98122' : '#f59e0b22'
+                      }}>
+                        <Text style={{ 
+                          color: order.payment_method === 'balance' ? '#10b981' : '#f59e0b', 
+                          fontSize: 11, 
+                          fontWeight: '800' 
+                        }}>
+                          {order.payment_method === 'balance' ? `✨ ${t.balancePayment}` : `💵 ${t.cashPayment}`}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.priceValue, { color: '#1e293b' }]}>{deliveryFee.toLocaleString()} MMK</Text>
+                  </View>
+                  
+                  {/* 分隔线 */}
+                  <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 16, borderStyle: 'dashed', borderRadius: 1 }} />
+                  
+                  {/* 总计结果 */}
+                  <LinearGradient
+                    colors={['#eff6ff', '#dbeafe']}
+                    style={{ padding: 16, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#3b82f6' }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: '#1e40af', fontWeight: '900', fontSize: 16 }}>{t.totalAmount}</Text>
+                      <Text style={{ color: '#1e40af', fontWeight: '950', fontSize: 26 }}>{total.toLocaleString()} MMK</Text>
+                    </View>
+                    <Text style={{ color: 'rgba(30, 64, 175, 0.6)', fontSize: 11, marginTop: 4, textAlign: 'right', fontStyle: 'italic' }}>
+                      * {language === 'zh' ? '包含商品费用与派送费' : 'Includes item cost and delivery fee'}
+                    </Text>
+                  </LinearGradient>
+                </View>
+              );
+            } else {
+              return (
+                <View style={[styles.priceRow, { backgroundColor: '#f8fafc', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#10b981' }]}>
+                  <Text style={[styles.priceLabel, { fontSize: 18, fontWeight: '800' }]}>{t.totalPrice}</Text>
+                  <Text style={[styles.priceValue, { fontSize: 22, fontWeight: '950', color: '#10b981' }]}>{deliveryFee.toLocaleString()} MMK</Text>
+                </View>
+              );
+            }
+          })()}
         </View>
 
         {/* 配送员信息 */}
