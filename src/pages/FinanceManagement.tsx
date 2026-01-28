@@ -197,6 +197,12 @@ const FinanceManagement: React.FC = () => {
   const [selectedCashPackages, setSelectedCashPackages] = useState<Set<string>>(new Set()); // 选中的包裹ID集合
   const [clearedCashPackages, setClearedCashPackages] = useState<Set<string>>(new Set()); // 已结清的包裹ID集合
   
+  // 🚀 新增：平台支付（余额支付）相关状态
+  const [showPlatformPaymentModal, setShowPlatformPaymentModal] = useState<boolean>(false);
+  const [platformPaymentOrders, setPlatformPaymentOrders] = useState<Package[]>([]);
+  const [platformPaymentCustomerFilter, setPlatformPaymentCustomerFilter] = useState<string>('all');
+  const [platformPaymentRegionFilter, setPlatformPaymentRegionFilter] = useState<string>('all');
+  
   // 新增：商家已结清和待结清弹窗状态
   const [showMerchantSettledModal, setShowMerchantSettledModal] = useState<boolean>(false);
   const [showPendingOrdersModal, setShowPendingOrdersModal] = useState<boolean>(false);
@@ -463,7 +469,8 @@ const FinanceManagement: React.FC = () => {
     packageCount: 0, // 添加包裹数量
     courierKmCost: 0, // 快递员公里费用（仅送货距离）
     totalKm: 0, // 总送货公里数
-    merchantsCollection: 0 // 总合伙店铺代收款
+    merchantsCollection: 0, // 总合伙店铺代收款
+    totalPlatformPayment: 0 // 总平台支付 (余额支付)
   });
 
   useEffect(() => {
@@ -488,8 +495,15 @@ const FinanceManagement: React.FC = () => {
       
       let packageIncome = 0;
       let settledPackageCount = 0;
+      let totalPlatformPayment = 0;
 
       deliveredPackages.forEach(pkg => {
+        // 🚀 累加平台支付金额
+        const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+        if (payMatch && payMatch[1]) {
+          totalPlatformPayment += parseFloat(payMatch[1].replace(/[^\d.]/g, '') || '0');
+        }
+
         // 如果是现金支付，必须已结清才计入收入
         if (pkg.payment_method === 'cash' && !pkg.rider_settled) {
           return;
@@ -534,7 +548,8 @@ const FinanceManagement: React.FC = () => {
         packageCount,
         courierKmCost,
         totalKm,
-        merchantsCollection
+        merchantsCollection,
+        totalPlatformPayment
       });
     };
     
@@ -1015,6 +1030,24 @@ const FinanceManagement: React.FC = () => {
     setShowPendingOrdersModal(true);
   };
 
+  // 🚀 新增：处理平台支付卡片点击
+  const handlePlatformPaymentClick = () => {
+    setPlatformPaymentCustomerFilter('all');
+    setPlatformPaymentRegionFilter('all');
+    // 找出所有已送达且描述中包含“平台支付”标识的订单
+    const platformOrders = packages.filter(pkg => {
+      if (pkg.status !== '已送达') return false;
+      return pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+    }).sort((a, b) => {
+      const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
+      const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    setPlatformPaymentOrders(platformOrders);
+    setShowPlatformPaymentModal(true);
+  };
+
   const handleDeleteRecord = async (id: string) => {
     if (!window.confirm('确定要删除这条财务记录吗？')) return;
 
@@ -1287,6 +1320,13 @@ const FinanceManagement: React.FC = () => {
             }}
           >
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
+            {renderSummaryCard(
+              language === 'my' ? 'စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု' : '总平台支付 (余额支付)', 
+              summary.totalPlatformPayment, 
+              language === 'my' ? 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း' : '所有订单的余额支付汇总', 
+              '#3b82f6',
+              () => handlePlatformPaymentClick()
+            )}
             {renderSummaryCard(t.totalMerchantCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handleMerchantCollectionClick())}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
@@ -4585,6 +4625,7 @@ const FinanceManagement: React.FC = () => {
                 
                 let totalDeliveryFee = 0;
                 let totalCOD = 0;
+                let totalPlatformPayment = 0;
                 
                 cashPackages.forEach(pkg => {
                   const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
@@ -4598,6 +4639,12 @@ const FinanceManagement: React.FC = () => {
                   const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
                   if (isMerchant) {
                     totalCOD += Number(pkg.cod_amount || 0);
+                  }
+
+                  // 🚀 新增：累加平台支付金额
+                  const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                  if (payMatch && payMatch[1]) {
+                    totalPlatformPayment += parseFloat(payMatch[1].replace(/[^\d.]/g, '') || '0');
                   }
                 });
                 
@@ -4651,6 +4698,22 @@ const FinanceManagement: React.FC = () => {
                       <div style={{ color: '#a7f3d0', fontSize: '0.9rem', marginBottom: '8px' }}>{language === 'my' ? 'စုစုပေါင်း ပမာဏ (ပို့ဆောင်ခ+ကိုယ်စားကောက်)' : t.totalAmount}</div>
                       <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
                         {totalAmount.toLocaleString()} MMK
+                      </div>
+                    </div>
+
+                    {/* 🚀 新增：总平台支付 */}
+                    <div style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                    }}>
+                      <div style={{ color: '#93c5fd', fontSize: '0.9rem', marginBottom: '8px' }}>{language === 'my' ? 'စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု' : '总平台支付'}</div>
+                      <div style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                        {totalPlatformPayment.toLocaleString()} MMK
+                      </div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '4px' }}>
+                        {language === 'my' ? 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း' : '余额支付汇总'}
                       </div>
                     </div>
 
@@ -5127,7 +5190,7 @@ const FinanceManagement: React.FC = () => {
                     }
                   });
                   
-                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD - visiblePlatformPayment;
+                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD;
                   
                   // 检查是否全选
                   const allSelected = visiblePackages.length > 0 && visiblePackages.every(pkg => selectedCashPackages.has(pkg.id));
@@ -5798,6 +5861,216 @@ const FinanceManagement: React.FC = () => {
                   setShowMerchantSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
+                style={{
+                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  border: 'none', color: '#05223b', padding: '10px 24px',
+                  borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(79, 172, 254, 0.3)'
+                }}
+              >
+                {language === 'zh' ? '确认' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🚀 新增：平台支付（余额支付）订单明细弹窗 */}
+      {showPlatformPaymentModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 2000, padding: isMobile ? '10px' : '20px'
+        }}
+        onClick={() => setShowPlatformPaymentModal(false)}
+        >
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+            borderRadius: '24px', width: '100%', maxWidth: '900px',
+            maxHeight: '90vh', overflow: 'hidden', display: 'flex',
+            flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                💳 {language === 'zh' ? '平台支付（余额支付）明细' : 'Platform Payment Details'}
+                <span style={{ fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', opacity: 0.8 }}>
+                  {platformPaymentOrders.filter(pkg => {
+                    const matchCustomer = platformPaymentCustomerFilter === 'all' || pkg.receiver_name === platformPaymentCustomerFilter;
+                    const matchRegion = platformPaymentRegionFilter === 'all' || pkg.id.startsWith(platformPaymentRegionFilter);
+                    return matchCustomer && matchRegion;
+                  }).length} {language === 'zh' ? '单' : ''}
+                </span>
+              </h2>
+              <button
+                onClick={() => setShowPlatformPaymentModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', border: 'none',
+                  color: 'white', fontSize: '1.5rem', cursor: 'pointer',
+                  width: '40px', height: '40px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              {/* 🚀 新增：筛选工具栏 */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+                background: 'rgba(255, 255, 255, 0.08)',
+                padding: '16px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '6px' }}>
+                    {language === 'zh' ? '按客户筛选' : 'Filter by Customer'}
+                  </label>
+                  <select
+                    value={platformPaymentCustomerFilter}
+                    onChange={(e) => setPlatformPaymentCustomerFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      background: 'rgba(7, 23, 53, 0.65)',
+                      color: 'white',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <option value="all">{language === 'zh' ? '所有客户' : 'All Customers'}</option>
+                    {Array.from(new Set(platformPaymentOrders.map(pkg => pkg.receiver_name))).sort().map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '6px' }}>
+                    {language === 'zh' ? '按地区筛选' : 'Filter by Region'}
+                  </label>
+                  <select
+                    value={platformPaymentRegionFilter}
+                    onChange={(e) => setPlatformPaymentRegionFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      background: 'rgba(7, 23, 53, 0.65)',
+                      color: 'white',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <option value="all">{language === 'zh' ? '所有地区' : 'All Regions'}</option>
+                    {REGIONS.map(reg => (
+                      <option key={reg.prefix} value={reg.prefix}>{reg.name} ({reg.prefix})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                {platformPaymentOrders
+                  .filter(pkg => {
+                    const matchCustomer = platformPaymentCustomerFilter === 'all' || pkg.receiver_name === platformPaymentCustomerFilter;
+                    const matchRegion = platformPaymentRegionFilter === 'all' || pkg.id.startsWith(platformPaymentRegionFilter);
+                    return matchCustomer && matchRegion;
+                  })
+                  .map(pkg => {
+                    const platformAmount = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/)?.[1] || '0';
+                    
+                    // 🚀 逻辑：判断跑腿费支付方式
+                    // 如果描述中包含 "[跑腿费已通过余额支付]" 标识，或者 payment_method 不是 cash 且订单有平台支付标识
+                    const isDeliveryFeeBalance = pkg.description?.includes('跑腿费已通过余额支付') || pkg.description?.includes('Delivery fee paid by balance') || pkg.payment_method !== 'cash';
+
+                    return (
+                      <div key={pkg.id} style={{
+                        background: 'rgba(255,255,255,0.05)', borderRadius: '16px',
+                        padding: '16px', border: '1px solid rgba(255,255,255,0.1)',
+                        transition: 'transform 0.2s'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#4facfe', fontSize: '1rem' }}>{pkg.id}</span>
+                          <span style={{ 
+                            padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600,
+                            background: 'rgba(16, 185, 129, 0.2)',
+                            color: '#10b981'
+                          }}>
+                            {language === 'zh' ? '余额支付' : 'Balance Pay'}
+                          </span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                            <span style={{ opacity: 0.6 }}>{language === 'zh' ? '客户' : 'Customer'}:</span>
+                            <span style={{ color: 'white' }}>{pkg.receiver_name}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                            <span style={{ opacity: 0.6 }}>{language === 'zh' ? '货款支付' : 'COD Paid'}:</span>
+                            <span style={{ fontWeight: 'bold', color: '#10b981' }}>{platformAmount} MMK</span>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ opacity: 0.6 }}>{language === 'zh' ? '跑腿费' : 'Delivery Fee'}:</span>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ color: 'white' }}>{pkg.price}</div>
+                              <div style={{ 
+                                fontSize: '0.7rem', 
+                                color: isDeliveryFeeBalance ? '#10b981' : '#fbc531',
+                                fontWeight: 'bold'
+                              }}>
+                                {isDeliveryFeeBalance 
+                                  ? (language === 'zh' ? '● 平台余额支付' : '● Paid by Balance')
+                                  : (language === 'zh' ? '● 现金支付' : '● Paid by Cash')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ 
+                            marginTop: '8px', paddingTop: '8px', 
+                            borderTop: '1px solid rgba(255,255,255,0.05)',
+                            fontSize: '0.8rem', opacity: 0.5, textAlign: 'right' 
+                          }}>
+                            {language === 'zh' ? '送达时间' : 'Delivered at'}: {pkg.delivery_time}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                
+                {platformPaymentOrders.length === 0 && (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '16px' }}>Empty</div>
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.1rem' }}>
+                      {language === 'zh' ? '暂无余额支付订单记录' : 'No balance payment orders found'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'right' }}>
+              <button
+                onClick={() => setShowPlatformPaymentModal(false)}
                 style={{
                   background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                   border: 'none', color: '#05223b', padding: '10px 24px',
