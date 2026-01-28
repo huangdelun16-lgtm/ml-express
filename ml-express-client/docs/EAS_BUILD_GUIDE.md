@@ -3,8 +3,8 @@
 ## 📋 前置条件
 
 - ✅ EAS CLI 已安装
-- ✅ eas.json 已配置（production profile 设置为 app-bundle）
-- ✅ app.json 版本信息：1.1.0 (versionCode: 2)
+- ✅ `eas.json` 已配置（`appVersionSource: "local"`）
+- ✅ 版本号已同步（见“版本号来源与同步规则”）
 
 ---
 
@@ -82,6 +82,35 @@ eas build:download --id BUILD_ID
 
 ---
 
+## 🧾 版本号来源与同步规则（重要）
+
+EAS 读取本地版本号（`appVersionSource: "local"`），但 **Android 版本号会被 Gradle 覆盖**，必须保持一致：
+
+### ✅ 需要同步的文件
+
+**1）`ml-express-client/app.json`**
+- `expo.version` → 显示版本（如 `2.2.0`）
+- `ios.buildNumber` → iOS 构建号（如 `46`）
+- `android.versionCode` → Android 版本码（如 `46`）
+
+**2）`ml-express-client/android/app/build.gradle`**
+- `defaultConfig.versionCode` → Android 版本码（如 `46`）
+- `defaultConfig.versionName` → 显示版本（如 `2.2.0`）
+
+> 说明：Expo 会优先使用 `build.gradle` 的 `versionCode/versionName`，  
+> 如果它和 `app.json` 不一致，**最终显示会以 `build.gradle` 为准**。
+
+### ✅ 推荐同步示例
+
+```
+expo.version = 2.2.0
+ios.buildNumber = 46
+android.versionCode = 46
+android/build.gradle: versionCode = 46, versionName = 2.2.0
+```
+
+---
+
 ## 🔑 签名配置
 
 EAS Build 会自动管理签名密钥：
@@ -134,7 +163,7 @@ eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value YOUR_KEY --plat
 
 构建完成后：
 1. 检查文件大小（通常 20-50MB）
-2. 验证版本号（1.1.0, versionCode: 2）
+2. 验证版本号（例如 `2.2.0 (46)`）
 3. 上传到 Google Play Console 测试
 
 ---
