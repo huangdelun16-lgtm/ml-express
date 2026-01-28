@@ -996,11 +996,55 @@ CI=true npm run build
 
 ---
 
+### 🔧 最新功能更新 (2026年1月27日) ✅
+
+#### 1. 跨端资源上传兼容性优化 (Expo 54+)
+**改进内容**:
+- **架构升级**: 针对 Expo v54+ 中 `expo-file-system` 的 `readAsStringAsync` 方法被弃用导致的问题，全面重构了图片上传引擎。
+- **技术实现**: 弃用 `FileSystem` 读取方案，改用标准的 `fetch` API 配合 `FileReader` 将本地 URI 直接转换为 `Uint8Array` 字节流。
+- **覆盖范围**: 
+  - **充值凭证上传** (`uploadProof`): 修复了 VIP 充值申请时 "Upload failed - URL is empty" 的报错。
+  - **商品图片上传** (`uploadProductImage`): 确保商家端管理商品时的稳定性。
+- **优势**: 提高了对新版 Expo SDK 的兼容性，且由于减少了中间的 Base64 编码环节，内存占用更低，上传更稳健。
+
+---
+
 ## 📋 版本信息
 
-*最后更新：2026年1月19日*  
-*版本：6.0.0*  
+*最后更新：2026年1月27日*  
+*版本：6.1.0*  
 *状态：生产环境运行中*
-*架构：全自动充值审批系统 + VIP 自动升级逻辑 + 稳健型资源上传引擎 + 管理端实时轮询监控*  
+*架构：全自动充值审批系统 + VIP 自动升级逻辑 + 兼容性资源上传引擎 (Expo 54+) + 管理端实时轮询监控*  
+
+---
+
+## 📌 版本号/构建号显示异常排查记录（客户端 App）
+
+**现象**：Expo Builds 列表显示旧版本号（如 `2.1.0 (45)`），即使 `app.json` 已更新到 `2.2.0 / 46`。  
+
+**根因**：iOS 与 Android 均存在“原生配置覆盖”：
+- **iOS**：`ml-express-client/ios/MARKETLINKEXPRESS/Info.plist` 中的  
+  `CFBundleShortVersionString` / `CFBundleVersion` 会覆盖 Expo 配置  
+- **Android**：`ml-express-client/android/app/build.gradle` 中的  
+  `versionCode` / `versionName` 会覆盖 `app.json`  
+- **EAS 版本来源**：`eas.json` 需设置 `appVersionSource: "local"`
+
+**最终修复（2.2.0 / 46）**：
+1. `ml-express-client/app.json`  
+   - `expo.version = 2.2.0`  
+   - `ios.buildNumber = 46`  
+   - `android.versionCode = 46`  
+   - `infoPlist` 中 `CFBundleShortVersionString = 2.2.0`  
+   - `infoPlist` 中 `CFBundleVersion = 46`  
+2. `ml-express-client/android/app/build.gradle`  
+   - `versionCode = 46`  
+   - `versionName = "2.2.0"`  
+3. `ml-express-client/ios/MARKETLINKEXPRESS/Info.plist`  
+   - `CFBundleShortVersionString = 2.2.0`  
+   - `CFBundleVersion = 46`  
+4. `eas.json`  
+   - `appVersionSource = "local"`  
+
+**避免复发**：以后每次发布，以上 4 处必须同步更新并推送到 GitHub 后再构建。
 
 
