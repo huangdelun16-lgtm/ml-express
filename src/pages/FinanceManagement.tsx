@@ -551,8 +551,13 @@ const FinanceManagement: React.FC = () => {
       }, 0);
       const courierKmCost = totalKm * COURIER_KM_RATE;
 
-      // 合伙商家代收款总额 = 所有 COD + 所有平台支付（余额支付）
-      const merchantsCollection = merchantCodTotal + merchantPlatformPaymentTotal;
+      // 合伙商家代收款总额 = 未结清给商家的 COD + 未结清平台支付（余额支付）
+      const merchantsCollection = deliveredPackages.reduce((sum, pkg) => {
+        if (!isMerchantPackage(pkg)) return sum;
+        if (!pkg.rider_settled || pkg.cod_settled) return sum;
+        const platformAmount = getPlatformPaymentAmount(pkg.description);
+        return sum + Number(pkg.cod_amount || 0) + platformAmount;
+      }, 0);
       
       setSummary({
         totalIncome,
@@ -623,14 +628,24 @@ const FinanceManagement: React.FC = () => {
     }).sort((a, b) => b.unclearedAmount - a.unclearedAmount);
   }, [deliveryStores, packages, isRegionalUser, currentRegionPrefix]);
 
+  const getMerchantFilterKey = (pkg: Package): string => {
+    const store = deliveryStores.find(item => item.id === pkg.delivery_store_id)
+      || deliveryStores.find(item => item.store_name === pkg.sender_name
+        || (pkg.sender_name && pkg.sender_name.startsWith(item.store_name)));
+    const storeName = store?.store_name || pkg.sender_name || '未知';
+    const storeCode = store?.store_code ? store.store_code : '';
+    return `${storeName}||${storeCode}`;
+  };
+
   const merchantCustomerOptions = useMemo(() => {
-    const names = modalOrders.map(pkg => pkg.receiver_name).filter(Boolean);
-    return Array.from(new Set(names)).sort();
+    const keys = modalOrders.map(pkg => getMerchantFilterKey(pkg));
+    return Array.from(new Set(keys)).sort();
   }, [modalOrders]);
 
   const filteredMerchantOrders = useMemo(() => {
     return modalOrders.filter(pkg => {
-      const matchCustomer = merchantCollectionCustomerFilter === 'all' || pkg.receiver_name === merchantCollectionCustomerFilter;
+      const matchCustomer = merchantCollectionCustomerFilter === 'all'
+        || getMerchantFilterKey(pkg) === merchantCollectionCustomerFilter;
       const matchRegion = merchantCollectionRegionFilter === 'all' || pkg.id.startsWith(merchantCollectionRegionFilter);
       return matchCustomer && matchRegion;
     });
@@ -5855,10 +5870,16 @@ const FinanceManagement: React.FC = () => {
                       fontSize: '0.9rem'
                     }}
                   >
-                    <option value="all">{language === 'zh' ? '所有客户' : 'All Customers'}</option>
-                    {merchantCustomerOptions.map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
+                    <option value="all">{language === 'zh' ? '所有商家' : 'All Merchants'}</option>
+                    {merchantCustomerOptions.map(optionKey => {
+                      const [storeName, storeCode] = optionKey.split('||');
+                      const label = storeCode ? `${storeName}（${storeCode}）` : storeName;
+                      return (
+                        <option key={optionKey} value={optionKey}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -5937,19 +5958,13 @@ const FinanceManagement: React.FC = () => {
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
                         <span style={{ opacity: 0.6 }}>{language === 'zh' ? '代收金额' : 'COD'}:</span>
-                        <span style={{ fontWeight: 'bold', color: '#ff7675' }}>{Number(pkg.cod_amount || 0).toLocaleString()} MMK</span>
+                        <span style={{ fontWeight: 'bold', color: '#ff7675' }}>
+                          {Number(pkg.cod_amount || 0).toLocaleString()} MMK
+                          {getPlatformPaymentAmount(pkg.description) > 0
+                            ? (language === 'zh' ? '（余额支付）' : ' (Balance Pay)')
+                            : ''}
+                        </span>
                       </div>
-
-                      {(() => {
-                        const platformAmount = getPlatformPaymentAmount(pkg.description);
-                        if (!platformAmount) return null;
-                        return (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                            <span style={{ opacity: 0.6 }}>{language === 'zh' ? '平台支付' : 'Platform Pay'}:</span>
-                            <span style={{ fontWeight: 'bold', color: '#10b981' }}>{platformAmount.toLocaleString()} MMK</span>
-                          </div>
-                        );
-                      })()}
 
                       {pkg.delivery_time && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
