@@ -5840,7 +5840,7 @@ const FinanceManagement: React.FC = () => {
               }}>
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '6px' }}>
-                    {language === 'zh' ? '按客户筛选' : 'Filter by Customer'}
+                    {language === 'zh' ? '商家筛选' : 'Filter by Merchant'}
                   </label>
                   <select
                     value={merchantCollectionCustomerFilter}
@@ -6067,7 +6067,7 @@ const FinanceManagement: React.FC = () => {
               }}>
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '6px' }}>
-                    {language === 'zh' ? '按客户筛选' : 'Filter by Customer'}
+                    {language === 'zh' ? '商家筛选' : 'Filter by Merchant'}
                   </label>
                   <select
                     value={platformPaymentCustomerFilter}
