@@ -28,8 +28,8 @@
         "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存付款二维码。",
         "CFBundleDisplayName": "MARKET LINK EXPRESS",
         "CFBundleName": "MARKET LINK EXPRESS",
-        "CFBundleShortVersionString": "2.1.0",
-        "CFBundleVersion": "45",
+        "CFBundleShortVersionString": "2.2.0",
+        "CFBundleVersion": "46",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
