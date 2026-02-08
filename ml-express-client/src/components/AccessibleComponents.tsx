@@ -9,26 +9,16 @@ import {
   Image,
   Switch,
   StyleSheet,
+  AccessibilityRole,
 } from 'react-native';
 
 // 无障碍属性接口
 interface AccessibilityProps {
   accessibilityLabel?: string;
   accessibilityHint?: string;
-  accessibilityRole?: string;
-  accessibilityState?: {
-    disabled?: boolean;
-    selected?: boolean;
-    checked?: boolean;
-    busy?: boolean;
-    expanded?: boolean;
-  };
-  accessibilityValue?: {
-    min?: number;
-    max?: number;
-    now?: number;
-    text?: string;
-  };
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: any;
+  accessibilityValue?: any;
   accessibilityActions?: Array<{
     name: string;
     label: string;
@@ -73,6 +63,7 @@ export const AccessibleButton: React.FC<AccessibleButtonProps> = ({
     </TouchableOpacity>
   );
 };
+
 // 无障碍文本输入组件
 interface AccessibleTextInputProps extends AccessibilityProps {
   placeholder?: string;
@@ -105,7 +96,6 @@ export const AccessibleTextInput: React.FC<AccessibleTextInputProps> = ({
       {label && (
         <Text
           style={styles.inputLabel}
-          accessibilityRole="text"
         >
           {label}
         </Text>
@@ -121,7 +111,6 @@ export const AccessibleTextInput: React.FC<AccessibleTextInputProps> = ({
         accessible={true}
         accessibilityLabel={accessibilityLabel || label || placeholder}
         accessibilityHint={accessibilityHint}
-        accessibilityRole="text"
         {...accessibilityProps}
       />
     </View>
@@ -150,11 +139,11 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
   const CardComponent = onPress ? TouchableOpacity : View;
   
   return (
-  
     <CardComponent
       style={[styles.card, style]}
+      accessibilityLabel={accessibilityLabel || title}
       accessibilityHint={accessibilityHint || subtitle}
-      accessibilityRole={onPress ? 'button' : 'summary'}
+      accessibilityRole={onPress ? 'button' : undefined}
       {...accessibilityProps}
     >
       {title && (
@@ -163,7 +152,7 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
         </Text>
       )}
       {subtitle && (
-        <Text style={styles.cardSubtitle} accessibilityRole="text">
+        <Text style={styles.cardSubtitle}>
           {subtitle}
         </Text>
       )}
@@ -186,6 +175,7 @@ export const AccessibleImage: React.FC<AccessibleImageProps> = ({
   alt,
   style,
   accessibilityLabel,
+  ...accessibilityProps
 }) => {
   return (
     <Image
@@ -194,6 +184,7 @@ export const AccessibleImage: React.FC<AccessibleImageProps> = ({
       resizeMode={resizeMode}
       accessibilityLabel={accessibilityLabel || alt}
       accessibilityRole="image"
+      {...accessibilityProps}
     />
   );
 };
@@ -214,16 +205,19 @@ export const AccessibleSwitch: React.FC<AccessibleSwitchProps> = ({
   disabled = false,
   style,
   accessibilityLabel,
+  ...accessibilityProps
 }) => {
   return (
     <View style={styles.switchContainer}>
-          style={styles.switchLabel}
+      {label && <Text style={styles.switchLabel}>{label}</Text>}
       <Switch
+        value={value}
         onValueChange={onValueChange}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel || label}
         accessibilityRole="switch"
         accessibilityState={{ checked: value, disabled }}
+        {...accessibilityProps}
       />
     </View>
   );
@@ -245,12 +239,13 @@ export const AccessibleList: React.FC<AccessibleListProps> = ({
   title,
   style,
   accessibilityLabel,
+  ...accessibilityProps
 }) => {
   return (
     <ScrollView
       style={[styles.list, style]}
-      accessibilityRole="list"
       accessibilityLabel={accessibilityLabel}
+      {...accessibilityProps}
     >
       {title && (
         <Text style={styles.listTitle} accessibilityRole="header">
@@ -261,8 +256,7 @@ export const AccessibleList: React.FC<AccessibleListProps> = ({
         <View
           key={keyExtractor(item, index)}
           accessible={true}
-          accessibilityRole="listitem"
-          accessibilityLabel={`${title} 项目 ${index + 1}`}
+          accessibilityLabel={`${title || '列表'} 项目 ${index + 1}`}
         >
           {renderItem({ item, index })}
         </View>
@@ -283,17 +277,19 @@ export const AccessibleHeading: React.FC<AccessibleHeadingProps> = ({
   children,
   style,
   accessibilityLabel,
+  ...accessibilityProps
 }) => {
   const headingStyle = [
     styles.heading,
     styles[`heading${level}` as keyof typeof styles],
     style,
   ];
+  return (
     <Text
       style={headingStyle}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="header"
-      accessibilityLevel={level}
+      {...accessibilityProps}
     >
       {children}
     </Text>
@@ -314,10 +310,11 @@ export const AccessibleLink: React.FC<AccessibleLinkProps> = ({
   style,
   textStyle,
   accessibilityHint,
+  ...accessibilityProps
 }) => {
   const handlePress = () => {
     // 这里应该使用 Linking.openURL(url)
-    LoggerService.debug('打开链接', url);
+    LoggerService.debug('打开链接', { url });
   };
   
   return (
@@ -326,6 +323,7 @@ export const AccessibleLink: React.FC<AccessibleLinkProps> = ({
       onPress={handlePress}
       accessibilityHint={accessibilityHint || `打开链接: ${url}`}
       accessibilityRole="link"
+      {...accessibilityProps}
     >
       <Text style={[styles.linkText, textStyle]}>
         {children}
@@ -333,6 +331,7 @@ export const AccessibleLink: React.FC<AccessibleLinkProps> = ({
     </TouchableOpacity>
   );
 };
+
 // 无障碍工具函数
 export const AccessibilityUtils = {
   // 生成无障碍标签
@@ -429,6 +428,7 @@ const styles = StyleSheet.create({
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   switchLabel: {
     flex: 1,
@@ -451,10 +451,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   heading4: {
+    fontSize: 20,
   },
   heading5: {
+    fontSize: 18,
   },
   heading6: {
+    fontSize: 16,
   },
   link: {
     paddingVertical: 8,

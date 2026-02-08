@@ -27,17 +27,40 @@ class SecureStorageService {
       LoggerService.error('SecureStorage setItem error:', error);
       // 降级方案
       await AsyncStorage.setItem(key, value);
+    }
+  }
+
+  /**
    * 获取安全存储的数据
+   */
   async getItem(key: string): Promise<string | null> {
+    try {
+      if (Platform.OS === 'web') {
         return await AsyncStorage.getItem(key);
+      } else {
         return await SecureStore.getItemAsync(key);
+      }
+    } catch (error) {
       LoggerService.error('SecureStorage getItem error:', error);
       return await AsyncStorage.getItem(key);
+    }
+  }
+
+  /**
    * 删除安全存储的数据
+   */
   async removeItem(key: string): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
         await AsyncStorage.removeItem(key);
+      } else {
         await SecureStore.deleteItemAsync(key);
+      }
+    } catch (error) {
       LoggerService.error('SecureStorage removeItem error:', error);
       await AsyncStorage.removeItem(key);
+    }
+  }
 }
+
 export const secureStorage = SecureStorageService.getInstance();

@@ -1,5 +1,5 @@
 import { Image } from 'react-native';
-import LoggerService from './LoggerService';
+import LoggerService from '../services/LoggerService';
 
 // 图片压缩配置
 interface CompressionConfig {

@@ -13,10 +13,12 @@ import {
   ScrollView,
   Vibration,
   Platform,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { deliveryStoreService } from '../services/supabase';
+import { deliveryStoreService, merchantService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { theme } from '../config/theme';
 import BackToHomeButton from '../components/BackToHomeButton';
@@ -42,6 +44,8 @@ export default function CityMallScreen({ navigation }: any) {
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
+  const [productMatches, setProductMatches] = useState<Record<string, string[]>>({});
+  const [searchingProducts, setSearchingProducts] = useState(false);
 
   const regions = [
     { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
@@ -57,6 +61,8 @@ export default function CityMallScreen({ navigation }: any) {
     zh: {
       title: '同城商场',
       searchPlaceholder: '搜索商户名称...',
+      productMatches: '匹配商品',
+      searchingProducts: '正在搜索商品...',
       allStores: '全部分类',
       noStores: '该区域暂无商户',
       operatingHours: '营业时间',
@@ -70,6 +76,8 @@ export default function CityMallScreen({ navigation }: any) {
     en: {
       title: 'City Mall',
       searchPlaceholder: 'Search store name...',
+      productMatches: 'Matching items',
+      searchingProducts: 'Searching products...',
       allStores: 'All Categories',
       noStores: 'No stores found in this region',
       operatingHours: 'Hours',
@@ -83,6 +91,8 @@ export default function CityMallScreen({ navigation }: any) {
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
       searchPlaceholder: 'ဆိုင်အမည်ရှာရန်...',
+      productMatches: 'ကိုက်ညီသောကုန်ပစ္စည်း',
+      searchingProducts: 'ကုန်ပစ္စည်းရှာနေသည်...',
       allStores: 'ကဏ္ဍအားလုံး',
       noStores: 'ဤဒေသတွင် ဆိုင်များမရှိသေးပါ',
       operatingHours: 'ဖွင့်ချိန်',
@@ -96,6 +106,8 @@ export default function CityMallScreen({ navigation }: any) {
   }[language] || {
     title: 'City Mall',
     searchPlaceholder: 'Search store name...',
+    productMatches: 'Matching items',
+    searchingProducts: 'Searching products...',
     allStores: 'All Categories',
     noStores: 'No stores found',
     operatingHours: 'Hours',
@@ -151,6 +163,35 @@ export default function CityMallScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
+  useEffect(() => {
+    const query = searchText.trim();
+    if (!query) {
+      setProductMatches({});
+      setSearchingProducts(false);
+      return;
+    }
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setSearchingProducts(true);
+      const results = await merchantService.searchProductsByName(query);
+      if (isCancelled) return;
+      const matchMap: Record<string, string[]> = {};
+      results.forEach((item: any) => {
+        const storeId = item.store_id || item.delivery_stores?.id;
+        if (!storeId) return;
+        const list = matchMap[storeId] || [];
+        if (!list.includes(item.name)) list.push(item.name);
+        matchMap[storeId] = list;
+      });
+      setProductMatches(matchMap);
+      setSearchingProducts(false);
+    }, 400);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchText]);
+
   // 🚀 核心逻辑：判断店铺是否正在营业
   const checkStoreOpenStatus = (store: DeliveryStore) => {
     if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
@@ -192,8 +233,10 @@ export default function CityMallScreen({ navigation }: any) {
 
   const filteredStores = stores
     .filter(store => {
-      const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
-        (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase()));
+      const searchLower = searchText.toLowerCase();
+      const matchesSearch = store.store_name.toLowerCase().includes(searchLower) ||
+        (store.store_code && store.store_code.toLowerCase().includes(searchLower)) ||
+        Boolean(productMatches[store.id]?.length);
       
       const storeAddr = (store.address || '').toUpperCase();
       let storeRegion = 'MDY';
@@ -209,6 +252,9 @@ export default function CityMallScreen({ navigation }: any) {
       return matchesSearch && storeRegion === selectedRegion;
     })
     .sort((a, b) => {
+      const matchA = Boolean(productMatches[a.id]?.length);
+      const matchB = Boolean(productMatches[b.id]?.length);
+      if (matchA !== matchB) return matchA ? -1 : 1;
       const statusA = checkStoreOpenStatus(a);
       const statusB = checkStoreOpenStatus(b);
       if (statusA.isOpen === statusB.isOpen) return 0;
@@ -227,6 +273,7 @@ export default function CityMallScreen({ navigation }: any) {
 
   const renderStoreItem = ({ item }: { item: DeliveryStore }) => {
     const status = checkStoreOpenStatus(item);
+    const matchedProducts = productMatches[item.id] || [];
     
     return (
       <TouchableOpacity
@@ -236,7 +283,7 @@ export default function CityMallScreen({ navigation }: any) {
         ]}
         onPress={() => {
           if (!status.isOpen) {
-            alert(t.closedToday);
+            Alert.alert('提示', t.closedToday);
             return;
           }
           navigation.navigate('MerchantProducts', { storeId: item.id, storeName: item.store_name });
@@ -262,6 +309,11 @@ export default function CityMallScreen({ navigation }: any) {
             ]}>
               {item.store_name}
             </Text>
+            {matchedProducts.length > 0 && (
+              <Text style={styles.matchText} numberOfLines={2}>
+                {t.productMatches}: {matchedProducts.join(', ')}
+              </Text>
+            )}
             <View style={styles.tagContainer}>
               <View style={styles.typeTag}>
                 <Text style={styles.typeTagText}>{item.store_type}</Text>
@@ -343,6 +395,9 @@ export default function CityMallScreen({ navigation }: any) {
               onChangeText={setSearchText}
             />
           </View>
+          {searchingProducts && (
+            <Text style={styles.searchHint}>{t.searchingProducts}</Text>
+          )}
         </View>
       </View>
 
@@ -441,6 +496,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
   },
+  searchHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
   regionContainer: {
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
     paddingVertical: 12,
@@ -521,6 +581,12 @@ const styles = StyleSheet.create({
   },
   storeMainInfo: {
     flex: 1,
+  },
+  matchText: {
+    fontSize: 12,
+    color: '#fbbf24',
+    marginTop: 2,
+    marginBottom: 6,
   },
   storeName: {
     fontSize: 20,

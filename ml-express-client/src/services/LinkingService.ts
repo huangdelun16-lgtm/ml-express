@@ -9,7 +9,7 @@ class LinkingService {
   }
 
   async handleInitialURL() {
-    const url = await Linking.getInitialURLAsync();
+    const url = await Linking.getInitialURL();
     if (url) this.handleDeepLink(url);
   }
 

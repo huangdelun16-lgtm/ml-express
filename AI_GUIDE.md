@@ -798,7 +798,38 @@ CI=true npm run build
 
 ---
 
-### 🔧 最新功能更新 (2025年1月31日)
+### 🔧 最新功能更新 (2026年2月6日) ✅
+
+#### 1. 商家端流程与视觉深度优化
+**改进内容**:
+- **批量操作 UI 升级**: 优化了商品管理页面的“批量操作”栏，增加了已选数量徽章和网格化按钮图标，并修复了底栏遮挡最后一行商品的布局 Bug。
+- **自动小票打印**: 实现了商家接单成功后自动触发“票据打印”。
+  - 弃用截图方案，改用 **结构化 HTML 票据模板**。
+  - 票据包含：公司 Logo、订单号、商家/客户详情、商品清单、费用明细及**动态生成二维码/取件码**。
+- **打包工作流**: 商家接单后新增“打包商品”强制弹窗，需手动点击“打包完成”确认，填补了“接单”到“取件”的状态空白。
+
+#### 2. 骑手端稳定性与多端同步加固
+**功能改进**:
+- **状态全端对齐**: 修复了“我的任务”、“地图”与“账号”页面状态不一致的问题。
+  - 引入 **状态归一化 (Normalization)** 逻辑，统一判定“配送中”和“已送达”的各种变体状态。
+  - 统一视觉色彩：已送达(绿)、配送中(紫)、已取件(蓝)、待处理(橙)。
+- **实时性补丁**: 针对数据库延迟，在 `MapScreen` 引入了 `statusOverrides` 和 `completedPackageIds` (持久化存储)，确保订单在“确认送达”后立即从地图消失，且刷新后不会回弹。
+- **离线强化与指示器**:
+  - 增强了 `cacheService`，支持离线排队上传配送照片（Base64 暂存）。
+  - 新增 **`SyncIndicator` (同步指示器)**：实时显示“待同步”或“正在同步”状态，网络恢复后自动补发积压任务。
+
+#### 3. 安全与设备运维监控
+**新增功能**:
+- **设备健康盾 (`DeviceHealthShield`)**: 
+  - 实时检查：电池电量 (低于20%预警)、GPS 精度 (50m内)、存储空间 (低于500MB预警) 及网络延迟。
+  - 自动预警：检测到风险时在首页弹出显著红色盾牌标识，点击可查看详细诊断报告与修复建议。
+
+#### 4. 客户端 App 体验增强
+- **订单编码可视化**: 在“我的订单”列表卡片左上角新增蓝色等宽字体订单号标识 (`#XXXXXX`)，方便用户与骑手快速对单。
+
+---
+
+### 🔧 历史功能更新 (2025年1月31日)
 
 #### 1. 二维码支付功能暂停 ✅
 
@@ -1011,40 +1042,9 @@ CI=true npm run build
 
 ## 📋 版本信息
 
-*最后更新：2026年1月27日*  
-*版本：6.1.0*  
+*最后更新：2026年2月6日*  
+*版本：6.2.0*  
 *状态：生产环境运行中*
-*架构：全自动充值审批系统 + VIP 自动升级逻辑 + 兼容性资源上传引擎 (Expo 54+) + 管理端实时轮询监控*  
-
----
-
-## 📌 版本号/构建号显示异常排查记录（客户端 App）
-
-**现象**：Expo Builds 列表显示旧版本号（如 `2.1.0 (45)`），即使 `app.json` 已更新到 `2.2.0 / 46`。  
-
-**根因**：iOS 与 Android 均存在“原生配置覆盖”：
-- **iOS**：`ml-express-client/ios/MARKETLINKEXPRESS/Info.plist` 中的  
-  `CFBundleShortVersionString` / `CFBundleVersion` 会覆盖 Expo 配置  
-- **Android**：`ml-express-client/android/app/build.gradle` 中的  
-  `versionCode` / `versionName` 会覆盖 `app.json`  
-- **EAS 版本来源**：`eas.json` 需设置 `appVersionSource: "local"`
-
-**最终修复（2.2.0 / 46）**：
-1. `ml-express-client/app.json`  
-   - `expo.version = 2.2.0`  
-   - `ios.buildNumber = 46`  
-   - `android.versionCode = 46`  
-   - `infoPlist` 中 `CFBundleShortVersionString = 2.2.0`  
-   - `infoPlist` 中 `CFBundleVersion = 46`  
-2. `ml-express-client/android/app/build.gradle`  
-   - `versionCode = 46`  
-   - `versionName = "2.2.0"`  
-3. `ml-express-client/ios/MARKETLINKEXPRESS/Info.plist`  
-   - `CFBundleShortVersionString = 2.2.0`  
-   - `CFBundleVersion = 46`  
-4. `eas.json`  
-   - `appVersionSource = "local"`  
-
-**避免复发**：以后每次发布，以上 4 处必须同步更新并推送到 GitHub 后再构建。
+*架构：全自动充值审批系统 + VIP 自动升级逻辑 + 兼容性资源上传引擎 (Expo 54+) + 管理端实时轮询监控 + 骑手端离线照片同步 & 设备健康预警系统 + 商家自动票据打印模板*  
 
 

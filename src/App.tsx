@@ -117,7 +117,7 @@ function App() {
             <Route 
               path="/admin/delivery-stores" 
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchants_stores">
+                <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchant_stores">
                   <DeliveryStoreManagement />
                 </ProtectedRoute>
               } 

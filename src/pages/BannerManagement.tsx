@@ -25,6 +25,23 @@ const BannerManagement: React.FC = () => {
     is_active: true
   });
 
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        if (!base64) {
+          reject(new Error('读取文件失败'));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('读取文件失败'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   useEffect(() => {
     loadBanners();
   }, []);
@@ -42,21 +59,29 @@ const BannerManagement: React.FC = () => {
 
     try {
       setUploading(true);
-      // 使用专门的 banners 存储桶
-      fileUploadService.updateConfig({ bucket: 'banners', folder: 'app-banners' });
-      const result = await fileUploadService.uploadFile(file);
-      
-      if (result.success && result.url) {
-        setFormData(prev => ({
-          ...prev,
-          image_url: result.url!
-        }));
-      } else {
-        alert(result.error || '上传失败，请重试');
+      const base64 = await readFileAsBase64(file);
+      const response = await fetch('/.netlify/functions/upload-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          base64
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result?.url) {
+        throw new Error(result?.error || '上传失败，请重试');
       }
+
+      setFormData(prev => ({
+        ...prev,
+        image_url: result.url
+      }));
     } catch (error) {
       console.error('上传图片异常:', error);
-      alert('上传异常，请检查网络连接');
+      alert(error instanceof Error ? error.message : '上传异常，请检查网络连接');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

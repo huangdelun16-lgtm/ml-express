@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LoggerService from './LoggerService';
+import LoggerService from '../services/LoggerService';
 
 // 缓存配置
 interface CacheConfig {

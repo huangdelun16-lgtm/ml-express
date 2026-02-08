@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   DeviceEventEmitter,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -641,6 +642,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               {/* 订单头部 */}
               <View style={styles.orderHeader}>
                 <View style={styles.orderHeaderLeft}>
+                  <Text style={styles.orderIdBadge}>#{order.id.slice(-6).toUpperCase()}</Text>
                   <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
                   <Text style={styles.orderWeight}>{order.weight}</Text>
                 </View>
@@ -919,7 +921,17 @@ const styles = StyleSheet.create({
   orderHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+  },
+  orderIdBadge: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1e3a8a',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   orderPackageType: {
     fontSize: 16,

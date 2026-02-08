@@ -1,14 +1,14 @@
 functionsDirectory = "/Users/aungmyatthu/Desktop/ml-express/netlify/functions"
 functionsDirectoryOrigin = "config"
+headersOrigin = "config"
 redirectsOrigin = "config"
 plugins = []
-headers = []
 
 [build]
 publish = "/Users/aungmyatthu/Desktop/ml-express/build"
 publishOrigin = "config"
 commandOrigin = "config"
-command = "npm install && npm run build"
+command = "npm install --legacy-peer-deps && CI=false npm run build"
 functions = "/Users/aungmyatthu/Desktop/ml-express/netlify/functions"
 
 [build.environment]
@@ -39,6 +39,16 @@ paths = ["*.md", "*.html", "test-*", "diagnose-*"]
 [functions]
 
 [functions."*"]
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss:; media-src 'self' https: data: blob: https://assets.mixkit.co; img-src 'self' data: https: blob:; font-src 'self' https: data:; frame-src 'self' https:; worker-src 'self' blob:;"
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[redirects]]
 from = "/*"

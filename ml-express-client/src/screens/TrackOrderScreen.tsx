@@ -20,6 +20,7 @@ import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 const { width, height } = Dimensions.get('window');
 
@@ -67,10 +68,33 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [mapError, setMapError] = useState(false);
   const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const mapRef = useRef<MapView>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    NetInfo.fetch().then((state) => {
+      if (!isMounted) return;
+      setIsOnline(Boolean(state.isConnected) && state.isInternetReachable !== false);
+    });
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsOnline(Boolean(state.isConnected) && state.isInternetReachable !== false);
+    });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline) {
+      setMapError(false);
+    }
+  }, [isOnline]);
 
   // 加载正在进行的订单
   const loadInTransitOrders = async () => {
@@ -104,9 +128,9 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         phone: userPhone || user?.phone
       });
 
-      // 过滤配送中订单
-      const transit = orders.filter((o: any) => o.status === '配送中' || o.status === '配送进行中');
-      setInTransitOrders(transit);
+      const excludedStatuses = new Set(['已送达', '已取消']);
+      const activeOrders = orders.filter((o: any) => !excludedStatuses.has(o.status));
+      setInTransitOrders(activeOrders);
       
       // 如果当前正在追踪的订单状态变了（不再是配送中），清除追踪详情
       if (packageData && !transit.find(o => o.id === packageData.id) && packageData.status !== '已送达') {
@@ -147,6 +171,12 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   // 为了能被 useEffect 调用，提取核心查询逻辑
   const handleTrackInternal = async (code: string) => {
     if (!code.trim()) return;
+
+    if (!isOnline) {
+      setSearched(true);
+      showToast(t.offlineSearch, 'warning');
+      return;
+    }
 
     setLoading(true);
     setSearched(true);
@@ -197,7 +227,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   useEffect(() => {
     let channel: any = null;
 
-    if (packageData?.status === '配送中' && courierId) {
+    if (isOnline && packageData?.status === '配送中' && courierId) {
       console.log('📡 启动骑手实时追踪:', courierId);
       
       // 1. 获取初始位置
@@ -240,7 +270,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         supabase.removeChannel(channel);
       }
     };
-  }, [packageData?.status, courierId]);
+  }, [packageData?.status, courierId, isOnline]);
 
   // 当骑手位置更新时，自动平滑移动地图中心
   useEffect(() => {
@@ -293,8 +323,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: '请输入订单号',
       searchError: '查询失败',
       searching: '查询中...',
-      ongoingOrders: '进行中的配送',
+      ongoingOrders: '未完成订单',
       tapToTrack: '点击立即追踪',
+      offlineSearch: '当前网络不可用，请连接网络后再查询',
+      offlineBanner: '当前处于离线状态，地图与实时追踪不可用',
+      mapOfflineTitle: '网络不可用',
+      mapOfflineDesc: '已为您保留订单详情，联网后可查看实时地图',
+      mapErrorTitle: '地图加载失败',
+      mapErrorDesc: '请稍后重试或检查网络与定位权限',
     },
     en: {
       title: 'Track Order',
@@ -328,8 +364,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: 'Please enter order number',
       searchError: 'Search failed',
       searching: 'Searching...',
-      ongoingOrders: 'Ongoing Deliveries',
+      ongoingOrders: 'Unfinished Orders',
       tapToTrack: 'Tap to track live',
+      offlineSearch: 'You are offline. Please connect to the network to search.',
+      offlineBanner: 'You are offline. Map and live tracking are unavailable.',
+      mapOfflineTitle: 'Offline',
+      mapOfflineDesc: 'Order details are available; live map will resume when online.',
+      mapErrorTitle: 'Map failed to load',
+      mapErrorDesc: 'Please try again later or check network and location permissions.',
     },
     my: {
       title: 'အော်ဒါခြေရာခံ',
@@ -363,8 +405,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       inputError: 'အော်ဒါနံပါတ်ထည့်ပါ',
       searchError: 'ရှာဖွေမှုမအောင်မြင်',
       searching: 'ရှာဖွေနေသည်...',
-      ongoingOrders: 'ပို့ဆောင်နေဆဲအော်ဒါများ',
+      ongoingOrders: 'မပြီးသေးသော အော်ဒါများ',
       tapToTrack: 'တိုက်ရိုက်ခြေရာခံရန် နှိပ်ပါ',
+      offlineSearch: 'အင်တာနက်မရှိပါ၊ ချိတ်ဆက်ပြီးမှ ရှာဖွေပါ',
+      offlineBanner: 'အင်တာနက်မရှိပါ၊ မြေပုံနှင့် တိုက်ရိုက်ခြေရာခံမှုမရနိုင်ပါ',
+      mapOfflineTitle: 'အင်တာနက်မရှိပါ',
+      mapOfflineDesc: 'အော်ဒါအသေးစိတ်ပြန်လည်ကြည့်နိုင်ပြီး အင်တာနက်ရသောအခါ မြေပုံမြင်နိုင်သည်',
+      mapErrorTitle: 'မြေပုံမရပါ',
+      mapErrorDesc: 'ခဏနေရင် ထပ်ကြိုးစားပါ သို့မဟုတ် အင်တာနက်/တည်နေရာခွင့်ပြုမှုစစ်ဆေးပါ',
     },
   };
 
@@ -385,7 +433,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   // 获取状态颜色
   const getStatusColor = (status: string) => {
     const colors: any = {
+      '待确认': '#f97316',
       '待取件': '#f59e0b',
+      '待收款': '#f59e0b',
+      '打包中': '#0ea5e9',
       '已取件': '#3b82f6',
       '配送中': '#8b5cf6',
       '已送达': '#10b981',
@@ -543,6 +594,12 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
 
+        {!isOnline && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>{t.offlineBanner}</Text>
+          </View>
+        )}
+
         {/* 加载中 */}
         {loading && (
           <View style={styles.loadingContainer}>
@@ -566,75 +623,91 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             {/* 实时地图追踪 */}
             {packageData.status === '配送中' && (
               <View style={styles.mapContainer}>
-                <MapView
-                  ref={mapRef}
-                  provider={PROVIDER_GOOGLE}
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
-                    longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                  }}
-                >
-                  {/* 起点标记 */}
-                  {packageData.sender_latitude && packageData.sender_longitude && (
-                    <Marker
-                      coordinate={{
-                        latitude: packageData.sender_latitude,
-                        longitude: packageData.sender_longitude
+                {!isOnline || mapError ? (
+                  <View style={styles.mapFallback}>
+                    <Text style={styles.mapFallbackIcon}>🛰️</Text>
+                    <Text style={styles.mapFallbackTitle}>
+                      {!isOnline ? t.mapOfflineTitle : t.mapErrorTitle}
+                    </Text>
+                    <Text style={styles.mapFallbackDesc}>
+                      {!isOnline ? t.mapOfflineDesc : t.mapErrorDesc}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <MapView
+                      ref={mapRef}
+                      provider={PROVIDER_GOOGLE}
+                      style={styles.map}
+                      onMapError={() => setMapError(true)}
+                      onMapReady={() => setMapError(false)}
+                      initialRegion={{
+                        latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
+                        longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
                       }}
-                      title="发货点"
-                      pinColor="#3b82f6"
-                    />
-                  )}
-
-                  {/* 终点标记 */}
-                  {packageData.receiver_latitude && packageData.receiver_longitude && (
-                    <Marker
-                      coordinate={{
-                        latitude: packageData.receiver_latitude,
-                        longitude: packageData.receiver_longitude
-                      }}
-                      title="我的位置"
-                      pinColor="#ef4444"
-                    />
-                  )}
-
-                  {/* 骑手标记 */}
-                  {riderLocation && (
-                    <Marker
-                      coordinate={riderLocation}
-                      title="骑手正在赶来"
                     >
-                      <View style={styles.riderMarker}>
-                        <Text style={{ fontSize: 24 }}>🛵</Text>
-                      </View>
-                    </Marker>
-                  )}
+                      {/* 起点标记 */}
+                      {packageData.sender_latitude && packageData.sender_longitude && (
+                        <Marker
+                          coordinate={{
+                            latitude: packageData.sender_latitude,
+                            longitude: packageData.sender_longitude
+                          }}
+                          title="发货点"
+                          pinColor="#3b82f6"
+                        />
+                      )}
 
-                  {/* 路线预览 */}
-                  {riderLocation && packageData.receiver_latitude && (
-                    <Polyline
-                      coordinates={[
-                        riderLocation,
-                        {
-                          latitude: packageData.receiver_latitude,
-                          longitude: packageData.receiver_longitude
-                        }
-                      ]}
-                      strokeColor="#3b82f6"
-                      strokeWidth={3}
-                      lineDashPattern={[5, 5]}
-                    />
-                  )}
-                </MapView>
-                
-                <View style={styles.mapOverlay}>
-                  <Text style={styles.mapOverlayText}>
-                    ✨ {language === 'zh' ? '正在为您进行实时追踪' : language === 'en' ? 'Live Tracking Enabled' : 'တိုက်ရိုက်ခြေရာခံနေသည်'}
-                  </Text>
-                </View>
+                      {/* 终点标记 */}
+                      {packageData.receiver_latitude && packageData.receiver_longitude && (
+                        <Marker
+                          coordinate={{
+                            latitude: packageData.receiver_latitude,
+                            longitude: packageData.receiver_longitude
+                          }}
+                          title="我的位置"
+                          pinColor="#ef4444"
+                        />
+                      )}
+
+                      {/* 骑手标记 */}
+                      {riderLocation && (
+                        <Marker
+                          coordinate={riderLocation}
+                          title="骑手正在赶来"
+                        >
+                          <View style={styles.riderMarker}>
+                            <Text style={{ fontSize: 24 }}>🛵</Text>
+                          </View>
+                        </Marker>
+                      )}
+
+                      {/* 路线预览 */}
+                      {riderLocation && packageData.receiver_latitude && packageData.receiver_longitude && (
+                        <Polyline
+                          coordinates={[
+                            riderLocation,
+                            {
+                              latitude: packageData.receiver_latitude,
+                              longitude: packageData.receiver_longitude
+                            }
+                          ]}
+                          strokeColor="#3b82f6"
+                          strokeWidth={3}
+                          lineDashPattern={[5, 5]}
+                        />
+                      )}
+                    </MapView>
+                    
+                    <View style={styles.mapOverlay}>
+                      <Text style={styles.mapOverlayText}>
+                        ✨ {language === 'zh' ? '正在为您进行实时追踪' : language === 'en' ? 'Live Tracking Enabled' : 'တိုက်ရိုက်ခြေရာခံနေသည်'}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             )}
 
@@ -1016,6 +1089,30 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  mapFallback: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  mapFallbackIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  mapFallbackTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  mapFallbackDesc: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   riderMarker: {
     backgroundColor: 'white',
     padding: 5,
@@ -1043,6 +1140,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  offlineBanner: {
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  offlineBannerText: {
+    color: '#e2e8f0',
+    fontSize: 12,
     textAlign: 'center',
   },
   ongoingContainer: {

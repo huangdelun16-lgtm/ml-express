@@ -1,7 +1,7 @@
 {
   "name": "ml-express-client",
-  "version": "2.0.0",
-  "main": "node_modules/expo/AppEntry.js",
+  "version": "2.1.0",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "start:offline": "EXPO_OFFLINE=1 expo start --offline",
@@ -34,6 +34,7 @@
     "expo-location": "~19.0.8",
     "expo-media-library": "~18.2.1",
     "expo-notifications": "^0.32.12",
+    "expo-print": "^15.0.8",
     "expo-secure-store": "^15.0.7",
     "expo-sharing": "~14.0.8",
     "expo-speech": "~14.0.8",

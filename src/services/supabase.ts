@@ -198,6 +198,7 @@ export interface RechargeRequest {
   created_at?: string;
   updated_at?: string;
   register_region?: string; // 🚀 新增：用户所属地区
+  user_balance?: number; // 🚀 新增：用户当前余额 (用于判断VIP)
 }
 
 // 审计日志数据类型定义
@@ -1632,6 +1633,36 @@ export const adminAccountService = {
   // 创建新账号（密码会自动加密）
   async createAccount(accountData: Omit<AdminAccount, 'id' | 'status' | 'created_at' | 'updated_at'>): Promise<AdminAccount | null> {
     try {
+      const isCourierAccount = accountData.position === '骑手' || accountData.position === '骑手队长';
+      const plainPassword = accountData.password || '';
+
+      let ensureAuthUserId = '';
+      if (isCourierAccount) {
+        if (!plainPassword || plainPassword.startsWith('$2a$') || plainPassword.startsWith('$2b$') || plainPassword.startsWith('$2y$')) {
+          throw new Error('骑手账号必须填写明文密码用于 Auth 绑定');
+        }
+
+        const baseEmail = (accountData.email || '').trim();
+        const fallbackEmail = `${(accountData.employee_id || accountData.username || accountData.employee_name || 'courier').toString().toLowerCase()}@mlexpress.app`;
+        const authEmail = baseEmail || fallbackEmail;
+
+        const ensureAuthResponse = await fetch(`${supabaseUrl}/functions/v1/ensure-courier-auth`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({ email: authEmail, password: plainPassword })
+        });
+
+        const ensureAuthPayload = await ensureAuthResponse.json();
+        if (!ensureAuthResponse.ok) {
+          throw new Error(ensureAuthPayload?.error || '骑手 Auth 绑定失败');
+        }
+        ensureAuthUserId = ensureAuthPayload?.userId || '';
+      }
+
       // 如果提供了密码，先加密
       let encryptedPassword = accountData.password;
       if (accountData.password && !accountData.password.startsWith('$2a$') && !accountData.password.startsWith('$2b$') && !accountData.password.startsWith('$2y$')) {
@@ -1677,6 +1708,15 @@ export const adminAccountService = {
         });
         // 抛出错误以便在UI层捕获
         throw new Error(error.message || '创建账号失败');
+      }
+
+      // 如果是骑手账号，尝试同步 couriers 表的 auth_user_id（存在时）
+      if (isCourierAccount && ensureAuthUserId) {
+        await supabase
+          .from('couriers')
+          .update({ auth_user_id: ensureAuthUserId })
+          .or(`employee_id.eq.${accountData.employee_id},name.eq.${accountData.employee_name}`)
+          .limit(1);
       }
 
       // 返回时不包含密码
@@ -2827,25 +2867,29 @@ export const rechargeService = {
       if (error) throw error;
       if (!requests || requests.length === 0) return [];
 
-      // 2. 获取所有相关的用户信息（用于提取地区）
+      // 2. 获取所有相关的用户信息（用于提取地区和余额）
       const userIds = Array.from(new Set(requests.map(r => r.user_id)));
       const { data: users, error: userError } = await supabase
         .from('users')
-        .select('id, register_region')
+        .select('id, register_region, balance')
         .in('id', userIds);
 
       // 3. 建立 ID 映射
-      const regionMap: Record<string, string> = {};
+      const userExtraMap: Record<string, { region: string, balance: number }> = {};
       if (!userError && users) {
         users.forEach(u => {
-          regionMap[u.id] = u.register_region || 'mandalay';
+          userExtraMap[u.id] = {
+            region: u.register_region || 'mandalay',
+            balance: u.balance || 0
+          };
         });
       }
       
       // 4. 合并数据
       return requests.map(req => ({
         ...req,
-        register_region: regionMap[req.user_id] || 'mandalay'
+        register_region: userExtraMap[req.user_id]?.region || 'mandalay',
+        user_balance: userExtraMap[req.user_id]?.balance || 0
       }));
     } catch (err) {
       console.error('获取充值申请失败:', err);

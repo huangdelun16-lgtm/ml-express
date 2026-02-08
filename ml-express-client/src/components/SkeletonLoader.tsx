@@ -43,7 +43,7 @@ export const SkeletonItem: React.FC<SkeletonLoaderProps> = ({
     <Animated.View
       style={[
         styles.skeleton,
-        { width, height, borderRadius, opacity },
+        { width: width as any, height, borderRadius, opacity },
         style,
       ]}
     />

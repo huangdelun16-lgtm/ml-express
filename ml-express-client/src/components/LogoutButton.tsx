@@ -55,6 +55,8 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
         },
       ]
     );
+  };
+
   const getPositionStyle = () => {
     switch (position) {
       case 'topRight':
@@ -66,7 +68,10 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
       case 'bottomLeft':
         return { position: 'absolute' as const, bottom: 20, left: 20, zIndex: 1000 };
       default:
+        return {};
     }
+  };
+
   return (
     <TouchableOpacity
       style={[getPositionStyle(), styles.button, style]}
@@ -79,6 +84,8 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
       </View>
     </TouchableOpacity>
   );
+};
+
 const styles = StyleSheet.create({
   button: {
     backgroundColor: 'rgba(231, 76, 60, 0.9)',

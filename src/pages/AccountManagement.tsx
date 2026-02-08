@@ -253,9 +253,14 @@ const AccountManagement: React.FC = () => {
     setShowEditModal(true);
   };
 
+  const normalizePermissionIds = (permissions: string[]) => {
+    const normalized = permissions.map(id => (id === 'merchants_stores' ? 'merchant_stores' : id));
+    return Array.from(new Set(normalized));
+  };
+
   const handleEditPermissions = (account: AdminAccount) => {
     setEditingAccount(account);
-    setPermissionsPermissionsFormData(account.permissions || []);
+    setPermissionsPermissionsFormData(normalizePermissionIds(account.permissions || []));
     setShowPermissionsModal(true);
   };
 
@@ -264,7 +269,7 @@ const AccountManagement: React.FC = () => {
 
     try {
       const success = await adminAccountService.updateAccount(editingAccount.id, {
-        permissions: permissionsFormData
+        permissions: normalizePermissionIds(permissionsFormData)
       });
 
       if (success) {
@@ -283,12 +288,13 @@ const AccountManagement: React.FC = () => {
   const AVAILABLE_PERMISSIONS = [
     { id: 'city_packages', name: '同城订单', icon: '📦' },
     { id: 'users', name: '用户管理', icon: '👥' },
-    { id: 'merchants_stores', name: '合伙店铺', icon: '🏪' },
+    { id: 'merchant_stores', name: '商家管理', icon: '🏪' },
     { id: 'finance', name: '财务管理', icon: '💰' },
     { id: 'tracking', name: '实时跟踪', icon: '📍' },
     { id: 'settings', name: '系统设置', icon: '⚙️' },
     { id: 'delivery_alerts', name: '配送警报', icon: '🚨' },
     { id: 'banners', name: '广告管理', icon: '🖼️' },
+    { id: 'recharges', name: '充值管理', icon: '💳' },
   ];
 
   const togglePermission = (permId: string) => {

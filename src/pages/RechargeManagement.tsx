@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, rechargeService, RechargeRequest, auditLogService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -25,6 +25,9 @@ const RechargeManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showProofModal, setShowProofModal] = useState<string | null>(null);
+  
+  // 🚀 修改：日期筛选改为单日，移除 VIP 筛选状态
+  const [selectedDate, setSelectedDate] = useState('');
 
   // 获取当前登录管理员信息
   const currentAdmin = sessionStorage.getItem('currentUserName') || '系统管理员';
@@ -101,7 +104,44 @@ const RechargeManagement: React.FC = () => {
     }
   };
 
-  const filteredRequests = requests.filter(r => filterStatus === 'all' || r.status === filterStatus);
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      // 1. 状态过滤
+      if (filterStatus !== 'all' && req.status !== filterStatus) return false;
+      
+      // 2. 🚀 修改：单日日期过滤
+      if (selectedDate) {
+        const reqDate = new Date(req.created_at!).toISOString().split('T')[0];
+        if (reqDate !== selectedDate) return false;
+      }
+      
+      return true;
+    });
+  }, [requests, filterStatus, selectedDate]);
+
+  // 🚀 新增：充值统计汇总
+  const summary = useMemo(() => {
+    const totalCompletedAmount = requests
+      .filter(r => r.status === 'completed')
+      .reduce((sum, r) => sum + r.amount, 0);
+    
+    const totalPendingAmount = requests
+      .filter(r => r.status === 'pending')
+      .reduce((sum, r) => sum + r.amount, 0);
+      
+    const vipCount = requests
+      .filter(r => (r.user_balance || 0) > 0)
+      .map(r => r.user_id)
+      .filter((value, index, self) => self.indexOf(value) === index) // 去重
+      .length;
+
+    return {
+      completed: totalCompletedAmount,
+      pending: totalPendingAmount,
+      vips: vipCount,
+      totalCount: requests.length
+    };
+  }, [requests]);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -151,54 +191,160 @@ const RechargeManagement: React.FC = () => {
           </button>
         </div>
 
+        {/* 🚀 新增：充值统计卡片 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+          gap: '16px',
+          marginBottom: '30px'
+        }}>
+          {[
+            { label: '已完成总额', value: summary.completed, color: '#10b981', icon: '💰' },
+            { label: '待审核总额', value: summary.pending, color: '#f59e0b', icon: '⏳' },
+            { label: 'VIP 客户数', value: summary.vips, color: '#8b5cf6', icon: '💎', noCurrency: true },
+            { label: '总申请单数', value: summary.totalCount, color: '#3b82f6', icon: '📊', noCurrency: true }
+          ].map((item, i) => (
+            <div key={i} style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              padding: '20px',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>{item.label}</span>
+                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#fff' }}>
+                  {item.value.toLocaleString()}
+                </span>
+                {!item.noCurrency && <span style={{ fontSize: '0.7rem', color: item.color, fontWeight: 'bold' }}>MMK</span>}
+              </div>
+              <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: item.color, marginTop: '5px' }}></div>
+            </div>
+          ))}
+        </div>
+
         {/* 过滤器 */}
         <div style={{
           background: 'rgba(255,255,255,0.03)',
-          padding: '10px',
-          borderRadius: '20px',
+          padding: '20px',
+          borderRadius: '24px',
           marginBottom: '30px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           border: '1px solid rgba(255,255,255,0.05)',
-          flexWrap: 'wrap',
-          gap: '15px'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
         }}>
-          <div style={{ display: 'flex', gap: '8px', padding: '5px' }}>
-            {['all', 'pending', 'completed', 'rejected'].map(s => (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '15px'
+          }}>
+            <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '16px' }}>
+              {['all', 'pending', 'completed', 'rejected'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: filterStatus === s ? '#3b82f6' : 'transparent',
+                    color: filterStatus === s ? 'white' : 'rgba(255,255,255,0.5)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {s === 'all' ? '全部' : getStatusStyle(s).label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '14px',
-                  border: 'none',
-                  background: filterStatus === s ? '#3b82f6' : 'transparent',
-                  color: filterStatus === s ? 'white' : 'rgba(255,255,255,0.5)',
+                onClick={loadRequests}
+                style={{ 
+                  padding: '10px 20px', 
+                  borderRadius: '12px', 
+                  border: 'none', 
+                  background: 'rgba(16, 185, 129, 0.1)', 
+                  color: '#10b981', 
                   cursor: 'pointer',
-                  fontWeight: 600,
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+              >
+                🔄 同步
+              </button>
+            </div>
+          </div>
+
+          {/* 🚀 修改：单日日期筛选 */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '15px', 
+            alignItems: 'center',
+            paddingTop: '15px',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            flexWrap: 'wrap'
+          }}>
+            <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)' }}>📅 筛选日期:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  color: 'white',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button 
+                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  color: '#3b82f6',
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer'
                 }}
               >
-                {s === 'all' ? '全部' : getStatusStyle(s).label}
+                今天
               </button>
-            ))}
+              {selectedDate && (
+                <button 
+                  onClick={() => setSelectedDate('')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  清除
+                </button>
+              )}
+            </div>
           </div>
-          <button
-            onClick={loadRequests}
-            style={{ 
-              padding: '10px 20px', 
-              borderRadius: '14px', 
-              border: 'none', 
-              background: 'rgba(16, 185, 129, 0.1)', 
-              color: '#10b981', 
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              marginRight: '5px'
-            }}
-          >
-            🔄 {language === 'zh' ? '同步数据' : 'Sync'}
-          </button>
         </div>
 
         {/* 申请列表 */}
@@ -227,7 +373,18 @@ const RechargeManagement: React.FC = () => {
                   alignItems: 'center',
                   flexWrap: 'wrap',
                   gap: '25px',
-                  transition: 'transform 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                  e.currentTarget.style.transform = 'translateY(-5px)';
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                 }}>
                   <div style={{ flex: 1, minWidth: '300px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
@@ -235,7 +392,23 @@ const RechargeManagement: React.FC = () => {
                         {req.user_name?.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: '800', fontSize: '1.25rem', color: '#fff' }}>{req.user_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontWeight: '800', fontSize: '1.25rem', color: '#fff' }}>{req.user_name}</div>
+                          {(req.user_balance || 0) > 0 && (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                              color: 'white',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.65rem',
+                              fontWeight: '900',
+                              textTransform: 'uppercase',
+                              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+                            }}>
+                              💎 VIP
+                            </div>
+                          )}
+                        </div>
                         <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '2px' }}>ID: {req.user_id}</div>
                       </div>
                     </div>

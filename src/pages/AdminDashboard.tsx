@@ -117,8 +117,9 @@ const AdminDashboard: React.FC = () => {
   const currentUserName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '用户';
   const currentUser = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || '';
   const currentUserRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || '';
-  const currentUserPermissionsStr = sessionStorage.getItem('currentUserPermissions') || localStorage.getItem('currentUserPermissions') || '[]';
-  const currentUserPermissions = JSON.parse(currentUserPermissionsStr);
+  const storedPermissionsStr = sessionStorage.getItem('currentUserPermissions') || localStorage.getItem('currentUserPermissions');
+  const hasPermissionOverride = storedPermissionsStr !== null;
+  const currentUserPermissions = storedPermissionsStr ? JSON.parse(storedPermissionsStr) : [];
 
   // 获取工作区域
   const getWorkRegion = () => {
@@ -294,8 +295,11 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
   // 根据当前用户角色或特有权限筛选可访问的卡片
   const cardData = allCardData.filter(card => {
     // 如果用户拥有特有权限列表，且包含该卡片的 ID
-    if (currentUserPermissions && Array.isArray(currentUserPermissions) && currentUserPermissions.length > 0) {
-      if (currentUserPermissions.includes(card.id)) return true;
+    if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
+      // 万能账号始终显示全部卡片
+      if (currentUserRole === 'admin') return true;
+      // 区域账号有明确权限列表时按列表显示
+      return currentUserPermissions.includes(card.id);
     }
     // 否则回退到角色基础权限
     return card.roles.includes(currentUserRole);

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,15 +11,19 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Image
+  Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
-import { supabase } from '../services/supabase';
+import { supabase, merchantService } from '../services/supabase';
 import { theme } from '../config/theme';
+import * as Print from 'expo-print';
+import QRCodeGenerator from 'qrcode';
 
 const { width } = Dimensions.get('window');
+const FOOTER_SPACE = 120;
 
 // 🚀 双向滑动确认组件 (右滑接单/左滑取消)
 const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
@@ -98,8 +102,131 @@ const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
   );
 };
 
-export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatusUpdate }: any) => {
+export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatusUpdate, onAccepted }: any) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let isActive = true;
+    const loadProducts = async () => {
+      if (!orderData?.delivery_store_id) {
+        setProductPriceMap({});
+        return;
+      }
+      const products = await merchantService.getStoreProducts(orderData.delivery_store_id);
+      if (!isActive) return;
+      const priceMap = products.reduce<Record<string, number>>((acc, product) => {
+        acc[product.name] = product.price;
+        return acc;
+      }, {});
+      setProductPriceMap(priceMap);
+    };
+    loadProducts();
+    return () => {
+      isActive = false;
+    };
+  }, [orderData?.delivery_store_id]);
+
+  const getPrintableItems = () => {
+    if (!orderData?.description) return [];
+    const itemsMatch = orderData.description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
+    if (!itemsMatch || !itemsMatch[1]) return [];
+    const items = itemsMatch[1].split(', ');
+    return items.map((item: string) => {
+      const match = item.match(/^(.+?)\s*x(\d+)$/i);
+      if (!match) {
+        return { label: item, qty: 1, price: undefined };
+      }
+      const name = match[1].trim();
+      const qty = Number(match[2]) || 1;
+      const unitPrice = productPriceMap[name];
+      return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
+    });
+  };
+
+  const handlePrintOrder = async () => {
+    const qrDataUrl = orderData?.id
+      ? await QRCodeGenerator.toDataURL(orderData.id, { margin: 1, width: 180 })
+      : '';
+    const items = getPrintableItems();
+    const itemPayMatch = orderData?.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+    const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
+    const deliveryFee = parseFloat(orderData?.price?.replace(/[^0-9.]/g, '') || '0');
+    const computedItemTotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
+    const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
+    const totalFee = deliveryFee + finalItemTotal;
+    const paymentText = orderData?.payment_method === 'cash' ? '现金支付' : '余额支付';
+    const orderIdShort = orderData?.id ? `#${orderData.id.slice(-5)}` : '';
+    const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #111827; }
+            .ticket { width: 100%; max-width: 420px; margin: 0 auto; padding: 16px; }
+            .title { text-align: center; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+            .subtitle { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+            .section { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
+            .row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin: 4px 0; }
+            .label { color: #6b7280; }
+            .value { font-weight: 600; text-align: right; }
+            .items { margin-top: 6px; }
+            .item { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
+            .total { font-size: 14px; font-weight: 700; }
+            .note { font-size: 11px; color: #6b7280; margin-top: 8px; text-align: center; }
+            .qr { display: flex; flex-direction: column; align-items: center; margin-top: 8px; }
+            .qr img { width: 160px; height: 160px; }
+            .qr-code { font-size: 12px; font-weight: 700; margin-top: 6px; }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <div class="title">MARKET LINK EXPRESS</div>
+            <div class="subtitle">订单号 ${orderIdShort}</div>
+
+            ${qrDataUrl ? `
+              <div class="qr">
+                <img src="${qrDataUrl}" />
+                <div class="qr-code">取件码: ${orderData?.id || '-'}</div>
+              </div>
+            ` : ''}
+
+            <div class="section">
+              <div class="row"><div class="label">商家</div><div class="value">${orderData?.sender_name || '-'}</div></div>
+              <div class="row"><div class="label">电话</div><div class="value">${orderData?.sender_phone || '-'}</div></div>
+              <div class="row"><div class="label">地址</div><div class="value">${orderData?.sender_address || '-'}</div></div>
+            </div>
+
+            <div class="section">
+              <div class="row"><div class="label">客户</div><div class="value">${orderData?.receiver_name || '-'}</div></div>
+              <div class="row"><div class="label">电话</div><div class="value">${orderData?.receiver_phone || '-'}</div></div>
+              <div class="row"><div class="label">地址</div><div class="value">${orderData?.receiver_address || '-'}</div></div>
+            </div>
+
+            <div class="section">
+              <div class="row"><div class="label">支付方式</div><div class="value">${paymentText}</div></div>
+              <div class="items">
+                ${(items.length === 0)
+                  ? '<div class="item"><div class="label">商品</div><div class="value">-</div></div>'
+                  : items.map(item => `
+                      <div class="item">
+                        <div>${item.label} x${item.qty}</div>
+                        <div class="value">${item.price ? `${item.price.toLocaleString()} MMK` : '-'}</div>
+                      </div>
+                    `).join('')}
+              </div>
+              <div class="row"><div class="label">跑腿费</div><div class="value">${deliveryFee.toLocaleString()} MMK</div></div>
+              <div class="row total"><div class="label">合计</div><div class="value">${totalFee.toLocaleString()} MMK</div></div>
+            </div>
+
+            <div class="note">请保留此票据用于对账</div>
+          </div>
+        </body>
+      </html>
+    `;
+    await Print.printAsync({ html });
+  };
 
   const handleAccept = async () => {
     if (!orderData || isProcessing) return;
@@ -113,6 +240,13 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
 
       if (error) throw error;
       onStatusUpdate?.();
+      try {
+        await handlePrintOrder();
+      } catch (printError) {
+        console.error('打印失败:', printError);
+        Alert.alert('错误', '打印失败，请检查打印机连接');
+      }
+      onAccepted?.(orderData);
       onClose();
     } catch (error) {
       console.error('接单失败:', error);
@@ -162,8 +296,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
               const { error: orderError } = await supabase
                 .from('packages')
                 .update({ 
-                  status: '已取消', 
-                  notes: (orderData.notes || '') + ' [商家拒绝接单]',
+                  status: '已取消',
                   updated_at: new Date().toISOString() 
                 })
                 .eq('id', orderData.id);
@@ -217,6 +350,22 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
     if (!itemsMatch || !itemsMatch[1]) return null;
     
     const items = itemsMatch[1].split(', ');
+    const itemPayMatch = orderData.description.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+    const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
+    const deliveryFee = parseFloat(orderData?.price?.replace(/[^0-9.]/g, '') || '0');
+    const parsedItems = items.map((item: string) => {
+      const match = item.match(/^(.+?)\s*x(\d+)$/i);
+      if (!match) {
+        return { label: item, qty: 1, price: undefined };
+      }
+      const name = match[1].trim();
+      const qty = Number(match[2]) || 1;
+      const unitPrice = productPriceMap[name];
+      return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
+    });
+    const computedItemTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+    const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
+    const totalFee = deliveryFee + finalItemTotal;
     
     return (
       <View style={styles.infoSection}>
@@ -225,9 +374,27 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
           <Text style={styles.sectionTitle}>{language === 'zh' ? '商品信息' : 'Items'}</Text>
         </View>
         <View style={styles.itemBox}>
-          {items.map((item: string, index: number) => (
-            <Text key={index} style={styles.itemText}>• {item}</Text>
+          {parsedItems.map((item, index) => (
+            <View
+              key={`${item.label}-${index}`}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
+            >
+              <Text style={styles.itemText}>• {item.label} x{item.qty}</Text>
+              <Text style={styles.value}>
+                {item.price ? `${item.price.toLocaleString()} MMK` : '-'}
+              </Text>
+            </View>
           ))}
+          <View style={{ height: 8 }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.cardLabel}>{language === 'zh' ? '跑腿费' : language === 'my' ? 'ပို့ဆောင်ခ' : 'Delivery Fee'}</Text>
+            <Text style={styles.value}>{deliveryFee.toLocaleString()} MMK</Text>
+          </View>
+          <View style={{ height: 8 }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.cardLabel}>{language === 'zh' ? '统计' : language === 'my' ? 'စုစုပေါင်း' : 'Total'}</Text>
+            <Text style={styles.value}>{totalFee.toLocaleString()} MMK</Text>
+          </View>
         </View>
       </View>
     );
@@ -236,7 +403,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '85%' }]}>
+        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '85%', position: 'relative' }]}>
           <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
             <View style={styles.iconContainer}>
               <Ionicons name="notifications" size={32} color="#fbbf24" />
@@ -250,7 +417,11 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
             </View>
           </LinearGradient>
 
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: FOOTER_SPACE }}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={{ padding: 20 }}>
               {/* 二维码寄件码 */}
               <View style={styles.qrSection}>
@@ -345,7 +516,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
             </View>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, styles.footerFixed]}>
             <SwipeAcceptDecline 
               language={language}
               onAccept={handleAccept}
@@ -381,7 +552,11 @@ const styles = StyleSheet.create({
   iconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 2, borderColor: '#fbbf24' },
   modalTitle: { fontSize: 20, fontWeight: '900', color: 'white', textAlign: 'center' },
   badgeContainer: { marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
-  orderIdBadge: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
+  orderIdBadge: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
   
   qrSection: { alignItems: 'center', marginBottom: 20, backgroundColor: 'white', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
   qrLabel: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 12 },
@@ -406,6 +581,7 @@ const styles = StyleSheet.create({
   notesText: { fontSize: 14, color: '#9a3412', fontWeight: '600', lineHeight: 20 },
 
   footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: 'white' },
+  footerFixed: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   label: { fontSize: 14, color: '#64748b' },
   value: { fontSize: 14, fontWeight: 'bold', color: '#1e293b' },
 });

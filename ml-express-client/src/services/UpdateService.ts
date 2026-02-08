@@ -16,8 +16,11 @@ export class UpdateService {
       }
     } catch (error) {
       LoggerService.error('Update check failed:', error);
+    }
   }
+
   static async downloadAndRestart() {
+    try {
       await Updates.fetchUpdateAsync();
       Alert.alert(
         '发现新版本',
@@ -33,5 +36,8 @@ export class UpdateService {
         ],
         { cancelable: false }
       );
+    } catch (error) {
       LoggerService.error('Update download failed:', error);
+    }
+  }
 }

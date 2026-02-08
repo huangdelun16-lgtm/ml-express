@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import QRCode from 'react-native-qrcode-svg';
+import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { useCart } from '../contexts/CartContext';
@@ -58,6 +59,14 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   
   // QR码保存引用
   const viewShotRef = useRef<any>(null);
+  const submitGuardRef = useRef(0);
+  const orderDraftRef = useRef<{
+    orderId: string;
+    signature: string;
+    createdAt: number;
+    deducted: boolean;
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 处理从其他页面（如商品详情/购物车）传来的预选商品
   useEffect(() => {
@@ -1330,8 +1339,136 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     return lines.filter(line => !line.includes('📍')).join('\n').trim();
   };
 
+  const ORDER_DRAFT_CACHE_KEY = 'pendingOrderDraft';
+  const ORDER_DRAFT_TTL_MS = 5 * 60 * 1000;
+
+  const buildOrderSignature = () => {
+    const signaturePayload = {
+      senderName: senderName.trim(),
+      senderPhone: senderPhone.trim(),
+      senderAddress: extractAddress(senderAddress),
+      receiverName: receiverName.trim(),
+      receiverPhone: receiverPhone.trim(),
+      receiverAddress: extractAddress(receiverAddress),
+      senderCoordinates,
+      receiverCoordinates,
+      packageType,
+      weight,
+      deliverySpeed,
+      scheduledTime: deliverySpeed === '定时达' ? scheduledTime : '',
+      paymentMethod,
+      hasCOD,
+      codAmount,
+      cartTotal,
+      calculatedPrice,
+      calculatedDistance,
+      isCalculated,
+      selectedProducts,
+      description,
+    };
+    return JSON.stringify(signaturePayload);
+  };
+
+  const getCachedDraft = async (signature: string) => {
+    try {
+      const cached = await AsyncStorage.getItem(ORDER_DRAFT_CACHE_KEY);
+      if (!cached) return null;
+      const parsed = JSON.parse(cached);
+      if (!parsed?.signature || !parsed?.orderId || !parsed?.createdAt) return null;
+      const isExpired = Date.now() - parsed.createdAt > ORDER_DRAFT_TTL_MS;
+      if (isExpired || parsed.signature !== signature) {
+        await AsyncStorage.removeItem(ORDER_DRAFT_CACHE_KEY);
+        return null;
+      }
+      return parsed as { orderId: string; signature: string; createdAt: number; deducted: boolean };
+    } catch (error) {
+      LoggerService.error('读取下单草稿失败:', error);
+      return null;
+    }
+  };
+
+  const saveDraft = async (draft: { orderId: string; signature: string; createdAt: number; deducted: boolean }) => {
+    orderDraftRef.current = draft;
+    try {
+      await AsyncStorage.setItem(ORDER_DRAFT_CACHE_KEY, JSON.stringify(draft));
+    } catch (error) {
+      LoggerService.error('保存下单草稿失败:', error);
+    }
+  };
+
+  const clearDraft = async () => {
+    orderDraftRef.current = null;
+    try {
+      await AsyncStorage.removeItem(ORDER_DRAFT_CACHE_KEY);
+    } catch (error) {
+      LoggerService.error('清除下单草稿失败:', error);
+    }
+  };
+
+  const isNetworkError = (error: any) => {
+    const message = error?.message || '';
+    return message.includes('Network request failed') ||
+      message.includes('Failed to fetch') ||
+      message.toLowerCase().includes('timeout');
+  };
+
+  const getOrderErrorMessage = (error: any) => {
+    const message = error?.message || '';
+    if (error?.code === '23505') {
+      return language === 'zh' ? '订单已提交，请勿重复下单' : language === 'en' ? 'Order already submitted' : 'အော်ဒါကို ပို့ပြီးသားပါ';
+    }
+    if (isNetworkError(error)) {
+      return language === 'zh' ? '网络不稳定，已为你保存订单，稍后可重试' : language === 'en' ? 'Network unstable. Order saved for retry.' : 'အင်တာနက်မတည်ငြိမ်ပါ၊ အော်ဒါကို သိမ်းထားပြီးပါပြီ';
+    }
+    if (message.includes('permission') || message.includes('unauthorized')) {
+      return language === 'zh' ? '权限不足，请重新登录' : language === 'en' ? 'Permission denied. Please re-login.' : 'အခွင့်မပြုပါ၊ ပြန်လည်ဝင်ရောက်ပါ';
+    }
+    return language === 'zh' ? '下单失败，请稍后重试或联系客服' : language === 'en' ? 'Order failed. Please retry or contact support.' : 'အော်ဒါမအောင်မြင်ပါ၊ နောက်မှ ထပ်ကြိုးစားပါ';
+  };
+
+  const createPackageWithRetry = async (orderData: any) => {
+    const maxAttempts = 2;
+    const timeoutMs = 12000;
+    let lastResult: any = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const result: any = await Promise.race([
+          packageService.createPackage(orderData),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+        ]);
+        lastResult = result;
+        if (result?.success || result?.error?.code === '23505') {
+          return result;
+        }
+        if (!isNetworkError(result?.error)) {
+          return result;
+        }
+      } catch (error: any) {
+        lastResult = { success: false, error };
+        if (!isNetworkError(error) || attempt === maxAttempts) {
+          return lastResult;
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+    }
+
+    return lastResult;
+  };
+
   // 提交订单
   const handleSubmitOrder = async () => {
+    if (isSubmitting) {
+      feedbackService.warning(language === 'zh' ? '订单提交中，请勿重复点击' : language === 'en' ? 'Submitting, please do not tap again' : 'အော်ဒါတင်နေပါသည်၊ ထပ်မနှိပ်ပါနှင့်');
+      return;
+    }
+    const submitTs = Date.now();
+    if (submitTs - submitGuardRef.current < 1500) {
+      feedbackService.warning(language === 'zh' ? '请稍候再提交' : language === 'en' ? 'Please wait before submitting again' : 'ခဏစောင့်ပြီးမှ ထပ်တင်ပါ');
+      return;
+    }
+
     // 1. 验证必填字段
     const newErrors: Record<string, string> = {};
     let isValid = true;
@@ -1373,6 +1510,31 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       return;
     }
 
+    const parsedWeight = Number(weight);
+    if (showWeightInput && (!Number.isFinite(parsedWeight) || parsedWeight <= 0)) {
+      feedbackService.warning(language === 'zh' ? '请输入有效包裹重量' : language === 'en' ? 'Please enter valid weight' : 'အလေးချိန်မှန်ကန်စွာ ထည့်ပါ');
+      return;
+    }
+
+    const finalPriceNumber = Number(isCalculated ? calculatedPrice : price);
+    if (!Number.isFinite(finalPriceNumber) || finalPriceNumber <= 0) {
+      feedbackService.warning(language === 'zh' ? '请先计算价格' : language === 'en' ? 'Please calculate price first' : 'စျေးနှုန်းကို အရင်တွက်ပါ');
+      return;
+    }
+
+    if (paymentMethod !== 'cash' && paymentMethod !== 'balance') {
+      feedbackService.warning(language === 'zh' ? '支付方式无效' : language === 'en' ? 'Invalid payment method' : 'ပေးချေမှုနည်းလမ်း မမှန်ကန်ပါ');
+      return;
+    }
+
+    const codAmountNumber = hasCOD ? Number(codAmount || '0') : 0;
+    if (hasCOD && (!Number.isFinite(codAmountNumber) || codAmountNumber < 0)) {
+      feedbackService.warning(language === 'zh' ? '代收款金额无效' : language === 'en' ? 'Invalid COD amount' : 'COD ငွေပမာဏ မမှန်ကန်ပါ');
+      return;
+    }
+
+    submitGuardRef.current = submitTs;
+    setIsSubmitting(true);
     let offlinePayload: any = null;
 
     try {
@@ -1427,8 +1589,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         return `${prefix}${year}${month}${day}${hour}${minute}${random1}${random2}`;
       };
       
-      const orderId = generateOrderId(senderAddress);
-      const now = new Date();
+      const signature = buildOrderSignature();
+      const cachedDraft = await getCachedDraft(signature);
+      const orderId = cachedDraft?.orderId || generateOrderId(senderAddress);
+      const createdAt = cachedDraft ? new Date(cachedDraft.createdAt) : new Date();
+      await saveDraft(cachedDraft || {
+        orderId,
+        signature,
+        createdAt: createdAt.getTime(),
+        deducted: false,
+      });
       
       // 🚀 优化：记录下单人身份 (识别 商家/VIP/普通会员)
       let ordererType = '会员';
@@ -1442,7 +1612,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                      language === 'en' ? `[Orderer: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]` : 
                      `[အော်ဒါတင်သူ: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]`;
 
-      const createTime = now.toLocaleString('zh-CN', {
+      const createTime = createdAt.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -1498,19 +1668,19 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const orderData = {
         id: orderId,
         customer_id: userId,
-        sender_name: senderName,
-        sender_phone: senderPhone,
+        sender_name: senderName.trim(),
+        sender_phone: senderPhone.trim(),
         sender_address: finalSenderAddr,
         sender_latitude: finalSenderLat || null,
         sender_longitude: finalSenderLng || null,
-        receiver_name: receiverName,
-        receiver_phone: receiverPhone,
+        receiver_name: receiverName.trim(),
+        receiver_phone: receiverPhone.trim(),
         receiver_address: extractAddress(receiverAddress),
         receiver_latitude: receiverCoordinates?.lat || null,
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
-        cod_amount: (currentUser?.user_type === 'merchant' && hasCOD) ? parseFloat(codAmount || '0') : (deliveryStoreId ? parseFloat(codAmount || '0') : 0),
+        cod_amount: (currentUser?.user_type === 'merchant' && hasCOD) ? codAmountNumber : (deliveryStoreId ? codAmountNumber : 0),
         description: `${typeTag} ${paymentTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
@@ -1524,26 +1694,43 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         pickup_time: '',
         delivery_time: '',
         courier: '待分配',
-        price: isCalculated ? calculatedPrice : price,
+        price: String(Math.round(finalPriceNumber)),
         payment_method: paymentMethod, // 添加支付方式字段
       };
 
+      offlinePayload = { ...orderData };
+
+      const netState = await NetInfo.fetch();
+      const isOnline = Boolean(netState.isConnected) && netState.isInternetReachable !== false;
+      if (!isOnline) {
+        hideLoading();
+        await persistOrderLocally(offlinePayload, 'pending', 'offline');
+        showOfflineSavedAlert();
+        return;
+      }
+
       // 🚀 核心逻辑：余额支付扣款校验
-      const shippingFee = parseFloat(orderData.price);
+      const shippingFee = Math.max(0, Number(orderData.price) || 0);
       let totalDeduction = 0;
+      const originalBalance = accountBalance;
+      const draftSnapshot = orderDraftRef.current;
 
       // 1. 如果是商城订单，强制检查余额是否充足支付商品
       // 🚀 修复：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不扣除自身余额
       if (cartTotal > 0 && !isGuest && currentUser?.user_type !== 'merchant') {
         if (accountBalance < cartTotal) {
-          hideLoading();
-          Alert.alert(
-            currentT.insufficientBalance, 
-            `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
-            `${language === 'zh' ? '商品总计' : 'Items Total'}: ${cartTotal.toLocaleString()} MMK\n\n` +
-            `${language === 'zh' ? '请先充值后再购买商场商品。' : 'Please recharge before buying mall items.'}`
-          );
-          return;
+          if (draftSnapshot?.deducted) {
+            // 已扣款情况下跳过余额不足校验
+          } else {
+            hideLoading();
+            Alert.alert(
+              currentT.insufficientBalance, 
+              `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
+              `${language === 'zh' ? '商品总计' : 'Items Total'}: ${cartTotal.toLocaleString()} MMK\n\n` +
+              `${language === 'zh' ? '请先充值后再购买商场商品。' : 'Please recharge before buying mall items.'}`
+            );
+            return;
+          }
         }
         totalDeduction += cartTotal;
       }
@@ -1553,7 +1740,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       if (paymentMethod === 'balance' && !isGuest && currentUser?.user_type !== 'merchant') {
         totalDeduction += shippingFee;
         
-        if (accountBalance < totalDeduction) {
+        if (accountBalance < totalDeduction && !draftSnapshot?.deducted) {
           hideLoading();
           Alert.alert(
             currentT.insufficientBalance, 
@@ -1566,38 +1753,44 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
       // 3. 执行扣款 (如果有需要扣款的金额)
       if (totalDeduction > 0 && !isGuest) {
-        console.log('💰 正在执行余额扣除:', totalDeduction);
-        const { data: updatedUser, error: deductError } = await supabase
-          .from('users')
-          .update({ 
-            balance: accountBalance - totalDeduction,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId)
-          .select()
-          .single();
+        if (!draftSnapshot?.deducted) {
+          console.log('💰 正在执行余额扣除:', totalDeduction);
+          const { data: updatedUser, error: deductError } = await supabase
+            .from('users')
+            .update({ 
+              balance: accountBalance - totalDeduction,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId)
+            .select()
+            .single();
 
-        if (deductError) {
-          hideLoading();
-          LoggerService.error('余额扣除失败:', deductError);
-          Alert.alert('扣款失败', '由于余额扣除异常，请稍后重试或联系客服。');
-          return;
+          if (deductError) {
+            hideLoading();
+            LoggerService.error('余额扣除失败:', deductError);
+            Alert.alert('扣款失败', '由于余额扣除异常，请稍后重试或联系客服。');
+            return;
+          }
+
+          // 扣款成功，更新本地状态和缓存
+          setAccountBalance(updatedUser.balance);
+          await AsyncStorage.setItem('currentUser', JSON.stringify({ ...currentUser, balance: updatedUser.balance }));
+          feedbackService.success(currentT.balanceDeducted);
+          await saveDraft({
+            orderId,
+            signature,
+            createdAt: createdAt.getTime(),
+            deducted: true,
+          });
         }
-
-        // 扣款成功，更新本地状态和缓存
-        setAccountBalance(updatedUser.balance);
-        await AsyncStorage.setItem('currentUser', JSON.stringify({ ...currentUser, balance: updatedUser.balance }));
-        feedbackService.success(currentT.balanceDeducted);
       }
 
-      offlinePayload = { ...orderData };
-
       // 调用API创建订单
-      const result = await packageService.createPackage(orderData);
+      const result = await createPackageWithRetry(orderData);
       
       hideLoading();
 
-      if (result?.success) {
+      if (result?.success || result?.error?.code === '23505') {
         // 🚀 核心优化：订单创建成功后清空购物车
         if (route.params?.selectedProducts) {
           clearCart();
@@ -1605,6 +1798,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         }
         
         await persistOrderLocally(offlinePayload, 'synced');
+        await clearDraft();
         syncPendingOrders();
         // 显示包裹二维码（无论支付方式，快递员需要扫描取件）
         // 注意：这是包裹二维码，不是支付二维码
@@ -1633,15 +1827,45 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         // 重置表单（在关闭二维码模态框时也会重置）
         // resetForm(); // 移到二维码模态框关闭时重置
       } else {
-        await persistOrderLocally(offlinePayload, 'pending', result?.error?.message);
-        showOfflineSavedAlert();
+        if (orderDraftRef.current?.deducted && !isGuest) {
+          const { error: refundError } = await supabase
+            .from('users')
+            .update({ 
+              balance: originalBalance,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+          if (refundError) {
+            LoggerService.error('余额回滚失败:', refundError);
+            Alert.alert('下单失败', '订单未创建成功，余额回滚失败，请联系客服处理。');
+          } else {
+            setAccountBalance(originalBalance);
+            await AsyncStorage.setItem('currentUser', JSON.stringify({ ...currentUser, balance: originalBalance }));
+            await saveDraft({
+              orderId,
+              signature,
+              createdAt: createdAt.getTime(),
+              deducted: false,
+            });
+          }
+        }
+        if (isNetworkError(result?.error)) {
+          await persistOrderLocally(offlinePayload, 'pending', result?.error?.message);
+          showOfflineSavedAlert();
+        }
+        feedbackService.error(getOrderErrorMessage(result?.error));
         return;
       }
     } catch (error: any) {
       hideLoading();
       errorService.handleError(error, { context: 'PlaceOrderScreen.handleSubmit', silent: true });
-      await persistOrderLocally(offlinePayload, 'pending', error?.message);
-      showOfflineSavedAlert();
+      if (isNetworkError(error)) {
+        await persistOrderLocally(offlinePayload, 'pending', error?.message);
+        showOfflineSavedAlert();
+      }
+      feedbackService.error(getOrderErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -2094,9 +2318,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           {/* 提交按钮 */}
           <ScaleInView delay={450}>
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
               onPress={handleSubmitOrder}
               activeOpacity={0.8}
+              disabled={isSubmitting}
             >
               <LinearGradient
                 colors={['#3b82f6', '#2563eb', '#1d4ed8']}
@@ -2105,7 +2330,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                 style={styles.submitGradient}
               >
                 <DeliveryIcon size={24} color="#ffffff" />
-                <Text style={styles.submitText}>{currentT.submitOrder}</Text>
+                <Text style={styles.submitText}>
+                  {isSubmitting ? currentT.creating : currentT.submitOrder}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </ScaleInView>
@@ -2750,6 +2977,9 @@ const baseStyles = StyleSheet.create({
     elevation: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
   submitGradient: {
     flexDirection: 'row',

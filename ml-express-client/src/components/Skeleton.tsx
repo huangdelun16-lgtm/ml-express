@@ -5,7 +5,7 @@ const { width } = Dimensions.get('window');
 
 interface SkeletonProps {
   width?: number | string;
-  height?: number;
+  height?: number | string;
   borderRadius?: number;
   style?: any;
 }

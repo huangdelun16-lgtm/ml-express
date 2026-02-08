@@ -254,8 +254,41 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
     });
 
     const result = await response.json();
-    
-    if (!result.valid) {
+
+    if (result.valid && result.user) {
+      try {
+        const existingRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || undefined;
+        const normalizedPermissions = Array.isArray(result.user.permissions)
+          ? result.user.permissions.map((id: string) => (id === 'merchants_stores' ? 'merchant_stores' : id))
+          : undefined;
+        if (result.user.username) {
+          sessionStorage.setItem('currentUser', result.user.username);
+          localStorage.setItem('currentUser', result.user.username);
+        }
+        if (result.user.name) {
+          sessionStorage.setItem('currentUserName', result.user.name);
+          localStorage.setItem('currentUserName', result.user.name);
+        }
+        if (result.user.role) {
+          sessionStorage.setItem('currentUserRole', result.user.role);
+          localStorage.setItem('currentUserRole', result.user.role);
+        }
+        if (existingRegion) {
+          sessionStorage.setItem('currentUserRegion', existingRegion);
+          localStorage.setItem('currentUserRegion', existingRegion);
+        }
+        if (normalizedPermissions) {
+          const permissionsStr = JSON.stringify(Array.from(new Set(normalizedPermissions)));
+          sessionStorage.setItem('currentUserPermissions', permissionsStr);
+          localStorage.setItem('currentUserPermissions', permissionsStr);
+        } else {
+          sessionStorage.removeItem('currentUserPermissions');
+          localStorage.removeItem('currentUserPermissions');
+        }
+      } catch (error) {
+        logger.warn('更新权限缓存失败:', error);
+      }
+    } else if (!result.valid) {
       await clearToken();
     }
     

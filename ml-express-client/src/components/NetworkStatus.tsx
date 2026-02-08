@@ -17,7 +17,7 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ onRetry }) => {
       const connected = state.isConnected && state.isInternetReachable;
       
       if (connected !== isConnected) {
-        setIsConnected(connected);
+        setIsConnected(!!connected);
         
         if (!connected) {
           // 显示离线提示

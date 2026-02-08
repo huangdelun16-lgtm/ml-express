@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
@@ -163,38 +163,6 @@ export interface ProductCategory {
   display_order: number;
 }
 
-// 🚀 新增：通用的 Base64 转 Uint8Array 解码器（用于上传图片）
-const decodeBase64 = (b64: string): Uint8Array => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) {
-    lookup[chars.charCodeAt(i)] = i;
-  }
-
-  const cleanB64 = b64.replace(/\s/g, '');
-  const len = cleanB64.length;
-  let bufferLength = len * 0.75;
-  
-  if (cleanB64[len - 1] === '=') {
-    bufferLength--;
-    if (cleanB64[len - 2] === '=') bufferLength--;
-  }
-
-  const bytes = new Uint8Array(bufferLength);
-  let p = 0;
-  for (let i = 0; i < len; i += 4) {
-    const encoded1 = lookup[cleanB64.charCodeAt(i)];
-    const encoded2 = lookup[cleanB64.charCodeAt(i + 1)];
-    const encoded3 = lookup[cleanB64.charCodeAt(i + 2)];
-    const encoded4 = lookup[cleanB64.charCodeAt(i + 3)];
-
-    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-    if (p < bufferLength) bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-    if (p < bufferLength) bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-  }
-
-  return bytes;
-};
 
 // 客户服务（使用users表）
 export const customerService = {
@@ -942,38 +910,43 @@ export const packageService = {
   // 获取客户最近的订单（支持商家和普通客户）
   async getRecentOrders(userId: string, limit: number = 5, email?: string, phone?: string, userType?: string) {
     try {
-      let query = supabase
-        .from('packages')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const runQuery = async (includeCustomerId: boolean) => {
+        let query = supabase
+          .from('packages')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(limit);
 
-      if (userType === 'merchant') {
-        // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
-        const conditions = [`delivery_store_id.eq.${userId}`];
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        
-        query = query.or(conditions.join(','));
-      } else {
-        // 普通客户：使用多种方式匹配订单
-        // 注意：如果 customer_id 字段不存在，请先运行 add-customer-id-to-packages.sql 脚本
-        const conditions: string[] = [];
-        
-        // 暂时注释掉 customer_id，等运行SQL脚本后再取消注释
-        // conditions.push(`customer_id.eq.${userId}`);
-        
-        // 使用备用方案匹配
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        if (phone) conditions.push(`sender_phone.eq.${phone}`);
-        
-        query = query.or(conditions.join(','));
+        if (userType === 'merchant') {
+          // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
+          const conditions = [`delivery_store_id.eq.${userId}`];
+          if (email) conditions.push(`customer_email.eq.${email}`);
+          query = query.or(conditions.join(','));
+        } else {
+          // 普通客户：使用多种方式匹配订单
+          const conditions: string[] = [];
+          if (includeCustomerId) conditions.push(`customer_id.eq.${userId}`);
+          conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+          if (email) conditions.push(`customer_email.eq.${email}`);
+          if (phone) conditions.push(`sender_phone.eq.${phone}`);
+          query = query.or(conditions.join(','));
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return data || [];
+      };
+
+      try {
+        return await runQuery(true);
+      } catch (error: any) {
+        const message = error?.message || '';
+        if (message.includes('customer_id') && message.includes('does not exist')) {
+          return await runQuery(false);
+        }
+        throw error;
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
     } catch (error) {
       LoggerService.error('获取最近订单失败:', error);
       return [];
@@ -985,72 +958,68 @@ export const packageService = {
   // 注意：此方法使用与 getAllOrders 完全相同的查询逻辑，确保统计准确
   async getOrderStats(userId: string, email?: string, phone?: string, userType?: string, storeName?: string) {
     try {
-      // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status 字段用于统计
-      let query = supabase
-        .from('packages')
-        .select('status')
-        .order('created_at', { ascending: false });
+      const runQuery = async (includeCustomerId: boolean) => {
+        // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status 字段用于统计
+        let query = supabase
+          .from('packages')
+          .select('status')
+          .order('created_at', { ascending: false });
 
-      if (userType === 'merchant') {
-        // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
-        // 与 getAllOrders 保持完全一致
-        const conditions: string[] = [];
-        conditions.push(`delivery_store_id.eq.${userId}`);
-        if (email) {
-          conditions.push(`customer_email.eq.${email}`);
-        }
-        
-        // 如果提供了店铺名称，也通过 sender_name 匹配（兼容旧数据）
-        if (storeName) {
-          conditions.push(`sender_name.eq.${storeName}`);
-        }
-        
-        // 使用 or 查询，匹配任一条件
-        if (conditions.length > 0) {
+        if (userType === 'merchant') {
+          // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
+          // 与 getAllOrders 保持完全一致
+          const conditions: string[] = [];
+          conditions.push(`delivery_store_id.eq.${userId}`);
+          if (email) {
+            conditions.push(`customer_email.eq.${email}`);
+          }
+          if (storeName) {
+            conditions.push(`sender_name.eq.${storeName}`);
+          }
+          if (conditions.length > 0) {
+            query = query.or(conditions.join(','));
+          }
+        } else {
+          // 普通客户：使用与 getAllOrders 完全相同的查询逻辑
+          const conditions: string[] = [];
+          if (includeCustomerId) conditions.push(`customer_id.eq.${userId}`);
+          conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+          if (email) {
+            conditions.push(`customer_email.eq.${email}`);
+          }
+          if (phone) {
+            conditions.push(`sender_phone.eq.${phone}`);
+          }
           query = query.or(conditions.join(','));
         }
-      } else {
-        // 普通客户：使用与 getAllOrders 完全相同的查询逻辑
-        // 注意：如果 customer_id 字段不存在，请先运行 add-customer-id-to-packages.sql 脚本
-        const conditions: string[] = [];
-        
-        // 方式1：通过 customer_id 匹配（运行SQL脚本后可用）
-        // 暂时注释掉 customer_id，等运行SQL脚本后再取消注释
-        // conditions.push(`customer_id.eq.${userId}`);
-        
-        // 方式2：通过 description 匹配（兼容旧数据）
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        
-        // 方式3：通过邮箱匹配
-        if (email) {
-          conditions.push(`customer_email.eq.${email}`);
+
+        const { data, error } = await query;
+
+        if (error) {
+          LoggerService.error('获取订单统计失败:', error);
+          throw error;
         }
-        
-        // 方式4：通过手机号匹配（备用方案）
-        if (phone) {
-          conditions.push(`sender_phone.eq.${phone}`);
-        }
-        
-        // 使用 or 查询，匹配任一条件（与 getAllOrders 保持一致）
-        query = query.or(conditions.join(','));
-      }
 
-      const { data, error } = await query;
+        const stats = {
+          total: data?.length || 0,
+          pending: data?.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length || 0,
+          inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
+          delivered: data?.filter(p => p.status === '已送达').length || 0,
+          cancelled: data?.filter(p => p.status === '已取消').length || 0,
+        };
 
-      if (error) {
-        LoggerService.error('获取订单统计失败:', error);
-        throw error;
-      }
-
-      const stats = {
-        total: data?.length || 0,
-        pending: data?.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length || 0,
-        inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
-        delivered: data?.filter(p => p.status === '已送达').length || 0,
-        cancelled: data?.filter(p => p.status === '已取消').length || 0,
+        return stats;
       };
 
-      return stats;
+      try {
+        return await runQuery(true);
+      } catch (error: any) {
+        const message = error?.message || '';
+        if (message.includes('customer_id') && message.includes('does not exist')) {
+          return await runQuery(false);
+        }
+        throw error;
+      }
     } catch (error) {
       LoggerService.error('获取订单统计失败:', error);
       return {
@@ -1365,74 +1334,67 @@ export const packageService = {
     storeName?: string; // 商家店铺名称，用于匹配 sender_name
   }) {
     try {
-      let query = supabase
-        .from('packages')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false });
+      const runQuery = async (includeCustomerId: boolean) => {
+        let query = supabase
+          .from('packages')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
 
-      if (options?.userType === 'merchant') {
-        // 商家订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
-        const conditions: string[] = [];
-        
-        // 通过 delivery_store_id 匹配
-        conditions.push(`delivery_store_id.eq.${userId}`);
-        
-        // 如果提供了店铺名称，也通过 sender_name 匹配（兼容旧数据）
-        if (options.storeName) {
-          // 精确匹配店铺名称
-          conditions.push(`sender_name.eq.${options.storeName}`);
-        }
-        
-        if (options.email) {
-          conditions.push(`customer_email.eq.${options.email}`);
-        }
-        
-        // 使用 or 查询，匹配任一条件
-        if (conditions.length > 0) {
+        if (options?.userType === 'merchant') {
+          // 商家订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
+          const conditions: string[] = [];
+          conditions.push(`delivery_store_id.eq.${userId}`);
+          if (options.storeName) {
+            conditions.push(`sender_name.eq.${options.storeName}`);
+          }
+          if (options.email) {
+            conditions.push(`customer_email.eq.${options.email}`);
+          }
+          if (conditions.length > 0) {
+            query = query.or(conditions.join(','));
+          }
+        } else {
+          // 普通客户查询：使用多种方式匹配订单
+          const conditions: string[] = [];
+          if (includeCustomerId) {
+            conditions.push(`customer_id.eq.${userId}`);
+          }
+          conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+          if (options?.email) {
+            conditions.push(`customer_email.eq.${options.email}`);
+          }
+          if (options?.phone) {
+            conditions.push(`sender_phone.eq.${options.phone}`);
+          }
           query = query.or(conditions.join(','));
         }
-      } else {
-        // 普通客户查询：使用多种方式匹配订单
-        // 注意：运行 add-customer-id-to-packages.sql 脚本后，customer_id 字段将可用
-        const conditions: string[] = [];
-        
-        // 方式1：通过 customer_id 匹配（运行SQL脚本后可用）
-        // 如果字段不存在，此条件会导致查询失败，所以先注释掉
-        // 运行 add-customer-id-to-packages.sql 后，取消下面的注释
-        // conditions.push(`customer_id.eq.${userId}`);
-        
-        // 方式2：通过 description 匹配（兼容旧数据）
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        
-        // 方式3：通过邮箱匹配
-        if (options?.email) {
-          conditions.push(`customer_email.eq.${options.email}`);
+
+        if (options?.status && options.status !== 'all') {
+          query = query.eq('status', options.status);
         }
-        
-        // 方式4：通过手机号匹配（备用方案）
-        if (options?.phone) {
-          conditions.push(`sender_phone.eq.${options.phone}`);
+
+        if (options?.limit) {
+          query = query.limit(options.limit);
         }
-        
-        query = query.or(conditions.join(','));
+
+        if (options?.offset) {
+          query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+        }
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+        return { orders: data || [], total: count || 0 };
+      };
+
+      try {
+        return await runQuery(true);
+      } catch (error: any) {
+        const message = error?.message || '';
+        if (message.includes('customer_id') && message.includes('does not exist')) {
+          return await runQuery(false);
+        }
+        throw error;
       }
-
-      if (options?.status && options.status !== 'all') {
-        query = query.eq('status', options.status);
-      }
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
-      }
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-      return { orders: data || [], total: count || 0 };
     } catch (error) {
       LoggerService.error('获取订单列表失败:', error);
       return { orders: [], total: 0 };
@@ -1562,34 +1524,54 @@ export const systemSettingsService = {
 
 // 充值服务
 export const rechargeService = {
-  // 上传支付凭证
+  // 上传充值凭证
   async uploadProof(userId: string, imageUri: string): Promise<string | null> {
     try {
+      if (!imageUri) {
+        throw new Error('imageUri is empty');
+      }
+
       const fileName = `recharge_${userId}_${Date.now()}.jpg`;
       console.log('开始准备上传凭证:', imageUri);
       
-      // 🚀 最终稳定性方案：使用 FileSystem 读取 base64，并手动转换为 Uint8Array
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: 'base64',
+      // 🚀 确保 URI 格式正确
+      let formattedUri = imageUri;
+      if (!imageUri.startsWith('file://') && !imageUri.startsWith('content://')) {
+        formattedUri = Platform.OS === 'ios' ? `file://${imageUri}` : imageUri;
+      }
+      
+      console.log('正在读取图片并转换为字节流...', formattedUri);
+      
+      // 🚀 使用 fetch 代替 deprecated 的 FileSystem.readAsStringAsync (Expo 54+ 兼容方案)
+      const response = await fetch(formattedUri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(blob);
       });
 
-      const bytes = decodeBase64(base64);
-      console.log('转换为二进制成功，大小:', bytes.length, '准备上传到 Supabase Storage...');
+      const bytes = new Uint8Array(arrayBuffer);
+      if (!bytes || bytes.length === 0) {
+        throw new Error('读取图片内容为空');
+      }
+
+      console.log('二进制转换成功，字节数:', bytes.length);
 
       // 上传到 storage
-      const { error } = await supabase.storage
+      console.log('正在执行 Supabase Storage 上传:', fileName);
+      const { error: uploadError } = await supabase.storage
         .from('payment_proofs')
         .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: true
         });
 
-      if (error) {
-        console.error('Supabase Storage Error:', error);
-        throw error;
+      if (uploadError) {
+        console.error('Supabase Storage 详细错误:', uploadError);
+        throw uploadError;
       }
-
-      console.log('文件上传成功，获取公共 URL...');
 
       // 获取公共 URL
       const { data: { publicUrl } } = supabase.storage
@@ -1599,8 +1581,8 @@ export const rechargeService = {
       console.log('获取 URL 成功:', publicUrl);
       return publicUrl;
     } catch (error: any) {
-      LoggerService.error('上传凭证失败:', error?.message || '未知错误');
-      console.error('uploadProof 最终报错详情:', error);
+      LoggerService.error('uploadProof 核心异常:', error);
+      console.error('uploadProof 核心异常详情:', error);
       return null;
     }
   },
@@ -1734,26 +1716,50 @@ export const merchantService = {
   // 上传商品图片
   async uploadProductImage(storeId: string, imageUri: string): Promise<string | null> {
     try {
+      if (!imageUri) {
+        throw new Error('imageUri is empty');
+      }
+
       const fileName = `${storeId}/${Date.now()}.jpg`;
       console.log('开始准备上传商品图片:', imageUri);
       
-      // 🚀 最终稳定性方案：使用 FileSystem 读取 base64，并手动转换为 Uint8Array
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: 'base64',
+      // 🚀 确保 URI 格式正确
+      let formattedUri = imageUri;
+      if (!imageUri.startsWith('file://') && !imageUri.startsWith('content://')) {
+        formattedUri = Platform.OS === 'ios' ? `file://${imageUri}` : imageUri;
+      }
+      
+      console.log('正在读取商品图片并转换为字节流...', formattedUri);
+      
+      // 🚀 使用 fetch 代替 deprecated 的 FileSystem.readAsStringAsync (Expo 54+ 兼容方案)
+      const response = await fetch(formattedUri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(blob);
       });
 
-      const bytes = decodeBase64(base64);
+      const bytes = new Uint8Array(arrayBuffer);
+      if (!bytes || bytes.length === 0) {
+        throw new Error('读取商品图片内容为空');
+      }
 
-      const { error } = await supabase.storage
+      console.log('二进制转换成功，字节数:', bytes.length);
+
+      // 上传到 storage
+      console.log('正在执行 Supabase Storage 商品图片上传:', fileName);
+      const { error: uploadError } = await supabase.storage
         .from('product_images')
         .upload(fileName, bytes, {
           contentType: 'image/jpeg',
           upsert: true
         });
 
-      if (error) {
-        console.error('Supabase Storage Error:', error);
-        throw error;
+      if (uploadError) {
+        console.error('Supabase Storage 商品图片详细错误:', uploadError);
+        throw uploadError;
       }
 
       // 获取公共 URL
@@ -1761,9 +1767,11 @@ export const merchantService = {
         .from('product_images')
         .getPublicUrl(fileName);
 
+      console.log('获取商品图片 URL 成功:', publicUrl);
       return publicUrl;
     } catch (error: any) {
-      LoggerService.error('上传商品图片失败:', error?.message || '未知错误');
+      LoggerService.error('uploadProductImage 核心异常:', error);
+      console.error('uploadProductImage 核心异常详情:', error);
       return null;
     }
   }

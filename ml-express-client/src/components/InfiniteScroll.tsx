@@ -23,12 +23,14 @@ interface PaginatedData<T> {
 }
 // 无限滚动组件属性
 interface InfiniteScrollProps<T> {
+  data: T[];
   renderItem: ({ item, index }: { item: T; index: number }) => React.ReactElement;
   keyExtractor: (item: T, index: number) => string;
   onLoadMore: () => Promise<void>;
   onRefresh: () => Promise<void>;
   loading: boolean;
   refreshing: boolean;
+  hasMore: boolean;
   emptyComponent?: React.ReactElement;
   loadingComponent?: React.ReactElement;
   endComponent?: React.ReactElement;
@@ -76,8 +78,11 @@ export function InfiniteScroll<T>({
   }, [isLoadingMore, hasMore, loading, onLoadMore]);
   // 刷新
   const handleRefresh = useCallback(async () => {
+    try {
       await onRefresh();
+    } catch (error) {
       LoggerService.error('刷新失败:', error);
+    }
   }, [onRefresh]);
   // 渲染加载更多指示器
   const renderLoadMore = () => {
@@ -183,17 +188,20 @@ export function VirtualizedList<T>({
   itemHeight,
   ...props
 }: InfiniteScrollProps<T> & { itemHeight: number }) {
+  const renderItem = ({ item, index }: { item: T; index: number }) => {
+    const isLastItem = index === props.data.length - 1;
+    return (
+      <View style={{ height: itemHeight }}>
+        {props.renderItem({ item, index })}
+        {isLastItem && <ActivityIndicator size="small" color="#2E86AB" style={{ marginTop: 10 }} />}
+      </View>
+    );
+  };
+
   return (
     <InfiniteScroll
       {...props}
-      renderItem={({ item, index }) => (
-        <View style={{ height: itemHeight }}>
-          {props.renderItem({ item, index })}
-          {index === props.data.length - 1 && props.onLoadMore && (
-            <View>{/* renderLoadMore logic */}</View>
-          )}
-        </View>
-      )}
+      renderItem={renderItem}
     />
   );
 }
@@ -207,6 +215,8 @@ export function GridList<T>({
   // 渲染网格项
   const renderGridItem = ({ item, index }: { item: T; index: number }) => {
     const isLastRow = Math.floor(index / numColumns) === Math.floor((props.data.length - 1) / numColumns);
+    const isLastItem = index === props.data.length - 1;
+    
     return (
       <View style={[
         styles.gridItem,
@@ -214,9 +224,9 @@ export function GridList<T>({
         isLastRow && { marginBottom: 0 },
       ]}>
         {props.renderItem({ item, index })}
-        {isLastRow && index === props.data.length - 1 && (
+        {isLastItem && (
           <View style={styles.gridLoadMore}>
-            {/* renderLoadMore logic */}
+            <ActivityIndicator size="small" color="#2E86AB" />
           </View>
         )}
       </View>

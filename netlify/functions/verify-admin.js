@@ -167,8 +167,8 @@ async function verifyAdminToken(token, requiredRoles = [], permissionId = null) 
       account = data[0];
     }
 
-    // 获取用户权限列表
-    const userPermissions = account.permissions || [];
+    // 获取用户权限列表（保留 null 以区分“未配置”与“配置为空”）
+    const userPermissions = Array.isArray(account.permissions) ? account.permissions : null;
 
     // 检查权限：满足角色要求 OR 拥有特有权限
     let hasAccess = false;
@@ -179,7 +179,7 @@ async function verifyAdminToken(token, requiredRoles = [], permissionId = null) 
     } 
     
     // 2. 特有权限检查 (如果角色检查没过，看看是否有指定的 permissionId)
-    if (!hasAccess && permissionId && userPermissions.includes(permissionId)) {
+    if (!hasAccess && permissionId && Array.isArray(userPermissions) && userPermissions.includes(permissionId)) {
       hasAccess = true;
     }
 

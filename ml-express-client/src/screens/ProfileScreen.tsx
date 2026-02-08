@@ -19,6 +19,7 @@ import {
   Animated,
   PanResponder
 } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -150,6 +151,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [tempHour, setTempHour] = useState('09');
   const [tempMinute, setTempMinute] = useState('00');
 
+  // 🚀 新增：用于捕获二维码的 Ref
+  const qrCodeRef = useRef<any>(null);
+
   const isMerchantStore = userType === 'merchant';
 
   // 🚀 新增：格式化函数（React Native 中 toLocaleString 可能不兼容）
@@ -275,6 +279,7 @@ export default function ProfileScreen({ navigation }: any) {
       rechargeFailed: '充值失败',
       uploadPaymentRecord: '上传汇款记录',
       paymentQRTitle: '扫描二维码支付',
+      comingSoon: '即将推出',
       pleaseUploadRecord: '请在支付后上传汇款凭证截图',
       // 身份标识
       merchants: '商家',
@@ -608,7 +613,8 @@ export default function ProfileScreen({ navigation }: any) {
             .from('users')
             .select('balance, user_type, name, phone, email')
             .eq('id', user.id)
-            .single();
+            .limit(1)
+            .maybeSingle();
           
           if (!userError && latestUser) {
             console.log('✅ 同步成功:', latestUser);
@@ -967,7 +973,41 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleSaveProfile = async () => {
-    // ... (rest of the function)
+    if (!editForm.name || !editForm.phone) {
+      showToast(language === 'zh' ? '请填写姓名和电话' : 'Please fill name and phone', 'warning');
+      return;
+    }
+
+    try {
+      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      const result = await customerService.updateUser(userId, {
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.phone,
+        address: editForm.address,
+      });
+
+      if (result.success) {
+        setUserName(editForm.name);
+        setUserEmail(editForm.email);
+        setUserPhone(editForm.phone);
+        
+        // 更新本地存储
+        await AsyncStorage.setItem('userName', editForm.name);
+        await AsyncStorage.setItem('userEmail', editForm.email);
+        await AsyncStorage.setItem('userPhone', editForm.phone);
+
+        showToast(t.updateSuccess, 'success');
+        setShowEditModal(false);
+      } else {
+        showToast(result.error?.message || t.updateFailed, 'error');
+      }
+    } catch (error) {
+      LoggerService.error('保存个人资料失败:', error);
+      showToast(t.updateFailed, 'error');
+    } finally {
+      hideLoading();
+    }
   };
 
   // 🚀 修改：开启支付二维码显示
@@ -991,26 +1031,20 @@ export default function ProfileScreen({ navigation }: any) {
         return;
       }
 
-      // 获取图片资源
-      const imageUrl = RECHARGE_QR_IMAGES[amount];
-      if (!imageUrl) {
-        hideLoading();
-        Alert.alert('错误', '找不到对应金额的二维码资源');
-        return;
+      // 🚀 优化方案：使用 captureRef 捕获组件视图，避开 FileSystem 下载问题
+      if (!qrCodeRef.current) {
+        throw new Error('无法找到二维码引用');
       }
 
-      console.log('正在下载二维码...', imageUrl);
-      if (!FileSystem.cacheDirectory) {
-        throw new Error('无法访问缓存目录');
-      }
-
-      const fileName = `kbz_qr_${amount}.png`;
-      const downloadPath = `${FileSystem.cacheDirectory}${fileName}`;
-      const downloadResult = await FileSystem.downloadAsync(imageUrl, downloadPath);
+      console.log('正在截图二维码视图...');
+      const localUri = await captureRef(qrCodeRef, {
+        format: 'png',
+        quality: 1.0,
+      });
       
-      if (downloadResult?.uri) {
-        console.log('正在保存到相册...', downloadResult.uri);
-        await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
+      if (localUri) {
+        console.log('正在保存到相册...', localUri);
+        await MediaLibrary.saveToLibraryAsync(localUri);
         
         hideLoading();
         Alert.alert(
@@ -1018,7 +1052,7 @@ export default function ProfileScreen({ navigation }: any) {
           language === 'zh' ? '收款码已保存到您的相册，请打开 KBZPay 支付' : 'QR code saved to gallery, please pay with KBZPay'
         );
       } else {
-        throw new Error('无法解析图片路径');
+        throw new Error('截图失败');
       }
     } catch (error: any) {
       hideLoading();
@@ -1184,7 +1218,7 @@ export default function ProfileScreen({ navigation }: any) {
         break;
       case 'coupons':
       case 'help':
-        showToast(t.comingSoon, 'info');
+        showToast(language === 'zh' ? '即将推出' : 'Coming soon', 'info');
         break;
       case 'notificationTest':
         navigation.navigate('NotificationWorkflow');
@@ -2486,7 +2520,7 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
             <LinearGradient
-              colors={['#1e3a8a', '#2563eb']}
+              colors={['#1e3a8a', '#2563eb'] as any}
               style={{ padding: 20, alignItems: 'center' }}
             >
               <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{t.paymentQRTitle}</Text>
@@ -2497,27 +2531,33 @@ export default function ProfileScreen({ navigation }: any) {
 
             <View style={{ padding: 20, alignItems: 'center' }}>
               <View style={{ position: 'relative' }}>
-                <TouchableOpacity 
-                  activeOpacity={0.8}
-                  onLongPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
-                  style={{ width: 220, height: 220, backgroundColor: '#f8fafc', borderRadius: 15, padding: 10, marginBottom: 10, justifyContent: 'center', alignItems: 'center' }}
+                <View 
+                  ref={qrCodeRef}
+                  collapsable={false}
+                  style={{ width: 220, height: 220, backgroundColor: '#ffffff', borderRadius: 15, padding: 10, marginBottom: 10, justifyContent: 'center', alignItems: 'center' }}
                 >
-                  {/* 🚀 使用预定义的映射显示二维码 */}
-                  {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
-                    <Image 
-                      source={{ uri: RECHARGE_QR_IMAGES[selectedRechargeAmount] }} 
-                      style={{ width: '100%', height: '100%' }} 
-                      resizeMode="contain" 
-                    />
-                  ) : (
-                    <View style={{ alignItems: 'center' }}>
-                      <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
-                      <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
-                        {language === 'zh' ? '加载中...' : 'Loading...'}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    activeOpacity={0.8}
+                    onLongPress={() => selectedRechargeAmount && handleSaveQRCode(selectedRechargeAmount)}
+                    style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    {/* 🚀 使用预定义的映射显示二维码 */}
+                    {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
+                      <Image 
+                        source={{ uri: RECHARGE_QR_IMAGES[selectedRechargeAmount] }} 
+                        style={{ width: '100%', height: '100%' }} 
+                        resizeMode="contain" 
+                      />
+                    ) : (
+                      <View style={{ alignItems: 'center' }}>
+                        <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
+                        <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
+                          {language === 'zh' ? '加载中...' : 'Loading...'}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
 
                 {/* 🚀 新增：显式的保存按钮图标 */}
                 <TouchableOpacity

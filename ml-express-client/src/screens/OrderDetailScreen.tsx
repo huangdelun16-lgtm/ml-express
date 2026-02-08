@@ -438,6 +438,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   // 拨打电话
   const handleCallPhone = (phone: string) => {
+    if (!phone || !phone.trim()) {
+      Alert.alert('提示', '暂无联系电话');
+      return;
+    }
     Linking.openURL(`tel:${phone}`);
   };
 
@@ -465,6 +469,20 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       minute: '2-digit',
     });
   };
+
+  const formatText = (value?: string) => {
+    if (!value) return t.none;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : t.none;
+  };
+
+  const formatCoord = (value?: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+    return value.toFixed(6);
+  };
+
+  const hasCoords = (lat?: number, lng?: number) =>
+    typeof lat === 'number' && Number.isFinite(lat) && typeof lng === 'number' && Number.isFinite(lng);
 
   // 格式化配送速度
   const formatDeliverySpeed = (speed?: string) => {
@@ -503,6 +521,9 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       </View>
     );
   }
+
+  const senderPhone = (order.sender_phone || '').trim();
+  const receiverPhone = (order.receiver_phone || '').trim();
 
   const handleRate = async () => {
     if (!order) return;
@@ -679,21 +700,22 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           <Text style={styles.cardTitle}>📤 {t.senderInfo}</Text>
           <View style={styles.addressContainer}>
             <View style={styles.addressRow}>
-              <Text style={styles.addressName}>{order.sender_name}</Text>
+              <Text style={styles.addressName}>{formatText(order.sender_name)}</Text>
               <TouchableOpacity
-                style={styles.phoneButton}
-                onPress={() => handleCallPhone(order.sender_phone)}
+                style={[styles.phoneButton, !senderPhone && styles.phoneButtonDisabled]}
+                onPress={() => handleCallPhone(senderPhone)}
                 activeOpacity={0.7}
+                disabled={!senderPhone}
               >
-                <Text style={styles.phoneButtonText}>📞 {order.sender_phone}</Text>
+                <Text style={styles.phoneButtonText}>📞 {senderPhone || t.none}</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.addressText}>📍 {order.sender_address}</Text>
-            {order.sender_latitude && order.sender_longitude && (
+            <Text style={styles.addressText}>📍 {formatText(order.sender_address)}</Text>
+            {hasCoords(order.sender_latitude, order.sender_longitude) && (
               <View style={styles.coordsContainer}>
                 <Text style={styles.coordsLabel}>经纬度：</Text>
                 <Text style={styles.coordsText}>
-                  {order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)}
+                  {formatCoord(order.sender_latitude)}, {formatCoord(order.sender_longitude)}
                 </Text>
               </View>
             )}
@@ -705,21 +727,22 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           <Text style={styles.cardTitle}>📥 {t.receiverInfo}</Text>
           <View style={styles.addressContainer}>
             <View style={styles.addressRow}>
-              <Text style={styles.addressName}>{order.receiver_name}</Text>
+              <Text style={styles.addressName}>{formatText(order.receiver_name)}</Text>
               <TouchableOpacity
-                style={styles.phoneButton}
-                onPress={() => handleCallPhone(order.receiver_phone)}
+                style={[styles.phoneButton, !receiverPhone && styles.phoneButtonDisabled]}
+                onPress={() => handleCallPhone(receiverPhone)}
                 activeOpacity={0.7}
+                disabled={!receiverPhone}
               >
-                <Text style={styles.phoneButtonText}>📞 {order.receiver_phone}</Text>
+                <Text style={styles.phoneButtonText}>📞 {receiverPhone || t.none}</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.addressText}>📍 {order.receiver_address}</Text>
-            {order.receiver_latitude && order.receiver_longitude && (
+            <Text style={styles.addressText}>📍 {formatText(order.receiver_address)}</Text>
+            {hasCoords(order.receiver_latitude, order.receiver_longitude) && (
               <View style={styles.coordsContainer}>
                 <Text style={styles.coordsLabel}>经纬度：</Text>
                 <Text style={styles.coordsText}>
-                  {order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)}
+                  {formatCoord(order.receiver_latitude)}, {formatCoord(order.receiver_longitude)}
                 </Text>
               </View>
             )}
@@ -731,16 +754,16 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           <Text style={styles.cardTitle}>📦 {t.packageInfo}</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t.packageType}:</Text>
-            <Text style={styles.infoValue}>{order.package_type}</Text>
+            <Text style={styles.infoValue}>{formatText(order.package_type)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t.weight}:</Text>
-            <Text style={styles.infoValue}>{order.weight}</Text>
+            <Text style={styles.infoValue}>{formatText(order.weight)}</Text>
           </View>
           {order.description && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>{t.description}:</Text>
-              <Text style={styles.infoValue}>{order.description}</Text>
+              <Text style={styles.infoValue}>{formatText(order.description)}</Text>
             </View>
           )}
           
@@ -858,23 +881,23 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                     style={{ padding: 16, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#3b82f6' }}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ color: '#1e40af', fontWeight: '900', fontSize: 16 }}>{t.totalAmount}</Text>
-                      <Text style={{ color: '#1e40af', fontWeight: '950', fontSize: 26 }}>{total.toLocaleString()} MMK</Text>
-                    </View>
-                    <Text style={{ color: 'rgba(30, 64, 175, 0.6)', fontSize: 11, marginTop: 4, textAlign: 'right', fontStyle: 'italic' }}>
-                      * {language === 'zh' ? '包含商品费用与派送费' : 'Includes item cost and delivery fee'}
-                    </Text>
-                  </LinearGradient>
-                </View>
-              );
-            } else {
-              return (
-                <View style={[styles.priceRow, { backgroundColor: '#f8fafc', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#10b981' }]}>
-                  <Text style={[styles.priceLabel, { fontSize: 18, fontWeight: '800' }]}>{t.totalPrice}</Text>
-                  <Text style={[styles.priceValue, { fontSize: 22, fontWeight: '950', color: '#10b981' }]}>{deliveryFee.toLocaleString()} MMK</Text>
-                </View>
-              );
-            }
+      <Text style={{ color: '#1e40af', fontWeight: '900', fontSize: 16 }}>{t.totalAmount}</Text>
+      <Text style={{ color: '#1e40af', fontWeight: '900', fontSize: 26 }}>{total.toLocaleString()} MMK</Text>
+    </View>
+    <Text style={{ color: 'rgba(30, 64, 175, 0.6)', fontSize: 11, marginTop: 4, textAlign: 'right', fontStyle: 'italic' }}>
+      * {language === 'zh' ? '包含商品费用与派送费' : 'Includes item cost and delivery fee'}
+    </Text>
+  </LinearGradient>
+</View>
+);
+} else {
+return (
+<View style={[styles.priceRow, { backgroundColor: '#f8fafc', padding: 20, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#10b981' }]}>
+  <Text style={[styles.priceLabel, { fontSize: 18, fontWeight: '800' }]}>{t.totalPrice}</Text>
+  <Text style={[styles.priceValue, { fontSize: 22, fontWeight: '900', color: '#10b981' }]}>{deliveryFee.toLocaleString()} MMK</Text>
+</View>
+);
+}
           })()}
         </View>
 
@@ -1305,6 +1328,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+  },
+  phoneButtonDisabled: {
+    opacity: 0.5,
   },
   phoneButtonText: {
     fontSize: 11,

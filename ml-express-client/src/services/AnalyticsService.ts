@@ -156,7 +156,7 @@ export class AnalyticsService {
       this.flush();
     }
 
-    LoggerService.debug('Event tracked:', type, properties);
+    LoggerService.debug('Event tracked:', { type, properties });
   }
 
   // 设置用户属性

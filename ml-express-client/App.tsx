@@ -1,3 +1,4 @@
+import './src/utils/polyfills'; // 🚀 必须在最顶部导入以确保 Polyfill 生效
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Alert, 
@@ -6,12 +7,16 @@ import {
   Text, 
   TouchableOpacity, 
   Platform,
-  DeviceEventEmitter 
+  DeviceEventEmitter,
+  Vibration,
+  Image
 } from 'react-native';
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 import NotificationService from './src/services/notificationService';
 import { AppProvider, useApp } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
@@ -20,8 +25,7 @@ import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
 import { OrderAlertModal } from './src/components/OrderAlertModal';
-// Sentry 已暂时禁用以避免依赖问题
-// import { sentryService } from './src/services/SentryService';
+import PackingModal from './src/components/PackingModal';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -66,14 +70,12 @@ const linking = {
 };
 
 import { analytics, EventType } from './src/services/AnalyticsService';
-
-// ...
-
 import { supabase } from './src/services/supabase';
-import { Vibration } from 'react-native';
 
 function AppContent({ onLayoutRootView }: any) {
   const { language, showOrderAlert, setShowOrderAlert, newOrderData } = useApp();
+  const [showPackingModal, setShowPackingModal] = useState(false);
+  const [packingOrderData, setPackingOrderData] = useState<any>(null);
 
   const handleCloseAlert = () => {
     setShowOrderAlert(false);
@@ -99,7 +101,6 @@ function AppContent({ onLayoutRootView }: any) {
             animation: 'slide_from_right',
           }}
         >
-          {/* ... */}
           <Stack.Screen 
             name="Welcome" 
             component={WelcomeScreen}
@@ -108,7 +109,6 @@ function AppContent({ onLayoutRootView }: any) {
             }}
           />
           
-          {/* 登录注册页面 */}
           <Stack.Screen 
             name="Login" 
             component={LoginScreen}
@@ -124,7 +124,6 @@ function AppContent({ onLayoutRootView }: any) {
             }}
           />
           
-          {/* 主应用 - 直接显示首页，不使用底部导航 */}
           <Stack.Screen 
             name="Main" 
             component={HomeScreen}
@@ -133,7 +132,6 @@ function AppContent({ onLayoutRootView }: any) {
             }}
           />
           
-          {/* 使用Stack导航，代替Tab导航 */}
           <Stack.Screen 
             name="PlaceOrder" 
             component={PlaceOrderScreen}
@@ -163,7 +161,6 @@ function AppContent({ onLayoutRootView }: any) {
             }}
           />
           
-          {/* 其他页面 */}
           <Stack.Screen 
             name="OrderDetail" 
             component={OrderDetailScreen}
@@ -229,9 +226,24 @@ function AppContent({ onLayoutRootView }: any) {
         orderData={newOrderData}
         language={language}
         onClose={handleCloseAlert}
+        onAccepted={(acceptedOrder: any) => {
+          if (acceptedOrder) {
+            setPackingOrderData(acceptedOrder);
+            setShowPackingModal(true);
+          }
+        }}
         onStatusUpdate={() => {
           console.log('✅ 订单状态已更新，发送全局通知');
           DeviceEventEmitter.emit('order_status_updated');
+        }}
+      />
+      <PackingModal
+        visible={showPackingModal}
+        orderData={packingOrderData}
+        language={language}
+        onComplete={() => {
+          setShowPackingModal(false);
+          setPackingOrderData(null);
         }}
       />
     </View>
@@ -270,7 +282,6 @@ export default function App() {
           setIsLoggedIn((prevState) => {
             if (prevState === null) {
               console.warn('⚠️ 初始化超时，强制进入首页');
-              saveErrorToStorage('init_timeout', new Error('App initialization timed out after 5s'), false);
               return false; // 超时默认为未登录
             }
             return prevState;
@@ -280,14 +291,18 @@ export default function App() {
         }, 5000);
 
         // 正常执行初始化
-        await initializeApp();
+        try {
+          await initializeApp();
+        } catch (initError) {
+          console.error('Initialization error:', initError);
+        }
         
         clearTimeout(safetyTimer);
         
         // 应用启动追踪
         analytics.track(EventType.APP_OPEN, {
           platform: Platform.OS,
-          version: '1.1.0'
+          version: '2.0.0'
         });
       } catch (e) {
         console.warn('应用准备阶段出错:', e);
@@ -302,17 +317,22 @@ export default function App() {
 
   // 全局错误兜底：无 adb 时在机上弹窗并写入本地
   useEffect(() => {
-    const originalHandler = (ErrorUtils as any)?.getGlobalHandler?.();
-    const globalHandler = (error: any, isFatal?: boolean) => {
+    const ErrorUtils = (global as any).ErrorUtils;
+    const globalHandler = ErrorUtils?.getGlobalHandler?.();
+    const newGlobalHandler = (error: any, isFatal?: boolean) => {
       saveErrorToStorage('global_error', error, isFatal);
       Alert.alert(
         '应用错误',
         `${isFatal ? '[致命]' : ''}${error?.message || error}`,
       );
-      originalHandler?.(error, isFatal);
+      if (globalHandler) {
+        globalHandler(error, isFatal);
+      }
     };
 
-    (ErrorUtils as any)?.setGlobalHandler?.(globalHandler);
+    if (ErrorUtils) {
+      ErrorUtils.setGlobalHandler(newGlobalHandler);
+    }
 
     const originalUnhandled = (global as any).onunhandledrejection;
     (global as any).onunhandledrejection = (event: any) => {
@@ -320,12 +340,14 @@ export default function App() {
       const err = reason instanceof Error ? reason : new Error(String(reason));
       saveErrorToStorage('unhandled_rejection', err, false);
       Alert.alert('Promise 未处理错误', err.message);
-      originalUnhandled?.(event);
+      if (originalUnhandled) {
+        originalUnhandled(event);
+      }
     };
 
     return () => {
-      if ((ErrorUtils as any)?.setGlobalHandler && originalHandler) {
-        (ErrorUtils as any).setGlobalHandler(originalHandler);
+      if (ErrorUtils && globalHandler) {
+        ErrorUtils.setGlobalHandler(globalHandler);
       }
       (global as any).onunhandledrejection = originalUnhandled;
     };
@@ -356,11 +378,6 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      // Sentry 已暂时禁用以避免依赖问题
-      // if (!__DEV__) {
-      //   sentryService.init();
-      // }
-
       // 初始化通知服务
       await initializeNotificationService();
 
@@ -378,19 +395,28 @@ export default function App() {
     try {
       // 检查是否在 Expo Go 中运行
       const Constants = require('expo-constants').default;
-      const isExpoGo = __DEV__ && !Constants.expoConfig?.extra?.eas?.projectId;
+      const isExpoGo = Constants.appOwnership === 'expo' || (__DEV__ && !Constants.expoConfig?.extra?.eas?.projectId);
       
       if (isExpoGo) {
-        console.log('⚠️ 在 Expo Go 中运行，跳过通知服务初始化以避免警告');
+        console.log('⚠️ 在 Expo Go 中运行，跳过通知服务初始化');
         return;
       }
 
-      const notificationService = NotificationService.getInstance();
-      await notificationService.loadSettings();
-      notificationService.setupNotificationHandlers();
+      // 添加超时保护，防止初始化挂起整个应用
+      const initPromise = (async () => {
+        const notificationService = NotificationService.getInstance();
+        await notificationService.loadSettings();
+        notificationService.setupNotificationHandlers();
+      })();
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Notification init timeout')), 3000)
+      );
+
+      await Promise.race([initPromise, timeoutPromise]);
       console.log('通知服务初始化成功');
     } catch (error) {
-      console.error('通知服务初始化失败:', error);
+      console.warn('通知服务初始化跳过或失败:', error);
     }
   };
 
@@ -404,18 +430,10 @@ export default function App() {
     }
   };
 
-  // const onLayoutRootView = useCallback(async () => {
-  //   if (appIsReady) {
-  //     // 只有当应用准备好后，才隐藏启动屏幕
-  //     await SplashScreen.hideAsync();
-  //   }
-  // }, [appIsReady]);
-
   if (!appIsReady || isLoggedIn === null) {
     return (
       <View style={{ flex: 1, backgroundColor: '#2E86AB', justifyContent: 'center', alignItems: 'center' }} onLayout={onLayoutRootView}>
         {/* 即使在初始化阶段也显示背景色，避免纯白屏 */}
-        {/* 如果 10 秒还没准备好，显示一个重试按钮 */}
         <LoadingFallback />
       </View>
     );
@@ -457,4 +475,3 @@ function LoadingFallback() {
     </View>
   );
 }
-

@@ -34,6 +34,18 @@ const REGIONS = [
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
 
+const getDateKey = (value?: string): string => {
+  if (!value) return '';
+  const match = value.match(/\d{4}-\d{2}-\d{2}/);
+  if (match) return match[0];
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 type TabKey = 'overview' | 'records' | 'analytics' | 'package_records' | 'courier_records' | 'cash_collection' | 'merchants_collection';
 type FilterStatus = 'all' | FinanceRecord['status'];
 type FilterType = 'all' | FinanceRecord['record_type'];
@@ -185,6 +197,7 @@ const FinanceManagement: React.FC = () => {
   // 包裹收支记录分页状态
   const [packageRecordsPage, setPackageRecordsPage] = useState<number>(1);
   const [packageRecordsPerPage, setPackageRecordsPerPage] = useState<number>(20);
+  const [packagePaymentFilter, setPackagePaymentFilter] = useState<'all' | 'cash' | 'balance'>('all');
   
   // 现金收款管理相关状态
   const [couriers, setCouriers] = useState<any[]>([]); // 快递员列表
@@ -209,6 +222,7 @@ const FinanceManagement: React.FC = () => {
   const [modalOrders, setModalOrders] = useState<Package[]>([]);
   const [merchantCollectionCustomerFilter, setMerchantCollectionCustomerFilter] = useState<string>('all');
   const [merchantCollectionRegionFilter, setMerchantCollectionRegionFilter] = useState<string>('all');
+  const [merchantRegionFilter, setMerchantRegionFilter] = useState<string>('all');
   const [modalTitle, setModalTitle] = useState<string>('');
 
   const deliveredPackages = useMemo(() => {
@@ -220,12 +234,17 @@ const FinanceManagement: React.FC = () => {
   }, [packages, isRegionalUser, currentRegionPrefix]);
 
   const deliveredPackagesSorted = useMemo(() => {
-    return [...deliveredPackages].sort((a, b) => {
+    const filtered = deliveredPackages.filter(pkg => {
+      if (packagePaymentFilter === 'all') return true;
+      if (packagePaymentFilter === 'cash') return pkg.payment_method === 'cash';
+      return pkg.payment_method !== 'cash';
+    });
+    return [...filtered].sort((a, b) => {
       const timeA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
       const timeB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
       return timeB - timeA;
     });
-  }, [deliveredPackages]);
+  }, [deliveredPackages, packagePaymentFilter]);
 
   const inProgressPackages = useMemo(() => {
     let filtered = packages.filter(pkg => pkg.status !== '已送达' && pkg.status !== '已取消');
@@ -255,6 +274,10 @@ const FinanceManagement: React.FC = () => {
       return prev > maxPage ? maxPage : prev;
     });
   }, [deliveredPackagesSorted.length, packageRecordsPerPage]);
+
+  useEffect(() => {
+    setPackageRecordsPage(1);
+  }, [packagePaymentFilter]);
 
   const packagePagination = useMemo(() => {
     const totalPages = Math.max(1, Math.ceil(deliveredPackagesSorted.length / packageRecordsPerPage));
@@ -468,11 +491,14 @@ const FinanceManagement: React.FC = () => {
     netProfit: 0,
     pendingPayments: 0,
     packageIncome: 0, // 添加包裹收入
+    packageIncomeCash: 0, // 包裹现金跑腿费收入
+    packageIncomeBalance: 0, // 包裹余额跑腿费收入
     packageCount: 0, // 添加包裹数量
     courierKmCost: 0, // 快递员公里费用（仅送货距离）
     totalKm: 0, // 总送货公里数
     merchantsCollection: 0, // 总合伙商家代收款
-    totalPlatformPayment: 0 // 总平台支付 (余额支付)
+    totalPlatformPayment: 0, // 总平台支付 (余额支付)
+    totalStartingFee: 0 // 总订单起步费
   });
 
   const getPlatformPaymentAmount = (description?: string): number => {
@@ -490,6 +516,12 @@ const FinanceManagement: React.FC = () => {
     return !!pkg.delivery_store_id || isStoreMatch;
   };
 
+  const getStoreRegionPrefix = (store?: { store_code?: string | null }): string => {
+    if (!store?.store_code) return '';
+    const match = store.store_code.match(/^[A-Z]+/i);
+    return match ? match[0].toUpperCase() : '';
+  };
+
   useEffect(() => {
     loadRecords();
     loadPricingSettings();
@@ -505,12 +537,26 @@ const FinanceManagement: React.FC = () => {
       const totalIncome = records.filter(r => r.record_type === 'income').reduce((sum, record) => sum + (record.amount || 0), 0);
       const totalExpense = records.filter(r => r.record_type === 'expense').reduce((sum, record) => sum + (record.amount || 0), 0);
       const netProfit = totalIncome - totalExpense;
-      const pendingPayments = records.filter(r => r.status === 'pending').reduce((sum, record) => sum + (record.amount || 0), 0);
+      const pendingPayments = packages
+        .filter(pkg => {
+          if (pkg.payment_method !== 'cash') return false;
+          if (pkg.status !== '已送达' && pkg.status !== '已完成') return false;
+          if (pkg.rider_settled) return false;
+          const dateKey = getDateKey(pkg.delivery_time || pkg.updated_at || pkg.created_at || pkg.create_time);
+          return Boolean(dateKey && dateKey === cashCollectionDate);
+        })
+        .reduce((sum, pkg) => {
+          const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+          const codAmount = isMerchantPackage(pkg) ? Number(pkg.cod_amount || 0) : 0;
+          return sum + price + codAmount;
+        }, 0);
       
       // 计算订单收入（统计已送达且已结清的包裹）
       const deliveredPackages = packages.filter(pkg => pkg.status === '已送达');
       
       let packageIncome = 0;
+      let packageIncomeCash = 0;
+      let packageIncomeBalance = 0;
       let settledPackageCount = 0;
       let totalPlatformPayment = 0;
       let merchantCodTotal = 0;
@@ -532,11 +578,18 @@ const FinanceManagement: React.FC = () => {
           }
         }
 
-        // 如果是现金支付，必须已结清才计入收入
-        if (pkg.payment_method === 'cash' && !pkg.rider_settled) {
-          return;
-        }
         const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+
+        // 如果是现金支付，必须已结清才计入收入
+        if (pkg.payment_method === 'cash') {
+          if (!pkg.rider_settled) {
+            return;
+          }
+          packageIncomeCash += price;
+        } else {
+          packageIncomeBalance += price;
+        }
+
         packageIncome += price;
         settledPackageCount++;
       });
@@ -551,13 +604,18 @@ const FinanceManagement: React.FC = () => {
       }, 0);
       const courierKmCost = totalKm * COURIER_KM_RATE;
 
-      // 合伙商家代收款总额 = 未结清给商家的 COD + 未结清平台支付（余额支付）
-      const merchantsCollection = deliveredPackages.reduce((sum, pkg) => {
+      // 总合伙商家代收款 = 已送达 + 骑手已结清 + 商家未结清
+      const merchantsCollection = packages.reduce((sum, pkg) => {
         if (!isMerchantPackage(pkg)) return sum;
+        if (pkg.status !== '已送达' && pkg.status !== '已完成') return sum;
+        const codAmount = Number(pkg.cod_amount || 0);
         if (!pkg.rider_settled || pkg.cod_settled) return sum;
-        const platformAmount = getPlatformPaymentAmount(pkg.description);
-        return sum + Number(pkg.cod_amount || 0) + platformAmount;
+        return sum + codAmount;
       }, 0);
+      
+      // 计算总订单起步费 (所有已送达订单 * 1500)
+      const BASE_STARTING_FEE = 1500;
+      const totalStartingFee = deliveredPackages.length * BASE_STARTING_FEE;
       
       setSummary({
         totalIncome,
@@ -565,16 +623,19 @@ const FinanceManagement: React.FC = () => {
         netProfit,
         pendingPayments,
         packageIncome,
+        packageIncomeCash,
+        packageIncomeBalance,
         packageCount,
         courierKmCost,
         totalKm,
         merchantsCollection,
-        totalPlatformPayment
+        totalPlatformPayment,
+        totalStartingFee
       });
     };
     
     calculateSummary();
-  }, [records, packages, deliveryStores]);
+  }, [records, packages, deliveryStores, cashCollectionDate]);
 
   // 计算合伙店铺代收款统计
   const merchantsCollectionStats = useMemo(() => {
@@ -594,28 +655,37 @@ const FinanceManagement: React.FC = () => {
         const isStorePkg = pkg.delivery_store_id === store.id || pkg.sender_name === store.store_name;
         const platformAmount = getPlatformPaymentAmount(pkg.description);
         return isStorePkg &&
-          pkg.status === '已送达' &&
+          (pkg.status === '已送达' || pkg.status === '已完成') &&
           (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0);
       });
 
       // 3. 计算金额和订单数
-      // 只有骑手已结清 (rider_settled) 的订单才计入商家待结清列表
-      const validPackages = storePackages.filter(pkg => pkg.rider_settled);
-      const totalAmount = validPackages.reduce((sum, pkg) => {
+      // 待结清金额 = 商家COD(需骑手已结清) + 余额支付(不依赖骑手结清)
+      const unclearedPackages = storePackages.filter(pkg => {
+        const platformAmount = getPlatformPaymentAmount(pkg.description);
+        return !pkg.cod_settled && (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0);
+      });
+      const unclearedAmount = unclearedPackages.reduce((sum, pkg) => {
+        const platformAmount = getPlatformPaymentAmount(pkg.description);
+        const codAmount = Number(pkg.cod_amount || 0);
+        const pendingCod = codAmount > 0 && pkg.rider_settled ? codAmount : 0;
+        return sum + pendingCod + platformAmount;
+      }, 0);
+
+      // 今年代收款统计 = 累计已结清金额(COD + 余额支付)
+      const settledPackages = storePackages.filter(pkg => pkg.cod_settled);
+      const totalAmount = settledPackages.reduce((sum, pkg) => {
         const platformAmount = getPlatformPaymentAmount(pkg.description);
         return sum + Number(pkg.cod_amount || 0) + platformAmount;
       }, 0);
       
-      const unclearedPackages = validPackages.filter(pkg => !pkg.cod_settled);
-      const unclearedAmount = unclearedPackages.reduce((sum, pkg) => sum + Number(pkg.cod_amount || 0), 0);
-      
       // 计算最后结清日期
-      const settledPackages = validPackages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
+      const settledPackagesWithTime = storePackages.filter(pkg => pkg.cod_settled && pkg.cod_settled_at);
       let lastSettledAt: string | null = null;
-      if (settledPackages.length > 0) {
+      if (settledPackagesWithTime.length > 0) {
         // 找到最新的结清日期
-        settledPackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
-        lastSettledAt = settledPackages[0].cod_settled_at || null;
+        settledPackagesWithTime.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        lastSettledAt = settledPackagesWithTime[0].cod_settled_at || null;
       }
       
       return {
@@ -1035,16 +1105,17 @@ const FinanceManagement: React.FC = () => {
   const handleMerchantCollectionClick = (storeName?: string) => {
     setMerchantCollectionCustomerFilter('all');
     setMerchantCollectionRegionFilter('all');
-    // 找出所有已送达且有代收款的合伙店铺订单（包括已结清和未结清）
+    // 找出所有已送达/已完成且有代收款的合伙店铺未结清订单
     const codOrders = packages.filter(pkg => {
       // 如果指定了店铺名，只看该店铺的
       if (storeName && pkg.sender_name !== storeName && !pkg.sender_name?.startsWith(storeName)) {
         return false;
       }
       const platformAmount = getPlatformPaymentAmount(pkg.description);
-      // 只要是合伙商家订单且已送达，且包含 COD 或平台支付
+      // 只要是合伙商家订单且已送达/已完成，且包含 COD 或平台支付，并且未结清
       return isMerchantPackage(pkg) &&
-        pkg.status === '已送达' &&
+        (pkg.status === '已送达' || pkg.status === '已完成') &&
+        !pkg.cod_settled &&
         (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0);
     }).sort((a, b) => {
       const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
@@ -1070,7 +1141,12 @@ const FinanceManagement: React.FC = () => {
         (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
       );
       const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
-      return isMerchant && pkg.rider_settled && !pkg.cod_settled && Number(pkg.cod_amount || 0) > 0;
+      if (!isMerchant || pkg.cod_settled) return false;
+      const platformAmount = getPlatformPaymentAmount(pkg.description);
+      const codAmount = Number(pkg.cod_amount || 0);
+      const pendingCod = codAmount > 0 && pkg.rider_settled;
+      const pendingPlatform = platformAmount > 0;
+      return pendingCod || pendingPlatform;
     });
 
     setModalOrders(pendingOrders);
@@ -1130,7 +1206,7 @@ const FinanceManagement: React.FC = () => {
     }
   };
 
-  const renderSummaryCard = (title: string, value: number, description: string, color: string, onClick?: () => void) => (
+  const renderSummaryCard = (title: string, value: number, description: React.ReactNode, color: string, onClick?: () => void) => (
     <div
       onClick={onClick}
       style={{
@@ -1173,7 +1249,7 @@ const FinanceManagement: React.FC = () => {
       <div style={{ color, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>
         {value.toLocaleString()} MMK
       </div>
-      <p style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.9rem', margin: 0 }}>{description}</p>
+      <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.9rem', margin: 0 }}>{description}</div>
     </div>
   );
 
@@ -1367,6 +1443,7 @@ const FinanceManagement: React.FC = () => {
               gap: '18px'
             }}
           >
+            {/* 第一行 */}
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
             {renderSummaryCard(
               language === 'my' ? 'စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု' : '总平台支付 (余额支付)', 
@@ -1375,11 +1452,24 @@ const FinanceManagement: React.FC = () => {
               '#3b82f6',
               () => handlePlatformPaymentClick()
             )}
-            {renderSummaryCard(t.totalMerchantCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handleMerchantCollectionClick())}
+            {renderSummaryCard(t.totalStartingFee, summary.totalStartingFee, t.totalStartingFeeDesc, '#a29bfe')}
+            {renderSummaryCard(t.totalMerchantCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handlePendingPaymentsClick())}
+            
+            {/* 第二行 */}
             {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
             {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
-            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handlePendingPaymentsClick())}
-            {renderSummaryCard(t.orderIncome, summary.packageIncome, `${t.orderIncomeDesc} (${summary.packageCount} ${t.packageSuffix})`, '#6c5ce7')}
+            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handleMerchantCollectionClick())}
+            {renderSummaryCard(
+              t.orderIncome,
+              summary.packageIncome,
+              (
+                <>
+                  <div>现金支付：{summary.packageIncomeCash.toLocaleString()} MMK</div>
+                  <div>余额支付：{summary.packageIncomeBalance.toLocaleString()} MMK（{summary.packageCount} {t.packageSuffix}）</div>
+                </>
+              ),
+              '#6c5ce7'
+            )}
             {renderSummaryCard(t.courierKmCost, summary.courierKmCost, `${t.courierFeeDesc}: ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
         )}
@@ -2976,6 +3066,32 @@ const FinanceManagement: React.FC = () => {
                 <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>{language === 'zh' ? '包裹收入记录' : language === 'my' ? 'ပစ္စည်းပို့ဆောင်မှု ဝင်ငွေမှတ်တမ်း' : 'Package Income Records'}</h4>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                    {language === 'zh' ? '支付方式' : language === 'my' ? 'ပေးချေမှု' : 'Payment'}
+                  </label>
+                  <select
+                    value={packagePaymentFilter}
+                    onChange={(e) => setPackagePaymentFilter(e.target.value as 'all' | 'cash' | 'balance')}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      background: 'rgba(7, 23, 53, 0.65)',
+                      color: 'white',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all" style={{ background: '#0f1729', color: 'white' }}>
+                      {language === 'zh' ? '全部' : language === 'my' ? 'အားလုံး' : 'All'}
+                    </option>
+                    <option value="cash" style={{ background: '#0f1729', color: 'white' }}>
+                      {language === 'zh' ? '现金支付' : language === 'my' ? 'ငွေသား' : 'Cash'}
+                    </option>
+                    <option value="balance" style={{ background: '#0f1729', color: 'white' }}>
+                      {language === 'zh' ? '余额支付' : language === 'my' ? 'လက်ကျန်ငွေ' : 'Balance'}
+                    </option>
+                  </select>
+                  <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
                     {t.recordsPerPage}：
                   </label>
                   <select
@@ -3015,6 +3131,9 @@ const FinanceManagement: React.FC = () => {
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'လက်ခံသူ' : '收件人'}</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'ပစ္စည်းအမျိုးအစား' : '包裹类型'}</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{t.amount}</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>
+                        {language === 'zh' ? '支付方式' : language === 'my' ? 'ပေးချေမှု' : 'Payment'}
+                      </th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{t.status}</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>{language === 'my' ? 'ပို့ဆောင်ချိန်' : '送达时间'}</th>
                     </tr>
@@ -3022,13 +3141,14 @@ const FinanceManagement: React.FC = () => {
                   <tbody>
                     {deliveredPackagesSorted.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
                           {t.noRecords}
                         </td>
                       </tr>
                     ) : (
                       packageCurrentPackages.map((pkg) => {
                         const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                        const isCashPayment = pkg.payment_method === 'cash';
                         return (
                           <tr key={pkg.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
@@ -3046,6 +3166,19 @@ const FinanceManagement: React.FC = () => {
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
                               <span style={{ color: '#22c55e', fontWeight: 'bold' }}>
                                 {price.toLocaleString()} MMK
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                background: isCashPayment ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                color: isCashPayment ? '#60a5fa' : '#34d399'
+                              }}>
+                                {isCashPayment
+                                  ? (language === 'zh' ? '现金支付' : language === 'my' ? 'ငွေသား' : 'Cash')
+                                  : (language === 'zh' ? '余额支付' : language === 'my' ? 'လက်ကျန်ငွေ' : 'Balance')}
                               </span>
                             </td>
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
@@ -4655,15 +4788,16 @@ const FinanceManagement: React.FC = () => {
               {/* 统计卡片 */}
               {(() => {
                 const cashPackages = packages.filter(pkg => {
-                  if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                  if (pkg.payment_method !== 'cash') return false;
+                  if (pkg.status !== '已送达' && pkg.status !== '已完成') return false;
                   
                   // 结清状态过滤
                   if (cashSettlementStatus === 'unsettled' && pkg.rider_settled) return false;
                   if (cashSettlementStatus === 'settled' && !pkg.rider_settled) return false;
                   
-                  // 日期筛选：检查送达时间是否包含选定日期
-                  const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
-                  if (!deliveryDate.includes(cashCollectionDate)) return false;
+                  // 日期筛选：按日期精确匹配
+                  const dateKey = getDateKey(pkg.delivery_time || pkg.updated_at || pkg.created_at || pkg.create_time);
+                  if (!dateKey || dateKey !== cashCollectionDate) return false;
 
                   // 领区过滤
                   if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix)) return false;
@@ -4789,14 +4923,15 @@ const FinanceManagement: React.FC = () => {
             {(() => {
               // 筛选符合条件的包裹：现金支付、已送达、符合结清状态、且符合日期
               const cashPackages = packages.filter(pkg => {
-                if (pkg.payment_method !== 'cash' || pkg.status !== '已送达') return false;
+                if (pkg.payment_method !== 'cash') return false;
+                if (pkg.status !== '已送达' && pkg.status !== '已完成') return false;
                 
                 // 结清状态过滤
                 if (cashSettlementStatus === 'unsettled' && pkg.rider_settled) return false;
                 if (cashSettlementStatus === 'settled' && !pkg.rider_settled) return false;
                 
-                const deliveryDate = pkg.delivery_time || pkg.updated_at || '';
-                return deliveryDate.includes(cashCollectionDate);
+                const dateKey = getDateKey(pkg.delivery_time || pkg.updated_at || pkg.created_at || pkg.create_time);
+                return Boolean(dateKey && dateKey === cashCollectionDate);
               });
               
               const courierCashMap: Record<string, { packages: Package[], total: number }> = {};
@@ -5149,8 +5284,8 @@ const FinanceManagement: React.FC = () => {
                 {/* 包裹列表 */}
                 {(() => {
                   let filteredPackages = packages.filter(
-                    pkg => pkg.payment_method === 'cash' 
-                    && pkg.status === '已送达' 
+                    pkg => pkg.payment_method === 'cash'
+                    && (pkg.status === '已送达' || pkg.status === '已完成')
                     && pkg.courier === selectedCourier
                   );
 
@@ -5170,8 +5305,10 @@ const FinanceManagement: React.FC = () => {
                       }
                       
                       filteredPackages = filteredPackages.filter(pkg => {
-                        if (!pkg.delivery_time) return false;
-                        const deliveryDate = new Date(pkg.delivery_time);
+                        const deliveryValue = pkg.delivery_time || pkg.updated_at || pkg.created_at || pkg.create_time;
+                        if (!deliveryValue) return false;
+                        const deliveryDate = new Date(deliveryValue);
+                        if (Number.isNaN(deliveryDate.getTime())) return false;
                         if (startDate && deliveryDate < startDate) return false;
                         if (endDate && deliveryDate > endDate) return false;
                         return true;
@@ -5182,19 +5319,28 @@ const FinanceManagement: React.FC = () => {
                       startDate.setHours(0, 0, 0, 0);
                       
                       filteredPackages = filteredPackages.filter(pkg => {
-                        if (!pkg.delivery_time) return false;
-                        const deliveryDate = new Date(pkg.delivery_time);
+                        const deliveryValue = pkg.delivery_time || pkg.updated_at || pkg.created_at || pkg.create_time;
+                        if (!deliveryValue) return false;
+                        const deliveryDate = new Date(deliveryValue);
+                        if (Number.isNaN(deliveryDate.getTime())) return false;
                         return deliveryDate >= startDate!;
                       });
                     }
                   }
 
-                  const totalAmount = filteredPackages.reduce((sum, pkg) => {
+                  const cashRelevantPackages = filteredPackages.filter(pkg => {
+                    const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                    const hasDeliveryFee = price > 0;
+                    const hasMerchantCod = isMerchantPackage(pkg) && Number(pkg.cod_amount || 0) > 0;
+                    return hasDeliveryFee || hasMerchantCod;
+                  });
+
+                  const totalAmount = cashRelevantPackages.reduce((sum, pkg) => {
                     const price = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
                     return sum + price;
                   }, 0);
 
-                  if (filteredPackages.length === 0) {
+                  if (cashRelevantPackages.length === 0) {
                     return (
                       <div style={{
                         background: 'rgba(255, 255, 255, 0.08)',
@@ -5212,7 +5358,7 @@ const FinanceManagement: React.FC = () => {
                   }
 
                   // 过滤掉已结清的包裹
-                  const visiblePackages = filteredPackages.filter(pkg => !clearedCashPackages.has(pkg.id) && !pkg.rider_settled);
+                  const visiblePackages = cashRelevantPackages.filter(pkg => !clearedCashPackages.has(pkg.id) && !pkg.rider_settled);
                   
                   let visibleDeliveryFee = 0;
                   let visibleCOD = 0;
@@ -5613,12 +5759,231 @@ const FinanceManagement: React.FC = () => {
         )}
 
         {activeTab === 'merchants_collection' && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-            gap: '20px'
-          }}>
-            {merchantsCollectionStats.map(store => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                  {language === 'zh' ? '分区域' : language === 'my' ? 'ဒေသအလိုက်' : 'Region'}
+                </span>
+                <select
+                  value={merchantRegionFilter}
+                  onChange={(e) => setMerchantRegionFilter(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <option value="all" style={{ color: '#111827' }}>
+                    {language === 'zh' ? '全部地区' : language === 'my' ? 'ဒေသအားလုံး' : 'All Regions'}
+                  </option>
+                  {REGIONS.map(region => (
+                    <option key={region.prefix} value={region.prefix} style={{ color: '#111827' }}>
+                      {region.prefix}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {merchantRegionFilter !== 'all' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {REGIONS.filter(region => region.prefix === merchantRegionFilter).map(region => {
+                  const regionStores = merchantsCollectionStats.filter(store => {
+                    const prefix = getStoreRegionPrefix(store);
+                    return prefix === region.prefix;
+                  });
+                  if (regionStores.length === 0) return null;
+                  return (
+                    <div key={region.prefix} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1rem', fontWeight: 600 }}>
+                        {region.name} ({region.prefix})
+                      </div>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                        gap: '20px'
+                      }}>
+                        {regionStores.map(store => (
+                          <div
+                            key={store.id}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.12)',
+                              borderRadius: '20px',
+                              padding: '24px',
+                              border: '1px solid rgba(255, 255, 255, 0.18)',
+                              boxShadow: '0 12px 35px rgba(7, 23, 55, 0.45)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '16px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem' }}>{store.store_name}</h3>
+                              <div style={{ 
+                                background: store.unclearedAmount > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                color: store.unclearedAmount > 0 ? '#ef4444' : '#10b981',
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                fontSize: '0.85rem',
+                                fontWeight: '600'
+                              }}>
+                                {store.unclearedAmount > 0 ? t.unsettled : t.settled}
+                              </div>
+                            </div>
+
+                            {/* 店铺联系信息 - 使用 delivery_stores 表的数据 */}
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.15)', 
+                              padding: '12px', 
+                              borderRadius: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              {store.contact_phone && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)' }}>
+                                  <span style={{ fontSize: '1rem' }}>📞</span>
+                                  <span style={{ fontSize: '0.9rem' }}>{store.contact_phone}</span>
+                                </div>
+                              )}
+                              {store.address && (
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'rgba(255,255,255,0.8)' }}>
+                                  <span style={{ fontSize: '1rem' }}>📍</span>
+                                  <span style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>{store.address}</span>
+                                </div>
+                              )}
+                              {store.store_code && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                  <span style={{ fontSize: '0.85rem', opacity: 0.7 }}>{language === 'zh' ? '代码' : language === 'my' ? 'ကုဒ်' : 'Code'}:</span>
+                                  <span style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.85rem' }}>{store.store_code}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div 
+                                onClick={() => handlePendingPaymentsClick(store.store_name)}
+                                style={{ 
+                                  background: 'rgba(255, 255, 255, 0.08)', 
+                                  padding: '12px', 
+                                  borderRadius: '12px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                              >
+                                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>
+                                  {language === 'my' ? 'ယခုနှစ် ငွေကောက်ခံမှု စုစုပေါင်း' : t.monthlyMerchantCollection}
+                                </div>
+                                <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                  {store.totalAmount.toLocaleString()}
+                                </div>
+                              </div>
+                              <div 
+                                onClick={() => handleMerchantCollectionClick(store.store_name)}
+                                style={{ 
+                                  background: 'rgba(239, 68, 68, 0.1)', 
+                                  padding: '12px', 
+                                  borderRadius: '12px', 
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}
+                              >
+                                <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '4px' }}>
+                                  {language === 'my' ? 'ရှင်းလင်းရန် ကျန်ငွေ' : t.pendingAmount}
+                                </div>
+                                <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                  {store.unclearedAmount.toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                              {t.unsettledOrders}: <span style={{ color: 'white', fontWeight: 'bold' }}>{store.unclearedCount}</span> {language === 'zh' ? '单' : ''}
+                            </div>
+
+                            {store.lastSettledAt && (
+                              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginTop: '4px' }}>
+                                {t.lastSettled}: <span style={{ color: 'white', fontWeight: '500' }}>{new Date(store.lastSettledAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            )}
+
+                            {store.unclearedAmount > 0 && (
+                              <button
+                                onClick={() => !isRegionalUser && handleSettleMerchant(store.id, store.store_name)}
+                                disabled={isRegionalUser}
+                                style={{
+                                  marginTop: 'auto',
+                                  padding: '10px 12px',
+                                  background: isRegionalUser ? 'rgba(148, 163, 184, 0.15)' : 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)',
+                                  border: 'none',
+                                  borderRadius: '12px',
+                                  color: 'white',
+                                  cursor: isRegionalUser ? 'not-allowed' : 'pointer',
+                                  fontWeight: 600,
+                                  boxShadow: isRegionalUser ? 'none' : '0 4px 15px rgba(239, 68, 68, 0.4)',
+                                  transition: 'all 0.3s ease',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                onMouseOver={(e) => {
+                                  if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1.02)';
+                                }}
+                                onMouseOut={(e) => {
+                                  if (!isRegionalUser) e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <span>{t.confirmSettle} ({store.unclearedAmount.toLocaleString()} MMK)</span>
+                                {isRegionalUser && (
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.8 }}>
+                                    🔒 {language === 'zh' ? '仅限总公司管理员操作' : language === 'my' ? 'ပင်မရုံးချုပ် စီမံခန့်ခွဲသူသာ ဆောင်ရွက်နိုင်သည်' : 'HQ Admin Only'}
+                                  </span>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '20px'
+              }}>
+                {merchantsCollectionStats.map(store => (
               <div
                 key={store.id}
                 style={{
@@ -5677,7 +6042,7 @@ const FinanceManagement: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div 
-                    onClick={() => handleMerchantCollectionClick(store.store_name)}
+                    onClick={() => handlePendingPaymentsClick(store.store_name)}
                     style={{ 
                       background: 'rgba(255, 255, 255, 0.08)', 
                       padding: '12px', 
@@ -5696,14 +6061,14 @@ const FinanceManagement: React.FC = () => {
                     }}
                   >
                     <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '4px' }}>
-                      {language === 'my' ? 'ယခုလဆိုင်များမှငွေကောက်ခံမှု' : t.monthlyMerchantCollection}
+                      {language === 'my' ? 'ယခုနှစ် ငွေကောက်ခံမှု စုစုပေါင်း' : t.monthlyMerchantCollection}
                     </div>
                     <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold' }}>
                       {store.totalAmount.toLocaleString()}
                     </div>
                   </div>
                   <div 
-                    onClick={() => handlePendingPaymentsClick(store.store_name)}
+                    onClick={() => handleMerchantCollectionClick(store.store_name)}
                     style={{ 
                       background: 'rgba(239, 68, 68, 0.1)', 
                       padding: '12px', 
@@ -5781,14 +6146,16 @@ const FinanceManagement: React.FC = () => {
               </div>
             ))}
             
-            {merchantsCollectionStats.length === 0 && (
-              <div style={{ 
-                gridColumn: '1 / -1', 
-                textAlign: 'center', 
-                padding: '60px',
-                color: 'rgba(255,255,255,0.5)' 
-              }}>
-                {language === 'zh' ? '暂无合伙店铺数据' : language === 'my' ? 'လုပ်ဖော်ကိုင်ဖက်ဆိုင် အချက်အလက် မရှိသေးပါ' : 'No merchants store data'}
+                {merchantsCollectionStats.length === 0 && (
+                  <div style={{ 
+                    gridColumn: '1 / -1', 
+                    textAlign: 'center', 
+                    padding: '60px',
+                    color: 'rgba(255,255,255,0.5)' 
+                  }}>
+                    {language === 'zh' ? '暂无合伙店铺数据' : language === 'my' ? 'လုပ်ဖော်ကိုင်ဖက်ဆိုင် အချက်အလက် မရှိသေးပါ' : 'No merchants store data'}
+                  </div>
+                )}
               </div>
             )}
           </div>
