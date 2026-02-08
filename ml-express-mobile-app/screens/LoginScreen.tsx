@@ -21,6 +21,7 @@ import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
 const { width, height } = Dimensions.get('window');
 
@@ -53,6 +54,9 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('currentUserName', account.employee_name);
         await AsyncStorage.setItem('currentUserRole', account.role);
         await AsyncStorage.setItem('currentUserPosition', account.position || '');
+        
+        // 🚀 核心：清除 Supabase Auth 状态，不再绑定
+        await supabase.auth.signOut();
         
         let courierId = '';
         
@@ -98,7 +102,7 @@ export default function LoginScreen({ navigation }: any) {
                 .update({ 
                   last_active: new Date().toISOString(), 
                   status: 'active',
-                  employee_id: account.employee_id // 确保员工编号同步
+                  employee_id: account.employee_id, // 确保员工编号同步
                 })
                 .eq('id', courierId);
               

@@ -27,9 +27,11 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { geofenceService } from '../services/geofenceService';
+import { DeviceHealthShield } from '../components/DeviceHealthShield';
 
 interface Package {
   id: string;
@@ -55,6 +57,7 @@ interface Package {
 const { width, height } = Dimensions.get('window');
 
 const MyTasksScreen: React.FC = () => {
+  const isFocused = useIsFocused();
   const { language } = useApp();
   const [packages, setPackages] = useState<Package[]>([]);
   const [groupedPackages, setGroupedPackages] = useState<{[key: string]: Package[]}>({});
@@ -288,10 +291,27 @@ const MyTasksScreen: React.FC = () => {
         }
       }
       
-      const myPackages = allPackages.filter(pkg => 
-        pkg.courier === userName && 
-        (pkg.status === '待取件' || pkg.status === '待收款' || pkg.status === '已取件' || pkg.status === '配送中' || pkg.status === '配送进行中' || pkg.status === '已送达')
-      );
+      const normalizeStatus = (status?: string) => {
+        if (!status) return '';
+        const trimmed = status.trim();
+        if (trimmed.includes('已送达')) return '已送达';
+        if (trimmed.includes('已取消')) return '已取消';
+        if (trimmed.includes('配送中') || trimmed.includes('配送进行中')) return '配送中';
+        if (trimmed.includes('已取件')) return '已取件';
+        if (trimmed.includes('待收款')) return '待收款';
+        if (trimmed.includes('待取件')) return '待取件';
+        if (trimmed.includes('待确认')) return '待确认';
+        return trimmed;
+      };
+
+      const myPackages = allPackages.filter(pkg => {
+        if (pkg.courier !== userName) return false;
+        const s = normalizeStatus(pkg.status);
+        return ['待取件', '待收款', '已取件', '配送中', '已送达'].includes(s);
+      }).map(pkg => ({
+        ...pkg,
+        status: normalizeStatus(pkg.status)
+      }));
       
       setPackages(myPackages);
       const grouped = groupPackagesByDate(myPackages);
@@ -327,29 +347,24 @@ const MyTasksScreen: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case '待取件':
-      case '待收款': return '#f59e0b';
-      case '已取件': return '#27ae60';
-      case '配送中':
-      case '配送进行中': return '#f39c12';
-      case '已送达': return '#3498db';
-      case '已取消': return '#e74c3c';
-      default: return '#95a5a6';
-    }
+    const s = (status || '').trim();
+    if (s.includes('已送达')) return '#27ae60'; // 绿色 - 已送达
+    if (s.includes('已取消')) return '#e74c3c'; // 红色 - 已取消
+    if (s.includes('配送中') || s.includes('配送进行中')) return '#9b59b6'; // 紫色 - 配送中
+    if (s.includes('已取件')) return '#3498db'; // 蓝色 - 已取件
+    if (s.includes('待取件') || s.includes('待收款')) return '#f39c12'; // 橙色 - 待取件
+    return '#95a5a6';
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case '待取件': return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
-      case '待收款': return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
-      case '已取件': return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
-      case '配送中':
-      case '配送进行中': return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
-      case '已送达': return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
-      case '已取消': return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
-      default: return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
-    }
+    const s = (status || '').trim();
+    if (s.includes('已送达')) return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
+    if (s.includes('已取消')) return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
+    if (s.includes('配送中') || s.includes('配送进行中')) return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
+    if (s.includes('已取件')) return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
+    if (s.includes('待取件')) return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
+    if (s.includes('待收款')) return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
+    return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
   };
 
   const handlePackagePress = (packageItem: Package) => {
@@ -643,6 +658,8 @@ const MyTasksScreen: React.FC = () => {
         </View>
       </View>
 
+      <DeviceHealthShield />
+
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}>
         {selectedDate && (
           <View style={styles.activeFilter}>
@@ -815,7 +832,15 @@ const MyTasksScreen: React.FC = () => {
       {/* 扫码相机 */}
       <Modal visible={showScanModal} transparent animationType="slide">
         <View style={styles.scanOverlay}>
-          <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+          {isFocused ? (
+            <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.cameraPaused]}>
+              <Text style={styles.cameraPausedText}>
+                {language === 'zh' ? '相机已暂停以节省电量' : language === 'en' ? 'Camera paused to save battery' : 'ကင်မရာကို ဘက်ထရီချွေတာရန် ခန့်ထားထားသည်'}
+              </Text>
+            </View>
+          )}
           <View style={styles.scanFrameContainer}>
             <View style={styles.scanFrame}>
               <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
@@ -981,6 +1006,17 @@ const styles = StyleSheet.create({
   dateItemSelected: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
   dateItemText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   scanOverlay: { flex: 1, backgroundColor: '#000' },
+  cameraPaused: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+  },
+  cameraPausedText: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   scanFrameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scanFrame: { width: 250, height: 250, position: 'relative' },
   corner: { position: 'absolute', width: 40, height: 40, borderColor: '#3b82f6' },

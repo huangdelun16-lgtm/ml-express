@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -40,7 +41,7 @@ interface ResolvedLocation {
   lat: number;
   lng: number;
   accuracy?: number;
-  source: 'coordinates' | 'geocoding' | 'fallback';
+  source: 'coordinates' | 'geocoding' | 'fallback' | 'cache';
   resolvedAddress?: string;
 }
 
@@ -133,6 +134,7 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
 
 export default function MapScreen({ navigation }: any) {
   const { language } = useApp();
+  const isFocused = useIsFocused();
   
   // 1. 状态定义
   const [location, setLocation] = useState<any>(null);
@@ -155,9 +157,11 @@ export default function MapScreen({ navigation }: any) {
   const [statusFilter, setStatusFilter] = useState<string>('全部');
   const [distanceFilter, setDistanceFilter] = useState<string>('全部');
   const [speedFilter, setSpeedFilter] = useState<string>('全部');
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [completedPackageIds, setCompletedPackageIds] = useState<Record<string, number>>({});
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(true);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(60);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [isBackground, setIsBackground] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -185,6 +189,7 @@ export default function MapScreen({ navigation }: any) {
   const appStateListenerRef = useRef<any>(null);
   const lastUpdateLocation = useRef<{lat: number, lng: number, time: number} | null>(null);
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLocationConfigRef = useRef<{ accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number; mode: string } | null>(null);
   const packageStartTimes = useRef<Record<string, number>>({});
   const pulseAnimations = useRef<Record<string, Animated.Value>>({});
   const pendingRequests = useRef<Set<string>>(new Set());
@@ -195,15 +200,58 @@ export default function MapScreen({ navigation }: any) {
 
   // 3. 核心功能函数 (useCallback)
   
+  const normalizeStatus = useCallback((status?: string) => {
+    if (!status) return '';
+    const trimmed = status.trim();
+    if (trimmed.includes('已送达')) return '已送达';
+    if (trimmed.includes('已取消')) return '已取消';
+    if (trimmed.includes('配送中')) return '配送中';
+    if (trimmed.includes('已取件')) return '已取件';
+    if (trimmed.includes('待收款')) return '待收款';
+    if (trimmed.includes('待取件')) return '待取件';
+    if (trimmed.includes('待确认')) return '待确认';
+    return trimmed;
+  }, []);
+
+  const resolvePackageStatus = useCallback((pkg: PackageWithExtras, override?: string) => {
+    if (pkg.delivery_time) return '已送达';
+    return normalizeStatus(override || pkg.status);
+  }, [normalizeStatus]);
+
+  const COMPLETED_IDS_KEY = 'completed_delivery_ids';
+  const COMPLETED_TTL = 7 * 24 * 60 * 60 * 1000;
+
+  const loadCompletedIds = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem(COMPLETED_IDS_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as Record<string, number>;
+      const now = Date.now();
+      const cleaned: Record<string, number> = {};
+      Object.entries(parsed).forEach(([id, ts]) => {
+        if (now - ts < COMPLETED_TTL) cleaned[id] = ts;
+      });
+      setCompletedPackageIds(cleaned);
+      await AsyncStorage.setItem(COMPLETED_IDS_KEY, JSON.stringify(cleaned));
+    } catch (e) {}
+  }, []);
+
+  const saveCompletedIds = useCallback(async (next: Record<string, number>) => {
+    try {
+      await AsyncStorage.setItem(COMPLETED_IDS_KEY, JSON.stringify(next));
+    } catch (e) {}
+  }, []);
+
   const getStatusColor = useCallback((status: string) => {
-    switch (status) {
+    switch (normalizeStatus(status)) {
       case '待取件': return '#f39c12';
+      case '待收款': return '#f39c12';
       case '已取件': return '#3498db';
       case '配送中': return '#9b59b6';
       case '已送达': return '#27ae60';
       default: return '#95a5a6';
     }
-  }, []);
+  }, [normalizeStatus]);
 
   const getMarkerIcon = useCallback((speed?: string) => speed === '急送达' ? '⚡' : (speed === '定时达' ? '⏰' : '📦'), []);
 
@@ -233,6 +281,38 @@ export default function MapScreen({ navigation }: any) {
     }
   }, []);
 
+  const hasInTransitOrders = useMemo(() => {
+    return Boolean(
+      currentDeliveringPackageId ||
+      packages.some(p => p.status === '配送中' || p.status === '配送进行中')
+    );
+  }, [currentDeliveringPackageId, packages]);
+
+  const buildLocationConfig = useCallback(() => {
+    if (isBackground) {
+      return {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 240000,
+        distanceInterval: 250,
+        mode: 'background'
+      };
+    }
+    if (hasInTransitOrders) {
+      return {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 10000,
+        distanceInterval: 15,
+        mode: 'active'
+      };
+    }
+    return {
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 20000,
+      distanceInterval: 80,
+      mode: 'idle'
+    };
+  }, [hasInTransitOrders, isBackground]);
+
   const cleanupMemory = useCallback(() => {
     coordinatesCache.current = {};
     packagesCache.current = [];
@@ -241,31 +321,144 @@ export default function MapScreen({ navigation }: any) {
     console.log('🧹 内存清理完成');
   }, []);
 
+  const normalizeAddressForDb = (address?: string) => {
+    if (!address) return null;
+    return address.trim().toLowerCase();
+  };
+
+  const normalizeAddressKey = (address?: string) => {
+    if (!address) return null;
+    return encodeURIComponent(address.trim().toLowerCase());
+  };
+
+  const getGeocodeCacheKey = (address?: string) => {
+    const normalized = normalizeAddressKey(address);
+    if (!normalized) return null;
+    return `geo:${normalized}`;
+  };
+
+  const readGeocodeCache = useCallback(async (address?: string): Promise<ResolvedLocation | null> => {
+    try {
+      const key = getGeocodeCacheKey(address);
+      if (!key) return null;
+      const cached = await AsyncStorage.getItem(key);
+      if (!cached) return null;
+      const parsed = JSON.parse(cached);
+      if (typeof parsed?.lat !== 'number' || typeof parsed?.lng !== 'number') return null;
+      return { lat: parsed.lat, lng: parsed.lng, source: 'cache', resolvedAddress: address || '' };
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  const readRemoteGeocodeCache = useCallback(async (address?: string): Promise<ResolvedLocation | null> => {
+    try {
+      const normalized = normalizeAddressForDb(address);
+      if (!normalized || !isOnline) return null;
+      const { data, error } = await supabase
+        .from('geocode_cache')
+        .select('lat, lng')
+        .eq('address', normalized)
+        .maybeSingle();
+      if (error || !data) return null;
+      return { lat: data.lat, lng: data.lng, source: 'cache', resolvedAddress: address || '' };
+    } catch (error) {
+      return null;
+    }
+  }, [isOnline]);
+
+  const writeGeocodeCache = useCallback(async (address: string | undefined, coords: { lat: number; lng: number }) => {
+    try {
+      const key = getGeocodeCacheKey(address);
+      if (!key) return;
+      await AsyncStorage.setItem(key, JSON.stringify({ lat: coords.lat, lng: coords.lng, ts: Date.now() }));
+    } catch (error) {
+      console.error('写入地理编码缓存失败:', error);
+    }
+  }, []);
+
+  const writeRemoteGeocodeCache = useCallback(async (address: string | undefined, coords: { lat: number; lng: number }) => {
+    try {
+      const normalized = normalizeAddressForDb(address);
+      if (!normalized || !isOnline) return;
+      await supabase
+        .from('geocode_cache')
+        .upsert({
+          address: normalized,
+          lat: coords.lat,
+          lng: coords.lng,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'address' });
+    } catch (error) {
+      console.error('写入共享地理编码缓存失败:', error);
+    }
+  }, [isOnline]);
+
   const getPickupCoordinates = useCallback(async (pkg: Package): Promise<ResolvedLocation | null> => {
     try {
-      if (pkg.sender_latitude && pkg.sender_longitude) return { lat: parseFloat(pkg.sender_latitude.toString()), lng: parseFloat(pkg.sender_longitude.toString()), source: 'coordinates', resolvedAddress: pkg.sender_address };
+      if (pkg.sender_latitude && pkg.sender_longitude) {
+        const coords = { lat: parseFloat(pkg.sender_latitude.toString()), lng: parseFloat(pkg.sender_longitude.toString()) };
+        await writeGeocodeCache(pkg.sender_address, coords);
+        await writeRemoteGeocodeCache(pkg.sender_address, coords);
+        return { ...coords, source: 'coordinates', resolvedAddress: pkg.sender_address };
+      }
       if (pkg.sender_address) {
+        const cached = await readGeocodeCache(pkg.sender_address);
+        if (cached) return cached;
+        const remoteCached = await readRemoteGeocodeCache(pkg.sender_address);
+        if (remoteCached) {
+          await writeGeocodeCache(pkg.sender_address, { lat: remoteCached.lat, lng: remoteCached.lng });
+          return remoteCached;
+        }
+        if (!isOnline) {
+          return { lat: 21.9588, lng: 96.0891, source: 'fallback', resolvedAddress: pkg.sender_address || '仰光' };
+        }
         try {
           const res = await Location.geocodeAsync(pkg.sender_address);
-          if (res && res.length > 0) return { lat: res[0].latitude, lng: res[0].longitude, source: 'geocoding', resolvedAddress: pkg.sender_address };
+          if (res && res.length > 0) {
+            const coords = { lat: res[0].latitude, lng: res[0].longitude };
+            await writeGeocodeCache(pkg.sender_address, coords);
+            await writeRemoteGeocodeCache(pkg.sender_address, coords);
+            return { ...coords, source: 'geocoding', resolvedAddress: pkg.sender_address };
+          }
         } catch (e) {}
       }
       return { lat: 21.9588, lng: 96.0891, source: 'fallback', resolvedAddress: pkg.sender_address || '仰光' };
     } catch (e) { return null; }
-  }, []);
+  }, [isOnline, readGeocodeCache, readRemoteGeocodeCache, writeGeocodeCache, writeRemoteGeocodeCache]);
 
   const getDeliveryCoordinates = useCallback(async (pkg: Package): Promise<ResolvedLocation | null> => {
     try {
-      if (pkg.receiver_latitude && pkg.receiver_longitude) return { lat: parseFloat(pkg.receiver_latitude.toString()), lng: parseFloat(pkg.receiver_longitude.toString()), source: 'coordinates', resolvedAddress: pkg.receiver_address };
+      if (pkg.receiver_latitude && pkg.receiver_longitude) {
+        const coords = { lat: parseFloat(pkg.receiver_latitude.toString()), lng: parseFloat(pkg.receiver_longitude.toString()) };
+        await writeGeocodeCache(pkg.receiver_address, coords);
+        await writeRemoteGeocodeCache(pkg.receiver_address, coords);
+        return { ...coords, source: 'coordinates', resolvedAddress: pkg.receiver_address };
+      }
       if (pkg.receiver_address) {
+        const cached = await readGeocodeCache(pkg.receiver_address);
+        if (cached) return cached;
+        const remoteCached = await readRemoteGeocodeCache(pkg.receiver_address);
+        if (remoteCached) {
+          await writeGeocodeCache(pkg.receiver_address, { lat: remoteCached.lat, lng: remoteCached.lng });
+          return remoteCached;
+        }
+        if (!isOnline) {
+          return { lat: 21.9588, lng: 96.0891, source: 'fallback', resolvedAddress: pkg.receiver_address || '仰光' };
+        }
         try {
           const res = await Location.geocodeAsync(pkg.receiver_address);
-          if (res && res.length > 0) return { lat: res[0].latitude, lng: res[0].longitude, source: 'geocoding', resolvedAddress: pkg.receiver_address };
+          if (res && res.length > 0) {
+            const coords = { lat: res[0].latitude, lng: res[0].longitude };
+            await writeGeocodeCache(pkg.receiver_address, coords);
+            await writeRemoteGeocodeCache(pkg.receiver_address, coords);
+            return { ...coords, source: 'geocoding', resolvedAddress: pkg.receiver_address };
+          }
         } catch (e) {}
       }
       return { lat: 21.9588, lng: 96.0891, source: 'fallback', resolvedAddress: pkg.receiver_address || '仰光' };
     } catch (e) { return null; }
-  }, []);
+  }, [isOnline, readGeocodeCache, readRemoteGeocodeCache, writeGeocodeCache, writeRemoteGeocodeCache]);
 
   const getCoordinatesForPackage = useCallback(async (pkg: PackageWithExtras): Promise<ResolvedLocation | null> => {
     const cached = coordinatesCache.current[pkg.id];
@@ -308,8 +501,26 @@ export default function MapScreen({ navigation }: any) {
         if (cached) allPackages = cached;
       }
       
-      const packagePromises = allPackages
-        .filter(pkg => pkg.courier === currentUser && !['已送达', '已取消'].includes(pkg.status))
+      const normalizedPackages = allPackages.map(pkg => ({
+        ...pkg,
+        status: normalizeStatus(pkg.status)
+      }));
+
+      // 过滤属于当前骑手且未完成的包裹
+      const packagePromises = normalizedPackages
+        .filter(pkg => {
+          const status = normalizeStatus(pkg.status);
+          const isFinished = status === '已送达' || status === '已取消' || !!pkg.delivery_time;
+          const isMyPackage = pkg.courier === currentUser;
+          const isLocallyCompleted = !!completedPackageIds[pkg.id];
+          
+          // 调试日志：帮助定位为何订单没消失
+          if (isMyPackage && (isFinished || isLocallyCompleted)) {
+            console.log(`🔍 过滤订单 ${pkg.id}: status=${status}, hasDeliveryTime=${!!pkg.delivery_time}, locallyCompleted=${isLocallyCompleted}`);
+          }
+
+          return isMyPackage && !isFinished && !isLocallyCompleted;
+        })
         .map(async pkg => {
             const pickupCoords = await getPickupCoordinates(pkg);
             const deliveryCoords = await getDeliveryCoordinates(pkg);
@@ -332,6 +543,30 @@ export default function MapScreen({ navigation }: any) {
       lastLoadTime.current = now;
       await cacheService.savePackages(myPackages);
       setPackages(myPackages);
+      setStatusOverrides(prev => {
+        const next = { ...prev };
+        myPackages.forEach(pkg => {
+          const serverResolved = pkg.delivery_time ? '已送达' : normalizeStatus(pkg.status);
+          if (next[pkg.id] && next[pkg.id] === serverResolved) {
+            delete next[pkg.id];
+          }
+          if (['配送中', '已送达', '已取消'].includes(serverResolved)) {
+            delete next[pkg.id];
+          }
+        });
+        return next;
+      });
+      setCompletedPackageIds(prev => {
+        const next = { ...prev };
+        myPackages.forEach(pkg => {
+          const resolved = resolvePackageStatus(pkg);
+          if (resolved === '已送达' || resolved === '已取消') {
+            delete next[pkg.id];
+          }
+        });
+        saveCompletedIds(next);
+        return next;
+      });
       setLastUpdateTime(new Date());
       trackPerformance('load packages', startTime);
     } catch (error) {
@@ -339,7 +574,7 @@ export default function MapScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [isOnline, getPickupCoordinates, getDeliveryCoordinates, trackPerformance]);
+  }, [isOnline, getPickupCoordinates, getDeliveryCoordinates, trackPerformance, completedPackageIds, normalizeStatus, resolvePackageStatus]);
 
   const loadCurrentDeliveringPackage = useCallback(async () => {
     try {
@@ -394,13 +629,31 @@ export default function MapScreen({ navigation }: any) {
           const name = await AsyncStorage.getItem('currentUserName') || '';
           const ok = await packageService.updatePackageStatus(packageId, '已取件', new Date().toLocaleString('zh-CN'), undefined, name);
           if (ok) {
-            loadPackages();
-            if (selectedPackageForMap?.id === packageId) setSelectedPackageForMap(prev => prev ? { ...prev, status: '已取件' } : null);
+            Alert.alert(
+              language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
+              language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ'
+            );
+            setStatusOverrides(prev => ({ ...prev, [packageId]: '已取件' }));
+            setPackages(prev => {
+              const nextPackages = prev.map(pkg => pkg.id === packageId ? { ...pkg, status: '已取件' } : pkg);
+              packagesCache.current = nextPackages;
+              cacheService.savePackages(nextPackages);
+              return nextPackages;
+            });
+            if (isOnline) {
+              loadPackages(true);
+            }
+      if (selectedPackageForMap?.id === packageId) setSelectedPackageForMap(prev => prev ? { ...prev, status: '已取件' } : null);
+          } else {
+            Alert.alert(
+              language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား',
+              language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ'
+            );
           }
         }}
       ]
     );
-  }, [loadPackages, selectedPackageForMap, language]);
+  }, [loadPackages, selectedPackageForMap, language, isOnline]);
 
   const stopAutoRefresh = useCallback(() => {
     if (autoRefreshTimerRef.current) {
@@ -411,11 +664,12 @@ export default function MapScreen({ navigation }: any) {
 
   const startAutoRefresh = useCallback(() => {
     stopAutoRefresh();
-    if (isBackground || !autoRefreshEnabled) return;
+    if (isBackground || !autoRefreshEnabled || !hasInTransitOrders) return;
+    const intervalSeconds = hasInTransitOrders ? autoRefreshInterval : Math.max(autoRefreshInterval, 120);
     autoRefreshTimerRef.current = setInterval(() => {
       if (!isBackground && isOnline) loadPackages(true);
-    }, autoRefreshInterval * 1000);
-  }, [isBackground, autoRefreshEnabled, autoRefreshInterval, isOnline, stopAutoRefresh, loadPackages]);
+    }, intervalSeconds * 1000);
+  }, [isBackground, autoRefreshEnabled, autoRefreshInterval, hasInTransitOrders, isOnline, stopAutoRefresh, loadPackages]);
 
   const initNetworkListener = useCallback(() => {
     NetInfo.fetch().then(state => setIsOnline(state.isConnected ?? false));
@@ -442,10 +696,10 @@ export default function MapScreen({ navigation }: any) {
         stopAutoRefresh();
       } else if (nextAppState === 'active') {
         setIsBackground(false);
-        if (autoRefreshEnabled) {
-          startAutoRefresh();
-          loadPackages(true);
-        }
+      if (autoRefreshEnabled) {
+        startAutoRefresh();
+        loadPackages(true);
+      }
       }
     });
   }, [autoRefreshEnabled, loadPackages, startAutoRefresh, stopAutoRefresh]);
@@ -457,10 +711,41 @@ export default function MapScreen({ navigation }: any) {
     }
   }, []);
 
+  const stopLocationTracking = useCallback(() => {
+    if (locationIntervalRef.current) {
+      if ((locationIntervalRef.current as any).remove) {
+        (locationIntervalRef.current as any).remove();
+      } else {
+      clearInterval(locationIntervalRef.current);
+      }
+      locationIntervalRef.current = null;
+    }
+    setIsLocationTracking(false);
+    lastLocationConfigRef.current = null;
+  }, []);
+
   const startLocationTracking = useCallback(async () => {
     try {
       const courierId = await AsyncStorage.getItem('currentCourierId');
       if (!courierId) return;
+
+      if (!hasInTransitOrders) {
+        stopLocationTracking();
+        return;
+      }
+
+      const locationConfig = buildLocationConfig();
+      const lastConfig = lastLocationConfigRef.current;
+      if (
+        isLocationTracking &&
+        lastConfig &&
+        lastConfig.mode === locationConfig.mode &&
+        lastConfig.timeInterval === locationConfig.timeInterval &&
+        lastConfig.distanceInterval === locationConfig.distanceInterval &&
+        lastConfig.accuracy === locationConfig.accuracy
+      ) {
+        return;
+      }
       
       // 清除旧的追踪
       if (locationIntervalRef.current) {
@@ -476,9 +761,9 @@ export default function MapScreen({ navigation }: any) {
       // 🚀 核心优化：使用 watchPositionAsync 替代定时器，实现更精准和实时的平滑追踪
       const subscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000,
-          distanceInterval: 10,
+          accuracy: locationConfig.accuracy,
+          timeInterval: locationConfig.timeInterval,
+          distanceInterval: locationConfig.distanceInterval,
         },
         async (currentLocation) => {
           const now = Date.now();
@@ -537,23 +822,12 @@ export default function MapScreen({ navigation }: any) {
       );
 
       locationIntervalRef.current = subscription as any;
+      lastLocationConfigRef.current = locationConfig;
     } catch (e) { 
       setIsLocationTracking(false); 
       console.error('追踪启动异常:', e);
     }
-  }, []);
-
-  const stopLocationTracking = useCallback(() => {
-    if (locationIntervalRef.current) {
-      if ((locationIntervalRef.current as any).remove) {
-        (locationIntervalRef.current as any).remove();
-      } else {
-      clearInterval(locationIntervalRef.current);
-      }
-      locationIntervalRef.current = null;
-    }
-    setIsLocationTracking(false);
-  }, []);
+  }, [buildLocationConfig, hasInTransitOrders, isBackground, isLocationTracking, stopLocationTracking]);
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -612,13 +886,37 @@ export default function MapScreen({ navigation }: any) {
         });
       const ok = await packageService.updatePackageStatus(currentPackageForDelivery.id, '已送达', undefined, new Date().toISOString(), name);
       if (ok) {
+        console.log(`✅ [验证] 订单 ${currentPackageForDelivery.id} 状态更新成功`);
+        
+        // 🚀 强制再次拉取确认 (双保险)
+        setTimeout(async () => {
+          const { data } = await supabase.from('packages').select('status, delivery_time').eq('id', currentPackageForDelivery.id).single();
+          console.log(`📡 [验证回拉] ${currentPackageForDelivery.id} 实时状态: status=${data?.status}, time=${data?.delivery_time}`);
+        }, 2000);
+
         const id = await AsyncStorage.getItem('currentCourierId');
         if (id) await supabase.from('couriers').update({ current_delivering_package_id: null }).eq('id', id);
         setCurrentDeliveringPackageId(null);
-                setShowPhotoModal(false);
-                setCapturedPhoto(null);
-                setCurrentPackageForDelivery(null);
-                loadPackages();
+        setStatusOverrides(prev => {
+          const next = { ...prev };
+          delete next[currentPackageForDelivery.id];
+          return next;
+        });
+        setCompletedPackageIds(prev => {
+          const next = { ...prev, [currentPackageForDelivery.id]: Date.now() };
+          saveCompletedIds(next);
+          return next;
+        });
+        setPackages(prev => {
+          const nextPackages = prev.filter(pkg => pkg.id !== currentPackageForDelivery.id);
+          packagesCache.current = nextPackages;
+          cacheService.savePackages(nextPackages);
+          return nextPackages;
+        });
+        setShowPhotoModal(false);
+        setCapturedPhoto(null);
+        setCurrentPackageForDelivery(null);
+        if (isOnline) loadPackages(true);
               }
     } finally { setUploadingPhoto(false); }
   }, [capturedPhoto, currentPackageForDelivery, location, convertImageToBase64, loadPackages]);
@@ -812,6 +1110,7 @@ export default function MapScreen({ navigation }: any) {
   // 6. 渲染辅助
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
     const isCurrent = currentDeliveringPackageId === item.id;
+    const effectiveStatus = resolvePackageStatus(item, statusOverrides[item.id]);
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -943,16 +1242,16 @@ export default function MapScreen({ navigation }: any) {
           </View>
 
           <View style={styles.actionRow}>
-            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(item.status) }]}>                                                                    
+            <View style={[styles.numberBadge, { backgroundColor: getStatusColor(effectiveStatus) }]}>                                                                    
               <Text style={styles.numberText}>{index + 1}</Text>
             </View>
             
             <View style={styles.buttonGroup}>
-            {item.status === '已取件' ? (
+            {effectiveStatus === '已取件' ? (
                 !isCurrent ? (
                 <TouchableOpacity 
                   style={styles.startDeliveryButton}
-                    onPress={(e) => { e.stopPropagation(); startDelivering(item.id); }}
+                    onPress={(e) => { e?.stopPropagation?.(); startDelivering(item.id); }}
                 >
                   <Text style={styles.startDeliveryText}>
                     🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
@@ -961,27 +1260,27 @@ export default function MapScreen({ navigation }: any) {
               ) : (
                 <TouchableOpacity 
                   style={styles.finishDeliveryButton}
-                    onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
+                    onPress={(e) => { e?.stopPropagation?.(); finishDelivering(item.id); }}
                 >
                   <Text style={styles.finishDeliveryText}>
                       🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
                   </Text>
                 </TouchableOpacity>
               )
-            ) : item.status === '配送中' ? (
+            ) : effectiveStatus === '配送中' ? (
               <TouchableOpacity 
                 style={styles.finishDeliveryButton}
-                  onPress={(e) => { e.stopPropagation(); finishDelivering(item.id); }}
+                  onPress={(e) => { e?.stopPropagation?.(); finishDelivering(item.id); }}
               >
                 <Text style={styles.finishDeliveryText}>
                     🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
                 </Text>
               </TouchableOpacity>
-            ) : item.status === '待取件' ? (
+            ) : effectiveStatus === '待取件' ? (
                 <View style={styles.dualButtons}>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#3b82f6' }]} 
-                    onPress={(e) => { e.stopPropagation(); navigation.navigate('Scan'); }}
+                    onPress={(e) => { e?.stopPropagation?.(); navigation.navigate('Scan'); }}
                   >
                 <Text style={styles.placeholderText}>
                       {language === 'zh' ? '扫码取件' : language === 'en' ? 'Scan' : 'စကင်န်ဖတ်ပါ'}
@@ -989,7 +1288,7 @@ export default function MapScreen({ navigation }: any) {
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#10b981' }]} 
-                    onPress={(e) => { e.stopPropagation(); handleManualPickup(item.id); }}
+                    onPress={(e) => { e?.stopPropagation?.(); handleManualPickup(item.id); }}
                   >
                     <Text style={styles.placeholderText}>
                       {language === 'zh' ? '手动取件' : language === 'en' ? 'Manual' : 'ကိုယ်တိုင်ယူ'}
@@ -1006,11 +1305,12 @@ export default function MapScreen({ navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor]);
+  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, normalizeStatus, resolvePackageStatus]);
 
   // 7. 初始化效果
   useEffect(() => {
     const init = async () => {
+      await loadCompletedIds();
       await requestLocationPermission();
       await loadPackages();
       await loadDeliveryStores();
@@ -1032,8 +1332,26 @@ export default function MapScreen({ navigation }: any) {
     };
   }, []);
 
+  useEffect(() => {
+    startLocationTracking();
+  }, [hasInTransitOrders, isBackground, startLocationTracking]);
+
+  useEffect(() => {
+    if (autoRefreshEnabled) {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+  }, [autoRefreshEnabled, hasInTransitOrders, startAutoRefresh, stopAutoRefresh]);
+
+  useEffect(() => {
+    if (!hasInTransitOrders) {
+      stopAutoRefresh();
+    }
+  }, [hasInTransitOrders, stopAutoRefresh]);
+
   const filteredPackages = useMemo(() => {
-    let filtered = [...packages];
+    let filtered = packages.filter(pkg => !completedPackageIds[pkg.id]);
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(p => p.id.toLowerCase().includes(q) || (p.receiver_name && p.receiver_name.toLowerCase().includes(q)) || (p.sender_name && p.sender_name.toLowerCase().includes(q)));
@@ -1041,7 +1359,7 @@ export default function MapScreen({ navigation }: any) {
     if (statusFilter !== '全部') filtered = filtered.filter(p => p.status === statusFilter);
     if (speedFilter !== '全部') filtered = filtered.filter(p => p.delivery_speed === speedFilter);
     return filtered;
-  }, [packages, searchQuery, statusFilter, speedFilter]);
+  }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds]);
 
   return (
     <View style={styles.container}>
@@ -1131,55 +1449,63 @@ export default function MapScreen({ navigation }: any) {
             <View style={{ width: 40 }} />
           </LinearGradient>
           <View style={{ flex: 1, position: 'relative' }}>
-            <MapView
-              ref={mapRef}
-              provider={PROVIDER_GOOGLE}
-              style={StyleSheet.absoluteFillObject} 
-              initialRegion={{
-                latitude: location?.latitude || 21.9588, 
-                longitude: location?.longitude || 96.0891, 
-                latitudeDelta: 0.05, 
-                longitudeDelta: 0.05 
-              }}
-            >
-              {location && (
-              <Marker
-                  coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
-                  title={language === 'zh' ? '当前位置' : 'My Location'}
+            {isFocused ? (
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={StyleSheet.absoluteFillObject} 
+                initialRegion={{
+                  latitude: location?.latitude || 21.9588, 
+                  longitude: location?.longitude || 96.0891, 
+                  latitudeDelta: 0.05, 
+                  longitudeDelta: 0.05 
+                }}
               >
-                <View style={styles.courierMarker}>
-                    <Text style={styles.courierMarkerText}>🛵</Text>
-                </View>
-              </Marker>
-              )}
-              
-              {optimizedPackagesWithCoords.map((p, i) => (
-                <React.Fragment key={`${p.id}-${i}`}>
-                  {p.pickupCoords && (
-                  <Marker
-                      coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
-                      title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
-                      description={p.sender_address}
-                  >
-                    <View style={styles.pickupMarker}>
-                        <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
-                    </View>
-                  </Marker>
-                  )}
-                  {p.deliveryCoords && (
-                  <Marker
-                      coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
-                      title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
-                      description={p.receiver_address}
-                  >
-                    <View style={styles.packageMarker}>
-                        <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
-                    </View>
-                  </Marker>
-                  )}
-                </React.Fragment>
-              ))}
-            </MapView>
+                {location && (
+                <Marker
+                    coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
+                    title={language === 'zh' ? '当前位置' : 'My Location'}
+                >
+                  <View style={styles.courierMarker}>
+                      <Text style={styles.courierMarkerText}>🛵</Text>
+                  </View>
+                </Marker>
+                )}
+                
+                {optimizedPackagesWithCoords.map((p, i) => (
+                  <React.Fragment key={`${p.id}-${i}`}>
+                    {p.pickupCoords && (
+                    <Marker
+                        coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
+                        title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
+                        description={p.sender_address}
+                    >
+                      <View style={styles.pickupMarker}>
+                          <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
+                      </View>
+                    </Marker>
+                    )}
+                    {p.deliveryCoords && (
+                    <Marker
+                        coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
+                        title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
+                        description={p.receiver_address}
+                    >
+                      <View style={styles.packageMarker}>
+                          <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
+                      </View>
+                    </Marker>
+                    )}
+                  </React.Fragment>
+                ))}
+              </MapView>
+            ) : (
+              <View style={styles.mapPausedContainer}>
+                <Text style={styles.mapPausedText}>
+                  {language === 'zh' ? '地图已暂停以节省电量' : language === 'en' ? 'Map paused to save battery' : 'မြေပုံကို ဘက်ထရီချွေတာရန် ခန့်ထားထားသည်'}
+                </Text>
+              </View>
+            )}
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
               <View style={styles.routeListContainer}>
                 <View style={styles.routeListHeader}>
@@ -1498,6 +1824,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)', 
     alignItems: 'center',
     justifyContent: 'center' 
+  },
+  mapPausedContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  mapPausedText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   courierMarker: {
     backgroundColor: '#10b981', 

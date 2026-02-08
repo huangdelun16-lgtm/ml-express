@@ -23,11 +23,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
 
 const { width } = Dimensions.get('window');
 
 export default function PackageDetailScreen({ route, navigation }: any) {
+  const isFocused = useIsFocused();
   const { language } = useApp();
   const { packageId, package: initialPackage, coords: initialCoords } = route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
@@ -401,7 +403,15 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       {/* 扫码相机 */}
       <Modal visible={showScanModal} transparent animationType="slide">
         <View style={styles.scanOverlay}>
-          <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+          {isFocused ? (
+            <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.cameraPaused]}>
+              <Text style={styles.cameraPausedText}>
+                {language === 'zh' ? '相机已暂停以节省电量' : language === 'en' ? 'Camera paused to save battery' : 'ကင်မရာကို ဘက်ထရီချွေတာရန် ခန့်ထားထားသည်'}
+              </Text>
+            </View>
+          )}
           <TouchableOpacity onPress={() => setShowScanModal(false)} style={styles.scanCloseBtn}><Ionicons name="close" size={32} color="white" /></TouchableOpacity>
         </View>
       </Modal>
@@ -519,6 +529,17 @@ const styles = StyleSheet.create({
   gridBtnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   gridBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 10 },
   scanOverlay: { flex: 1, backgroundColor: '#000' },
+  cameraPaused: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+  },
+  cameraPausedText: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   scanCloseBtn: { position: 'absolute', top: 60, right: 30, zIndex: 10 },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   photoPreviewWrapper: {

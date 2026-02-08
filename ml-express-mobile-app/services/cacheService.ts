@@ -9,18 +9,28 @@ const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时
 export interface OfflineUpdate {
   id: string;
   packageId: string;
-  status: string;
+  type: 'status' | 'photo';
+  status?: string;
   pickupTime?: string;
   deliveryTime?: string;
   courierName?: string;
+  photoData?: {
+    photoBase64?: string;
+    photoUrl?: string;
+    courierId?: string;
+    latitude?: number;
+    longitude?: number;
+    locationName?: string;
+  };
   timestamp: number;
+  retryCount: number;
 }
 
 export const cacheService = {
   /**
    * 将更新加入离线队列
    */
-  async queueUpdate(update: Omit<OfflineUpdate, 'id' | 'timestamp'>) {
+  async queueUpdate(update: Omit<OfflineUpdate, 'id' | 'timestamp' | 'retryCount'>) {
     try {
       const queueJson = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
       const queue: OfflineUpdate[] = queueJson ? JSON.parse(queueJson) : [];
@@ -28,17 +38,34 @@ export const cacheService = {
       const newUpdate: OfflineUpdate = {
         ...update,
         id: `upd_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        retryCount: 0
       };
       
       queue.push(newUpdate);
       await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
-      console.log('📦 已加入离线更新队列:', newUpdate.packageId);
+      console.log(`📦 已加入离线更新队列 [${update.type}]:`, newUpdate.packageId);
       return true;
     } catch (error) {
       console.error('Failed to queue offline update:', error);
       return false;
     }
+  },
+
+  /**
+   * 更新队列中的重试次数
+   */
+  async incrementRetry(updateId: string) {
+    try {
+      const queueJson = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (!queueJson) return;
+      const queue: OfflineUpdate[] = JSON.parse(queueJson);
+      const index = queue.findIndex(item => item.id === updateId);
+      if (index !== -1) {
+        queue[index].retryCount += 1;
+        await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+      }
+    } catch (error) {}
   },
 
   /**

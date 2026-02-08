@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import { packageService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function ScanScreen({ navigation }: any) {
   const { language } = useApp();
   const [permission, requestPermission] = useCameraPermissions();
+  const isFocused = useIsFocused();
   const [scanned, setScanned] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
@@ -686,64 +688,76 @@ export default function ScanScreen({ navigation }: any) {
         <View style={styles.scanContainer}>
           {permission?.granted ? (
             <View style={styles.cameraContainer}>
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-                barcodeScannerSettings={{
-                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
-                }}
-                onCameraReady={() => {
-                  console.log('相机已准备就绪');
-                  setCameraError(null);
-                }}
-                onMountError={(error) => {
-                  console.error('相机挂载错误:', error);
-                  setCameraError('相机无法启动，请检查设备权限或重启应用');
-                }}
-              />
-              
-              {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
-              <View style={styles.overlayContainer}>
-                {/* 遮罩层 */}
-                <View style={styles.maskContainer}>
-                  <View style={styles.maskRow}>
-                    <View style={styles.maskCell} />
-                    <View style={styles.maskMiddle} />
-                    <View style={styles.maskCell} />
-                  </View>
-                  <View style={styles.maskCenter}>
-                    <View style={styles.maskCell} />
-                    <View style={styles.scanArea}>
-                      {/* 扫描框 */}
-                      <Animated.View style={[styles.scanFrame, { transform: [{ scale: pulseAnimation }] }]}>
-                        <View style={[styles.corner, styles.cornerTopLeft]} />
-                        <View style={[styles.corner, styles.cornerTopRight]} />
-                        <View style={[styles.corner, styles.cornerBottomLeft]} />
-                        <View style={[styles.corner, styles.cornerBottomRight]} />
-                        
-                        {/* 扫描线 */}
-                        {!scanned && (
-                          <Animated.View 
-                            style={[
-                              styles.scanLine,
-                              {
-                                transform: [{ translateY: scanLineTranslate }]
-                              }
-                            ]} 
-                          />
-                        )}
-                      </Animated.View>
+              {isFocused ? (
+                <>
+                  <CameraView
+                    style={styles.camera}
+                    facing="back"
+                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
+                    }}
+                    onCameraReady={() => {
+                      console.log('相机已准备就绪');
+                      setCameraError(null);
+                    }}
+                    onMountError={(error) => {
+                      console.error('相机挂载错误:', error);
+                      setCameraError('相机无法启动，请检查设备权限或重启应用');
+                    }}
+                  />
+
+                  {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
+                  <View style={styles.overlayContainer}>
+                    {/* 遮罩层 */}
+                    <View style={styles.maskContainer}>
+                      <View style={styles.maskRow}>
+                        <View style={styles.maskCell} />
+                        <View style={styles.maskMiddle} />
+                        <View style={styles.maskCell} />
+                      </View>
+                      <View style={styles.maskCenter}>
+                        <View style={styles.maskCell} />
+                        <View style={styles.scanArea}>
+                          {/* 扫描框 */}
+                          <Animated.View style={[styles.scanFrame, { transform: [{ scale: pulseAnimation }] }]}>
+                            <View style={[styles.corner, styles.cornerTopLeft]} />
+                            <View style={[styles.corner, styles.cornerTopRight]} />
+                            <View style={[styles.corner, styles.cornerBottomLeft]} />
+                            <View style={[styles.corner, styles.cornerBottomRight]} />
+
+                            {/* 扫描线 */}
+                            {!scanned && (
+                              <Animated.View 
+                                style={[
+                                  styles.scanLine,
+                                  {
+                                    transform: [{ translateY: scanLineTranslate }]
+                                  }
+                                ]} 
+                              />
+                            )}
+                          </Animated.View>
+                        </View>
+                        <View style={styles.maskCell} />
+                      </View>
+                      <View style={styles.maskRow}>
+                        <View style={styles.maskCell} />
+                        <View style={styles.maskMiddle} />
+                        <View style={styles.maskCell} />
+                      </View>
                     </View>
-                    <View style={styles.maskCell} />
                   </View>
-                  <View style={styles.maskRow}>
-                    <View style={styles.maskCell} />
-                    <View style={styles.maskMiddle} />
-                    <View style={styles.maskCell} />
+                </>
+              ) : (
+                <View style={styles.cameraErrorContainer}>
+                  <View style={styles.errorIconContainer}>
+                    <Text style={styles.cameraErrorIcon}>📷</Text>
                   </View>
+                  <Text style={styles.cameraErrorTitle}>{t.cameraError}</Text>
+                  <Text style={styles.cameraErrorDesc}>{t.checkingPermission}</Text>
                 </View>
-              </View>
+              )}
 
               {cameraError && (
                 <View style={styles.cameraErrorOverlay}>

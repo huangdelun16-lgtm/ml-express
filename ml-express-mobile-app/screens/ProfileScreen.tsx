@@ -31,6 +31,7 @@ export default function ProfileScreen({ navigation }: any) {
     todayPlatformPayment: 0,
     todayDeliveryFee: 0,
     todayCOD: 0,
+    todayIncome: 0,
   });
 
   useFocusEffect(
@@ -61,7 +62,20 @@ export default function ProfileScreen({ navigation }: any) {
       if (error) throw error;
 
       const myPackages = allPackages || [];
-      const deliveredPackages = myPackages.filter(p => p.status === '已送达');
+      
+      // 归一化状态判定函数
+      const isDelivered = (p: any) => {
+        const s = (p.status || '').trim();
+        return s === '已送达' || s.includes('已送达') || !!p.delivery_time;
+      };
+      
+      const isInProgress = (p: any) => {
+        const s = (p.status || '').trim();
+        if (isDelivered(p)) return false;
+        return ['已取件', '配送中', '配送进行中'].some(status => s.includes(status));
+      };
+
+      const deliveredPackages = myPackages.filter(p => isDelivered(p));
       
       // 🚀 优化：更稳健的“今日”日期获取逻辑 (支持 YYYY-MM-DD 匹配)
       const now = new Date();
@@ -76,7 +90,7 @@ export default function ProfileScreen({ navigation }: any) {
         totalDelivered: deliveredPackages.length,
         todayDelivered: todayDelivered.length,
         // 🚀 优化：包含所有配送中的中间状态
-        inProgress: myPackages.filter(p => ['已取件', '配送中', '配送进行中'].includes(p.status)).length,
+        inProgress: myPackages.filter(p => isInProgress(p)).length,
         totalPlatformPayment: deliveredPackages.reduce((sum, p) => {
           const match = p.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
           return sum + (match ? parseFloat(match[1].replace(/,/g, '')) : 0);
@@ -91,6 +105,21 @@ export default function ProfileScreen({ navigation }: any) {
         }, 0),
         todayCOD: todayDelivered.reduce((sum, p) => {
           return sum + (p.cod_amount || 0);
+        }, 0),
+        // 🚀 优化：今日预计收入计算 (排除基础起步价，只保留附加费)
+        // 逻辑：预计收入 = 总金额 - (单量 * 基础起步价)
+        todayIncome: todayDelivered.reduce((sum, p) => {
+          // 基础起步价 (平台收入)
+          const BASE_STARTING_FEE = 1500; 
+          
+          // 获取该订单的总配送费 (字符串转数字)
+          const totalDeliveryFee = parseFloat(p.price?.toString().replace(/[^\d.]/g, '') || '0');
+          
+          // 骑手收入 = 总配送费 - 基础起步价
+          // 如果总费小于起步价(理论不应该)，则骑手收入为0
+          const courierEarning = Math.max(0, totalDeliveryFee - BASE_STARTING_FEE);
+          
+          return sum + courierEarning;
         }, 0),
       });
     } catch (error) {
@@ -280,6 +309,11 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.statRowVertical}>
               <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日余额支付' : language === 'my' ? 'ယနေ့ပလက်ဖောင်းမှပေးချေခြင်း' : 'Today Platform Pay'}</Text>
               <Text style={[styles.statNumberVertical, { color: '#10b981' }]}>{stats.todayPlatformPayment.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
+            </View>
+            <View style={styles.statDividerHorizontal} />
+            <View style={styles.statRowVertical}>
+              <Text style={styles.statLabelVertical}>{language === 'zh' ? '今日预计收入' : language === 'my' ? 'ယနေ့ ခန့်မှန်းဝင်ငွေ' : 'Today Income'}</Text>
+              <Text style={[styles.statNumberVertical, { color: '#fbbf24' }]}>{stats.todayIncome.toLocaleString()} <Text style={styles.unitText}>MMK</Text></Text>
             </View>
           </LinearGradient>
         </View>

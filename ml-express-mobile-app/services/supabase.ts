@@ -460,15 +460,16 @@ export const packageService = {
     // 🚀 离线支持逻辑
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      console.log('📶 检测到离线状态，正在缓存更新...');
+      console.log('📶 检测到离线状态，正在缓存状态更新...');
       await cacheService.queueUpdate({
         packageId: id,
+        type: 'status',
         status,
         pickupTime,
         deliveryTime,
         courierName
       });
-      return true; // 返回 true 让 UI 认为操作成功
+      return true;
     }
 
     const updateData: any = { status };
@@ -557,24 +558,41 @@ export const packageService = {
     const queue = await cacheService.getOfflineQueue();
     if (queue.length === 0) return;
 
-    console.log(`🔄 正在同步 ${queue.length} 条离线更新...`);
+    console.log(`🔄 正在同步 ${queue.length} 条离线记录...`);
     
-    for (const update of queue) {
+    for (const item of queue) {
+      if (item.retryCount > 5) {
+        console.warn(`⚠️ 记录 ${item.id} 重试次数过多，跳过`);
+        continue;
+      }
+
       try {
-        const { packageId, status, pickupTime, deliveryTime, courierName } = update;
-        const success = await this.updatePackageStatus(
-          packageId, 
-          status, 
-          pickupTime, 
-          deliveryTime, 
-          courierName
-        );
+        let success = false;
+        if (item.type === 'status') {
+          success = await this.updatePackageStatus(
+            item.packageId, 
+            item.status!, 
+            item.pickupTime, 
+            item.deliveryTime, 
+            item.courierName
+          );
+        } else if (item.type === 'photo' && item.photoData) {
+          success = await deliveryPhotoService.saveDeliveryPhoto({
+            packageId: item.packageId,
+            ...item.photoData,
+            courierName: item.courierName || '未知'
+          });
+        }
         
         if (success) {
-          await cacheService.removeFromQueue(update.id);
+          await cacheService.removeFromQueue(item.id);
+          console.log(`✅ 成功同步离线记录: ${item.id}`);
+        } else {
+          await cacheService.incrementRetry(item.id);
         }
       } catch (error) {
-        console.warn('同步单条更新失败:', error);
+        console.warn('同步离线记录失败:', error);
+        await cacheService.incrementRetry(item.id);
       }
     }
   },
@@ -1119,6 +1137,26 @@ export const deliveryPhotoService = {
     locationName?: string;
   }): Promise<boolean> {
     try {
+      // 🚀 离线支持逻辑
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        console.log('📶 检测到离线状态，正在缓存照片上传...');
+        await cacheService.queueUpdate({
+          packageId: photoData.packageId,
+          type: 'photo',
+          courierName: photoData.courierName,
+          photoData: {
+            photoBase64: photoData.photoBase64,
+            photoUrl: photoData.photoUrl,
+            courierId: photoData.courierId,
+            latitude: photoData.latitude,
+            longitude: photoData.longitude,
+            locationName: photoData.locationName
+          }
+        });
+        return true;
+      }
+
       // 生成照片URL（使用data URL格式）
       const photoUrl = photoData.photoBase64 
         ? `data:image/jpeg;base64,${photoData.photoBase64}`

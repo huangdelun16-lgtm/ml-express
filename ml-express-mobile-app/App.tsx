@@ -38,6 +38,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import MyTasksScreen from './screens/MyTasksScreen';
 import MyStatisticsScreen from './screens/MyStatisticsScreen';
 import PerformanceAnalyticsScreen from './screens/PerformanceAnalyticsScreen';
+import { SyncIndicator } from './components/SyncIndicator';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -299,7 +300,9 @@ const GlobalOrderMonitor = () => {
           table: 'packages'
         },
         async (payload) => {
-          const { eventType, new: newPkg, old: oldPkg } = payload;
+          const { eventType, new: newPkgRaw, old: oldPkgRaw } = payload;
+          const newPkg = newPkgRaw as any;
+          const oldPkg = oldPkgRaw as any;
           
           if (!newPkg || !newPkg.id) return;
 
@@ -312,6 +315,7 @@ const GlobalOrderMonitor = () => {
           // 1. 是一条新插入且指派给我的记录
           // 2. 是更新操作，且指派对象从别人变成了我（或从空变我）
           const isNewlyAssigned = eventType === 'UPDATE' && 
+                                oldPkg &&
                                 (oldPkg.courier || '').toLowerCase().trim() !== pkgCourierClean && 
                                 isMyOrder;
           
@@ -443,6 +447,7 @@ export default function App() {
     <SafeAreaProvider>
       <AppProvider>
         <GlobalOrderMonitor />
+        <SyncIndicator />
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName="Login"
