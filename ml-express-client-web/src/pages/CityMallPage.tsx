@@ -282,7 +282,7 @@ const CityMallPage: React.FC = () => {
               .region-scroll::-webkit-scrollbar { display: none; }
             `}</style>
             <div className="region-scroll" style={{ display: 'flex', gap: '0.75rem' }}>
-              {regions.map(r => {
+              {regions.map((r: any) => {
                 const isActive = selectedRegion === r.id;
                 return (
                   <button
@@ -349,7 +349,7 @@ const CityMallPage: React.FC = () => {
             gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
             gap: '2.5rem' 
           }}>
-            {filteredStores.map(store => {
+            {filteredStores.map((store: any) => {
               const status = checkStoreOpenStatus(store);
               return (
                 <div 

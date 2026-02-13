@@ -188,7 +188,7 @@ const ContactPage: React.FC = () => {
                 iconBg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
                 isBusiness: true
               }
-            ].map((contact, index) => (
+            ].map((contact: any, index: number) => (
               <div key={index} style={{
                 background: 'rgba(255, 255, 255, 0.98)',
                 backdropFilter: 'blur(20px)',

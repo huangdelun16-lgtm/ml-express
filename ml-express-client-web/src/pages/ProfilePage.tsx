@@ -2137,7 +2137,7 @@ const ProfilePage: React.FC = () => {
               }}>
                 {userPackages
                   .slice((currentPage - 1) * packagesPerPage, currentPage * packagesPerPage)
-                  .map((pkg) => (
+                  .map((pkg: any) => (
                 <div
                   key={pkg.id}
                   style={{
@@ -3319,7 +3319,7 @@ const ProfilePage: React.FC = () => {
             
             <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
               {codOrders.length > 0 ? (
-                codOrders.map((order, index) => (
+                codOrders.map((order: any, index: number) => (
                   <div
                     key={index}
                     style={{
@@ -3482,7 +3482,7 @@ const ProfilePage: React.FC = () => {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '2rem'
                 }}>
-                  {products.map(product => (
+                  {products.map((product: any) => (
                     <div 
                       key={product.id}
                       onClick={() => handleOpenEditProduct(product)}
@@ -3721,7 +3721,7 @@ const ProfilePage: React.FC = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                {[10000, 50000, 100000, 300000, 500000, 1000000].map(amount => (
+                {[10000, 50000, 100000, 300000, 500000, 1000000].map((amount: number) => (
                   <button
                     key={amount}
                     onClick={() => setRechargeAmount(amount.toString())}

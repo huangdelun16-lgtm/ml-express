@@ -123,7 +123,7 @@ const CartPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {cartItems.map(item => (
+                {cartItems.map((item: any) => (
                   <div 
                     key={item.id}
                     style={{ 

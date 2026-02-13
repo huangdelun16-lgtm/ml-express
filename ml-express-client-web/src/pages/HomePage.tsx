@@ -1839,7 +1839,7 @@ const HomePage: React.FC = () => {
         if (lastSearchQueryRef.current === input.trim()) {
           if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
             // 显示更多结果（最多10个），像Google Maps一样
-            const suggestions = predictions.slice(0, 10).map((prediction) => ({
+            const suggestions = predictions.slice(0, 10).map((prediction: any) => ({
               place_id: prediction.place_id,
               main_text: prediction.structured_formatting.main_text,
               secondary_text: prediction.structured_formatting.secondary_text,
@@ -2261,7 +2261,7 @@ const HomePage: React.FC = () => {
                     justifyContent: 'center',
             animation: 'fadeInUp 1s ease-out 0.6s both'
           }}>
-            {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag, index) => (
+            {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag: string, index: number) => (
               <div key={index} style={{
                 background: 'rgba(255,255,255,0.15)',
                 backdropFilter: 'blur(10px)',
@@ -3315,7 +3315,7 @@ const HomePage: React.FC = () => {
                         🔍 {language === 'zh' ? '搜索中...' : language === 'en' ? 'Searching...' : 'ရှာဖွေနေသည်...'}
                       </div>
                     ) : autocompleteSuggestions.length > 0 ? (
-                      autocompleteSuggestions.map((suggestion, index) => (
+                      autocompleteSuggestions.map((suggestion: any, index: number) => (
                         <div
                           key={`${suggestion.place_id}-${index}`}
                           onClick={() => handleSelectSuggestion(suggestion)}
@@ -3582,7 +3582,7 @@ const HomePage: React.FC = () => {
                   { label: '明天上午', value: 'tomorrow-morning' },
                   { label: '明天下午', value: 'tomorrow-afternoon' },
                   { label: '后天上午', value: 'day-after-morning' }
-                ].map((option) => (
+                ].map((option: any) => (
                   <button
                     key={option.value}
                     onClick={() => {

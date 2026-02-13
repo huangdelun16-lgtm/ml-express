@@ -320,7 +320,7 @@ const StoreProductsPage: React.FC = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
                 gap: '1.5rem' 
               }}>
-                {products.map(product => {
+                {products.map((product: any) => {
                   const qty = itemQuantities[product.id] || 0;
                   return (
                     <div 

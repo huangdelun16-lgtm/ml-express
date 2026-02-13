@@ -188,7 +188,7 @@ const ServicesPage: React.FC = () => {
               bgGradient: 'linear-gradient(135deg, #f093fb, #f5576c)',
               iconBg: 'rgba(240, 147, 251, 0.2)'
             }
-          ].map((service, index) => (
+          ].map((service: any, index: number) => (
             <div key={index} style={{
               background: 'var(--card-bg)',
               backdropFilter: 'var(--card-backdrop)',
@@ -275,7 +275,7 @@ const ServicesPage: React.FC = () => {
 
               {/* 特色功能列表 */}
               <div style={{ marginBottom: '1.5rem' }}>
-                {service.features.map((feature, idx) => (
+                {service.features.map((feature: string, idx: number) => (
                   <div key={idx} style={{
                     display: 'flex',
                     alignItems: 'center',
