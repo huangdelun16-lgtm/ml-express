@@ -371,7 +371,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
               }}>
                 {[
                   { value: 'zh', label: '中文' },
-                  { value: 'en', label: 'English' }
+                  { value: 'en', label: 'English' },
+                  { value: 'my', label: 'မြန်မာ' }
                 ].map((option: any) => (
                   <button
                     key={option.value}

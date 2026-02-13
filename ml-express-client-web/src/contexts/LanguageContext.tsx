@@ -958,7 +958,7 @@ const translations: any = {
     nav: {
       home: 'ပင်မစာမျက်နှာ',
       services: 'ဝန်ဆောင်မှုများ',
-      tracking: 'ခြေရာခံ',
+      tracking: 'အော်ဒါခြေရာခံ',
       contact: 'ဆက်သွယ်ရန်',
       mall: 'စျေးဝယ်စင်တာ',
       cart: 'စျေးဝယ်လှည်း',
