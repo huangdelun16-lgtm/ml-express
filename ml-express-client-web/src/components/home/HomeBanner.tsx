@@ -243,11 +243,11 @@ const HomeBanner = () => {
                     margin: '0 0 12px 0'
                   }}>5分钟接单 · 实时定位</p>
                   <p style={{
-                    fontSize: '16px',
-                    color: 'rgba(30, 41, 59, 0.85)',
+                    fontSize: '18px',
+                    color: 'rgba(30, 41, 59, 0.95)',
                     margin: '0 0 16px 0',
-                    lineHeight: '20px',
-                    fontStyle: 'italic'
+                    lineHeight: '24px',
+                    fontFamily: 'var(--font-family-myanmar)'
                   }}>မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း</p>
                 </div>
                 
@@ -379,11 +379,11 @@ const HomeBanner = () => {
                     margin: '0 0 12px 0'
                   }}>实时定位 · 全城服务 · 30分钟送达</p>
                   <p style={{
-                    fontSize: '16px',
-                    color: '#6b7280',
+                    fontSize: '18px',
+                    color: '#4b5563',
                     margin: '0 0 16px 0',
-                    lineHeight: '20px',
-                    fontStyle: 'italic'
+                    lineHeight: '24px',
+                    fontFamily: 'var(--font-family-myanmar)'
                   }}>မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း</p>
                 </div>
                 
