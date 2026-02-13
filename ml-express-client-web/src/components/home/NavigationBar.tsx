@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Logo from '../Logo';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface NavigationBarProps {
   language: string;
@@ -8,14 +9,6 @@ interface NavigationBarProps {
   currentUser: any;
   onLogout: () => void;
   onShowRegisterModal: (isLoginMode: boolean) => void;
-  translations: {
-    nav: {
-      home: string;
-      services: string;
-      tracking: string;
-      contact: string;
-    };
-  };
 }
 
 const NavigationBar: React.FC<NavigationBarProps> = ({
@@ -23,9 +16,9 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onLanguageChange,
   currentUser,
   onLogout,
-  onShowRegisterModal,
-  translations: t
+  onShowRegisterModal
 }) => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);

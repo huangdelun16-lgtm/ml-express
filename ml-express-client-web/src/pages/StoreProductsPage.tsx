@@ -9,7 +9,7 @@ import LoggerService from '../services/LoggerService';
 const StoreProductsPage: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { language, setLanguage, t: translations } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const { addToCart, cartCount } = useCart();
   
   const [loading, setLoading] = useState(true);
@@ -17,73 +17,6 @@ const StoreProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
-
-  const t = {
-    zh: {
-      loading: '正在加载商品...',
-      addToCart: '加入购物车',
-      noProducts: '该商店暂无商品',
-      stock: '库存',
-      infinite: '无限',
-      addedToCart: '已加入购物车',
-      cart: '购物车',
-      back: '返回商场',
-      merchantInfo: '商家信息',
-      address: '详细地址',
-      contact: '联系电话',
-      hours: '营业时间',
-      openNow: '正在营业',
-      closedNow: '休息中',
-      closedToday: '今日打烊'
-    },
-    en: {
-      loading: 'Loading products...',
-      addToCart: 'Add to Cart',
-      noProducts: 'No products in this store',
-      stock: 'Stock',
-      infinite: 'Infinite',
-      addedToCart: 'Added to cart',
-      cart: 'Cart',
-      back: 'Back to Mall',
-      merchantInfo: 'Merchant Info',
-      address: 'Address',
-      contact: 'Phone',
-      hours: 'Hours',
-      openNow: 'Open Now',
-      closedNow: 'Closed',
-      closedToday: 'Closed Today'
-    },
-    my: {
-      loading: 'ကုန်ပစ္စည်းများရှာဖွေနေပါသည်...',
-      addToCart: 'ခြင်းထဲသို့ထည့်ရန်',
-      noProducts: 'ဤဆိုင်တွင် ကုန်ပစ္စည်းမရှိသေးပါ',
-      stock: 'လက်ကျန်',
-      infinite: 'အကန့်အသတ်မရှိ',
-      addedToCart: 'ခြင်းထဲသို့ထည့်ပြီးပါပြီ',
-      cart: 'ခြင်း',
-      back: 'ဈေးသို့ပြန်သွားရန်',
-      merchantInfo: 'ဆိုင်အချက်အလက်',
-      address: 'လိပ်စာ',
-      contact: 'ဖုန်းနံပါတ်',
-      hours: 'ဖွင့်ချိန်',
-      openNow: 'ဆိုင်ဖွင့်ထားသည်',
-      closedNow: 'ဆိုင်ပိတ်ထားသည်',
-      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
-    }
-  }[language as 'zh' | 'en' | 'my'] || {
-    loading: 'Loading...',
-    addToCart: 'Add to Cart',
-    noProducts: 'No products in this store',
-    stock: 'Stock',
-    infinite: 'Infinite',
-    addedToCart: 'Added to cart',
-    cart: 'Cart',
-    back: 'Back',
-    merchantInfo: 'Merchant Info',
-    address: 'Address',
-    contact: 'Phone',
-    hours: 'Hours'
-  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -144,7 +77,7 @@ const StoreProductsPage: React.FC = () => {
     if (qty > 0) {
       addToCart(product, qty);
       setItemQuantities(prev => ({ ...prev, [product.id]: 0 }));
-      alert(t.addedToCart);
+      alert(t.store.addedToCart);
     }
   };
 
@@ -209,7 +142,7 @@ const StoreProductsPage: React.FC = () => {
     });
 
     setItemQuantities({});
-    alert(t.addedToCart);
+    alert(t.store.addedToCart);
   };
 
   // 🚀 首页同款背景渐变
@@ -236,7 +169,6 @@ const StoreProductsPage: React.FC = () => {
           onShowRegisterModal={(isLoginMode) => {
             navigate('/', { state: { showModal: true, isLoginMode } });
           }}
-          translations={translations}
         />
         
         <div style={{ maxWidth: '1200px', margin: '2rem auto 0', color: 'white' }}>
@@ -260,7 +192,7 @@ const StoreProductsPage: React.FC = () => {
                   backdropFilter: 'blur(10px)'
                 }}
               >
-                <span style={{ fontSize: '1.2rem' }}>←</span> {t.back}
+                <span style={{ fontSize: '1.2rem' }}>←</span> {t.store.back}
               </button>
               
               {store && (
@@ -297,7 +229,7 @@ const StoreProductsPage: React.FC = () => {
                             fontSize: '0.8rem', 
                             fontWeight: 'bold' 
                           }}>
-                            ● {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                            ● {status.isOpen ? t.store.openNow : (status.reason === 'closed_today' ? t.store.closedToday : t.store.closedNow)}
                           </span>
                         );
                       })()}
@@ -328,7 +260,7 @@ const StoreProductsPage: React.FC = () => {
                 onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
                 onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                <span style={{ fontSize: '1.5rem' }}>➕</span> {t.addToCart}
+                <span style={{ fontSize: '1.5rem' }}>➕</span> {t.store.addToCart}
               </button>
 
               <button 
@@ -351,7 +283,7 @@ const StoreProductsPage: React.FC = () => {
                 onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
                 onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                <span style={{ fontSize: '1.5rem' }}>🛒</span> {t.cart} 
+                <span style={{ fontSize: '1.5rem' }}>🛒</span> {t.store.cart} 
                 <span style={{ 
                   background: '#ef4444', 
                   color: 'white', 
@@ -377,7 +309,7 @@ const StoreProductsPage: React.FC = () => {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
-            <p style={{ color: '#64748b', fontWeight: 'bold' }}>{t.loading}</p>
+            <p style={{ color: '#64748b', fontWeight: 'bold' }}>{t.store.loading}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem', alignItems: 'start' }}>
@@ -436,7 +368,7 @@ const StoreProductsPage: React.FC = () => {
                           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                           border: '1px solid #e0e7ff'
                         }}>
-                          {t.stock}: {product.stock === -1 ? t.infinite : product.stock}
+                          {t.store.stock}: {product.stock === -1 ? t.store.infinite : product.stock}
                         </div>
                       </div>
                       
@@ -465,7 +397,7 @@ const StoreProductsPage: React.FC = () => {
               {products.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '10rem 0', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '40px', border: '2px dashed rgba(255,255,255,0.3)' }}>
                   <div style={{ fontSize: '6rem', marginBottom: '1.5rem', opacity: 0.8 }}>🧺</div>
-                  <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.noProducts}</h3>
+                  <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.store.noProducts}</h3>
                 </div>
               )}
             </div>
@@ -481,20 +413,20 @@ const StoreProductsPage: React.FC = () => {
                 backdropFilter: 'blur(10px)'
               }}>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: '900', color: '#0f172a', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <span style={{ fontSize: '1.8rem' }}>ℹ️</span> {t.merchantInfo}
+                  <span style={{ fontSize: '1.8rem' }}>ℹ️</span> {t.store.merchantInfo}
                 </h2>
                 {store && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
                     <div style={{ borderBottom: '1px solid rgba(30, 64, 175, 0.05)', paddingBottom: '1.5rem' }}>
-                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.address}</p>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.store.address}</p>
                       <p style={{ color: '#334155', fontSize: '1rem', lineHeight: '1.6', fontWeight: '500' }}>{store.address}</p>
                     </div>
                     <div style={{ borderBottom: '1px solid rgba(30, 64, 175, 0.05)', paddingBottom: '1.5rem' }}>
-                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.contact}</p>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.store.contact}</p>
                       <p style={{ color: '#0f172a', fontSize: '1.3rem', fontWeight: '900' }}>{store.phone}</p>
                     </div>
                     <div>
-                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.hours}</p>
+                      <p style={{ color: '#1e40af', fontSize: '0.9rem', fontWeight: '900', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '1px' }}>{t.store.hours}</p>
                       <p style={{ color: '#334155', fontSize: '1.1rem', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</p>
                     </div>
                   </div>

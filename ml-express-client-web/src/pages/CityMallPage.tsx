@@ -7,7 +7,7 @@ import LoggerService from '../services/LoggerService';
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language, setLanguage, t: translations } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -23,68 +23,6 @@ const CityMallPage: React.FC = () => {
     { id: 'LSO', zh: '腊戌', en: 'Lashio', my: 'လားရှိုး' },
     { id: 'MSE', zh: '木姐', en: 'Muse', my: 'မူဆယ်' }
   ];
-
-  const t = {
-    zh: {
-      title: '同城商场',
-      subtitle: '发现您身边的优质商户',
-      searchPlaceholder: '搜索商户名称或类型...',
-      noStores: '该区域暂无商户',
-      operatingHours: '营业时间',
-      contact: '联系电话',
-      visitStore: '进入店铺',
-      loading: '正在为您加载...',
-      all: '全部',
-      region: '所在地区',
-      openNow: '正在营业',
-      closedNow: '休息中',
-      closedToday: '今日暂停营业'
-    },
-    en: {
-      title: 'City Mall',
-      subtitle: 'Discover quality merchants around you',
-      searchPlaceholder: 'Search store name or type...',
-      noStores: 'No stores found in this region',
-      operatingHours: 'Hours',
-      contact: 'Phone',
-      visitStore: 'Visit Store',
-      loading: 'Loading for you...',
-      all: 'All',
-      region: 'Region',
-      openNow: 'Open Now',
-      closedNow: 'Closed',
-      closedToday: 'Closed Today'
-    },
-    my: {
-      title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
-      subtitle: 'သင့်အနီးနားရှိ အရည်အသွေးမြင့်ဆိုင်များကို ရှာဖွေပါ',
-      searchPlaceholder: 'ဆိုင်အမည် သို့မဟုတ် အမျိုးအစားရှာရန်...',
-      noStores: 'ဤဒေသတွင် ဆိုင်များမရှိသေးပါ',
-      operatingHours: 'ဖွင့်ချိန်',
-      contact: 'ဖုန်းနံပါတ်',
-      visitStore: 'ဆိုင်သို့ဝင်ရန်',
-      loading: 'ခေတ္တစောင့်ဆိုင်းပါ...',
-      all: 'အားလုံး',
-      region: 'ဒေသ',
-      openNow: 'ဆိုင်ဖွင့်ထားသည်',
-      closedNow: 'ဆိုင်ပိတ်ထားသည်',
-      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
-    }
-  }[language as 'zh' | 'en' | 'my'] || {
-    title: 'City Mall',
-    subtitle: 'Discover quality merchants around you',
-    searchPlaceholder: 'Search store name or type...',
-    noStores: 'No stores found in this region',
-    operatingHours: 'Hours',
-    contact: 'Phone',
-    visitStore: 'Visit Store',
-    loading: 'Loading...',
-    all: 'All',
-    region: 'Region',
-    openNow: 'Open Now',
-    closedNow: 'Closed',
-    closedToday: 'Closed Today'
-  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -230,7 +168,6 @@ const CityMallPage: React.FC = () => {
           onShowRegisterModal={(isLoginMode) => {
             navigate('/', { state: { showModal: true, isLoginMode } });
           }}
-          translations={translations}
         />
         
         <div style={{ 
@@ -245,14 +182,14 @@ const CityMallPage: React.FC = () => {
             fontWeight: '900',
             textShadow: '2px 4px 8px rgba(0,0,0,0.2)',
             letterSpacing: '2px'
-          }}>{t.title}</h1>
+          }}>{t.mall.title}</h1>
           <p style={{ 
             fontSize: '1.2rem', 
             opacity: 0.9, 
             marginBottom: '2.5rem',
             fontWeight: '600',
             textShadow: '1px 2px 4px rgba(0,0,0,0.1)'
-          }}>{t.subtitle}</p>
+          }}>{t.mall.subtitle}</p>
           
           <div style={{ 
             maxWidth: '700px', 
@@ -277,7 +214,7 @@ const CityMallPage: React.FC = () => {
               }}>🔍</div>
               <input
                 type="text"
-                placeholder={t.searchPlaceholder}
+                placeholder={t.mall.searchPlaceholder}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 style={{
@@ -329,7 +266,7 @@ const CityMallPage: React.FC = () => {
             border: '1px solid rgba(255, 255, 255, 0.2)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}>
-            <span style={{ fontSize: '1.2rem' }}>📍</span> {t.region}
+            <span style={{ fontSize: '1.2rem' }}>📍</span> {t.mall.region}
           </div>
 
           {/* 滚动容器 */}
@@ -404,7 +341,7 @@ const CityMallPage: React.FC = () => {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1.5rem'
             }}></div>
-            <p style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.loading}</p>
+            <p style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.mall.loading}</p>
           </div>
         ) : (
           <div style={{ 
@@ -419,7 +356,7 @@ const CityMallPage: React.FC = () => {
                   key={store.id}
                   onClick={() => {
                     if (!status.isOpen) {
-                      alert(t.closedToday);
+                      alert(t.mall.closedToday);
                       return;
                     }
                     navigate(`/mall/${store.id}`);
@@ -497,7 +434,7 @@ const CityMallPage: React.FC = () => {
                           borderRadius: '10px',
                           fontWeight: '800'
                         }}>
-                          ● {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                          ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : t.mall.closedNow)}
                         </span>
                       </div>
                     </div>
@@ -516,12 +453,12 @@ const CityMallPage: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
                       <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
-                      <span style={{ fontWeight: '600' }}>{t.operatingHours}:</span>
+                      <span style={{ fontWeight: '600' }}>{t.mall.operatingHours}:</span>
                       <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
                       <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
-                      <span style={{ fontWeight: '600' }}>{t.contact}:</span>
+                      <span style={{ fontWeight: '600' }}>{t.mall.contact}:</span>
                       <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
@@ -548,7 +485,7 @@ const CityMallPage: React.FC = () => {
                     justifyContent: 'flex-end',
                     gap: '0.6rem'
                   }}>
-                    {status.isOpen ? t.visitStore : t.closedToday} <span style={{ fontSize: '1.6rem' }}>{status.isOpen ? '→' : '🔒'}</span>
+                    {status.isOpen ? t.mall.visitStore : t.mall.closedToday} <span style={{ fontSize: '1.6rem' }}>{status.isOpen ? '→' : '🔒'}</span>
                   </div>
                 </div>
               );
@@ -567,7 +504,7 @@ const CityMallPage: React.FC = () => {
             border: '2px dashed rgba(255, 255, 255, 0.3)'
           }}>
             <div style={{ fontSize: '7rem', marginBottom: '1.5rem', opacity: 0.8 }}>🏢</div>
-            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.noStores}</h3>
+            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.mall.noStores}</h3>
             <p style={{ marginTop: '0.8rem', fontSize: '1.1rem', opacity: 0.9 }}>请尝试切换其他地区或搜索关键词</p>
           </div>
         )}

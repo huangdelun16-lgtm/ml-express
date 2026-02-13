@@ -7,7 +7,7 @@ import NavigationBar from '../components/home/NavigationBar';
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, updateQuantity, removeFromCart, cartTotal, clearCart } = useCart();
-  const { language, setLanguage, t: translations } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
@@ -25,52 +25,6 @@ const CartPage: React.FC = () => {
     localStorage.removeItem('ml-express-customer');
     setCurrentUser(null);
     navigate('/');
-  };
-
-  const t = {
-    zh: {
-      title: '我的购物车',
-      empty: '您的购物车是空的',
-      backToMall: '返回商场',
-      total: '订单总计',
-      checkout: '立即结算下单',
-      clear: '清空全部',
-      price: '单价',
-      quantity: '数量',
-      items: '件商品'
-    },
-    en: {
-      title: 'My Cart',
-      empty: 'Your cart is empty',
-      backToMall: 'Back to Mall',
-      total: 'Order Total',
-      checkout: 'Checkout Now',
-      clear: 'Clear All',
-      price: 'Price',
-      quantity: 'Qty',
-      items: 'Items'
-    },
-    my: {
-      title: 'ကျွန်ုပ်၏ခြင်း',
-      empty: 'ခြင်းထဲတွင် ပစ္စည်းမရှိသေးပါ',
-      backToMall: 'ဈေးသို့ပြန်သွားရန်',
-      total: 'စုစုပေါင်း',
-      checkout: 'အခုပဲဝယ်မည်',
-      clear: 'အားလုံးဖျက်ရန်',
-      price: 'စျေးနှုန်း',
-      quantity: 'အရေအတွက်',
-      items: 'ခု'
-    }
-  }[language as 'zh' | 'en' | 'my'] || {
-    title: 'Shopping Cart',
-    empty: 'Your cart is empty',
-    backToMall: 'Back to Mall',
-    total: 'Total',
-    checkout: 'Place Order',
-    clear: 'Clear Cart',
-    price: 'Price',
-    quantity: 'Quantity',
-    items: 'Items'
   };
 
   const handleCheckout = () => {
@@ -101,13 +55,12 @@ const CartPage: React.FC = () => {
           onShowRegisterModal={(isLoginMode) => {
             navigate('/', { state: { showModal: true, isLoginMode } });
           }}
-          translations={translations}
         />
         
         <div style={{ maxWidth: '1000px', margin: '2rem auto 0', color: 'white', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '3rem', fontWeight: '900', textShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>{t.title}</h1>
+          <h1 style={{ fontSize: '3rem', fontWeight: '900', textShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>{t.cart.title}</h1>
           <p style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: '600' }}>
-            {cartItems.length} {t.items}
+            {cartItems.length} {t.cart.items}
           </p>
         </div>
       </div>
@@ -124,7 +77,7 @@ const CartPage: React.FC = () => {
             border: '1px solid white'
           }}>
             <div style={{ fontSize: '7rem', marginBottom: '2rem' }}>🛒</div>
-            <h2 style={{ color: '#1e293b', fontSize: '2rem', marginBottom: '1rem', fontWeight: '900' }}>{t.empty}</h2>
+            <h2 style={{ color: '#1e293b', fontSize: '2rem', marginBottom: '1rem', fontWeight: '900' }}>{t.cart.empty}</h2>
             <p style={{ color: '#64748b', fontSize: '1.2rem', marginBottom: '3rem', fontWeight: '500' }}>快去商场选购您喜欢的商品吧！</p>
             <button 
               onClick={() => navigate('/mall')}
@@ -143,7 +96,7 @@ const CartPage: React.FC = () => {
               onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
               onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              🚀 {t.backToMall}
+              🚀 {t.cart.backToMall}
             </button>
           </div>
         ) : (
@@ -165,7 +118,7 @@ const CartPage: React.FC = () => {
                   onMouseOver={(e) => e.currentTarget.style.background = '#fecaca'}
                   onMouseOut={(e) => e.currentTarget.style.background = '#fee2e2'}
                 >
-                  🗑️ {t.clear}
+                  🗑️ {t.cart.clear}
                 </button>
               </div>
 
@@ -240,7 +193,7 @@ const CartPage: React.FC = () => {
                     <span>{cartItems.length} 件</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0', borderTop: '2px dashed #e2e8f0', borderBottom: '2px dashed #e2e8f0' }}>
-                    <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a' }}>{t.total}</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a' }}>{t.cart.total}</span>
                     <span style={{ fontWeight: '900', color: '#10b981', fontSize: '1.5rem' }}>{cartTotal.toLocaleString()} MMK</span>
                   </div>
                 </div>
@@ -264,7 +217,7 @@ const CartPage: React.FC = () => {
                   onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
                   onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                 >
-                  🚀 {t.checkout}
+                  🚀 {t.cart.checkout}
                 </button>
                 
                 <button 
@@ -290,7 +243,7 @@ const CartPage: React.FC = () => {
                     e.currentTarget.style.borderColor = '#e2e8f0';
                   }}
                 >
-                  🏪 {t.backToMall}
+                  🏪 {t.cart.backToMall}
                 </button>
               </div>
             </div>
