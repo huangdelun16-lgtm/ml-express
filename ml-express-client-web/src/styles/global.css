@@ -309,18 +309,13 @@ textarea::placeholder {
   animation: slideIn var(--transition-base);
 }
 
-/* ========== 缅语字体缩小2号 ========== */
-/* 当语言为缅语时，所有文本字体缩小2px */
-body[data-language="my"] *,
-body[data-language="my"],
-[lang="my"],
-*[lang="my"],
-[data-lang="my"],
-.myanmar-text {
-  font-size: calc(100% - 2px) !important;
+/* ========== 缅语字体优化 (Unicode) ========== */
+/* 移除导致字体缩小的错误设置，并确保使用 Unicode 缅文家族 */
+body[data-language="my"] {
+  font-family: var(--font-family-myanmar) !important;
 }
 
-/* 针对特定元素的缅语字体缩小 */
+/* 针对特定文本元素的缅语优化 */
 body[data-language="my"] h1,
 body[data-language="my"] h2,
 body[data-language="my"] h3,
@@ -338,6 +333,7 @@ body[data-language="my"] a,
 body[data-language="my"] li,
 body[data-language="my"] td,
 body[data-language="my"] th {
-  font-size: calc(100% - 2px) !important;
+  font-family: var(--font-family-myanmar) !important;
+  line-height: 1.6;
 }
 
