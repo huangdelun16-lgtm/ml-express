@@ -58,9 +58,6 @@ const DeleteAccountPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
-  const translations = {
-    zh: {
-      nav: {
   return (
     <div style={{
       minHeight: '100vh',

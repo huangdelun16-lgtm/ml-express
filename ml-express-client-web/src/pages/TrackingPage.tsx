@@ -123,9 +123,6 @@ const TrackingPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
-  const translations = {
-    zh: {
-      nav: {
   const handleTracking = async () => {
     if (!trackingNumber.trim()) {
       alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');

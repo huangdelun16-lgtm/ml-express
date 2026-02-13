@@ -726,8 +726,6 @@ const ProfilePage: React.FC = () => {
     return null;
   }
 
-  const translations = {
-
   // 获取店铺类型文本
   const getStoreTypeLabel = (type: string) => {
     const typeMap: { [key: string]: { zh: string; en: string; my: string } } = {
