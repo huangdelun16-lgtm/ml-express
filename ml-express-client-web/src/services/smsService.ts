@@ -12,7 +12,7 @@ export interface VerificationResult {
 // 发送短信验证码（简化版 - 客户端不直接发送，应通过后端）
 export async function sendVerificationCode(
   phone: string,
-  language: 'zh' | 'en' | 'my' = 'zh'
+  language: 'zh' | 'en' = 'zh'
 ): Promise<VerificationResult> {
   try {
     // 客户端版本：调用 Netlify Function 发送验证码
@@ -55,7 +55,7 @@ export async function sendVerificationCode(
 export async function verifyVerificationCode(
   phone: string,
   code: string,
-  language: 'zh' | 'en' | 'my' = 'zh'
+  language: 'zh' | 'en' = 'zh'
 ): Promise<VerificationResult> {
   try {
     // 客户端版本：调用 Netlify Function 验证验证码

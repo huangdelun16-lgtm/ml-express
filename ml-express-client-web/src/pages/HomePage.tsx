@@ -748,11 +748,11 @@ const HomePage: React.FC = () => {
         if (verificationType === 'email') {
           const { verifyEmailCode } = await import('../services/emailService');
           console.log('正在调用邮箱验证服务，邮箱:', registerForm.email, '验证码:', registerForm.verificationCode);
-          verifyResult = await verifyEmailCode(registerForm.email, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+          verifyResult = await verifyEmailCode(registerForm.email, registerForm.verificationCode, language as 'zh' | 'en');
         } else {
           const { verifyVerificationCode } = await import('../services/smsService');
           console.log('正在调用短信验证服务，手机:', normalizedPhone, '验证码:', registerForm.verificationCode);
-          verifyResult = await verifyVerificationCode(normalizedPhone, registerForm.verificationCode, language as 'zh' | 'en' | 'my');
+          verifyResult = await verifyVerificationCode(normalizedPhone, registerForm.verificationCode, language as 'zh' | 'en');
         }
         
         console.log('验证服务返回结果:', verifyResult);
@@ -851,7 +851,7 @@ const HomePage: React.FC = () => {
         
         // 调用邮箱服务
         const { sendEmailVerificationCode } = await import('../services/emailService');
-        const result = await sendEmailVerificationCode(registerForm.email, language as 'zh' | 'en' | 'my');
+        const result = await sendEmailVerificationCode(registerForm.email, language as 'zh' | 'en');
         
         console.log('📧 邮箱服务返回结果:', result);
         
@@ -893,7 +893,7 @@ const HomePage: React.FC = () => {
         
         // 调用SMS服务
         const { sendVerificationCode } = await import('../services/smsService');
-        const result = await sendVerificationCode(normalizedPhone, language as 'zh' | 'en' | 'my');
+        const result = await sendVerificationCode(normalizedPhone, language as 'zh' | 'en');
         
         if (result.success) {
           setCodeSent(true);
@@ -1832,7 +1832,7 @@ const HomePage: React.FC = () => {
         location: new window.google.maps.LatLng(mapCenter.lat, mapCenter.lng),
         radius: 50000, // 50公里范围
         componentRestrictions: { country: 'mm' }, // 限制在缅甸
-        language: language === 'zh' ? 'zh-CN' : language === 'en' ? 'en' : 'my'
+        language: language === 'zh' ? 'zh-CN' : 'en'
       },
       (predictions: any[], status: any) => {
         // 确保这是最新的查询结果

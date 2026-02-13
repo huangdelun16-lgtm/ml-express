@@ -320,7 +320,7 @@ const CityMallPage: React.FC = () => {
                       }
                     }}
                   >
-                    {r[language as 'zh' | 'en' | 'my'] || r.en}
+                    {r[language as 'zh' | 'en'] || r.en}
                   </button>
                 );
               })}
