@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService, merchantService } from '../services/supabase';
 import { useCart } from '../contexts/CartContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import TrackingSection from '../components/home/TrackingSection';
