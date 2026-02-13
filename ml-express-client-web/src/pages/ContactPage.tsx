@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ContactPage: React.FC = () => {
   const navigate = useNavigate();
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('ml-express-language') || 'zh';
-  });
+  const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   
@@ -41,95 +40,6 @@ const ContactPage: React.FC = () => {
     setLanguage(newLanguage);
     localStorage.setItem('ml-express-language', newLanguage);
   };
-
-  const translations = {
-    zh: {
-      nav: {
-        home: '首页',
-        services: '服务',
-        tracking: '包裹跟踪',
-        contact: '联系我们',
-        mall: '同城商场',
-        cart: '购物车',
-        admin: '管理后台',
-      },
-      contact: {
-        title: '联系我们',
-        subtitle: '我们随时为您提供专业的快递服务支持',
-        phone: '电话联系',
-        email: '邮箱联系',
-        address: '公司地址',
-        businessHours: '营业时间',
-        businessCooperation: '商务合作',
-        phoneValue: '(+95) 09788848928',
-        emailValue: 'marketlink982@gmail.com',
-        addressValue: 'ChanMyaThaZi Mandalay',
-        businessHoursValue: '周一至周日 8:00 - 20:00',
-        wechatId: 'WeChat ID',
-        wechatValue: 'AMT349',
-        viber: 'Viber',
-        viberValue: '09259369349'
-      }
-    },
-    en: {
-      nav: {
-        home: 'Home',
-        services: 'Services',
-        tracking: 'Tracking',
-        contact: 'Contact',
-        mall: 'City Mall',
-        cart: 'Cart',
-        admin: 'Admin',
-      },
-      contact: {
-        title: 'Contact Us',
-        subtitle: 'We are here to provide professional express service support',
-        phone: 'Phone Contact',
-        email: 'Email Contact',
-        address: 'Company Address',
-        businessHours: 'Business Hours',
-        businessCooperation: 'Business Cooperation',
-        businessHoursValue: 'Monday to Sunday 8:00 - 20:00',
-        phoneValue: '(+95) 09788848928',
-        emailValue: 'marketlink982@gmail.com',
-        addressValue: 'ChanMyaThaZi Mandalay',
-        wechatId: 'WeChat ID',
-        wechatValue: 'AMT349',
-        viber: 'Viber',
-        viberValue: '09259369349'
-      }
-    },
-    my: {
-      nav: {
-        home: 'ပင်မ',
-        services: 'ဝန်ဆောင်မှု',
-        tracking: 'ထုပ်ပိုးခြင်း',
-        contact: 'ဆက်သွယ်ရန်',
-        mall: 'ဈေး',
-        cart: 'ခြင်း',
-        admin: 'စီမံခန့်ခွဲမှု',
-      },
-      contact: {
-        title: 'ဆက်သွယ်ရန်',
-        subtitle: 'ကျွန်ုပ်တို့သည် ပရော်ဖက်ရှင်နယ် ပို့ဆောင်မှု ဝန်ဆောင်မှုကို ပေးဆောင်ရန် ဤနေရာတွင် ရှိပါသည်',
-        phone: 'ဖုန်းဆက်သွယ်ရန်',
-        email: 'အီးမေးလ်ဆက်သွယ်ရန်',
-        address: 'ကုမ္ပဏီလိပ်စာ',
-        businessHours: 'အလုပ်ချိန်',
-        businessCooperation: 'စီးပွားရေးပူးပေါင်းဆောင်ရွက်မှု',
-        businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00',
-        phoneValue: '(+95) 09788848928',
-        emailValue: 'marketlink982@gmail.com',
-        addressValue: 'ChanMyaThaZi Mandalay',
-        wechatId: 'WeChat ID',
-        wechatValue: 'AMT349',
-        viber: 'Viber',
-        viberValue: '09259369349'
-      }
-    }
-  };
-
-  const t = translations[language as keyof typeof translations] || translations.zh;
 
   return (
     <>
@@ -181,9 +91,9 @@ const ContactPage: React.FC = () => {
           currentUser={currentUser}
           onLogout={handleLogout}
           onShowRegisterModal={(isLoginMode) => {
-            navigate('/', { state: { showModal: true, isLoginMode } });
-          }} 
-          translations={t}
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }} 
+          
         />
 
         {/* 主要内容区域 */}

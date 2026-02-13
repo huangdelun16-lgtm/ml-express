@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -14,6 +15,7 @@ const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { language, setLanguage, t } = useLanguage();
   
   // Google Maps API 加载
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
@@ -30,9 +32,6 @@ const TrackingPage: React.FC = () => {
     }
   }, [mapLoadError]);
 
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('ml-express-language') || 'zh';
-  });
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -127,110 +126,6 @@ const TrackingPage: React.FC = () => {
   const translations = {
     zh: {
       nav: {
-        home: '首页',
-        services: '服务',
-        tracking: '包裹跟踪',
-        contact: '联系我们',
-        mall: '同城商场',
-        cart: '购物车',
-        admin: '管理后台',
-      },
-      tracking: {
-        title: '包裹跟踪',
-        placeholder: '请输入包裹单号',
-        track: '查询',
-        notFound: '未找到包裹信息',
-        packageInfo: '包裹信息',
-        trackingNumber: '单号',
-        status: '状态',
-        location: '当前位置',
-        estimatedDelivery: '预计送达',
-        sender: '寄件人',
-        receiver: '收件人',
-        courier: '配送员',
-        packageType: '包裹类型',
-        weight: '重量',
-        courierLocation: '快递员位置',
-        packageLocation: '包裹位置',
-        realTimeTracking: '实时跟踪',
-        lastUpdate: '最后更新',
-        courierInfo: '快递员信息',
-        vehicle: '车辆',
-        contactCourier: '联系快递员'
-      }
-    },
-    en: {
-        nav: {
-            home: 'Home',
-            services: 'Services',
-            tracking: 'Tracking',
-            contact: 'Contact',
-            mall: 'City Mall',
-            cart: 'Cart',
-            admin: 'Admin',
-        },
-        tracking: {
-            title: 'Package Tracking',
-            placeholder: 'Enter tracking number',
-            track: 'Track',
-            notFound: 'Package not found',
-            packageInfo: 'Package Information',
-            trackingNumber: 'Number',
-            status: 'Status',
-            location: 'Current Location',
-            estimatedDelivery: 'Estimated Delivery',
-            sender: 'Sender',
-            receiver: 'Receiver',
-            courier: 'Courier',
-            packageType: 'Type',
-            weight: 'Weight',
-            courierLocation: 'Courier Location',
-            packageLocation: 'Package Location',
-            realTimeTracking: 'Real-Time Tracking',
-            lastUpdate: 'Last Update',
-            courierInfo: 'Courier Info',
-            vehicle: 'Vehicle',
-            contactCourier: 'Contact Courier'
-        }
-    },
-    my: {
-        nav: {
-            home: 'ပင်မ',
-            services: 'ဝန်ဆောင်မှု',
-            tracking: 'ထုပ်ပိုးခြင်း',
-            contact: 'ဆက်သွယ်ရန်',
-            mall: 'ဈေး',
-            cart: 'ခြင်း',
-            admin: 'စီမံခန့်ခွဲမှု',
-        },
-        tracking: {
-            title: 'ထုပ်ပိုးခြင်း',
-            placeholder: 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ',
-            track: 'ရှာဖွေပါ',
-            notFound: 'ထုပ်ပိုးအချက်အလက် မတွေ့ပါ',
-            packageInfo: 'ထုပ်ပိုးအချက်အလက်',
-            trackingNumber: 'နံပါတ်',
-            status: 'အခြေအနေ',
-            location: 'လက်ရှိတည်နေရာ',
-            estimatedDelivery: 'ပို့ဆောင်မည့်အချိန်',
-            sender: 'ပို့သူ',
-            receiver: 'လက်ခံသူ',
-            courier: 'ပေးပို့သူ',
-            packageType: 'အမျိုးအစား',
-            weight: 'အလေးချိန်',
-            courierLocation: 'ပေးပို့သူတည်နေရာ',
-            packageLocation: 'ထုပ်ပိုးတည်နေရာ',
-            realTimeTracking: 'တိုက်ရိုက်ခြေရာခံခြင်း',
-            lastUpdate: 'နောက်ဆုံးအပ်ဒိတ်',
-            courierInfo: 'ပေးပို့သူအချက်အလက်',
-            vehicle: 'ယာဉ်',
-            contactCourier: 'ပေးပို့သူကို ဆက်သွယ်ပါ'
-        }
-    }
-  };
-
-  const t = translations[language as keyof typeof translations] || translations.zh;
-
   const handleTracking = async () => {
     if (!trackingNumber.trim()) {
       alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
@@ -339,7 +234,7 @@ const TrackingPage: React.FC = () => {
         onShowRegisterModal={(isLoginMode) => {
           navigate('/', { state: { showModal: true, isLoginMode } });
         }} 
-        translations={t as any}
+        
       />
       {/* 搜索区域 */}
 

@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ServicesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('ml-express-language') || 'zh';
-  });
+  const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -61,134 +60,6 @@ const ServicesPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
-  const translations = {
-    zh: {
-      nav: {
-        home: '首页',
-        services: '服务',
-        tracking: '包裹跟踪',
-        contact: '联系我们',
-        mall: '同城商场',
-        cart: '购物车',
-        admin: '管理后台',
-      },
-      features: {
-        title: '服务特色',
-        subtitle: '专业、高效、值得信赖的快递服务体验',
-      },
-      services: {
-        lightning: {
-          title: '闪电配送',
-          subtitle: 'LIGHTNING DELIVERY',
-          desc: '30分钟内上门取件，极速送达',
-          features: ['实时定位', '智能路线', '即时通知']
-        },
-        secure: {
-          title: '安全护航',
-          subtitle: 'SECURE ESCORT',
-          desc: '全程保险保障，零风险配送',
-          features: ['全程保险', '实时监控', '安全认证']
-        },
-        smart: {
-          title: '智能服务',
-          subtitle: 'SMART SERVICE',
-          desc: '在线下单，实时跟踪，智能客服',
-          features: ['在线下单', '实时跟踪', 'AI客服']
-        },
-        transparent: {
-          title: '透明定价',
-          subtitle: 'TRANSPARENT PRICING',
-          desc: '价格透明，无隐藏费用，物超所值',
-          features: ['透明定价', '无隐藏费', '优惠活动']
-        }
-      }
-    },
-    en: {
-        nav: {
-            home: 'Home',
-            services: 'Services',
-            tracking: 'Tracking',
-            contact: 'Contact',
-            mall: 'City Mall',
-            cart: 'Cart',
-            admin: 'Admin',
-        },
-      features: {
-        title: 'Service Features',
-        subtitle: 'Professional, efficient, and trustworthy express delivery service experience',
-      },
-      services: {
-        lightning: {
-          title: 'Lightning Delivery',
-          subtitle: 'LIGHTNING DELIVERY',
-          desc: 'Door-to-door pickup within 30 minutes, ultra-fast delivery',
-          features: ['Real-time Location', 'Smart Routing', 'Instant Notifications']
-        },
-        secure: {
-          title: 'Secure Escort',
-          subtitle: 'SECURE ESCORT',
-          desc: 'Full insurance coverage, zero-risk delivery',
-          features: ['Full Insurance', 'Real-time Monitoring', 'Security Certification']
-        },
-        smart: {
-          title: 'Smart Service',
-          subtitle: 'SMART SERVICE',
-          desc: 'Online ordering, real-time tracking, smart customer service',
-          features: ['Online Ordering', 'Real-time Tracking', 'AI Customer Service']
-        },
-        transparent: {
-          title: 'Transparent Pricing',
-          subtitle: 'TRANSPARENT PRICING',
-          desc: 'Transparent pricing, no hidden fees, great value',
-          features: ['Transparent Pricing', 'No Hidden Fees', 'Special Offers']
-        }
-      }
-    },
-    my: {
-        nav: {
-            home: 'ပင်မ',
-            services: 'ဝန်ဆောင်မှု',
-            tracking: 'ထုပ်ပိုးခြင်း',
-            contact: 'ဆက်သွယ်ရန်',
-            mall: 'ဈေး',
-            cart: 'ခြင်း',
-            admin: 'စီမံခန့်ခွဲမှု',
-        },
-      features: {
-        title: 'ဝန်ဆောင်မှုများ',
-        subtitle: 'ပရော်ဖက်ရှင်နယ်၊ ထိရောက်သော၊ ယုံကြည်စိတ်ချရသော ပို့ဆောင်မှု အတွေ့အကြုံ',
-      },
-      services: {
-        lightning: {
-          title: 'မြန်ဆန်သော ပို့ဆောင်မှု',
-          subtitle: 'LIGHTNING DELIVERY',
-          desc: 'မိနစ် ၃၀ အတွင်း အိမ်တွင်းလာယူ၊ အလျင်အမြန် ပို့ဆောင်ခြင်း',
-          features: ['လက်ရှိတည်နေရာ', 'ဉာဏ်ရည်တု လမ်းကြောင်း', 'ချက်ချင်း အကြောင်းကြားခြင်း']
-        },
-        secure: {
-          title: 'လုံခြုံသော စောင့်ရှောက်မှု',
-          subtitle: 'SECURE ESCORT',
-          desc: 'တစ်လျှောက်လုံး အာမခံအကာအကွယ်၊ အန္တရာယ်မရှိသော ပို့ဆောင်မှု',
-          features: ['တစ်လျှောက်လုံး အာမခံ', 'လက်ရှိ စောင့်ကြည့်ခြင်း', 'လုံခြုံမှု အတည်ပြုခြင်း']
-        },
-        smart: {
-          title: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
-          subtitle: 'SMART SERVICE',
-          desc: 'အွန်လိုင်း အမှာတင်ခြင်း၊ လက်ရှိ စောင့်ကြည့်ခြင်း၊ ဉာဏ်ရည်တု ဖောက်သည်ဝန်ဆောင်မှု',
-          features: ['အွန်လိုင်း အမှာတင်ခြင်း', 'လက်ရှိ စောင့်ကြည့်ခြင်း', 'AI ဖောက်သည်ဝန်ဆောင်မှု']
-        },
-        transparent: {
-          title: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
-          subtitle: 'TRANSPARENT PRICING',
-          desc: 'စျေးနှုန်း ပွင့်လင်းမြင်သာမှု၊ ဖုံးကွယ်ထားသော ကုန်ကျစရိတ်မရှိ၊ တန်ဖိုးရှိသော',
-          features: ['ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း', 'ဖုံးကွယ်ထားသော ကုန်ကျစရိတ်မရှိ', 'အထူးလျော့စျေးများ']
-        }
-      }
-    }
-  };
-
-  const t = translations[language as keyof typeof translations] || translations.zh;
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -230,7 +101,7 @@ const ServicesPage: React.FC = () => {
         onShowRegisterModal={(isLoginMode) => {
           navigate('/', { state: { showModal: true, isLoginMode } });
         }}
-        translations={t}
+        
       />
 
       {/* 主要内容区域 */}
