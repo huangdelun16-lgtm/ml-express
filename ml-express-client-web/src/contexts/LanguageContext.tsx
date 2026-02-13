@@ -9,7 +9,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 // 客户端网站所有页面的翻译文本
-const translations = {
+const translations: any = {
   zh: {
     nav: {
       home: '首页',
@@ -310,7 +310,7 @@ const translations = {
           items: [
             '个人身份信息：姓名、电话号码、电子邮件地址、地址等',
             '位置信息：当您使用我们的应用程序时，我们会收集您的位置数据以提供配送服务',
-            '设备信息：设备型号、操作系统版本、唯一设备标识符',
+            '设备信息：设备型号、操作系统版本、唯一 device identifier',
             '使用数据：应用程序使用情况、访问时间、功能使用记录',
             '照片和媒体：当您使用应用程序拍照或上传图片时'
           ]
@@ -1241,7 +1241,7 @@ const translations = {
     },
     privacy: {
       title: 'ကိုယ်ရေးလုံခြုံမှု မူဝါဒ',
-      subtitle: 'ကျွန်ုပ်တို့သည် သင့်ကိုယ်ရေးလုံခြုံမှုကို တန်ဖိုးထားပါသည်။ ဤမူဝါဒသည် ကျွန်ုပ်တို့အနေဖြင့် သင့်ကိုယ်ရေးအချက်အလက်များကို မည်သို့ စုဆောင်း၊ အသုံးပြု، ကာကွယ်သည်ကို ရှင်းလင်းပြထားပါသည်',
+      subtitle: 'ကျွန်ုပ်တို့သည် သင့်ကိုယ်ရေးလုံခြုံမှုကို တန်ဖိုးထားပါသည်။ ဤမူဝါဒသည် ကျွန်ုပ်တို့အနေဖြင့် သင့်ကိုယ်ရေးအချက်အလက်များကို မည်သို့ စုဆောင်း၊ အသုံးပြု၊ ကာကွယ်သည်ကို ရှင်းလင်းပြထားပါသည်',
       lastUpdated: 'နောက်ဆုံးအပ်ဒိတ်: ၂၀၂၄ ဒီဇင်ဘာ',
       sections: {
         introduction: {
@@ -1283,7 +1283,7 @@ const translations = {
         },
         dataSecurity: {
           title: '၅. အချက်အလက် လုံခြုံမှု',
-          content: 'ကျွန်ုပ်တို့သည် သင့်ကိုယ်ရေးအချက်အလက်များကို ကာကွယ်ရန် သင့်လျော်သော นည်းပညာနှင့် အဖွဲ့အစည်းဆိုင်ရာ လုပ်ဆောင်ချက်များကို ဆောင်ရွက်ပါသည်၊ အောက်ပါတို့ ပါဝင်ပါသည်:',
+          content: 'ကျွန်ုပ်တို့သည် သင့်ကိုယ်ရေးအချက်အလက်များကို ကာကွယ်ရန် သင့်လျော်သော နည်းပညာနှင့် အဖွဲ့အစည်းဆိုင်ရာ လုပ်ဆောင်ချက်များကို ဆောင်ရွက်ပါသည်၊ အောက်ပါတို့ ပါဝင်ပါသည်:',
           items: [
             'အချက်အလက် ပို့ဆောင်မှုကို ကာကွယ်ရန် encryption နည်းပညာကို အသုံးပြုခြင်း',
             'ကိုယ်ရေးအချက်အလက်များသို့ ဝင်ရောက်ခွင့်ကို ကန့်သတ်ခြင်း',
@@ -1453,7 +1453,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     document.body.setAttribute('data-language', lang);
   };
 
-  const t = translations[language as keyof typeof translations] || translations.zh;
+  const t = translations[language] || translations.zh;
 
   const value: LanguageContextType = {
     language,
