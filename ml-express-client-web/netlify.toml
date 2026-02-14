@@ -16,6 +16,12 @@
   force = true
 
 [[redirects]]
+  from = "/download-rider"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

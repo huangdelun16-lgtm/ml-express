@@ -145,7 +145,18 @@ const ContactPage: React.FC = () => {
                 color: '#38a169',
                 bgGradient: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                 iconBg: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                isDownload: true
+                isDownload: true,
+                downloadUrl: 'https://market-link-express.com/download'
+              },
+              {
+                icon: '🛵',
+                title: language === 'zh' ? '下载骑手端 APK' : language === 'en' ? 'Download Courier APK' : 'Rider App ဒေါင်းလုဒ်လုပ်ရန်',
+                value: language === 'zh' ? '仅限 Android 骑手使用' : language === 'en' ? 'For Android couriers only' : 'Android Rider များအတွက်သာ',
+                color: '#3182ce',
+                bgGradient: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
+                iconBg: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
+                isDownload: true,
+                downloadUrl: 'https://market-link-express.com/download-rider'
               },
               {
                 icon: '📞',
@@ -294,7 +305,7 @@ const ContactPage: React.FC = () => {
                 {contact.isDownload ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
                     <button
-                      onClick={() => window.open('https://market-link-express.com/download', '_blank')}
+                      onClick={() => window.open(contact.downloadUrl || 'https://market-link-express.com/download', '_blank')}
                       style={{
                         background: contact.bgGradient,
                         color: 'white',
