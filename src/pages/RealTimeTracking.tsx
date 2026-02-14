@@ -2238,7 +2238,7 @@ const RealTimeTracking: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{courier.name}</span>
                         <span style={{ fontSize: '0.75rem', color: '#fef3c7', background: '#d97706', padding: '1px 6px', borderRadius: '4px' }}>
-                          停留 >30min
+                          停留 &gt; 30min
                         </span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
@@ -2274,7 +2274,7 @@ const RealTimeTracking: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', color: '#f87171' }}>{pkg.id}</span>
                         <span style={{ fontSize: '0.75rem', color: '#fee2e2', background: '#dc2626', padding: '1px 6px', borderRadius: '4px' }}>
-                          超时 >2h
+                          超时 &gt; 2h
                         </span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
