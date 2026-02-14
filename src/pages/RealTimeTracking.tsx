@@ -61,8 +61,8 @@ const RealTimeTracking: React.FC = () => {
         const distance = calculateDistance(
           pkg.sender_latitude || 0,
           pkg.sender_longitude || 0,
-          courier.latitude,
-          courier.longitude
+          courier.latitude || 0,
+          courier.longitude || 0
         );
         
         // 推荐指数计算：距离越近分数越高，包裹越少分数越高
