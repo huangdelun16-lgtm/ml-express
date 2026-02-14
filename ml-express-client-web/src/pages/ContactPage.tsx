@@ -139,6 +139,15 @@ const ContactPage: React.FC = () => {
           }}>
             {[
               {
+                icon: '📲',
+                title: language === 'zh' ? '下载APP链接' : language === 'en' ? 'Download App' : 'App ဒေါင်းလုဒ်လုပ်ရန်',
+                value: '',
+                color: '#38a169',
+                bgGradient: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                iconBg: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                isDownload: true
+              },
+              {
                 icon: '📞',
                 title: t.contact.phone,
                 value: t.contact.phoneValue,
@@ -282,7 +291,27 @@ const ContactPage: React.FC = () => {
                 </h3>
 
                 {/* 内容 */}
-                {typeof contact.value === 'string' ? (
+                {contact.isDownload ? (
+                  <button
+                    onClick={() => window.open('https://market-link-express.com/download', '_blank')}
+                    style={{
+                      background: contact.bgGradient,
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.8rem 1.5rem',
+                      borderRadius: '12px',
+                      fontWeight: '900',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                      transition: 'all 0.3s ease',
+                      fontSize: '1rem'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    {language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်'}
+                  </button>
+                ) : typeof contact.value === 'string' ? (
                   <p style={{
                     fontSize: '1.15rem',
                     color: '#2d3748',
