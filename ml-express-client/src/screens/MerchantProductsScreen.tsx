@@ -558,12 +558,23 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             </Text>
           </View>
 
-          {/* 管理模式下显示状态文字 */}
+          {/* 管理模式下显示状态文字和开关 */}
           {!isReadOnly && (
-            <View style={[styles.statusIndicator, { backgroundColor: item.is_available ? '#dcfce7' : '#fee2e2' }]}>
-              <Text style={[styles.statusText, { color: item.is_available ? '#15803d' : '#ef4444' }]}>
-                {item.is_available ? currentT.available : currentT.unavailable}
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <View style={[styles.statusIndicator, { backgroundColor: item.is_available ? '#dcfce7' : '#fee2e2', marginTop: 0 }]}>
+                <Text style={[styles.statusText, { color: item.is_available ? '#15803d' : '#ef4444' }]}>
+                  {item.is_available ? currentT.available : currentT.unavailable}
+                </Text>
+              </View>
+              <View style={{ marginLeft: 10 }}>
+                <Switch
+                  value={item.is_available}
+                  onValueChange={() => toggleProductStatus(item)}
+                  trackColor={{ false: '#cbd5e1', true: '#10b981' }}
+                  thumbColor="#ffffff"
+                  style={Platform.OS === 'ios' ? { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] } : {}}
+                />
+              </View>
             </View>
           )}
 
@@ -591,13 +602,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
         {!isReadOnly && (
           <View style={styles.productActions}>
-            <Switch
-              value={item.is_available}
-              onValueChange={() => toggleProductStatus(item)}
-              trackColor={{ false: '#cbd5e1', true: '#10b981' }}
-              thumbColor="#ffffff"
-            />
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" style={{ marginTop: 8 }} />
+            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
           </View>
         )}
       </TouchableOpacity>

@@ -136,20 +136,8 @@ const TrackingPage: React.FC = () => {
       if (foundPackage) {
         setTrackingResult(foundPackage);
         
-        // 🚀 核心修复：如果是已送达状态，直接使用收件人坐标，不再显示骑手位置
-        if (foundPackage.status === '已送达' || foundPackage.status === 'Delivered' || foundPackage.status === 'ပို့ဆောင်ပြီး') {
-          if (foundPackage.receiver_latitude && foundPackage.receiver_longitude) {
-            console.log('📍 订单已送达，切换至收件人位置:', { lat: foundPackage.receiver_latitude, lng: foundPackage.receiver_longitude });
-            setMapCenter({ 
-              lat: Number(foundPackage.receiver_latitude), 
-              lng: Number(foundPackage.receiver_longitude) 
-            });
-            setCourierLocation(null); // 隐藏骑手
-            return;
-          }
-        }
-
-        // 解析收件地址的坐标（作为回退方案）
+        // 解析收件地址的坐标（如果有）
+        // 这里使用 Geocoding API 获取地址坐标
         if (foundPackage.receiver_address && isMapLoaded) {
           try {
             const geocoder = new window.google.maps.Geocoder();
