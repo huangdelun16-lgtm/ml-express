@@ -140,8 +140,8 @@ const ContactPage: React.FC = () => {
             {[
               {
                 icon: '📲',
-                title: language === 'zh' ? '下载APP链接' : language === 'en' ? 'Download App' : 'App ဒေါင်းလုဒ်လုပ်ရန်',
-                value: '',
+                title: language === 'zh' ? '下载 Android APP' : language === 'en' ? 'Download Android App' : 'Android App ဒေါင်းလုဒ်လုပ်ရန်',
+                value: language === 'zh' ? '苹果手机可以在 App Store 下载 APP' : language === 'en' ? 'Apple users can download from App Store' : 'Apple ဖုန်းများအတွက် App Store တွင် ဒေါင်းလုဒ်လုပ်နိုင်ပါသည်',
                 color: '#38a169',
                 bgGradient: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                 iconBg: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
@@ -292,25 +292,30 @@ const ContactPage: React.FC = () => {
 
                 {/* 内容 */}
                 {contact.isDownload ? (
-                  <button
-                    onClick={() => window.open('https://market-link-express.com/download', '_blank')}
-                    style={{
-                      background: contact.bgGradient,
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.8rem 1.5rem',
-                      borderRadius: '12px',
-                      fontWeight: '900',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                      transition: 'all 0.3s ease',
-                      fontSize: '1rem'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  >
-                    {language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                    <button
+                      onClick={() => window.open('https://market-link-express.com/download', '_blank')}
+                      style={{
+                        background: contact.bgGradient,
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 1.5rem',
+                        borderRadius: '12px',
+                        fontWeight: '900',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                        transition: 'all 0.3s ease',
+                        fontSize: '1rem'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      {language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်'}
+                    </button>
+                    <p style={{ fontSize: '0.9rem', color: '#4a5568', fontWeight: '600', opacity: 0.8, lineHeight: '1.4' }}>
+                      {contact.value}
+                    </p>
+                  </div>
                 ) : typeof contact.value === 'string' ? (
                   <p style={{
                     fontSize: '1.15rem',
