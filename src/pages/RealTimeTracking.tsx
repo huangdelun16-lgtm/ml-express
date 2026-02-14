@@ -114,7 +114,7 @@ const RealTimeTracking: React.FC = () => {
   const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
 
   // 音频提示相关状态
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const soundEnabledRef = useRef(soundEnabled);
 
@@ -671,73 +671,6 @@ const RealTimeTracking: React.FC = () => {
           <h1 style={{ margin: 0, color: '#1f2937', fontSize: '1.8rem' }}>
             📍 实时跟踪管理
           </h1>
-          
-          {/* 🚀 自动刷新状态指示器 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            background: 'rgba(59, 130, 246, 0.1)',
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
-            marginLeft: '1rem'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#3b82f6',
-              animation: 'pulse 2s infinite'
-            }} />
-            <span style={{ fontSize: '0.85rem', color: '#1e40af', fontWeight: '600' }}>
-              自动刷新中: {nextRefreshCountdown}s
-            </span>
-            <button 
-              onClick={() => {
-                setNextRefreshCountdown(1); // 触发下一秒刷新
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#3b82f6',
-                cursor: 'pointer',
-                padding: '2px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              title="立即刷新"
-            >
-              <span style={{ fontSize: '1rem' }}>🔄</span>
-            </button>
-            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '0.5rem' }}>
-              上次更新: {lastRefreshTime}
-            </span>
-          </div>
-          
-          {/* 声音开关按钮 */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            style={{
-              background: soundEnabled ? '#10b981' : '#9ca3af',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              marginLeft: '1rem',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-            title={soundEnabled ? "点击关闭新订单提示音" : "点击开启新订单提示音"}
-          >
-            {soundEnabled ? '🔔 提示音: 开' : '🔕 提示音: 关'}
-          </button>
           
           {/* 隐藏的音频元素 - 使用清脆的提示音效 */}
           <audio 
