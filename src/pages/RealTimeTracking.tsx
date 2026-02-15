@@ -51,18 +51,27 @@ const RealTimeTracking: React.FC = () => {
     return R * c;
   };
 
-  // 🚀 辅助函数：获取热力图数据
-  const getHeatmapData = () => {
-    if (!isMapLoaded || !window.google) return [];
-    
-    return packages
-      .filter(p => p.sender_latitude && p.sender_longitude)
-      .map(p => new window.google.maps.LatLng(p.sender_latitude!, p.sender_longitude!));
-  };
-
   // 🚀 辅助函数：根据当前包裹推荐最合适的骑手
   const getRecommendedCouriers = (pkg: Package) => {
-    // ... code ...
+    if (!pkg.sender_latitude || !pkg.sender_longitude) return couriers.filter(c => c.status !== 'offline');
+
+    return couriers
+      .filter(c => c.status !== 'offline')
+      .map(courier => {
+        const distance = calculateDistance(
+          pkg.sender_latitude || 0,
+          pkg.sender_longitude || 0,
+          courier.latitude || 0,
+          courier.longitude || 0
+        );
+        
+        // 推荐指数计算：距离越近分数越高，包裹越少分数越高
+        // 基础分数 100，每公里扣 5 分，每个包裹扣 10 分
+        const score = 100 - (distance * 5) - ((courier.currentPackages || 0) * 10);
+        
+        return { ...courier, distance, score };
+      })
+      .sort((a, b) => b.score - a.score);
   };
 
   // 🚀 辅助函数：获取热力图数据
@@ -113,8 +122,6 @@ const RealTimeTracking: React.FC = () => {
   } | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(new Date().toLocaleTimeString()); // 🚀 新增：最后刷新时间
   const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
-  const [showHeatmap, setShowHeatmap] = useState(false); // 🚀 新增：热力图显示状态
-  const [draggedPackage, setDraggedPackage] = useState<Package | null>(null); // 🚀 新增：被拖拽的包裹
   const [showHeatmap, setShowHeatmap] = useState(false); // 🚀 新增：热力图显示状态
 
   // 音频提示相关状态
@@ -941,17 +948,6 @@ const RealTimeTracking: React.FC = () => {
                     ]
                   }}
                 >
-                  {/* 热力图层 */}
-                  {showHeatmap && (
-                    <HeatmapLayer
-                      data={getHeatmapData()}
-                      options={{
-                        radius: 30,
-                        opacity: 0.7
-                      }}
-                    />
-                  )}
-
                   {/* 热力图层 */}
                   {showHeatmap && (
                     <HeatmapLayer
