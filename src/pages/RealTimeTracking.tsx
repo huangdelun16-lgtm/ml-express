@@ -1463,9 +1463,9 @@ const RealTimeTracking: React.FC = () => {
           
           {/* 根据选项卡显示不同内容 */}
           {activeTab === 'packages' ? (
-            <div key="packages-tab-container">
+            <>
               {/* 待分配包裹 */}
-              <div style={{ marginBottom: '2rem' }}>
+              <div key="pending-section" style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ color: '#dc2626', margin: 0, fontSize: '1.1rem' }}>
                     ⏳ 待分配包裹 ({pendingCount})
@@ -2093,7 +2093,7 @@ const RealTimeTracking: React.FC = () => {
                 )))
             }
           </div>
-        </div>
+        </>
       ) : activeTab === 'stores' ? (
             // 快递店管理内容
             <div>
