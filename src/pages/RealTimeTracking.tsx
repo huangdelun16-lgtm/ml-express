@@ -1722,15 +1722,17 @@ const RealTimeTracking: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              )
+            })
+          )}
         </div>
+      </div>
           
-        <div>
-          <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-            ✅ 已分配包裹 ({assignedCount})
-          </h3>
+      <div style={{ marginTop: '2rem' }}>
+        <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ background: '#dcfce7', padding: '4px 8px', borderRadius: '8px' }}>✅</span> 
+          已分配包裹 ({assignedCount})
+        </h3>
             
             {assignedCount === 0 ? (
               <div style={{
@@ -1954,8 +1956,9 @@ const RealTimeTracking: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                );
-              })}
+                )
+              })
+            )}
           </div>
         </>
       ) : activeTab === 'stores' ? (
