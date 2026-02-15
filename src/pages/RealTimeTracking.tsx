@@ -740,114 +740,145 @@ const RealTimeTracking: React.FC = () => {
     }}>
       {/* 顶部导航 */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '15px',
-        padding: '1.5rem',
-        marginBottom: '2rem',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '0.8rem 1.5rem',
+        marginBottom: '1.5rem',
+        boxShadow: '0 8px 32px rgba(31, 38, 135, 0.1)',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        border: '1px solid rgba(255, 255, 255, 0.18)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
           <button
             onClick={() => navigate('/admin')}
             style={{
-              background: '#6366f1',
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
               color: 'white',
               border: 'none',
-              padding: '0.8rem 1.5rem',
-              borderRadius: '8px',
+              padding: '0.6rem 1.2rem',
+              borderRadius: '10px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              fontSize: '1rem'
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+              transition: 'transform 0.2s'
             }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
           >
-            ← 返回后台
+            <span>←</span> 返回后台
           </button>
-          <h1 style={{ margin: 0, color: '#1f2937', fontSize: '1.8rem' }}>
-            📍 实时跟踪管理
-          </h1>
-          
-          {/* 隐藏的音频元素 - 使用清脆的提示音效 */}
-          <audio 
-            ref={audioRef} 
-            src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
-            preload="auto"
-          />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ margin: 0, color: '#1f2937', fontSize: '1.4rem', fontWeight: '800', letterSpacing: '-0.02em' }}>
+              📍 实时跟踪管理
+            </h1>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '500' }}>
+              Real-time Fleet & Package Monitoring
+            </div>
+          </div>
         </div>
+
         <div style={{ 
           display: 'flex', 
-          gap: '0.8rem', 
+          gap: '0.6rem', 
           alignItems: 'center', 
-          flexWrap: 'wrap',
-          background: 'rgba(255, 255, 255, 0.8)',
-          padding: '0.6rem 1rem',
+          background: 'rgba(241, 245, 249, 0.5)',
+          padding: '0.4rem 0.8rem',
           borderRadius: '12px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          border: '1px solid #e5e7eb'
+          border: '1px solid #e2e8f0'
         }}>
-          {/* 区域按钮 */}
+          {/* 区域标记 */}
           <div style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            background: '#3b82f6',
             color: 'white',
-            padding: '0.5rem 1rem',
+            padding: '0.4rem 0.8rem',
             borderRadius: '8px',
             fontWeight: 'bold',
-            fontSize: '0.9rem',
+            fontSize: '0.8rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            cursor: isRegionalUser ? 'default' : 'pointer'
+            gap: '0.4rem',
+            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.2)'
           }}>
-            <span>📍 {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}</span>
+            <span>📍 {isRegionalUser ? `${currentRegionPrefix}` : myanmarCities[selectedCity].name}</span>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 0.5rem' }} />
+          <div style={{ width: '1px', height: '16px', background: '#cbd5e1', margin: '0 0.2rem' }} />
 
-          {/* 骑手统计 */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ background: '#ecfdf5', color: '#065f46', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #b9f6ca' }}>
-              🟢 在线: {onlineRiderCount}
+          {/* 状态统计组 */}
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.3rem' }}>
+              <div title="在线骑手" style={{ background: '#f0fdf4', color: '#166534', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span>
+                在线: {onlineRiderCount}
+              </div>
+              <div title="忙碌骑手" style={{ background: '#fffbeb', color: '#92400e', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #fef3c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                忙碌: {couriers.filter(c => c.status === 'busy').length}
+              </div>
             </div>
-            <div style={{ background: '#fffbeb', color: '#92400e', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #fde68a' }}>
-              🟠 忙碌: {couriers.filter(c => c.status === 'busy').length}
-            </div>
-            <div style={{ background: '#f3f4f6', color: '#374151', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #d1d5db' }}>
-              ⚪ 离线: {couriers.filter(c => c.status === 'offline').length}
+
+            <div style={{ width: '1px', height: '16px', background: '#cbd5e1', margin: '0 0.2rem' }} />
+
+            <div style={{ display: 'flex', gap: '0.3rem' }}>
+              <div title="待分配包裹" style={{ background: '#fef2f2', color: '#991b1b', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #fee2e2', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontSize: '0.9rem' }}>⌛</span> {pendingCount}
+              </div>
+              <div title="配送中包裹" style={{ background: '#eff6ff', color: '#1e40af', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontSize: '0.9rem' }}>🚚</span> {assignedCount}
+              </div>
             </div>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 0.5rem' }} />
+          <div style={{ width: '1px', height: '16px', background: '#cbd5e1', margin: '0 0.2rem' }} />
 
-          {/* 包裹统计 */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #fecaca' }}>
-              ⏳ 待分配: {pendingCount}
-            </div>
-            <div style={{ background: '#eff6ff', color: '#1e40af', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #bfdbfe' }}>
-              🚚 配送中: {assignedCount}
-            </div>
-          </div>
-
-          {/* 刷新倒计时 */}
+          {/* 刷新胶囊 - 极致紧凑 */}
           <div style={{
-            marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            background: '#f8fafc',
-            padding: '0.4rem 0.8rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0'
+            gap: '0.4rem',
+            background: 'white',
+            padding: '0.2rem 0.5rem 0.2rem 0.7rem',
+            borderRadius: '20px',
+            border: '1px solid #e2e8f0',
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
           }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>自动刷新: {nextRefreshCountdown}s</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1' }}>
+              <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '2px' }}>NEXT SYNC</span>
+              <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: '800', fontFamily: 'monospace' }}>
+                {nextRefreshCountdown}s
+              </span>
+            </div>
             <button 
               onClick={() => setNextRefreshCountdown(1)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
+              style={{ 
+                background: '#f1f5f9', 
+                border: 'none', 
+                cursor: 'pointer', 
+                padding: '5px', 
+                borderRadius: '50%',
+                display: 'flex',
+                transition: 'all 0.2s',
+                color: '#64748b'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e2e8f0';
+                e.currentTarget.style.color = '#4f46e5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f1f5f9';
+                e.currentTarget.style.color = '#64748b';
+              }}
               title={`上次更新: ${lastRefreshTime}`}
-            >🔄</button>
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8', borderLeft: '1px solid #e2e8f0', paddingLeft: '0.5rem' }}>{lastRefreshTime}</span>
+            >
+              <span style={{ fontSize: '0.8rem' }}>🔄</span>
+            </button>
           </div>
         </div>
       </div>
@@ -893,11 +924,12 @@ const RealTimeTracking: React.FC = () => {
           
           <div style={{ 
             width: '100%', 
-            height: '600px', 
-            borderRadius: '10px', 
+            height: '650px', 
+            borderRadius: '20px', 
             overflow: 'hidden',
-            border: '2px solid #e5e7eb',
-            position: 'relative'
+            border: '1px solid rgba(0,0,0,0.05)',
+            position: 'relative',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
           }}>
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
                   <div style={{
@@ -1477,36 +1509,38 @@ const RealTimeTracking: React.FC = () => {
                       loadStores();
                     }}
                     style={{
-                      background: 'rgba(59, 130, 246, 0.1)',
+                      background: 'white',
                       color: '#2563eb',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '10px',
                       cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
+                      gap: '0.5rem',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                       transition: 'all 0.2s'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
                   >
                     🔄 刷新
                   </button>
                 </div>
 
-          {pendingCount === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#9ca3af'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-              <p>当前没有待分配的包裹</p>
-            </div>
-          ) : (
+                {pendingCount === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '3rem',
+                    color: '#9ca3af',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '2px dashed #e2e8f0'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                    <p>当前没有待分配的包裹</p>
+                  </div>
+                ) : (
             filterPackagesByCity(packages)
               .filter(p => p.status === '待取件' || p.status === '待收款')
               .map(pkg => (
@@ -1516,342 +1550,158 @@ const RealTimeTracking: React.FC = () => {
                   onDragStart={() => setDraggedPackage(pkg)}
                   onDragEnd={() => setDraggedPackage(null)}
                   style={{
-                    background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                      ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
-                      : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    marginBottom: '1rem',
+                    background: 'white',
+                    padding: '1.2rem',
+                    borderRadius: '16px',
+                    marginBottom: '1.2rem',
                     border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                       ? '2px solid #22c55e'
-                      : '2px solid #bae6fd',
+                      : '1px solid #e2e8f0',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
                     opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1,
-                    cursor: 'grab'
+                    cursor: 'grab',
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   <div style={{ position: 'relative' }}>
                     {draggedPackage?.id === pkg.id && (
                       <div style={{
                         position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(255, 255, 255, 0.5)',
+                        top: -5,
+                        left: -5,
+                        right: -5,
+                        bottom: -5,
+                        background: 'rgba(59, 130, 246, 0.1)',
                         zIndex: 1,
-                        borderRadius: '8px'
+                        borderRadius: '12px',
+                        border: '2px dashed #3b82f6'
                       }} />
                     )}
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.5rem',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem'
-                  }}>
-                    <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* 下单身份标识 */}
-                      {(() => {
-                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
-                        if (identityMatch && identityMatch[1]) {
-                          const identity = identityMatch[1];
-                          const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                          const isVIP = identity === 'VIP';
-                          return (
-                            <span style={{
-                              background: isMERCHANTS ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
-                              color: isMERCHANTS ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold',
-                              border: `1px solid ${isMERCHANTS ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
-                            }}>
-                              👤 {identity}
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
+                      alignItems: 'flex-start',
+                      marginBottom: '0.8rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <strong style={{ color: '#1e2937', fontSize: '1.05rem', fontFamily: 'monospace' }}>
+                          #{pkg.id.slice(-8)}
+                        </strong>
+                        <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>ID: {pkg.id}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* 下单身份标识 */}
+                        {(() => {
+                          const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                          if (identityMatch && identityMatch[1]) {
+                            const identity = identityMatch[1];
+                            const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
+                            const isVIP = identity === 'VIP';
+                            return (
+                              <span style={{
+                                background: isMERCHANTS ? '#eff6ff' : (isVIP ? '#fffbeb' : '#f8fafc'),
+                                color: isMERCHANTS ? '#2563eb' : (isVIP ? '#d97706' : '#64748b'),
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: '800',
+                                border: `1px solid ${isMERCHANTS ? '#dbeafe' : (isVIP ? '#fef3c7' : '#e2e8f0')}`
+                              }}>
+                                {identity}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
 
-                      {/* 支付方式标识 */}
-                      {(pkg as any).payment_method === 'cash' && (
                         <span style={{
-                          background: '#fef3c7',
-                          color: '#92400e',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
+                          background: pkg.status === '待收款' ? '#fff7ed' : '#f0fdf4',
+                          color: pkg.status === '待收款' ? '#c2410c' : '#16a34a',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          fontWeight: '800',
+                          border: `1px solid ${pkg.status === '待收款' ? '#ffedd5' : '#dcfce7'}`
                         }}>
-                          💵 现金
+                          {pkg.status === '待收款' ? '待取件 (CASH)' : pkg.status}
                         </span>
-                      )}
-                      {(pkg as any).payment_method === 'qr' && (
-                        <span style={{
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          📱 二维码
-                        </span>
-                      )}
-                      {(!(pkg as any).payment_method) && (
-                        <span style={{
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          📱 已支付
-                        </span>
-                      )}
-                      <span style={{
-                        background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                          ? '#dcfce7'
-                          : '#fef3c7',
-                        color: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                          ? '#166534'
-                          : '#92400e',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '5px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {pkg.status === '待收款' ? '待取件' : pkg.status}
-                      </span>
+                      </div>
+                    </div>
+                    
+                    <div style={{ 
+                      fontSize: '0.8rem', 
+                      color: '#4b5563', 
+                      lineHeight: '1.4',
+                      background: '#f8fafc',
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid #f1f5f9',
+                      marginBottom: '0.8rem'
+                    }}>                                                                           
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '6px' }}>
+                        <span>📤</span>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#1f2937' }}>{pkg.sender_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{pkg.sender_address}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                        <span>📥</span>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#1f2937' }}>{pkg.receiver_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{pkg.receiver_address}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.8rem',
+                      padding: '0 0.2rem'
+                    }}>
+                      <div style={{ display: 'flex', gap: '0.8rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: '700' }}>DIST</div>
+                          <div style={{ fontWeight: '800', fontSize: '0.85rem' }}>{pkg.delivery_distance || '--'} km</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: '700' }}>PRICE</div>
+                          <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#2563eb' }}>{pkg.price}</div>
+                        </div>
+                      </div>
                       
-                      {/* 代收款显示 - MERCHANTS订单显示代收款 */}
                       {(() => {
-                        const isStoreMatch = stores.some(store => 
-                          store.store_name === pkg.sender_name || 
-                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                        );
-                        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                        const codVal = Number(pkg.cod_amount || 0);
-                        
-                        if (isMERCHANTS) {
+                        const payMatch = pkg.description?.match(/\[(?:平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                        if (payMatch && payMatch[1]) {
                           return (
-                            <span style={{
-                              background: '#fee2e2',
-                              color: '#b91c1c',
-                              border: '1px solid #fecaca',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.8rem',
-                              fontWeight: 'bold',
-                              whiteSpace: 'nowrap'
-                            }}>
-                              {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
-                            </span>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.6rem', color: '#10b981', fontWeight: '700' }}>PAID</div>
+                              <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#10b981' }}>{payMatch[1]}</div>
+                            </div>
                           );
                         }
                         return null;
                       })()}
                     </div>
-                  </div>
-                  
-                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📍 从: {pkg.sender_address}
-                      {pkg.sender_latitude && pkg.sender_longitude && (
-                        <span 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!pkg.sender_latitude || !pkg.sender_longitude) return;
-                            const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
-                            setSelectedLocationPoint({
-                              packageId: pkg.id,
-                              type: 'pickup',
-                              coordinates: coords
-                            });
-                            setMapCenter(coords);
-                            setSelectedCourier(null);
-                          }}
-                          style={{ 
-                            color: '#3b82f6', 
-                            fontSize: '0.8rem', 
-                            marginLeft: '0.5rem',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#2563eb';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#3b82f6';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
-                        </span>
-                      )}
-                    </p>
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📍 到: {pkg.receiver_address}
-                      {pkg.receiver_latitude && pkg.receiver_longitude && (
-                        <span 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
-                            const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
-                            setSelectedLocationPoint({
-                              packageId: pkg.id,
-                              type: 'delivery',
-                              coordinates: coords
-                            });
-                            setMapCenter(coords);
-                            setSelectedCourier(null);
-                          }}
-                          style={{ 
-                            color: '#ef4444', 
-                            fontSize: '0.8rem', 
-                            marginLeft: '0.5rem',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#dc2626';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#ef4444';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
-                        </span>
-                      )}
-                    </p>
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📦 类型: {pkg.package_type} ({pkg.weight})
-                    </p>
-                    {pkg.delivery_distance && (
-                      <p style={{ margin: '0.3rem 0' }}>
-                        🚗 距离: {pkg.delivery_distance} km
-                      </p>
-                    )}
-                    {pkg.price && (
-                    <p style={{ margin: '0.3rem 0' }}>
-                      💰 跑腿费: {pkg.price}
-                    </p>
-                    )}
-                    {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
-                    {(() => {
-                      const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-                      if (payMatch && payMatch[1]) {
-                        return (
-                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#10b981' }}>
-                            💵 平台支付: {payMatch[1]} MMK
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                    {(() => {
-                      const isStoreMatch = stores.some(store => 
-                        store.store_name === pkg.sender_name || 
-                        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                      );
-                      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                      
-                      if (isMERCHANTS) {
-                        const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                        const codVal = Number(pkg.cod_amount || 0);
-                        const totalVal = priceVal + codVal;
-                        return (
-                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#b45309' }}>
-                            💰 总金额: {totalVal.toLocaleString()} MMK
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
 
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '0.5rem',
-                    marginTop: '1rem'
-                  }}>
-                    {/* 如果包裹已分配给骑手（有courier且不为'未分配'和'待分配'），显示状态信息而不是分配按钮 */}
-                    {pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? (
-                      <div style={{
-                        flex: 1,
-                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                        color: '#92400e',
-                        border: '2px solid #f59e0b',
-                        padding: '0.6rem',
-                        borderRadius: '8px',
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem',
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        ✅ 已分配给: {pkg.courier}
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => autoAssignPackage(pkg)}
-                          disabled={isAssigning}
-                          style={{
-                            flex: 1,
-                            background: isAssigning 
-                              ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
-                              : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.6rem',
-                            borderRadius: '8px',
-                            cursor: isAssigning ? 'not-allowed' : 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '0.9rem',
-                            opacity: isAssigning ? 0.7 : 1
-                          }}
-                        >
-                          {isAssigning ? '⏳ 分配中...' : '🤖 自动分配'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedPackage(pkg);
-                            setShowAssignModal(true);
-                          }}
-                          style={{
-                            flex: 1,
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.6rem',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          👤 手动分配
-                        </button>
-                      </>
-                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? (
+                        <div style={{ flex: 1, background: '#f0fdf4', color: '#166534', padding: '0.6rem', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', textAlign: 'center', border: '1px solid #dcfce7' }}>
+                          ✅ 已分配: {pkg.courier}
+                        </div>
+                      ) : (
+                        <>
+                          <button onClick={() => autoAssignPackage(pkg)} style={{ flex: 1.5, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', padding: '0.6rem', borderRadius: '10px', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)' }}>🤖 智能分配</button>
+                          <button onClick={() => { setSelectedPackage(pkg); setShowAssignModal(true); }} style={{ flex: 1, background: 'white', color: '#1e2937', border: '1px solid #e2e8f0', padding: '0.6rem', borderRadius: '10px', fontWeight: '800', fontSize: '0.8rem', cursor: 'pointer' }}>👤 手动</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
             )))
           }
         </div>
@@ -2209,19 +2059,19 @@ const RealTimeTracking: React.FC = () => {
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.currentTarget.style.background = '#eff6ff';
-                      e.currentTarget.style.border = '2px dashed #3b82f6';
+                      e.currentTarget.style.borderColor = '#3b82f6';
                       e.currentTarget.style.transform = 'scale(1.02)';
                     }}
                     onDragLeave={(e) => {
                       e.preventDefault();
                       e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.border = '1px solid #e5e7eb';
+                      e.currentTarget.style.borderColor = '#e2e8f0';
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                     onDrop={async (e) => {
                       e.preventDefault();
                       e.currentTarget.style.background = 'white';
-                      e.currentTarget.style.border = '1px solid #e5e7eb';
+                      e.currentTarget.style.borderColor = '#e2e8f0';
                       e.currentTarget.style.transform = 'scale(1)';
                       
                       if (draggedPackage) {
@@ -2232,12 +2082,25 @@ const RealTimeTracking: React.FC = () => {
                     }}
                     style={{
                       background: 'white',
-                      border: '1px solid #e5e7eb',
-                      padding: '1rem',
-                      borderRadius: '10px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                      transition: 'all 0.2s',
-                      cursor: draggedPackage ? 'copy' : 'pointer'
+                      border: '1px solid #e2e8f0',
+                      padding: '1.2rem',
+                      borderRadius: '16px',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      cursor: draggedPackage ? 'copy' : 'pointer',
+                      marginBottom: '0.8rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!draggedPackage) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 10px 15px rgba(0,0,0,0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!draggedPackage) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                      }
                     }}
                     onClick={() => {
                       if (courier.latitude && courier.longitude) {
@@ -2246,39 +2109,52 @@ const RealTimeTracking: React.FC = () => {
                       }
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                          <h4 style={{ margin: 0, color: '#1f2937' }}>{courier.name}</h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+                          <h4 style={{ margin: 0, color: '#1e2937', fontSize: '1rem', fontWeight: '800' }}>{courier.name}</h4>
                           <span style={{ 
-                            fontSize: '0.7rem', 
-                            padding: '0.1rem 0.4rem', 
-                            borderRadius: '4px',
+                            fontSize: '0.65rem', 
+                            padding: '0.2rem 0.5rem', 
+                            borderRadius: '6px', 
                             background: getCourierStatusColor(courier.status),
                             color: 'white',
-                            fontWeight: 'bold'
+                            fontWeight: '900',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
                           }}>
                             {getCourierStatusText(courier.status)}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            📦 <strong>{courier.currentPackages || 0}</strong> 件中
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                            <span style={{ fontSize: '1rem' }}>📦</span> 
+                            <strong style={{ color: '#3b82f6' }}>{courier.currentPackages || 0}</strong> Pkgs
                           </span>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                            📱 {courier.phone}
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '1rem' }}>📱</span> {courier.phone}
                           </span>
                         </div>
                       </div>
-                      {courier.batteryLevel != null && (
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: courier.batteryLevel < 30 ? '#ef4444' : '#10b981',
-                          fontWeight: 'bold'
-                        }}>
-                          🔋 {courier.batteryLevel}%
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        {courier.batteryLevel != null && (
+                          <div style={{ 
+                            fontSize: '0.75rem', 
+                            color: courier.batteryLevel < 30 ? '#ef4444' : '#10b981',
+                            fontWeight: '800',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            background: courier.batteryLevel < 30 ? '#fef2f2' : '#f0fdf4',
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                            border: `1px solid ${courier.batteryLevel < 30 ? '#fee2e2' : '#dcfce7'}`
+                          }}>
+                            {courier.batteryLevel < 30 ? '🪫' : '🔋'} {courier.batteryLevel}%
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: '700' }}>CLICK TO LOCATE</div>
+                      </div>
                     </div>
                   </div>
                 ))}
