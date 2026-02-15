@@ -1463,7 +1463,7 @@ const RealTimeTracking: React.FC = () => {
           
           {/* 根据选项卡显示不同内容 */}
           {activeTab === 'packages' ? (
-            <>
+            <div key="packages-tab-container">
               {/* 待分配包裹 */}
               <div style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1851,14 +1851,15 @@ const RealTimeTracking: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))
+              )))
           }
-          </div>
+        </div>
+      </div>
           
-          <div>
-            <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ✅ 已分配包裹 ({assignedCount})
-            </h3>
+      <div>
+        <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
+          ✅ 已分配包裹 ({assignedCount})
+        </h3>
             
             {assignedCount === 0 ? (
               <div style={{
@@ -2089,11 +2090,11 @@ const RealTimeTracking: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                ))))
+                )))
             }
           </div>
-            </>
-          ) : activeTab === 'stores' ? (
+        </div>
+      ) : activeTab === 'stores' ? (
             // 快递店管理内容
             <div>
               <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
