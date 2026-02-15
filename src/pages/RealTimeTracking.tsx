@@ -646,6 +646,9 @@ const RealTimeTracking: React.FC = () => {
     });
   };
 
+  const pendingCount = filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length;
+  const assignedCount = filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length;
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -737,10 +740,10 @@ const RealTimeTracking: React.FC = () => {
           {/* 包裹统计 */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #fecaca' }}>
-              ⏳ 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length}
+              ⏳ 待分配: {pendingCount}
             </div>
             <div style={{ background: '#eff6ff', color: '#1e40af', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #bfdbfe' }}>
-              🚚 配送中: {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length}
+              🚚 配送中: {assignedCount}
             </div>
           </div>
 
@@ -1342,7 +1345,7 @@ const RealTimeTracking: React.FC = () => {
               <div style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ color: '#dc2626', margin: 0, fontSize: '1.1rem' }}>
-                    ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length})
+                    ⏳ 待分配包裹 ({pendingCount})
                   </h3>
                   <button
                     onClick={() => {
@@ -1371,7 +1374,7 @@ const RealTimeTracking: React.FC = () => {
                   </button>
                 </div>
 
-          {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length === 0 ? (
+          {pendingCount === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '3rem',
@@ -1725,17 +1728,16 @@ const RealTimeTracking: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))
-          )}
+              )))
+          }
           </div>
           
-          {/* 已分配包裹 */}
           <div>
             <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ✅ 已分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length})
+              ✅ 已分配包裹 ({assignedCount})
             </h3>
             
-            {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
+            {assignedCount === 0 ? (
               <div style={{
                 textAlign: 'center',
                 padding: '2rem',
@@ -1964,8 +1966,8 @@ const RealTimeTracking: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                ))
-            )}
+                )))
+            }
           </div>
             </>
           ) : activeTab === 'stores' ? (
