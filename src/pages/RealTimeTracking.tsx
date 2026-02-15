@@ -1627,7 +1627,7 @@ const RealTimeTracking: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* 🚀 重要：代收款 (COD) 突出显示 - 仅商家订单显示 */}
+                          {/* 🚀 COD_FIX：代收款 (COD) 突出显示 - 仅商家订单显示 */}
                           {pkg.cod_amount && Number(pkg.cod_amount) > 0 && !isVIP && (
                             <div style={{ 
                               background: '#fff1f2', 
