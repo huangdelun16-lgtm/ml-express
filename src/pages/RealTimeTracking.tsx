@@ -1726,7 +1726,7 @@ const RealTimeTracking: React.FC = () => {
                   </div>
                 </div>
               ))
-          }
+          )}
           </div>
           
           {/* 已分配包裹 */}
@@ -1965,7 +1965,7 @@ const RealTimeTracking: React.FC = () => {
                     </div>
                   </div>
                 ))
-            }
+            )}
           </div>
             </>
           ) : activeTab === 'stores' ? (
@@ -2051,7 +2051,7 @@ const RealTimeTracking: React.FC = () => {
                     </div>
                   </div>
                 ))
-              }
+              )}
             </div>
           ) : (
             // 骑手列表标签内容
