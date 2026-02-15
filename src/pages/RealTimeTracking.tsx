@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer, TrafficLayer } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -123,6 +123,8 @@ const RealTimeTracking: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(new Date().toLocaleTimeString()); // 🚀 新增：最后刷新时间
   const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
   const [showHeatmap, setShowHeatmap] = useState(false); // 🚀 新增：热力图显示状态
+  const [showTraffic, setShowTraffic] = useState(false); // 🚀 新增：路况层显示状态
+  const [mapType, setMapTheme] = useState<'standard' | 'dark' | 'satellite'>('standard'); // 🚀 新增：地图主题
 
   // 音频提示相关状态
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -646,6 +648,87 @@ const RealTimeTracking: React.FC = () => {
     });
   };
 
+  const darkMapStyle = [
+    { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+    {
+      featureType: 'administrative.locality',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#d59563' }]
+    },
+    {
+      featureType: 'poi',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#d59563' }]
+    },
+    {
+      featureType: 'poi.park',
+      elementType: 'geometry',
+      stylers: [{ color: '#263c3f' }]
+    },
+    {
+      featureType: 'poi.park',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#6b9a76' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'geometry',
+      stylers: [{ color: '#38414e' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'geometry.stroke',
+      stylers: [{ color: '#212a37' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#9ca5b3' }]
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'geometry',
+      stylers: [{ color: '#746855' }]
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'geometry.stroke',
+      stylers: [{ color: '#1f2835' }]
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#f3d19c' }]
+    },
+    {
+      featureType: 'transit',
+      elementType: 'geometry',
+      stylers: [{ color: '#2f3948' }]
+    },
+    {
+      featureType: 'transit.station',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#d59563' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'geometry',
+      stylers: [{ color: '#17263c' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'labels.text.fill',
+      stylers: [{ color: '#515c6d' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'labels.text.stroke',
+      stylers: [{ color: '#17263c' }]
+    }
+  ];
+
   const pendingCount = filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length;
   const assignedCount = filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length;
 
@@ -854,26 +937,63 @@ const RealTimeTracking: React.FC = () => {
                     )}
                     
                     {/* 热力图开关按钮 */}
-                    <button
-                      onClick={() => setShowHeatmap(!showHeatmap)}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        background: showHeatmap ? '#ef4444' : 'white',
-                        color: showHeatmap ? 'white' : '#1f2937',
-                        border: '2px solid #e5e7eb',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {showHeatmap ? '🔥 关闭热力图' : '📈 开启热力图'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => setShowTraffic(!showTraffic)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          background: showTraffic ? '#10b981' : 'white',
+                          color: showTraffic ? 'white' : '#1f2937',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                          transition: 'all 0.2s'
+                        }}
+                        title="显示实时路况"
+                      >
+                        🚦 路况
+                      </button>
+                      <button
+                        onClick={() => setShowHeatmap(!showHeatmap)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          background: showHeatmap ? '#ef4444' : 'white',
+                          color: showHeatmap ? 'white' : '#1f2937',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {showHeatmap ? '🔥 关闭热力' : '📈 热力图'}
+                      </button>
+                      <select
+                        value={mapType}
+                        onChange={(e) => setMapTheme(e.target.value as any)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '2px solid #e5e7eb',
+                          background: 'white',
+                          color: '#1f2937',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="standard">🗺️ 标准</option>
+                        <option value="dark">🌑 深夜</option>
+                        <option value="satellite">🛰️ 卫星</option>
+                      </select>
+                    </div>
                   </div>
 
               {!isMapLoaded ? (
@@ -930,10 +1050,11 @@ const RealTimeTracking: React.FC = () => {
                 </div>
               ) : (
                   <GoogleMap
-                  key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
+                  key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}-${mapType}`}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={mapCenter}
                   zoom={13}
+                  mapTypeId={mapType === 'satellite' ? 'satellite' : 'roadmap'}
                   options={{
                     fullscreenControl: true,
                     fullscreenControlOptions: {
@@ -942,7 +1063,7 @@ const RealTimeTracking: React.FC = () => {
                     zoomControl: true,
                     streetViewControl: false,
                     mapTypeControl: false,
-                    styles: [
+                    styles: mapType === 'dark' ? darkMapStyle : [
                       {
                         featureType: 'poi',
                         elementType: 'labels',
@@ -951,6 +1072,8 @@ const RealTimeTracking: React.FC = () => {
                     ]
                   }}
                 >
+                  {/* 路况层 */}
+                  {showTraffic && <TrafficLayer />}
                   {/* 热力图层 */}
                   {showHeatmap && (
                     <HeatmapLayer
