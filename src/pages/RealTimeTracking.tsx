@@ -1851,7 +1851,7 @@ const RealTimeTracking: React.FC = () => {
                     )}
                   </div>
                 </div>
-              )))
+              ))
           }
           </div>
           
@@ -2089,7 +2089,7 @@ const RealTimeTracking: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                )))
+                ))))
             }
           </div>
             </>
