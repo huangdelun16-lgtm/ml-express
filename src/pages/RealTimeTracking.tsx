@@ -1722,8 +1722,9 @@ const RealTimeTracking: React.FC = () => {
                     </div>
                   </div>
                 </div>
-            }))
-          }
+              );
+            })}
+          </div>
         </div>
           
         <div>
@@ -1953,8 +1954,8 @@ const RealTimeTracking: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                }))
-            }
+                );
+              })}
           </div>
         </>
       ) : activeTab === 'stores' ? (
