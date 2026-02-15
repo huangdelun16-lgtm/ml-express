@@ -1854,12 +1854,11 @@ const RealTimeTracking: React.FC = () => {
               )))
           }
         </div>
-      </div>
           
-      <div>
-        <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-          ✅ 已分配包裹 ({assignedCount})
-        </h3>
+        <div>
+          <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
+            ✅ 已分配包裹 ({assignedCount})
+          </h3>
             
             {assignedCount === 0 ? (
               <div style={{
