@@ -1726,7 +1726,6 @@ const RealTimeTracking: React.FC = () => {
             })
           )}
         </div>
-      </div>
           
       <div style={{ marginTop: '2rem' }}>
         <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
