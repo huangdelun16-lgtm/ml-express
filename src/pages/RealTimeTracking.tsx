@@ -1629,6 +1629,29 @@ const RealTimeTracking: React.FC = () => {
                         </span>
                       </div>
                     </div>
+
+                    {/* 🚀 重要：代收款 (COD) 突出显示 */}
+                    {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
+                      <div style={{ 
+                        background: '#fff1f2', 
+                        color: '#e11d48', 
+                        padding: '0.6rem 1rem', 
+                        borderRadius: '12px', 
+                        marginBottom: '0.8rem',
+                        border: '1px solid #ffe4e6',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        boxShadow: '0 2px 4px rgba(225, 29, 72, 0.05)'
+                      }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>💰</span> {language === 'zh' ? '代收款' : 'COD Amount'}
+                        </span>
+                        <span style={{ fontWeight: '900', fontSize: '1.15rem', letterSpacing: '0.02em' }}>
+                          {Number(pkg.cod_amount).toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
+                        </span>
+                      </div>
+                    )}
                     
                     <div style={{ 
                       fontSize: '0.8rem', 
@@ -1792,33 +1815,21 @@ const RealTimeTracking: React.FC = () => {
                           {pkg.status === '待收款' ? '待取件' : pkg.status}
                         </span>
 
-                        {/* 代收款显示 - MERCHANTS订单显示代收款 */}
-                        {(() => {
-                          const isStoreMatch = stores.some(store => 
-                            store.store_name === pkg.sender_name || 
-                            (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                          );
-                          const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                          const codVal = Number(pkg.cod_amount || 0);
-                          
-                          if (isMERCHANTS) {
-                            return (
-                              <span style={{
-                                background: '#fee2e2',
-                                color: '#b91c1c',
-                                border: '1px solid #fecaca',
-                                padding: '0.2rem 0.6rem',
-                                borderRadius: '5px',
-                                fontSize: '0.8rem',
-                                fontWeight: 'bold',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
+                        {/* 代收款显示 - 强化显示 */}
+                        {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
+                          <span style={{
+                            background: '#fff1f2',
+                            color: '#e11d48',
+                            border: '1px solid #ffe4e6',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '900',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            💰 {language === 'zh' ? '代收' : 'COD'}: {Number(pkg.cod_amount).toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                     
