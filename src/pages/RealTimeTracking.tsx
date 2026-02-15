@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -12,7 +12,7 @@ const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
+const GOOGLE_MAPS_LIBRARIES: any = ['places', 'visualization'];
 
 // 配送商店接口已在types/index.ts中定义
 
@@ -51,27 +51,27 @@ const RealTimeTracking: React.FC = () => {
     return R * c;
   };
 
+  // 🚀 辅助函数：获取热力图数据
+  const getHeatmapData = () => {
+    if (!isMapLoaded || !window.google) return [];
+    
+    return packages
+      .filter(p => p.sender_latitude && p.sender_longitude)
+      .map(p => new window.google.maps.LatLng(p.sender_latitude!, p.sender_longitude!));
+  };
+
   // 🚀 辅助函数：根据当前包裹推荐最合适的骑手
   const getRecommendedCouriers = (pkg: Package) => {
-    if (!pkg.sender_latitude || !pkg.sender_longitude) return couriers.filter(c => c.status !== 'offline');
+    // ... code ...
+  };
 
-    return couriers
-      .filter(c => c.status !== 'offline')
-      .map(courier => {
-        const distance = calculateDistance(
-          pkg.sender_latitude || 0,
-          pkg.sender_longitude || 0,
-          courier.latitude || 0,
-          courier.longitude || 0
-        );
-        
-        // 推荐指数计算：距离越近分数越高，包裹越少分数越高
-        // 基础分数 100，每公里扣 5 分，每个包裹扣 10 分
-        const score = 100 - (distance * 5) - ((courier.currentPackages || 0) * 10);
-        
-        return { ...courier, distance, score };
-      })
-      .sort((a, b) => b.score - a.score);
+  // 🚀 辅助函数：获取热力图数据
+  const getHeatmapData = () => {
+    if (!isMapLoaded || !window.google) return [];
+    
+    return packages
+      .filter(p => p.sender_latitude && p.sender_longitude)
+      .map(p => new window.google.maps.LatLng(p.sender_latitude!, p.sender_longitude!));
   };
 
   const [packages, setPackages] = useState<Package[]>([]);
@@ -97,10 +97,11 @@ const RealTimeTracking: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<CityKey>(initialCity); 
   const [mapCenter, setMapCenter] = useState<Coordinates>(initialCenter); 
   const [isAssigning, setIsAssigning] = useState(false); // 分配状态
+  const [draggedPackage, setDraggedPackage] = useState<Package | null>(null); // 🚀 新增：被拖拽的包裹
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
   // 选项卡和快递店相关状态
-  const [activeTab, setActiveTab] = useState<'packages' | 'stores'>('packages');
+  const [activeTab, setActiveTab] = useState<'packages' | 'stores' | 'couriers'>('packages');
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   
@@ -112,6 +113,9 @@ const RealTimeTracking: React.FC = () => {
   } | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(new Date().toLocaleTimeString()); // 🚀 新增：最后刷新时间
   const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
+  const [showHeatmap, setShowHeatmap] = useState(false); // 🚀 新增：热力图显示状态
+  const [draggedPackage, setDraggedPackage] = useState<Package | null>(null); // 🚀 新增：被拖拽的包裹
+  const [showHeatmap, setShowHeatmap] = useState(false); // 🚀 新增：热力图显示状态
 
   // 音频提示相关状态
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -803,43 +807,64 @@ const RealTimeTracking: React.FC = () => {
             position: 'relative'
           }}>
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
-              {/* 城市选择器 - 仅非领区限制用户（如 admin）显示 */}
-              {!isRegionalUser && (
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  zIndex: 1000,
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <select
-                    value={selectedCity}
-                    onChange={(e) => handleCityChange(e.target.value)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '2px solid #e5e7eb',
-                      background: 'white',
-                      color: '#1f2937',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      minWidth: '150px',
-                      outline: 'none'
-                    }}
-                  >
-                    {Object.entries(myanmarCities).map(([key, city]) => (
-                      <option key={key} value={key}>
-                        📍 {city.name} ({city.nameEn})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    alignItems: 'flex-end'
+                  }}>
+                    {!isRegionalUser && (
+                      <select
+                        value={selectedCity}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '2px solid #e5e7eb',
+                          background: 'white',
+                          color: '#1f2937',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          minWidth: '150px',
+                          outline: 'none',
+                          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)'
+                        }}
+                      >
+                        {Object.entries(myanmarCities).map(([key, city]) => (
+                          <option key={key} value={key}>
+                            📍 {city.name} ({city.nameEn})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    
+                    {/* 热力图开关按钮 */}
+                    <button
+                      onClick={() => setShowHeatmap(!showHeatmap)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        background: showHeatmap ? '#ef4444' : 'white',
+                        color: showHeatmap ? 'white' : '#1f2937',
+                        border: '2px solid #e5e7eb',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {showHeatmap ? '🔥 关闭热力图' : '📈 开启热力图'}
+                    </button>
+                  </div>
 
               {!isMapLoaded ? (
                 <div style={{
@@ -916,6 +941,28 @@ const RealTimeTracking: React.FC = () => {
                     ]
                   }}
                 >
+                  {/* 热力图层 */}
+                  {showHeatmap && (
+                    <HeatmapLayer
+                      data={getHeatmapData()}
+                      options={{
+                        radius: 30,
+                        opacity: 0.7
+                      }}
+                    />
+                  )}
+
+                  {/* 热力图层 */}
+                  {showHeatmap && (
+                    <HeatmapLayer
+                      data={getHeatmapData()}
+                      options={{
+                        radius: 30,
+                        opacity: 0.7
+                      }}
+                    />
+                  )}
+
                   {/* 显示快递员位置 */}
                   {couriers
                     .filter(courier => courier.latitude != null && courier.longitude != null)
@@ -1271,6 +1318,24 @@ const RealTimeTracking: React.FC = () => {
               >
                 🏪 合伙店铺
               </button>
+              <button
+                onClick={() => setActiveTab('couriers')}
+                style={{
+                  background: activeTab === 'couriers' 
+                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                    : 'transparent',
+                  color: activeTab === 'couriers' ? 'white' : '#6b7280',
+                  border: '2px solid',
+                  borderColor: activeTab === 'couriers' ? '#f59e0b' : '#e5e7eb',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🛵 骑手列表
+              </button>
             </div>
           </div>
           
@@ -1325,6 +1390,9 @@ const RealTimeTracking: React.FC = () => {
               .map(pkg => (
                 <div
                   key={pkg.id}
+                  draggable
+                  onDragStart={() => setDraggedPackage(pkg)}
+                  onDragEnd={() => setDraggedPackage(null)}
                   style={{
                     background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                       ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
@@ -1335,12 +1403,26 @@ const RealTimeTracking: React.FC = () => {
                     border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
                       ? '2px solid #22c55e'
                       : '2px solid #bae6fd',
-                    opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1
+                    opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1,
+                    cursor: 'grab'
                   }}
                 >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
+                  <div style={{ position: 'relative' }}>
+                    {draggedPackage?.id === pkg.id && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        zIndex: 1,
+                        borderRadius: '8px'
+                      }} />
+                    )}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
                     alignItems: 'center',
                     marginBottom: '0.5rem',
                     flexWrap: 'wrap',
@@ -1890,7 +1972,7 @@ const RealTimeTracking: React.FC = () => {
             )}
           </div>
             </>
-          ) : (
+          ) : activeTab === 'stores' ? (
             // 快递店管理内容
             <div>
               <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
@@ -1967,23 +2049,126 @@ const RealTimeTracking: React.FC = () => {
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📞 电话:</strong> {store.phone}
                       </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>👤 店长:</strong> {store.manager_name} ({store.manager_phone})
-                      </p>
                       <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#059669' }}>
                         📍 坐标: ({store.latitude.toFixed(6)}, {store.longitude.toFixed(6)})
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                        ⏰ 营业时间: {store.operating_hours} | 
-                        📦 容量: {store.capacity} | 
-                        🎯 服务半径: {store.service_area_radius}km
                       </p>
                     </div>
                   </div>
                 ))
               )}
             </div>
-          )}
+          ) : (
+            // 骑手列表标签内容
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ 
+                background: '#f8fafc', 
+                padding: '0.8rem', 
+                borderRadius: '8px', 
+                fontSize: '0.85rem', 
+                color: '#64748b',
+                border: '1px solid #e2e8f0',
+                marginBottom: '0.5rem',
+                lineHeight: '1.4'
+              }}>
+                💡 <strong>拖拽秒配：</strong> 从“包裹管理”标签中拖拽一个待分配包裹，放置到下方的骑手卡片上即可完成派单。
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <h3 style={{ color: '#f59e0b', margin: 0, fontSize: '1.1rem' }}>
+                  🛵 在线骑手 ({couriers.filter(c => c.status !== 'offline').length})
+                </h3>
+              </div>
+
+              {couriers
+                .filter(c => c.status !== 'offline')
+                .map(courier => (
+                  <div
+                    key={courier.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.background = '#eff6ff';
+                      e.currentTarget.style.border = '2px dashed #3b82f6';
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.border = '1px solid #e5e7eb';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.border = '1px solid #e5e7eb';
+                      e.currentTarget.style.transform = 'scale(1)';
+                      
+                      if (draggedPackage) {
+                        if (window.confirm(`确定将订单 ${draggedPackage.id} 分配给骑手 ${courier.name} 吗？`)) {
+                          await assignPackageToCourier(draggedPackage, courier);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: 'white',
+                      border: '1px solid #e5e7eb',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      transition: 'all 0.2s',
+                      cursor: draggedPackage ? 'copy' : 'pointer'
+                    }}
+                    onClick={() => {
+                      if (courier.latitude && courier.longitude) {
+                        setMapCenter({ lat: courier.latitude, lng: courier.longitude });
+                        setSelectedCourier(courier);
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                          <h4 style={{ margin: 0, color: '#1f2937' }}>{courier.name}</h4>
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            padding: '0.1rem 0.4rem', 
+                            borderRadius: '4px',
+                            background: getCourierStatusColor(courier.status),
+                            color: 'white',
+                            fontWeight: 'bold'
+                          }}>
+                            {getCourierStatusText(courier.status)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            📦 <strong>{courier.currentPackages || 0}</strong> 件中
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            📱 {courier.phone}
+                          </span>
+                        </div>
+                      </div>
+                      {courier.batteryLevel != null && (
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          color: courier.batteryLevel < 30 ? '#ef4444' : '#10b981',
+                          fontWeight: 'bold'
+                        }}>
+                          🔋 {courier.batteryLevel}%
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              
+              {couriers.filter(c => c.status !== 'offline').length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>😴</div>
+                  <p>当前没有在线骑手</p>
+                </div>
+              )}
+            </div>
+          )
         </div>
       </div>
 
