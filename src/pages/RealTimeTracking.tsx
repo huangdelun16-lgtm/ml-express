@@ -1543,115 +1543,112 @@ const RealTimeTracking: React.FC = () => {
                 ) : (
             filterPackagesByCity(packages)
               .filter(p => p.status === '待取件' || p.status === '待收款')
-              .map(pkg => (
-                <div
-                  key={pkg.id}
-                  draggable
-                  onDragStart={() => setDraggedPackage(pkg)}
-                  onDragEnd={() => setDraggedPackage(null)}
-                  style={{
-                    background: 'white',
-                    padding: '1.2rem',
-                    borderRadius: '16px',
-                    marginBottom: '1.2rem',
-                    border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                      ? '2px solid #22c55e'
-                      : '1px solid #e2e8f0',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                    opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1,
-                    cursor: 'grab',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ position: 'relative' }}>
-                    {draggedPackage?.id === pkg.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: -5,
-                        left: -5,
-                        right: -5,
-                        bottom: -5,
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        zIndex: 1,
-                        borderRadius: '12px',
-                        border: '2px dashed #3b82f6'
-                      }} />
-                    )}
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '0.8rem',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <strong style={{ color: '#1e2937', fontSize: '1.05rem', fontFamily: 'monospace' }}>
-                          #{pkg.id.slice(-8)}
-                        </strong>
-                        <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>ID: {pkg.id}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {/* 下单身份标识 */}
-                        {(() => {
-                          const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
-                          if (identityMatch && identityMatch[1]) {
-                            const identity = identityMatch[1];
-                            const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                            const isVIP = identity === 'VIP';
-                            return (
+                    .map(pkg => {
+                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                      const identity = identityMatch ? identityMatch[1] : null;
+                      const isVIP = identity === 'VIP';
+                      const isMERCHANT = identity === '商家' || identity === 'MERCHANTS';
+
+                      return (
+                      <div
+                        key={pkg.id}
+                        draggable
+                        onDragStart={() => setDraggedPackage(pkg)}
+                        onDragEnd={() => setDraggedPackage(null)}
+                        style={{
+                          background: 'white',
+                          padding: '1.2rem',
+                          borderRadius: '16px',
+                          marginBottom: '1.2rem',
+                          border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
+                            ? '2px solid #22c55e'
+                            : '1px solid #e2e8f0',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                          opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1,
+                          cursor: 'grab',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ position: 'relative' }}>
+                          {draggedPackage?.id === pkg.id && (
+                            <div style={{
+                              position: 'absolute',
+                              top: -5,
+                              left: -5,
+                              right: -5,
+                              bottom: -5,
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              zIndex: 1,
+                              borderRadius: '12px',
+                              border: '2px dashed #3b82f6'
+                            }} />
+                          )}
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '0.8rem',
+                            flexWrap: 'wrap',
+                            gap: '0.5rem'
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <strong style={{ color: '#1e2937', fontSize: '1.05rem', fontFamily: 'monospace' }}>
+                                #{pkg.id.slice(-8)}
+                              </strong>
+                              <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>ID: {pkg.id}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              {/* 下单身份标识 */}
+                              {identity && (
+                                <span style={{
+                                  background: isMERCHANT ? '#eff6ff' : (isVIP ? '#fffbeb' : '#f8fafc'),
+                                  color: isMERCHANT ? '#2563eb' : (isVIP ? '#d97706' : '#64748b'),
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  border: `1px solid ${isMERCHANT ? '#dbeafe' : (isVIP ? '#fef3c7' : '#e2e8f0')}`
+                                }}>
+                                  {identity}
+                                </span>
+                              )}
+
                               <span style={{
-                                background: isMERCHANTS ? '#eff6ff' : (isVIP ? '#fffbeb' : '#f8fafc'),
-                                color: isMERCHANTS ? '#2563eb' : (isVIP ? '#d97706' : '#64748b'),
+                                background: pkg.status === '待收款' ? '#fff7ed' : '#f0fdf4',
+                                color: pkg.status === '待收款' ? '#c2410c' : '#16a34a',
                                 padding: '0.2rem 0.5rem',
                                 borderRadius: '6px',
                                 fontSize: '0.7rem',
                                 fontWeight: '800',
-                                border: `1px solid ${isMERCHANTS ? '#dbeafe' : (isVIP ? '#fef3c7' : '#e2e8f0')}`
+                                border: `1px solid ${pkg.status === '待收款' ? '#ffedd5' : '#dcfce7'}`
                               }}>
-                                {identity}
+                                {pkg.status === '待收款' ? '待取件 (CASH)' : pkg.status}
                               </span>
-                            );
-                          }
-                          return null;
-                        })()}
+                            </div>
+                          </div>
 
-                        <span style={{
-                          background: pkg.status === '待收款' ? '#fff7ed' : '#f0fdf4',
-                          color: pkg.status === '待收款' ? '#c2410c' : '#16a34a',
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
-                          fontWeight: '800',
-                          border: `1px solid ${pkg.status === '待收款' ? '#ffedd5' : '#dcfce7'}`
-                        }}>
-                          {pkg.status === '待收款' ? '待取件 (CASH)' : pkg.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 🚀 重要：代收款 (COD) 突出显示 */}
-                    {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
-                      <div style={{ 
-                        background: '#fff1f2', 
-                        color: '#e11d48', 
-                        padding: '0.6rem 1rem', 
-                        borderRadius: '12px', 
-                        marginBottom: '0.8rem',
-                        border: '1px solid #ffe4e6',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        boxShadow: '0 2px 4px rgba(225, 29, 72, 0.05)'
-                      }}>
-                        <span style={{ fontWeight: '800', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '1.1rem' }}>💰</span> {language === 'zh' ? '代收款' : 'COD Amount'}
-                        </span>
-                        <span style={{ fontWeight: '900', fontSize: '1.15rem', letterSpacing: '0.02em' }}>
-                          {Number(pkg.cod_amount).toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
-                        </span>
-                      </div>
-                    )}
+                          {/* 🚀 重要：代收款 (COD) 突出显示 - 仅商家订单显示 */}
+                          {pkg.cod_amount && Number(pkg.cod_amount) > 0 && !isVIP && (
+                            <div style={{ 
+                              background: '#fff1f2', 
+                              color: '#e11d48', 
+                              padding: '0.6rem 1rem', 
+                              borderRadius: '12px', 
+                              marginBottom: '0.8rem',
+                              border: '1px solid #ffe4e6',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              boxShadow: '0 2px 4px rgba(225, 29, 72, 0.05)'
+                            }}>
+                              <span style={{ fontWeight: '800', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '1.1rem' }}>💰</span> {language === 'zh' ? '代收款' : 'COD Amount'}
+                              </span>
+                              <span style={{ fontWeight: '900', fontSize: '1.15rem', letterSpacing: '0.02em' }}>
+                                {Number(pkg.cod_amount).toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
+                              </span>
+                            </div>
+                          )}
                     
                     <div style={{ 
                       fontSize: '0.8rem', 
@@ -1746,7 +1743,12 @@ const RealTimeTracking: React.FC = () => {
             ) : (
               filterPackagesByCity(packages)
                 .filter(p => p.status === '已取件' || p.status === '配送中')
-                .map(pkg => (
+                .map(pkg => {
+                  const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                  const identity = identityMatch ? identityMatch[1] : null;
+                  const isVIP = identity === 'VIP';
+
+                  return (
                   <div
                     key={pkg.id}
                     style={{
@@ -1815,8 +1817,8 @@ const RealTimeTracking: React.FC = () => {
                           {pkg.status === '待收款' ? '待取件' : pkg.status}
                         </span>
 
-                        {/* 代收款显示 - 强化显示 */}
-                        {pkg.cod_amount && Number(pkg.cod_amount) > 0 && (
+                        {/* 代收款显示 - 强化显示 - 仅非VIP订单显示 */}
+                        {pkg.cod_amount && Number(pkg.cod_amount) > 0 && !isVIP && (
                           <span style={{
                             background: '#fff1f2',
                             color: '#e11d48',
