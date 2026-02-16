@@ -27,15 +27,15 @@ export async function sendVerificationCode(
     if (result.success) {
       return {
         success: true,
-        message: language === 'zh' ? '验证码已发送到您的手机' : 
+        message: result.message || (language === 'zh' ? '验证码已发送到您的手机' : 
                  language === 'en' ? 'Verification code sent to your phone' :
-                 'အတည်ပြုကုဒ် ပို့ပြီးပါပြီ',
-        code: result.code // 开发模式可能会返回验证码
+                 'အတည်ပြုကုဒ် ပို့ပြီးပါပြီ'),
+        code: result.code 
       };
     } else {
       return {
         success: false,
-        message: result.message || (language === 'zh' ? '发送验证码失败' : 
+        message: result.error || result.message || (language === 'zh' ? '发送验证码失败' : 
                  language === 'en' ? 'Failed to send verification code' :
                  'အတည်ပြုကုဒ် ပို့ခြင်း မအောင်မြင်ပါ')
       };
