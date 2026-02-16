@@ -46,7 +46,9 @@ exports.handler = async (event, context) => {
 
   try {
     // 解析请求体
-    const { phoneNumber, language = 'zh' } = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || '{}');
+    const phoneNumber = body.phoneNumber || body.phone;
+    const language = body.language || 'zh';
 
     // 验证手机号格式
     const phoneRegex = /^09\d{7,9}$/;
