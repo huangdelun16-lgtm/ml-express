@@ -65,9 +65,10 @@ exports.handler = async (event, context) => {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
     // 如果没配置 Twilio，返回模拟成功（开发模式）
-    if (!accountSid || !authToken || !twilioPhone) {
+    if (!accountSid || !authToken || (!twilioPhone && !messagingServiceSid)) {
       console.log('⚠️ Twilio Credentials missing, using Dev Mode');
       return {
         statusCode: 200,
@@ -123,11 +124,19 @@ exports.handler = async (event, context) => {
 
     console.log(`📱 Attempting to send SMS to: ${formattedForTwilio}`);
 
-    const message = await client.messages.create({
+    // 发送参数：优先使用 Messaging Service
+    const sendOptions = {
       body: messageBody,
-      from: twilioPhone.trim(),
       to: formattedForTwilio
-    });
+    };
+
+    if (messagingServiceSid) {
+      sendOptions.messagingServiceSid = messagingServiceSid.trim();
+    } else {
+      sendOptions.from = twilioPhone.trim();
+    }
+
+    const message = await client.messages.create(sendOptions);
 
     console.log(`✅ SMS Sent Success, SID: ${message.sid}`);
 
