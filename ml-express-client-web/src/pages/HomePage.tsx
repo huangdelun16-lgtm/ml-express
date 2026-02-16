@@ -514,16 +514,16 @@ const HomePage: React.FC = () => {
 
       // 在注册模式下，或者登录模式下输入了不符合基本格式的号码时进行提示
       // 登录时稍微放宽一点，但基本格式还是要对
-      const phoneRegex = /^0?9\d{7,9}$/;
+      const phoneRegex = /^[1-9]\d{7,10}$/;
       if (!isLoginMode && !phoneRegex.test(registerForm.phone)) {
-        alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
-              language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
-              'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
+        alert(language === 'zh' ? '请输入有效的手机号' : 
+              language === 'en' ? 'Please enter a valid phone number' : 
+              'မှန်ကန်သော ဖုန်းနံပါတ်ထည့်ပါ');
         return;
       }
 
       // 统一格式为 09xxxxxxxx
-      normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+      normalizedPhone = '0' + registerForm.phone.replace(/^0+/, '');
     }
 
     // 验证密码
@@ -884,17 +884,17 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        // 支持 9xxxxxxxx 或 09xxxxxxxx 两种格式
-        const phoneRegex = /^0?9\d{7,9}$/;
+        // 支持 9xxxxxxxx 格式（UI 已带 +95 并自动去 0）
+        const phoneRegex = /^[1-9]\d{7,10}$/;
         if (!phoneRegex.test(registerForm.phone)) {
-          alert(language === 'zh' ? '请输入有效的缅甸手机号（9开头或09开头）' : 
-                language === 'en' ? 'Please enter a valid Myanmar phone number (9xxxxxxxx or 09xxxxxxxx)' : 
-                'မှန်ကန်သော မြန်မာဖုန်းနံပါတ်ထည့်ပါ (9 သို့မဟုတ် 09 ဖြင့်စတင်သည်)');
+          alert(language === 'zh' ? '请输入有效的手机号' : 
+                language === 'en' ? 'Please enter a valid phone number' : 
+                'မှန်ကန်သော ဖုန်းနံပါတ်ထည့်ပါ');
           return;
         }
 
-        // 确保手机号以0开头（统一格式）
-        const normalizedPhone = registerForm.phone.startsWith('0') ? registerForm.phone : '0' + registerForm.phone;
+        // 统一格式为 09... 发送给后端函数
+        const normalizedPhone = '0' + registerForm.phone.replace(/^0+/, '');
         console.log('📱 发送验证码到手机:', normalizedPhone);
         
         // 调用SMS服务
@@ -3892,7 +3892,40 @@ const HomePage: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{registerMethod === 'phone' ? (language === 'zh' ? '电话号码' : 'Phone') : (language === 'zh' ? '邮箱' : 'Email')}</label>
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      <input type={registerMethod === 'phone' ? 'tel' : 'email'} value={registerMethod === 'phone' ? registerForm.phone : registerForm.email} onChange={(e) => registerMethod === 'phone' ? setRegisterForm({...registerForm, phone: e.target.value}) : setRegisterForm({...registerForm, email: e.target.value})} required placeholder={registerMethod === 'phone' ? '09xxxxxxxx' : 'example@gmail.com'} style={{ flex: 1, padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
+                      {registerMethod === 'phone' && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 1rem',
+                          background: '#f8fafc',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '16px',
+                          color: '#475569',
+                          fontWeight: '800',
+                          fontSize: '1rem'
+                        }}>
+                          +95
+                        </div>
+                      )}
+                      <input 
+                        type={registerMethod === 'phone' ? 'tel' : 'email'} 
+                        value={registerMethod === 'phone' ? registerForm.phone : registerForm.email} 
+                        onChange={(e) => {
+                          let val = e.target.value;
+                          if (registerMethod === 'phone') {
+                            // 自动删除开头的 0
+                            if (val.startsWith('0')) {
+                              val = val.substring(1);
+                            }
+                            setRegisterForm({...registerForm, phone: val});
+                          } else {
+                            setRegisterForm({...registerForm, email: val});
+                          }
+                        }} 
+                        required 
+                        placeholder={registerMethod === 'phone' ? '9xxxxxxxx' : 'example@gmail.com'} 
+                        style={{ flex: 1, padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} 
+                      />
                       <button type='button' onClick={handleSendVerificationCode} disabled={countdown > 0} style={{ padding: '0 1.25rem', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '16px', fontWeight: '800', cursor: 'pointer' }}>{countdown > 0 ? countdown + 's' : (language === 'zh' ? '获取验证码' : 'Get Code')}</button>
                     </div>
                   </div>

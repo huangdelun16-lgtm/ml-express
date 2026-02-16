@@ -33,51 +33,31 @@ exports.handler = async (event, context) => {
     let rawPhone = body.phoneNumber || body.phone || '';
     const language = body.language || 'zh';
 
-    // 预处理手机号：去掉所有空格、横杠、括号
+    // 预处理手机号：去掉所有非数字字符
     rawPhone = rawPhone.replace(/\D/g, '');
 
-    // 验证手机号格式 (缅甸 09 开头，后面 7-9 位数字)
-    if (!rawPhone || !/^09\d{7,9}$/.test(rawPhone)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: language === 'zh' ? '无效的手机号格式，请输入 09 开头的缅甸号码' : 'Invalid Myanmar phone number'
-        })
-      };
+    // 缅甸手机号逻辑：
+    // 客户可能输入 09... 或 9...
+    // 我们统一将其转换为 +959... 格式发送给 Twilio
+    let formattedForTwilio = '';
+    if (rawPhone.startsWith('95')) {
+      formattedForTwilio = '+' + rawPhone; // 已经是 95... 开头
+    } else if (rawPhone.startsWith('09')) {
+      formattedForTwilio = '+95' + rawPhone.substring(1); // 09... -> +959...
+    } else if (rawPhone.startsWith('9')) {
+      formattedForTwilio = '+95' + rawPhone; // 9... -> +959...
+    } else {
+      // 其他情况尝试直接加 +95
+      formattedForTwilio = '+95' + rawPhone.replace(/^0+/, '');
     }
+
+    console.log(`📱 Twilio Formatting: Raw=${rawPhone} -> Final=${formattedForTwilio}`);
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 
-    // 如果没配置 Twilio，返回模拟成功（开发模式）
-    if (!accountSid || !authToken || !twilioPhone) {
-      console.log('⚠️ Twilio Credentials missing, using Dev Mode');
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: '验证码已发送（测试模式，请输入 123456）',
-          code: '123456',
-          isDevelopmentMode: true
-        })
-      };
-    }
-
-    // 初始化 Twilio (放入 try 以防环境变量格式错误导致崩溃)
-    let client;
-    try {
-      client = twilio(accountSid.trim(), authToken.trim());
-    } catch (err) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Twilio 初始化失败，请检查 SID/TOKEN 格式', details: err.message })
-      };
-    }
+    // ... (rest of the code)
 
     const code = generateVerificationCode();
     
@@ -86,15 +66,12 @@ exports.handler = async (event, context) => {
       ? `【ML Express】您的验证码是：${code}，5分钟内有效。`
       : `[ML Express] Your verification code is: ${code}. Valid for 5 mins.`;
 
-    // 转换成国际格式 +959...
-    const toPhone = '+95' + rawPhone.substring(1);
-
-    console.log(`📱 Attempting to send SMS to: ${toPhone}`);
+    console.log(`📱 Attempting to send SMS to: ${formattedForTwilio}`);
 
     const message = await client.messages.create({
       body: messageBody,
       from: twilioPhone.trim(),
-      to: toPhone
+      to: formattedForTwilio
     });
 
     return {
