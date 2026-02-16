@@ -3879,6 +3879,16 @@ const HomePage: React.FC = () => {
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '姓名' : 'Name'}</label>
                     <input type='text' value={registerForm.name} onChange={(e) => setRegisterForm({...registerForm, name: e.target.value})} required placeholder={language === 'zh' ? '请输入您的姓名' : 'Your Full Name'} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '密码' : 'Password'}</label>
+                      <input type='password' value={registerForm.password} onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '确认密码' : 'Confirm'}</label>
+                      <input type='password' value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({...registerForm, confirmPassword: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{registerMethod === 'phone' ? (language === 'zh' ? '电话号码' : 'Phone') : (language === 'zh' ? '邮箱' : 'Email')}</label>
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -3889,16 +3899,6 @@ const HomePage: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '验证码' : 'Code'}</label>
                     <input type='text' value={registerForm.verificationCode} onChange={(e) => setRegisterForm({...registerForm, verificationCode: e.target.value})} placeholder='000000' maxLength={6} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', textAlign: 'center', letterSpacing: '0.5rem', fontWeight: '900', fontSize: '1.25rem' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '密码' : 'Password'}</label>
-                      <input type='password' value={registerForm.password} onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '确认密码' : 'Confirm'}</label>
-                      <input type='password' value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({...registerForm, confirmPassword: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
-                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '详细地址' : 'Address'}</label>
