@@ -2,6 +2,12 @@
 // 路径: /.netlify/functions/send-sms
 
 const twilio = require('twilio');
+const { createClient } = require('@supabase/supabase-js');
+
+// 初始化 Supabase 客户端
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // 生成6位随机验证码
 function generateVerificationCode() {
@@ -36,18 +42,21 @@ exports.handler = async (event, context) => {
     // 预处理手机号：去掉所有非数字字符
     rawPhone = rawPhone.replace(/\D/g, '');
 
-    // 缅甸手机号逻辑：
-    // 客户可能输入 09... 或 9...
-    // 我们统一将其转换为 +959... 格式发送给 Twilio
+    if (!rawPhone) {
+      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: '请输入电话号码' }) };
+    }
+
+    // 缅甸手机号逻辑：转换成 Twilio 要求的国际格式 +959...
     let formattedForTwilio = '';
-    if (rawPhone.startsWith('95')) {
-      formattedForTwilio = '+' + rawPhone; // 已经是 95... 开头
+    if (rawPhone.startsWith('959')) {
+      formattedForTwilio = '+' + rawPhone;
+    } else if (rawPhone.startsWith('95')) {
+      formattedForTwilio = '+' + rawPhone;
     } else if (rawPhone.startsWith('09')) {
-      formattedForTwilio = '+95' + rawPhone.substring(1); // 09... -> +959...
+      formattedForTwilio = '+95' + rawPhone.substring(1);
     } else if (rawPhone.startsWith('9')) {
-      formattedForTwilio = '+95' + rawPhone; // 9... -> +959...
+      formattedForTwilio = '+95' + rawPhone;
     } else {
-      // 其他情况尝试直接加 +95
       formattedForTwilio = '+95' + rawPhone.replace(/^0+/, '');
     }
 
@@ -57,11 +66,57 @@ exports.handler = async (event, context) => {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 
-    // ... (rest of the code)
+    // 如果没配置 Twilio，返回模拟成功（开发模式）
+    if (!accountSid || !authToken || !twilioPhone) {
+      console.log('⚠️ Twilio Credentials missing, using Dev Mode');
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: '验证码已发送（测试模式，请输入 123456）',
+          code: '123456',
+          isDevelopmentMode: true
+        })
+      };
+    }
+
+    // 初始化 Twilio
+    let client;
+    try {
+      client = twilio(accountSid.trim(), authToken.trim());
+    } catch (err) {
+      console.error('Twilio Init Error:', err);
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Twilio 配置格式错误，请检查 SID/TOKEN' })
+      };
+    }
 
     const code = generateVerificationCode();
     
-    // 构造短信
+    // 存储验证码到 Supabase (借用 email 字段存储手机号)
+    if (supabase) {
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const identifier = 'PHONE_' + rawPhone; // 使用特殊前缀防止与邮箱冲突
+      
+      // 删除旧验证码
+      await supabase.from('verification_codes').delete().eq('email', identifier);
+      
+      // 插入新验证码
+      const { error: dbError } = await supabase.from('verification_codes').insert({
+        email: identifier,
+        code: code,
+        expires_at: expiresAt,
+        used: false
+      });
+      
+      if (dbError) console.error('❌ Supabase Save Error:', dbError);
+      else console.log(`✅ Code stored in DB for ${identifier}`);
+    }
+
+    // 构造短信内容
     const messageBody = language === 'zh' 
       ? `【ML Express】您的验证码是：${code}，5分钟内有效。`
       : `[ML Express] Your verification code is: ${code}. Valid for 5 mins.`;
@@ -73,6 +128,8 @@ exports.handler = async (event, context) => {
       from: twilioPhone.trim(),
       to: formattedForTwilio
     });
+
+    console.log(`✅ SMS Sent Success, SID: ${message.sid}`);
 
     return {
       statusCode: 200,
@@ -87,13 +144,12 @@ exports.handler = async (event, context) => {
   } catch (error) {
     console.error('❌ SMS Function Error:', error);
     return {
-      statusCode: 200, // 即使报错也返回 200，但在 body 中详细说明原因，防止 502
+      statusCode: 200,
       headers,
       body: JSON.stringify({
         success: false,
         error: '发送失败: ' + (error.message || '未知错误'),
-        code: error.code,
-        moreInfo: '请检查 Twilio 控制台或余额'
+        errorCode: error.code
       })
     };
   }
