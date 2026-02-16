@@ -17,7 +17,9 @@ function getAllowedOrigins() {
   
   // 默认允许的来源（开发和生产环境）
   return [
+    'https://admin-market-link-express.com',      // 后台管理自定义域名
     'https://admin-market-link-express.netlify.app',
+    'https://market-link-express.com',            // 主域名
     'https://market-link-express.netlify.app',
     'https://client-ml-express.netlify.app',
     'http://localhost:3000',      // 本地开发（admin）
