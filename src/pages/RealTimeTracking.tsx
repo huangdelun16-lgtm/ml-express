@@ -1354,114 +1354,84 @@ const RealTimeTracking: React.FC = () => {
                     gap: '0.5rem'
                   }}>
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* 下单身份标识 */}
-                      {(() => {
-                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
-                        if (identityMatch && identityMatch[1]) {
-                          const identity = identityMatch[1];
-                          const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                          const isVIP = identity === 'VIP';
-                          return (
+                    {/* 下单身份标识 */}
+                    {(() => {
+                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                      const identity = identityMatch ? identityMatch[1] : '';
+                      const isMerchant = identity === '商家' || identity === 'MERCHANTS';
+                      const isVIP = identity === 'VIP';
+                      const isMember = identity === '会员' || identity === 'Member' || identity === '普通用户' || (!isMerchant && !isVIP);
+
+                      return (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {identity && (
                             <span style={{
-                              background: isMERCHANTS ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
-                              color: isMERCHANTS ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
+                              background: isMerchant ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
+                              color: isMerchant ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
                               padding: '0.2rem 0.6rem',
                               borderRadius: '5px',
                               fontSize: '0.7rem',
                               fontWeight: 'bold',
-                              border: `1px solid ${isMERCHANTS ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
+                              border: `1px solid ${isMerchant ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
                             }}>
-                              👤 {identity}
+                              {isMerchant ? '👤 商家' : (isVIP ? '💎 VIP' : `👤 ${identity}`)}
                             </span>
-                          );
-                        }
-                        return null;
-                      })()}
+                          )}
 
-                      {/* 支付方式标识 */}
-                      {(pkg as any).payment_method === 'cash' && (
-                        <span style={{
-                          background: '#fef3c7',
-                          color: '#92400e',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          💵 现金
-                        </span>
-                      )}
-                      {(pkg as any).payment_method === 'qr' && (
-                        <span style={{
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          📱 二维码
-                        </span>
-                      )}
-                      {(!(pkg as any).payment_method) && (
-                        <span style={{
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          📱 已支付
-                        </span>
-                      )}
-                      <span style={{
-                        background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                          ? '#dcfce7'
-                          : '#fef3c7',
-                        color: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                          ? '#166534'
-                          : '#92400e',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '5px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {pkg.status === '待收款' ? '待取件' : pkg.status}
-                      </span>
-                      
-                      {/* 代收款显示 - MERCHANTS订单显示代收款 */}
-                      {(() => {
-                        const isStoreMatch = stores.some(store => 
-                          store.store_name === pkg.sender_name || 
-                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                        );
-                        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                        const codVal = Number(pkg.cod_amount || 0);
-                        
-                        if (isMERCHANTS) {
-                          return (
+                          {/* 跑腿费支付方式 */}
+                          <span style={{
+                            background: (pkg as any).payment_method === 'balance' ? '#dcfce7' : '#fef3c7',
+                            color: (pkg as any).payment_method === 'balance' ? '#166534' : '#92400e',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '5px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            border: `1px solid ${(pkg as any).payment_method === 'balance' ? '#bbf7d0' : '#fde68a'}`
+                          }}>
+                            跑腿费: {(pkg as any).payment_method === 'balance' ? '💳 余额' : '💵 现金'}
+                          </span>
+
+                          {/* 商品费显示逻辑 */}
+                          {isMerchant && Number(pkg.cod_amount || 0) > 0 && (
                             <span style={{
                               background: '#fee2e2',
                               color: '#b91c1c',
                               border: '1px solid #fecaca',
                               padding: '0.2rem 0.6rem',
                               borderRadius: '5px',
-                              fontSize: '0.8rem',
-                              fontWeight: 'bold',
-                              whiteSpace: 'nowrap'
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold'
                             }}>
-                              {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
+                              💰 COD代收款: {Number(pkg.cod_amount).toLocaleString()} MMK
                             </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
+                          )}
+
+                          {isVIP && (() => {
+                            const balanceMatch = pkg.description?.match(/\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
+                            if (balanceMatch && balanceMatch[1]) {
+                              return (
+                                <span style={{
+                                  background: '#dcfce7',
+                                  color: '#166534',
+                                  border: '1px solid #bbf7d0',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '5px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold'
+                                }}>
+                                  💳 余额支付 (商品费): {balanceMatch[1]} MMK
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      );
+                    })()}
                   </div>
-                  
-                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
+                </div>
+
+                <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 从: {pkg.sender_address}
                       {pkg.sender_latitude && pkg.sender_longitude && (
@@ -1696,83 +1666,90 @@ const RealTimeTracking: React.FC = () => {
                       gap: '0.5rem'
                     }}>
                       <strong style={{ color: '#166534' }}>{pkg.id}</strong>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {/* 支付方式标识 */}
-                        {pkg.payment_method === 'cash' && (
-                          <span style={{
-                            background: '#fef3c7',
-                            color: '#92400e',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}>
-                            💵 现金
-                          </span>
-                        )}
-                        {pkg.payment_method === 'qr' && (
-                          <span style={{
-                            background: '#dbeafe',
-                            color: '#1e40af',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}>
-                            📱 二维码
-                          </span>
-                        )}
-                        {(!pkg.payment_method) && (
-                          <span style={{
-                            background: '#dbeafe',
-                            color: '#1e40af',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}>
-                            📱 已支付
-                          </span>
-                        )}
-                        <span style={{
-                          background: pkg.status === '待收款' ? '待取件' : pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
-                          color: pkg.status === '待收款' ? 'inherit' : pkg.status === '已取件' ? '#92400e' : '#1e40af',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold'
-                        }}>
-                          {pkg.status === '待收款' ? '待取件' : pkg.status}
-                        </span>
+                      {(() => {
+                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        const identity = identityMatch ? identityMatch[1] : '';
+                        const isMerchant = identity === '商家' || identity === 'MERCHANTS';
+                        const isVIP = identity === 'VIP';
 
-                        {/* 代收款显示 - MERCHANTS订单显示代收款 */}
-                        {(() => {
-                          const isStoreMatch = stores.some(store => 
-                            store.store_name === pkg.sender_name || 
-                            (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                          );
-                          const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                          const codVal = Number(pkg.cod_amount || 0);
-                          
-                          if (isMERCHANTS) {
-                            return (
+                        return (
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {identity && (
+                              <span style={{
+                                background: isMerchant ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
+                                color: isMerchant ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '5px',
+                                fontSize: '0.7rem',
+                                fontWeight: 'bold',
+                                border: `1px solid ${isMerchant ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
+                              }}>
+                                {isMerchant ? '👤 商家' : (isVIP ? '💎 VIP' : `👤 ${identity}`)}
+                              </span>
+                            )}
+
+                            {/* 跑腿费支付方式 */}
+                            <span style={{
+                              background: (pkg as any).payment_method === 'balance' ? '#dcfce7' : '#fef3c7',
+                              color: (pkg as any).payment_method === 'balance' ? '#166534' : '#92400e',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '5px',
+                              fontSize: '0.7rem',
+                              fontWeight: 'bold',
+                              border: `1px solid ${(pkg as any).payment_method === 'balance' ? '#bbf7d0' : '#fde68a'}`
+                            }}>
+                              跑腿费: {(pkg as any).payment_method === 'balance' ? '💳 余额' : '💵 现金'}
+                            </span>
+
+                            {/* 商品费显示逻辑 */}
+                            {isMerchant && Number(pkg.cod_amount || 0) > 0 && (
                               <span style={{
                                 background: '#fee2e2',
                                 color: '#b91c1c',
                                 border: '1px solid #fecaca',
                                 padding: '0.2rem 0.6rem',
                                 borderRadius: '5px',
-                                fontSize: '0.8rem',
-                                fontWeight: 'bold',
-                                whiteSpace: 'nowrap'
+                                fontSize: '0.7rem',
+                                fontWeight: 'bold'
                               }}>
-                                {language === 'zh' ? '代收款' : 'COD'}: {codVal > 0 ? `${codVal} MMK` : '无'}
+                                💰 COD代收款: {Number(pkg.cod_amount).toLocaleString()} MMK
                               </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
+                            )}
+
+                            {isVIP && (() => {
+                              const balanceMatch = pkg.description?.match(/\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
+                              if (balanceMatch && balanceMatch[1]) {
+                                return (
+                                  <span style={{
+                                    background: '#dcfce7',
+                                    color: '#166534',
+                                    border: '1px solid #bbf7d0',
+                                    padding: '0.2rem 0.6rem',
+                                    borderRadius: '5px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    💳 余额支付 (商品费): {balanceMatch[1]} MMK
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
+                            <span style={{
+                              background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
+                              color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '5px',
+                              fontSize: '0.8rem',
+                              fontWeight: 'bold'
+                            }}>
+                              {pkg.status === '待收款' ? '待取件' : pkg.status}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     </div>
                     
                     <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
