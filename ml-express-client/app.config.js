@@ -1,7 +1,7 @@
-const baseConfig = require('./app.json');
-
 module.exports = ({ config }) => {
-  const expoConfig = baseConfig.expo || {};
+  // 🚀 使用 Expo 自动传入的 config (即 app.json 中的内容)
+  // 这样可以确保版本号和构建号与 app.json 同步
+  const expoConfig = config || {};
   
   // 优先从环境变量读取，如果没有则从 app.json 读取作为回退
   const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 
@@ -12,7 +12,7 @@ module.exports = ({ config }) => {
                             (expoConfig.extra && expoConfig.extra.googlePlacesApiKey) || 
                             'AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk';
 
-  // 🚀 关键修复：Expo app.config.js 应该返回 expo 对象本身的内容
+  // 返回最终配置
   return {
     ...expoConfig,
     ios: {
@@ -38,7 +38,7 @@ module.exports = ({ config }) => {
     extra: {
       ...(expoConfig.extra || {}),
       googleMapsApiKey,
-      googlePlacesApiKey, // 专门用于搜索的无限制 Key
+      googlePlacesApiKey,
     },
   };
 };
