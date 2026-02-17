@@ -22,11 +22,12 @@ export const DeviceHealthShield = () => {
   if (!report || report.isOk) return null;
 
   const getAlertCount = () => {
+    if (!report) return 0;
     let count = 0;
-    if (report.battery.isLow) count++;
-    if (!report.location.isPrecise) count++;
-    if (report.storage.isLow) count++;
-    if (!report.network.isConnected) count++;
+    if (report.battery?.isLow) count++;
+    if (report.location && !report.location.isPrecise) count++;
+    if (report.storage?.isLow) count++;
+    if (report.network && !report.network.isConnected) count++;
     return count;
   };
 
@@ -57,34 +58,42 @@ export const DeviceHealthShield = () => {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              <HealthItem 
-                icon="battery-dead" 
-                label="电池电量" 
-                value={`${report.battery.level}%`} 
-                isError={report.battery.isLow}
-                hint="请及时充电，以免影响配送更新"
-              />
-              <HealthItem 
-                icon="location" 
-                label="GPS 精度" 
-                value={report.location.isPrecise ? '良好' : '偏差较大'} 
-                isError={!report.location.isPrecise}
-                hint="请确保处于开阔地带，或重启定位权限"
-              />
-              <HealthItem 
-                icon="cloud-upload" 
-                label="存储空间" 
-                value={report.storage.isLow ? '不足' : '充足'} 
-                isError={report.storage.isLow}
-                hint="空间不足可能导致拍照存证失败"
-              />
-              <HealthItem 
-                icon="wifi" 
-                label="网络连接" 
-                value={report.network.isConnected ? '已连接' : '已断开'} 
-                isError={!report.network.isConnected}
-                hint="当前处于离线模式，操作将自动进入缓存"
-              />
+              {report.battery && (
+                <HealthItem 
+                  icon="battery-dead" 
+                  label="电池电量" 
+                  value={`${report.battery.level}%`} 
+                  isError={report.battery.isLow}
+                  hint="请及时充电，以免影响配送更新"
+                />
+              )}
+              {report.location && (
+                <HealthItem 
+                  icon="location" 
+                  label="GPS 精度" 
+                  value={report.location.isPrecise ? '良好' : '偏差较大'} 
+                  isError={!report.location.isPrecise}
+                  hint="请确保处于开阔地带，或重启定位权限"
+                />
+              )}
+              {report.storage && (
+                <HealthItem 
+                  icon="cloud-upload" 
+                  label="存储空间" 
+                  value={report.storage.isLow ? '不足' : '充足'} 
+                  isError={report.storage.isLow}
+                  hint="空间不足可能导致拍照存证失败"
+                />
+              )}
+              {report.network && (
+                <HealthItem 
+                  icon="wifi" 
+                  label="网络连接" 
+                  value={report.network.isConnected ? '已连接' : '已断开'} 
+                  isError={!report.network.isConnected}
+                  hint="当前处于离线模式，操作将自动进入缓存"
+                />
+              )}
             </ScrollView>
 
             <TouchableOpacity 

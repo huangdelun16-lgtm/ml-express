@@ -5,10 +5,6 @@ import * as Device from 'expo-device';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
 
-// 🚀 修复：expo-file-system v54+ 中 getFreeDiskStorageAsync 已弃用，使用 legacy 导入或新 API
-const getFreeDiskStorage = (FileSystem as any).getFreeDiskStorageAsync || 
-                           (require('expo-file-system/legacy')?.getFreeDiskStorageAsync);
-
 export interface HealthReport {
   isOk: boolean;
   battery: {
@@ -85,14 +81,34 @@ export const deviceHealthService = {
 
     // 3. 检查存储
     try {
-      const freeSpace = await getFreeDiskStorage();
-      report.storage = {
-        freeSpace,
-        isLow: freeSpace < 500 * 1024 * 1024, // 低于 500MB 警告
-      };
-      if (report.storage.isLow) report.isOk = false;
+      // 🚀 核心修复：更健壮的存储检查逻辑，适配不同 SDK 版本
+      let getStorageFn = (FileSystem as any).getFreeDiskStorageAsync;
+      
+      // 如果直接获取不到，尝试从 legacy 路径获取
+      if (!getStorageFn) {
+        try {
+          const legacy = require('expo-file-system/legacy');
+          getStorageFn = legacy?.getFreeDiskStorageAsync;
+        } catch (e) {
+          // 忽略 require 错误
+        }
+      }
+
+      if (typeof getStorageFn === 'function') {
+        const freeSpace = await getStorageFn();
+        report.storage = {
+          freeSpace,
+          isLow: freeSpace < 500 * 1024 * 1024, // 低于 500MB 警告
+        };
+        if (report.storage.isLow) report.isOk = false;
+      } else {
+        // 如果 API 完全不可用，设置一个默认值，不触发报警
+        report.storage = { freeSpace: 1024 * 1024 * 1024, isLow: false };
+      }
     } catch (e) {
       console.warn('Storage check failed', e);
+      // 发生异常时也设置默认值，防止下游崩溃
+      report.storage = { freeSpace: 1024 * 1024 * 1024, isLow: false };
     }
 
     // 4. 检查网络和延迟
