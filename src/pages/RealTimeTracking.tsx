@@ -674,76 +674,90 @@ const RealTimeTracking: React.FC = () => {
         </div>
         <div style={{ 
           display: 'flex', 
-          gap: '0.8rem', 
+          gap: '1rem', 
           alignItems: 'center', 
           flexWrap: 'wrap',
-          background: 'rgba(255, 255, 255, 0.8)',
-          padding: '0.6rem 1rem',
-          borderRadius: '12px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          border: '1px solid #e5e7eb'
+          background: 'rgba(255, 255, 255, 0.9)',
+          padding: '0.75rem 1.25rem',
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          flex: 1
         }}>
-          {/* 区域按钮 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            fontWeight: 'bold',
-            fontSize: '0.9rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            cursor: isRegionalUser ? 'default' : 'pointer'
-          }}>
-            <span>📍 {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}</span>
-          </div>
-
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 0.5rem' }} />
-
-          {/* 骑手统计 */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ background: '#ecfdf5', color: '#065f46', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #b9f6ca' }}>
-              🟢 在线: {onlineRiderCount}
+          {/* 左侧：统计信息组 */}
+          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+            {/* 骑手统计 */}
+            <div style={{ display: 'flex', gap: '0.4rem', background: '#f8fafc', padding: '0.3rem 0.6rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div title="在线" style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> {onlineRiderCount}
+              </div>
+              <div title="忙碌" style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} /> {couriers.filter(c => c.status === 'busy').length}
+              </div>
+              <div title="离线" style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8' }} /> {couriers.filter(c => c.status === 'offline').length}
+              </div>
             </div>
-            <div style={{ background: '#fffbeb', color: '#92400e', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #fde68a' }}>
-              🟠 忙碌: {couriers.filter(c => c.status === 'busy').length}
-            </div>
-            <div style={{ background: '#f3f4f6', color: '#374151', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #d1d5db' }}>
-              ⚪ 离线: {couriers.filter(c => c.status === 'offline').length}
+
+            <div style={{ width: '1px', height: '20px', background: '#e2e8f0' }} />
+
+            {/* 包裹统计 */}
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', border: '1px solid #fee2e2' }}>
+                ⌛ 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length}
+              </div>
+              <div style={{ background: '#eff6ff', color: '#2563eb', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', border: '1px solid #dbeafe' }}>
+                🚚 配送中: {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length}
+              </div>
             </div>
           </div>
 
-          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 0.5rem' }} />
-
-          {/* 包裹统计 */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ background: '#fef2f2', color: '#991b1b', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #fecaca' }}>
-              ⏳ 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length}
+          {/* 右侧：控制组件组 */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+            {/* 区域按钮 */}
+            <div 
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '10px',
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                cursor: isRegionalUser ? 'default' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onClick={() => !isRegionalUser && navigate('/admin/settings')}
+            >
+              <span>📍 {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}</span>
             </div>
-            <div style={{ background: '#eff6ff', color: '#1e40af', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #bfdbfe' }}>
-              🚚 配送中: {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length}
-            </div>
-          </div>
 
-          {/* 刷新倒计时 */}
-          <div style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            background: '#f8fafc',
-            padding: '0.4rem 0.8rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>自动刷新: {nextRefreshCountdown}s</span>
-            <button 
-              onClick={() => setNextRefreshCountdown(1)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.9rem' }}
-              title={`上次更新: ${lastRefreshTime}`}
-            >🔄</button>
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8', borderLeft: '1px solid #e2e8f0', paddingLeft: '0.5rem' }}>{lastRefreshTime}</span>
+            {/* 刷新卡片 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              background: 'white',
+              padding: '0.4rem 0.8rem',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.1' }}>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: '700' }}>AUTO SYNC</span>
+                <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: '850', fontFamily: 'monospace' }}>{nextRefreshCountdown}s</span>
+              </div>
+              <button 
+                onClick={() => setNextRefreshCountdown(1)}
+                style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', transition: 'transform 0.3s' }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'rotate(180deg)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'rotate(0deg)'}
+                title={`上次更新: ${lastRefreshTime}`}
+              >🔄</button>
+            </div>
           </div>
         </div>
       </div>
