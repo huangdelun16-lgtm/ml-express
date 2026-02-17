@@ -1429,9 +1429,8 @@ const RealTimeTracking: React.FC = () => {
                       );
                     })()}
                   </div>
-                </div>
 
-                <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
+                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
                     <p style={{ margin: '0.3rem 0' }}>
                       📍 从: {pkg.sender_address}
                       {pkg.sender_latitude && pkg.sender_longitude && (
@@ -1750,8 +1749,7 @@ const RealTimeTracking: React.FC = () => {
                         );
                       })()}
                     </div>
-                    </div>
-                    
+
                     <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>📤 寄件人:</strong> {pkg.sender_name} ({pkg.sender_phone})
