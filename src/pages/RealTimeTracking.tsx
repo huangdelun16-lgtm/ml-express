@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer, TrafficLayer } from '@react-google-maps/api';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -12,7 +12,7 @@ const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
+const GOOGLE_MAPS_LIBRARIES: any = ['places', 'visualization'];
 
 // 配送商店接口已在types/index.ts中定义
 
@@ -2238,7 +2238,7 @@ const RealTimeTracking: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{courier.name}</span>
                         <span style={{ fontSize: '0.75rem', color: '#fef3c7', background: '#d97706', padding: '1px 6px', borderRadius: '4px' }}>
-                          停留 >30min
+                          停留 &gt; 30min
                         </span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
@@ -2274,7 +2274,7 @@ const RealTimeTracking: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', color: '#f87171' }}>{pkg.id}</span>
                         <span style={{ fontSize: '0.75rem', color: '#fee2e2', background: '#dc2626', padding: '1px 6px', borderRadius: '4px' }}>
-                          超时 >2h
+                          超时 &gt; 2h
                         </span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
