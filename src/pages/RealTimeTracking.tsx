@@ -539,8 +539,53 @@ const RealTimeTracking: React.FC = () => {
                   {showTraffic && <TrafficLayer />}
                   {showHeatmap && <HeatmapLayer data={getHeatmapData()} options={{ radius: 30, opacity: 0.7 }} />}
                   {couriers.filter(c => c.latitude != null).map(c => (
-                    <Marker key={c.id} position={{ lat: c.latitude!, lng: c.longitude! }} onClick={() => setSelectedCourier(c)} />
+                    <Marker 
+                      key={c.id} 
+                      position={{ lat: c.latitude!, lng: c.longitude! }} 
+                      onClick={() => setSelectedCourier(c)}
+                      icon={{
+                        url: c.vehicle_type === 'car' ? '/car-icon.png' : '/rider-icon.png',
+                        scaledSize: new window.google.maps.Size(35, 35),
+                        anchor: new window.google.maps.Point(17, 17)
+                      }}
+                      label={{
+                        text: c.name,
+                        color: '#1e293b',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        className: 'marker-label'
+                      }}
+                    />
                   ))}
+                  
+                  {/* 恢复包裹的 P (取件) 和 D (送货) 标记 */}
+                  {pendingPackages.map(pkg => (
+                    <React.Fragment key={`pkg-markers-${pkg.id}`}>
+                      {pkg.sender_latitude && pkg.sender_longitude && (
+                        <Marker
+                          position={{ lat: pkg.sender_latitude, lng: pkg.sender_longitude }}
+                          icon={{
+                            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                            scaledSize: new window.google.maps.Size(32, 32)
+                          }}
+                          label={{ text: 'P', color: 'white', fontWeight: 'bold' }}
+                          title={`取件点: ${pkg.sender_name}`}
+                        />
+                      )}
+                      {pkg.receiver_latitude && pkg.receiver_longitude && (
+                        <Marker
+                          position={{ lat: pkg.receiver_latitude, lng: pkg.receiver_longitude }}
+                          icon={{
+                            url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                            scaledSize: new window.google.maps.Size(32, 32)
+                          }}
+                          label={{ text: 'D', color: 'white', fontWeight: 'bold' }}
+                          title={`送货点: ${pkg.receiver_name}`}
+                        />
+                      )}
+                    </React.Fragment>
+                  ))}
+
                   {stores.filter(s => s.latitude != null).map(s => (
                     <Marker key={s.id} position={{ lat: s.latitude!, lng: s.longitude! }} icon={{ url: '/store-icon.png', scaledSize: new window.google.maps.Size(30, 30) }} />
                   ))}
@@ -569,11 +614,17 @@ const RealTimeTracking: React.FC = () => {
                       <span style={{ background: '#fef2f2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>{pkg.status}</span>
                     </div>
                     {pkg.cod_amount && !isVIP && (
-                      <div style={{ color: '#e11d48', fontWeight: 'bold' }}>💰 COD: {Number(pkg.cod_amount).toLocaleString()}</div>
+                      <div style={{ color: '#e11d48', fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.4rem' }}>
+                        💰 COD: {Number(pkg.cod_amount).toLocaleString()}
+                      </div>
                     )}
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      <div>📤 {pkg.sender_name}</div>
-                      <div>📥 {pkg.receiver_name}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#3b82f6' }}>👤</span> {pkg.sender_name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#10b981' }}>📍</span> {pkg.receiver_name}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem' }}>
                       <button onClick={() => autoAssignPackage(pkg)} style={{ flex: 1, background: '#10b981', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer' }}>智能分配</button>
