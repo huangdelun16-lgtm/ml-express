@@ -3928,6 +3928,13 @@ const HomePage: React.FC = () => {
                       />
                       <button type='button' onClick={handleSendVerificationCode} disabled={countdown > 0} style={{ padding: '0 1.25rem', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '16px', fontWeight: '800', cursor: 'pointer' }}>{countdown > 0 ? countdown + 's' : (language === 'zh' ? '获取验证码' : 'Get Code')}</button>
                     </div>
+                    {registerMethod === 'phone' && (
+                      <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.4rem', fontWeight: '600', fontStyle: 'italic' }}>
+                        {language === 'zh' ? '备注***目前只有 MYTEL Sim卡 能收到验证码***' : 
+                         language === 'en' ? 'Note: Currently only MYTEL Sim cards can receive codes' : 
+                         'မှတ်ချက် - လက်ရှိတွင် MYTEL Sim ကတ်များသာ ကုဒ်လက်ခံရရှိနိုင်ပါသည်'}
+                      </p>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '验证码' : 'Code'}</label>
