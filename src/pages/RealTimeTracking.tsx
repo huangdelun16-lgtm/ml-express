@@ -105,6 +105,11 @@ const RealTimeTracking: React.FC = () => {
   const [loadingStores, setLoadingStores] = useState(false);
   
   // 包裹位置点显示状态
+  const [selectedLocationPoint, setSelectedLocationPoint] = useState<{
+    packageId: string;
+    type: 'pickup' | 'delivery';
+    coordinates: Coordinates;
+  } | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(new Date().toLocaleTimeString()); // 🚀 新增：最后刷新时间
   const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
 
@@ -956,7 +961,7 @@ const RealTimeTracking: React.FC = () => {
                   )}
                 </div>
               ) : (
-                  <GoogleMap
+                <GoogleMap
                   key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={mapCenter}
