@@ -42,7 +42,7 @@ export default function DashboardScreen({ navigation }: any) {
     requestLocationPermission();
     checkForNewNotifications(); // 立即检查通知
     
-    // 骑手心跳：每5分钟更新一次在线状态和位置
+    // 骑手心跳：每1分钟更新一次在线状态和位置 (从5分钟缩短到1分钟，使后台显示更及时)
     const heartbeatInterval = setInterval(async () => {
       const userPosition = await AsyncStorage.getItem('currentUserPosition');
       if (userPosition === '骑手' || userPosition === '骑手队长') {
@@ -67,7 +67,7 @@ export default function DashboardScreen({ navigation }: any) {
           console.error('心跳更新失败:', error);
         }
       }
-    }, 5 * 60 * 1000); // 5分钟
+    }, 1 * 60 * 1000); // 1分钟
 
     // 🔔 通知轮询：每30秒检查一次新通知
     const notificationInterval = setInterval(async () => {

@@ -236,7 +236,7 @@ const RealTimeTracking: React.FC = () => {
         loadStores()
       ]);
       setLastRefreshTime(new Date().toLocaleTimeString());
-      setNextRefreshCountdown(60);
+      setNextRefreshCountdown(30); // 🚀 优化：缩短刷新间隔
     };
 
     refreshData();
@@ -246,7 +246,7 @@ const RealTimeTracking: React.FC = () => {
       setNextRefreshCountdown(prev => {
         if (prev <= 1) {
           refreshData();
-          return 60;
+          return 30; // 🚀 优化：缩短刷新间隔
         }
         return prev - 1;
       });
@@ -438,7 +438,16 @@ const RealTimeTracking: React.FC = () => {
         })
         .map(acc => {
           // 在 couriers 表中查找对应的实时数据
-          const courierRt = couriersData.find(c => c.employee_id === acc.employee_id || c.phone === acc.phone);
+          // 🚀 优化：增强匹配逻辑，同时支持 employee_id 和 phone 匹配（忽略 0 开头差异）
+          const normalizePhoneForMatch = (p: string) => p ? p.replace(/^0/, '') : '';
+          const accPhone = normalizePhoneForMatch(acc.phone);
+          
+          const courierRt = couriersData.find(c => {
+            if (c.employee_id === acc.employee_id) return true;
+            if (normalizePhoneForMatch(c.phone) === accPhone) return true;
+            return false;
+          });
+          
           // 在 courier_locations 表中查找位置
           const location = locationsData?.find(loc => loc.courier_id === (courierRt?.id || acc.id));
           
@@ -450,16 +459,23 @@ const RealTimeTracking: React.FC = () => {
           
           if (acc.status === 'active') {
             // 比较 couriers 表的最后活跃时间和 admin_accounts 的最后登录时间，取最近的一个
-            const rtActiveTime = courierRt?.last_active ? new Date(courierRt.last_active).getTime() : 0;
-            const loginActiveTime = acc.last_login ? new Date(acc.last_login).getTime() : 0;
+            // 🚀 优化：增加有效性检查，防止非日期字符串导致 NaN
+            const parseDate = (dateStr: any) => {
+              if (!dateStr || dateStr === '从未上线' || dateStr === '从未登录') return 0;
+              const d = new Date(dateStr).getTime();
+              return isNaN(d) ? 0 : d;
+            };
+
+            const rtActiveTime = parseDate(courierRt?.last_active);
+            const loginActiveTime = parseDate(acc.last_login);
             const mostRecentActiveTime = Math.max(rtActiveTime, loginActiveTime);
 
             if (mostRecentActiveTime > 0) {
               const now = Date.now();
               const diffMinutes = (now - mostRecentActiveTime) / (1000 * 60);
               
-              // 30分钟内有活动视为在线
-              if (diffMinutes < 30) {
+              // 🚀 优化：将在线判定阈值从 30 分钟缩短为 10 分钟，使上线显示更及时
+              if (diffMinutes < 10) {
                 displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
               }
             }
