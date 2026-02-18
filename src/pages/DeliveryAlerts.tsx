@@ -692,6 +692,37 @@ export default function DeliveryAlerts() {
     }
   };
 
+  // 🗑️ 删除所有警报记录
+  const handleDeleteAll = async () => {
+    if (!window.confirm('确定要删除所有警报记录吗？此操作不可恢复！')) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('delivery_alerts')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // 删除所有记录
+
+      if (error) {
+        console.error('删除失败:', error);
+        window.alert('删除失败，请重试');
+      } else {
+        await logAdminAction({
+          action_type: 'delete_all_alerts',
+          target_type: 'system',
+          target_id: 'all',
+          action_description: '删除了所有配送警报记录'
+        });
+        loadAlerts();
+        window.alert('所有警报已成功清除');
+      }
+    } catch (err) {
+      console.error('删除异常:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical':
@@ -981,6 +1012,33 @@ export default function DeliveryAlerts() {
               }}
             >
               {loading ? t.loading : '🔄 ' + t.refresh}
+            </button>
+
+            <button
+              onClick={handleDeleteAll}
+              disabled={loading}
+              style={{
+                marginTop: '28px',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: '1.5px solid #ef4444',
+                background: 'white',
+                color: '#ef4444',
+                fontSize: '1rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#ef4444';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.color = '#ef4444';
+              }}
+            >
+              🗑️ {language === 'zh' ? '清空所有' : language === 'en' ? 'Clear All' : 'အားလုံးဖျက်မည်'}
             </button>
           </div>
         </div>
