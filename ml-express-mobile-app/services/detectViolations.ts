@@ -9,11 +9,18 @@ export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
-// 违规检测函数
+/**
+ * 违规检测与配送行为记录函数
+ * 
+ * 逻辑优化：
+ * 1. 记录所有手动点击“确认送达”的行为
+ * 2. 重点标记距离送货点 > 200米的异常行为
+ * 3. 记录照片上传状态
+ */
 export async function detectViolationsAsync(
   packageId: string,
   courierId: string,
@@ -21,7 +28,7 @@ export async function detectViolationsAsync(
   courierLng: number
 ): Promise<void> {
   try {
-    console.log('🔍 [开始违规检测]', { packageId, courierId, courierLat, courierLng });
+    console.log('🔍 [配送行为检测]', { packageId, courierId, courierLat, courierLng });
 
     // 1. 获取包裹详情（带重试逻辑，确保获取到最新分配的骑手姓名）
     let packageData = null;
@@ -29,7 +36,7 @@ export async function detectViolationsAsync(
     while (retryCount < 3) {
       const { data, error } = await supabase
         .from('packages')
-        .select('receiver_latitude, receiver_longitude, courier')
+        .select('receiver_latitude, receiver_longitude, courier, sender_address, receiver_address')
         .eq('id', packageId)
         .single();
       
@@ -38,87 +45,88 @@ export async function detectViolationsAsync(
         break;
       }
       
-      console.log(`⏳ [违规检测] 等待包裹数据同步 (重试 ${retryCount + 1})...`);
+      console.log(`⏳ [行为检测] 等待包裹数据同步 (重试 ${retryCount + 1})...`);
       await new Promise(resolve => setTimeout(resolve, 1000));
       retryCount++;
     }
 
     if (!packageData) {
-      console.error('❌ [违规检测] 无法获取完整的包裹数据或骑手未绑定');
+      console.error('❌ [行为检测] 无法获取完整的包裹数据或骑手未绑定');
       return;
     }
 
     const courierName = packageData.courier || '未知骑手';
+    const destLat = Number(packageData.receiver_latitude || 0);
+    const destLng = Number(packageData.receiver_longitude || 0);
+    const cLat = Number(courierLat);
+    const cLng = Number(courierLng);
 
-    // 2. 检测位置违规
-    if (packageData.receiver_latitude && packageData.receiver_longitude) {
-      const destLat = Number(packageData.receiver_latitude);
-      const destLng = Number(packageData.receiver_longitude);
-      const cLat = Number(courierLat);
-      const cLng = Number(courierLng);
+    // 计算距离
+    let distance = 0;
+    if (destLat !== 0 && destLng !== 0 && cLat !== 0 && cLng !== 0) {
+      distance = calculateDistance(cLat, cLng, destLat, destLng);
+    }
+    
+    console.log(`📍 [距离计算] 订单: ${packageId}, 距离: ${Math.round(distance)}m`);
 
-      const distance = calculateDistance(cLat, cLng, destLat, destLng);
-      console.log(`📍 [距离计算] 订单: ${packageId}, 距离: ${Math.round(distance)}m`);
+    // 2. 记录“确认送达”行为（所有手动点击均记录）
+    const isLocationAnomaly = distance > 200; // 优化：距离阈值改为 200 米
+    
+    const alertData = {
+      package_id: packageId,
+      courier_id: courierId,
+      courier_name: courierName,
+      alert_type: isLocationAnomaly ? 'location_violation' : 'delivery_confirmation',
+      severity: isLocationAnomaly ? (distance > 1000 ? 'critical' : 'high') : 'low',
+      title: isLocationAnomaly ? '位置异常 - 确认送达点过远' : '确认送达 - 骑手操作记录',
+      description: isLocationAnomaly 
+        ? `骑手在距离收件地址 ${Math.round(distance)} 米处完成配送，超出200米安全范围`
+        : `骑手已手动点击确认送达 (距离目标: ${Math.round(distance)}米)`,
+      status: 'pending',
+      courier_latitude: cLat,
+      courier_longitude: cLng,
+      destination_latitude: destLat,
+      destination_longitude: destLng,
+      distance_from_destination: distance,
+      action_attempted: 'complete_delivery',
+      metadata: {
+        auto_detected: true,
+        detection_time: new Date().toISOString(),
+        is_manual_click: true,
+        distance_meters: Math.round(distance)
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
 
-      if (distance > 100) {
-        console.warn('⚠️ [检测到位置违规]', { distance });
-        const alertData = {
-          package_id: packageId,
-          courier_id: courierId,
-          courier_name: courierName,
-          alert_type: 'location_violation',
-          severity: distance > 1000 ? 'critical' : 'high',
-          title: '位置违规 - 距离收件地址过远',
-          description: `骑手在距离收件地址 ${Math.round(distance)} 米处完成配送，超出100米安全范围`,
-          status: 'pending',
-          courier_latitude: courierLat,
-          courier_longitude: courierLng,
-          destination_latitude: destLat,
-          destination_longitude: destLng,
-          distance_from_destination: distance,
-          action_attempted: 'complete_delivery',
-          metadata: {
-            auto_detected: true,
-            detection_time: new Date().toISOString()
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+    const { data: insertedData, error: alertError } = await supabase
+      .from('delivery_alerts')
+      .insert(alertData)
+      .select();
 
-        const { data: insertedData, error: alertError } = await supabase
-          .from('delivery_alerts')
-          .insert(alertData)
-          .select();
-
-        if (alertError) {
-          console.error('❌ [违规检测] 创建位置警报失败:', alertError.message, alertError.details);
-        } else {
-          console.log('✅ [违规检测] 位置违规警报创建成功!', insertedData?.[0]?.id);
-        }
-      } else {
-        console.log('✅ [违规检测] 位置验证通过:', { distance });
-      }
+    if (alertError) {
+      console.error('❌ [行为检测] 创建记录失败:', alertError.message);
     } else {
-      console.warn('⚠️ [违规检测] 包裹缺少收件地址坐标');
+      console.log('✅ [行为检测] 配送行为已记录!', insertedData?.[0]?.id);
     }
 
     // 3. 检测照片违规（延迟 8 秒检测，确保图片已上传成功）
     setTimeout(async () => {
       try {
-        console.log('📸 [开始照片检测]', packageId);
+        console.log('📸 [照片检测] 订单:', packageId);
         const { data: photos, error: photoError } = await supabase
           .from('delivery_photos')
           .select('id')
           .eq('package_id', packageId);
 
         if (photoError) {
-          console.error('❌ [违规检测] 查询照片失败:', photoError.message);
+          console.error('❌ [行为检测] 查询照片失败:', photoError.message);
           return;
         }
 
         if (!photos || photos.length === 0) {
-          console.warn('⚠️ [检测到照片违规]', packageId);
-          const alertData = {
+          console.warn('⚠️ [检测到照片缺失]', packageId);
+          const photoAlertData = {
             package_id: packageId,
             courier_id: courierId,
             courier_name: courierName,
@@ -127,8 +135,8 @@ export async function detectViolationsAsync(
             title: '照片违规 - 未上传配送照片',
             description: '骑手完成配送但未上传配送照片，无法提供配送证明',
             status: 'pending',
-            courier_latitude: courierLat,
-            courier_longitude: courierLng,
+            courier_latitude: cLat,
+            courier_longitude: cLng,
             action_attempted: 'complete_delivery',
             metadata: {
               auto_detected: true,
@@ -138,23 +146,22 @@ export async function detectViolationsAsync(
             updated_at: new Date().toISOString()
           };
 
-          const { data: insertedPhotoData, error: alertError } = await supabase
+          const { error: photoAlertError } = await supabase
             .from('delivery_alerts')
-            .insert(alertData)
-            .select();
+            .insert(photoAlertData);
 
-          if (alertError) {
-            console.error('❌ [违规检测] 创建照片警报失败:', alertError.message, alertError.details);
+          if (photoAlertError) {
+            console.error('❌ [行为检测] 创建照片警报失败:', photoAlertError.message);
           } else {
-            console.log('✅ [违规检测] 照片违规警报创建成功!', insertedPhotoData?.[0]?.id);
+            console.log('✅ [行为检测] 照片违规警报已创建!');
           }
         }
       } catch (err) {
-        console.error('❌ [违规检测] 照片检测异常:', err);
+        console.error('❌ [行为检测] 照片检测异常:', err);
       }
     }, 8000);
 
   } catch (error: any) {
-    console.error('❌ [违规检测] 核心流程异常:', error.message);
+    console.error('❌ [行为检测] 核心流程异常:', error.message);
   }
 }

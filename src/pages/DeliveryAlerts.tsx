@@ -757,15 +757,17 @@ export default function DeliveryAlerts() {
   const getViolationTypeText = (alertType: string) => {
     switch (alertType) {
       case 'location_violation':
-        return '📍 位置违规';
+        return '📍 位置异常';
+      case 'delivery_confirmation':
+        return '✅ 确认送达';
       case 'photo_violation':
-        return '📸 照片违规';
+        return '📸 照片缺失';
       case 'time_violation':
-        return '⏰ 时间违规';
+        return '⏰ 时间异常';
       case 'route_violation':
-        return '🛣️ 路线违规';
+        return '🛣️ 路线偏差';
       default:
-        return '⚠️ 其他违规';
+        return '⚠️ 其他记录';
     }
   };
 
@@ -773,9 +775,11 @@ export default function DeliveryAlerts() {
   const getViolationTypeColor = (alertType: string) => {
     switch (alertType) {
       case 'location_violation':
-        return '#e53e3e'; // 红色 - 位置违规最严重
+        return '#e53e3e'; // 红色 - 位置违规
+      case 'delivery_confirmation':
+        return '#38a169'; // 绿色 - 正常操作记录
       case 'photo_violation':
-        return '#d69e2e'; // 黄色 - 照片违规中等
+        return '#d69e2e'; // 黄色 - 照片违规
       case 'time_violation':
         return '#3182ce'; // 蓝色 - 时间违规
       case 'route_violation':
@@ -787,6 +791,10 @@ export default function DeliveryAlerts() {
 
   const getAlertTypeText = (type: string) => {
     switch (type) {
+      case 'location_violation':
+        return '📍 确认点过远';
+      case 'delivery_confirmation':
+        return '📱 手动确认';
       case 'distance_violation':
         return '📍 距离违规';
       case 'suspicious_location':
