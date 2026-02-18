@@ -520,10 +520,12 @@ export const packageService = {
       console.warn('记录移动端审计日志失败:', logError);
     }
     
-    // 如果是送达状态且有骑手位置信息，进行违规检测
+    // 如果是送达状态，进行违规检测
     if (status === '已送达') {
       try {
-        // 获取包裹信息以进行违规检测和发送通知
+        console.log('🏁 订单已送达，启动自动违规检测...');
+        
+        // 1. 获取包裹详情
         const { data: packageData } = await supabase
           .from('packages')
           .select('receiver_latitude, receiver_longitude, courier, customer_id')
@@ -531,20 +533,41 @@ export const packageService = {
           .single();
 
         if (packageData) {
-          // 1. 调用违规检测函数
-          if (courierLocation && courierName) {
-            await detectViolationsAsync(id, courierName, courierLocation.latitude, courierLocation.longitude);
+          // 2. 获取骑手坐标 (优先使用传入的，如果没有则尝试从 locationService 获取最新的)
+          let finalLat = courierLocation?.latitude;
+          let finalLng = courierLocation?.longitude;
+
+          if (!finalLat || !finalLng) {
+            try {
+              const { locationService } = require('./locationService');
+              const currentLoc = await locationService.getCurrentLocation();
+              if (currentLoc) {
+                finalLat = currentLoc.latitude;
+                finalLng = currentLoc.longitude;
+                console.log('📍 已自动获取骑手当前位置用于违规检测:', { finalLat, finalLng });
+              }
+            } catch (locErr) {
+              console.warn('⚠️ 自动获取位置失败:', locErr);
+            }
           }
 
-          // 2. 🚀 新增：通知寄件人订单已送达
+          // 3. 执行违规检测
+          const realCourierId = await AsyncStorage.getItem('currentCourierId') || courierName || packageData.courier || '未知';
+          await detectViolationsAsync(id, realCourierId, finalLat || 0, finalLng || 0);
+
+          // 4. 🚀 通知寄件人订单已送达
           if (packageData.customer_id) {
-            const { notificationService } = require('./notificationService');
-            await notificationService.notifySenderOnDelivery(id, packageData.customer_id);
-            console.log(`✅ 已发送送达通知给寄件人 (ID: ${packageData.customer_id})`);
+            try {
+              const { notificationService } = require('./notificationService');
+              await notificationService.notifySenderOnDelivery(id, packageData.customer_id);
+              console.log(`✅ 已发送送达通知给寄件人 (ID: ${packageData.customer_id})`);
+            } catch (notifErr) {
+              console.warn('⚠️ 发送送达通知失败:', notifErr);
+            }
           }
         }
       } catch (error) {
-        console.error('送达后续处理失败:', error);
+        console.error('❌ 送达后续处理失败:', error);
       }
     }
     
