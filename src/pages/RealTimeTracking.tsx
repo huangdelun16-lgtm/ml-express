@@ -457,7 +457,12 @@ const RealTimeTracking: React.FC = () => {
           const lastActiveStr = courierRt?.last_active || acc.last_login;
           let displayStatus: Courier['status'] = 'offline';
           
-          if (acc.status === 'active') {
+          // 🚀 优化：增加明确的离线状态检查
+          // 1. 账号被禁用
+          // 2. 骑手主动在 App 中登出 (courierRt.status === 'inactive')
+          const isExplicitlyOffline = acc.status !== 'active' || courierRt?.status === 'inactive';
+
+          if (!isExplicitlyOffline) {
             // 比较 couriers 表的最后活跃时间和 admin_accounts 的最后登录时间，取最近的一个
             // 🚀 优化：增加有效性检查，防止非日期字符串导致 NaN
             const parseDate = (dateStr: any) => {
