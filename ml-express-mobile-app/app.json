@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML Express Staff",
     "slug": "MarketLinkStaffApp",
-    "version": "2.0.0",
+    "version": "2.1.1",
     "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.courier",
+      "buildNumber": "61",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
@@ -38,7 +39,7 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 27,
+      "versionCode": 61,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
