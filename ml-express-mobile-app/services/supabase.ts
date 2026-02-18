@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { cacheService } from './cacheService';
+import { detectViolationsAsync } from './detectViolations';
 
 // 缓存键名
 const CACHE_KEYS = {
@@ -551,9 +552,9 @@ export const packageService = {
             }
           }
 
-          // 3. 执行违规检测
+          // 3. 执行违规检测 (异步执行，不阻塞主流程)
           const realCourierId = await AsyncStorage.getItem('currentCourierId') || courierName || packageData.courier || '未知';
-          await detectViolationsAsync(id, realCourierId, finalLat || 0, finalLng || 0);
+          detectViolationsAsync(id, realCourierId, finalLat || 0, finalLng || 0).catch(e => console.error('Violation detection failed:', e));
 
           // 4. 🚀 通知寄件人订单已送达
           if (packageData.customer_id) {
@@ -1235,127 +1236,3 @@ export const deliveryPhotoService = {
 };
 
 // 违规检测函数
-async function detectViolationsAsync(
-  packageId: string,
-  courierId: string,
-  courierLat: number,
-  courierLng: number
-): Promise<void> {
-  try {
-    console.log('🔍 开始违规检测...', { packageId, courierId, courierLat, courierLng });
-
-    // 1. 检测位置违规
-    const { data: packageData } = await supabase
-      .from('packages')
-      .select('receiver_latitude, receiver_longitude, courier')
-      .eq('id', packageId)
-      .single();
-
-    if (packageData && packageData.receiver_latitude && packageData.receiver_longitude) {
-      const destLat = packageData.receiver_latitude;
-      const destLng = packageData.receiver_longitude;
-
-      const distance = calculateDistance(courierLat, courierLng, destLat, destLng);
-      console.log('📍 距离计算:', { distance, courierLat, courierLng, destLat, destLng });
-
-      if (distance > 100) {
-        console.warn('⚠️ 检测到位置违规:', { distance });
-        const alertData = {
-          package_id: packageId,
-          courier_id: courierId,
-          courier_name: packageData.courier,
-          alert_type: 'location_violation',
-          severity: 'high',
-          title: '位置违规 - 距离收件地址过远',
-          description: `骑手在距离收件地址 ${distance.toFixed(0)} 米处完成配送，超出100米安全范围`,
-          status: 'pending',
-          courier_latitude: courierLat,
-          courier_longitude: courierLng,
-          destination_latitude: destLat,
-          destination_longitude: destLng,
-          distance_from_destination: distance,
-          action_attempted: 'complete_delivery',
-          metadata: {
-            auto_detected: true,
-            detection_time: new Date().toISOString()
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        const { error: alertError } = await supabase
-          .from('delivery_alerts')
-          .insert(alertData);
-        if (alertError) {
-          console.error('❌ 创建位置违规警报失败:', alertError);
-        } else {
-          console.log('✅ 位置违规警报创建成功!');
-        }
-      } else {
-        console.log('✅ 位置验证通过:', { distance });
-      }
-    } else {
-      console.warn('⚠️ 包裹缺少收件地址坐标');
-    }
-
-    // 2. 检测照片违规（延迟5秒检测）
-    setTimeout(async () => {
-      try {
-        const { data: photos } = await supabase
-          .from('delivery_photos')
-          .select('photo_url')
-          .eq('package_id', packageId);
-
-        if (!photos || photos.length === 0) {
-          console.warn('⚠️ 检测到照片违规: 未上传配送照片');
-          const alertData = {
-            package_id: packageId,
-            courier_id: courierId,
-            courier_name: packageData?.courier || '未知',
-            alert_type: 'photo_violation',
-            severity: 'medium',
-            title: '照片违规 - 未上传配送照片',
-            description: '骑手完成配送但未上传配送照片，无法提供配送证明',
-            status: 'pending',
-            courier_latitude: courierLat,
-            courier_longitude: courierLng,
-            action_attempted: 'complete_delivery',
-            metadata: {
-              auto_detected: true,
-              detection_time: new Date().toISOString(),
-              photo_count: 0
-            },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          const { error: alertError } = await supabase
-            .from('delivery_alerts')
-            .insert(alertData);
-          if (alertError) {
-            console.error('❌ 创建照片违规警报失败:', alertError);
-          } else {
-            console.log('✅ 照片违规警报创建成功!');
-          }
-        } else {
-          console.log('✅ 照片验证通过:', { photoCount: photos.length });
-        }
-      } catch (photoError) {
-        console.error('❌ 照片验证失败:', photoError);
-      }
-    }, 5000);
-
-  } catch (error) {
-    console.error('❌ 违规检测异常:', error);
-  }
-}
-
-// 计算距离函数
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000; // 地球半径（米）
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
