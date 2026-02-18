@@ -210,6 +210,7 @@ export default function DeliveryAlerts() {
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [packagePhotos, setPackagePhotos] = useState<string[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true); // 🚀 新增：语音播报开关
   const [realTimeStats, setRealTimeStats] = useState({
     totalAlerts: 0,
     criticalAlerts: 0,
@@ -217,6 +218,19 @@ export default function DeliveryAlerts() {
     resolvedToday: 0
   });
   
+  // 🚀 新增：语音播报函数
+  const speakNotification = (text: string) => {
+    if (voiceEnabled && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // 违规记录管理状态
   const [violationRecords, setViolationRecords] = useState<ViolationRecord[]>([]);
   const [showViolationModal, setShowViolationModal] = useState(false);
@@ -251,7 +265,12 @@ export default function DeliveryAlerts() {
           
           // 显示新警报通知
           if (payload.eventType === 'INSERT') {
-            showNewAlertNotification(payload.new);
+            const newAlert = payload.new as DeliveryAlert;
+            showNewAlertNotification(newAlert);
+            
+            // 🚀 新增：触发语音播报
+            const alertTypeZh = getAlertTypeText(newAlert.alert_type);
+            speakNotification(`发现新配送警报：${newAlert.courier_name}${alertTypeZh}`);
           }
         }
       )
@@ -1003,6 +1022,24 @@ export default function DeliveryAlerts() {
                 <option value="low" style={{ color: '#000' }}>{t.low}</option>
               </select>
             </div>
+
+            <button
+              onClick={() => setVoiceEnabled(!voiceEnabled)}
+              style={{
+                marginTop: '28px',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                background: voiceEnabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                color: 'white',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.3s'
+              }}
+            >
+              {voiceEnabled ? '🔊 语音: 开启' : '🔇 语音: 关闭'}
+            </button>
 
             <button
               onClick={loadAlerts}
