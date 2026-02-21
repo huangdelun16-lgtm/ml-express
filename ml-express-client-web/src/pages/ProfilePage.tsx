@@ -107,7 +107,7 @@ const ProfilePage: React.FC = () => {
   const [productForm, setProductForm] = useState({
     name: '',
     price: '',
-    original_price: '',
+    discount_percent: '',
     stock: '-1',
     image_url: '',
     is_available: true
@@ -174,7 +174,7 @@ const ProfilePage: React.FC = () => {
     setProductForm({
       name: '',
       price: '',
-      original_price: '',
+      discount_percent: '',
       stock: '-1',
       image_url: '',
       is_available: true
@@ -184,10 +184,17 @@ const ProfilePage: React.FC = () => {
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
+    
+    // 计算优惠百分比
+    let discountPercent = '';
+    if (product.original_price && product.original_price > product.price) {
+      discountPercent = Math.round((1 - product.price / product.original_price) * 100).toString();
+    }
+
     setProductForm({
       name: product.name,
       price: product.price.toString(),
-      original_price: product.original_price?.toString() || '',
+      discount_percent: discountPercent,
       stock: product.stock.toString(),
       image_url: product.image_url || '',
       is_available: product.is_available
@@ -221,11 +228,20 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoadingProducts(true);
+      
+      const price = parseFloat(productForm.price);
+      const discountPercent = parseFloat(productForm.discount_percent);
+      let originalPrice = undefined;
+      
+      if (!isNaN(discountPercent) && discountPercent > 0 && discountPercent < 100) {
+        originalPrice = Math.round(price / (1 - discountPercent / 100));
+      }
+
       const productData = {
         store_id: currentUser.id,
         name: productForm.name,
-        price: parseFloat(productForm.price),
-        original_price: productForm.original_price ? parseFloat(productForm.original_price) : undefined,
+        price: price,
+        original_price: originalPrice,
         stock: parseInt(productForm.stock),
         image_url: productForm.image_url,
         is_available: productForm.is_available,
@@ -3817,26 +3833,26 @@ const ProfilePage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.originalPrice} (MMK)</label>
-                  <input 
-                    type="number"
-                    value={productForm.original_price}
-                    onChange={(e) => setProductForm({...productForm, original_price: e.target.value})}
-                    placeholder="选填"
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productPrice} (MMK) *</label>
-                  <input 
-                    type="number"
-                    value={productForm.price}
-                    onChange={(e) => setProductForm({...productForm, price: e.target.value})}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
-                  />
-                </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productPrice} (MMK) *</label>
+                <input 
+                  type="number"
+                  value={productForm.price}
+                  onChange={(e) => setProductForm({...productForm, price: e.target.value})}
+                  placeholder="输入价格"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productDiscount} (%)</label>
+                <input 
+                  type="number"
+                  value={productForm.discount_percent}
+                  onChange={(e) => setProductForm({...productForm, discount_percent: e.target.value})}
+                  placeholder="输入优惠百分比 (如 10)"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                />
               </div>
 
               <div>
