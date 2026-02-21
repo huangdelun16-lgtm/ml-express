@@ -23,7 +23,8 @@ if (typeof document !== 'undefined') {
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t: allT } = useLanguage();
+  const t = allT.profile;
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
