@@ -107,6 +107,7 @@ const ProfilePage: React.FC = () => {
   const [productForm, setProductForm] = useState({
     name: '',
     price: '',
+    original_price: '',
     stock: '-1',
     image_url: '',
     is_available: true
@@ -173,6 +174,7 @@ const ProfilePage: React.FC = () => {
     setProductForm({
       name: '',
       price: '',
+      original_price: '',
       stock: '-1',
       image_url: '',
       is_available: true
@@ -185,6 +187,7 @@ const ProfilePage: React.FC = () => {
     setProductForm({
       name: product.name,
       price: product.price.toString(),
+      original_price: product.original_price?.toString() || '',
       stock: product.stock.toString(),
       image_url: product.image_url || '',
       is_available: product.is_available
@@ -222,6 +225,7 @@ const ProfilePage: React.FC = () => {
         store_id: currentUser.id,
         name: productForm.name,
         price: parseFloat(productForm.price),
+        original_price: productForm.original_price ? parseFloat(productForm.original_price) : undefined,
         stock: parseInt(productForm.stock),
         image_url: productForm.image_url,
         is_available: productForm.is_available,
@@ -3690,7 +3694,19 @@ const ProfilePage: React.FC = () => {
                         )}
                       </div>
                       <h4 style={{ color: 'white', fontSize: '1.2rem', fontWeight: '800', margin: '0 0 0.75rem 0' }}>{product.name}</h4>
-                      <div style={{ color: '#10b981', fontWeight: '900', fontSize: '1.5rem' }}>{product.price.toLocaleString()} MMK</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <div style={{ color: '#10b981', fontWeight: '900', fontSize: '1.5rem' }}>{product.price.toLocaleString()} MMK</div>
+                        {product.original_price && product.original_price > product.price && (
+                          <div style={{ color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through', fontSize: '0.9rem', fontWeight: '600' }}>
+                            {product.original_price.toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      {product.original_price && product.original_price > product.price && (
+                        <div style={{ position: 'absolute', top: '20px', right: '20px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '900', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', zIndex: 2 }}>
+                          {Math.round((1 - product.price / product.original_price) * 100)}% OFF
+                        </div>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
                         <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
                           {t.productStock}: {product.stock === -1 ? t.stockInfinite : product.stock}
@@ -3803,6 +3819,16 @@ const ProfilePage: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div>
+                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.originalPrice} (MMK)</label>
+                  <input 
+                    type="number"
+                    value={productForm.original_price}
+                    onChange={(e) => setProductForm({...productForm, original_price: e.target.value})}
+                    placeholder="选填"
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                  />
+                </div>
+                <div>
                   <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productPrice} (MMK) *</label>
                   <input 
                     type="number"
@@ -3811,15 +3837,16 @@ const ProfilePage: React.FC = () => {
                     style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
                   />
                 </div>
-                <div>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productStock} (-1={t.stockInfinite})</label>
-                  <input 
-                    type="number"
-                    value={productForm.stock}
-                    onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
-                  />
-                </div>
+              </div>
+
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t.productStock} (-1={t.stockInfinite})</label>
+                <input 
+                  type="number"
+                  value={productForm.stock}
+                  onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px' }}>
