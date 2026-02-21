@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
-    "version": "2.2.2",
+    "version": "2.2.3",
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.client",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS需要访问您的位置信息以提供准确的配送服务和包裹追踪功能。",
@@ -28,8 +28,8 @@
         "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存付款二维码。",
         "CFBundleDisplayName": "MARKET LINK EXPRESS",
         "CFBundleName": "MARKET LINK EXPRESS",
-        "CFBundleShortVersionString": "2.2.2",
-        "CFBundleVersion": "47",
+        "CFBundleShortVersionString": "2.2.3",
+        "CFBundleVersion": "48",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -61,7 +61,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
-      "versionCode": 47,
+      "versionCode": 48,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
