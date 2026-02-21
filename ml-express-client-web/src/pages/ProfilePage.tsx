@@ -46,6 +46,7 @@ const ProfilePage: React.FC = () => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(''); // 二维码数据URL
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
   const [showPackingModal, setShowPackingModal] = useState(false); // 🚀 新增：显示打包模态框
+  const [showPackingListModal, setShowPackingListModal] = useState(false); // 🚀 新增：显示待打包订单列表模态框
   const [packingOrderData, setPackingOrderData] = useState<any>(null); // 🚀 新增：打包订单数据
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({}); // 🚀 新增：打包清单选中项
   const [showPasswordModal, setShowPasswordModal] = useState(false); // 显示密码修改模态框
@@ -1471,9 +1472,10 @@ const ProfilePage: React.FC = () => {
                 border: '1px solid rgba(16, 185, 129, 0.3)',
                 textAlign: 'center',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'default',
+                cursor: 'pointer',
                 boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
               }}
+              onClick={() => setShowPackingListModal(true)}
               onMouseOver={(e) => {
                 e.currentTarget.style.transform = 'translateY(-5px)';
                 e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.2)';
@@ -1579,37 +1581,6 @@ const ProfilePage: React.FC = () => {
                 {t.completed}
               </div>
             </div>
-
-            {/* 🚀 新增：打包中 */}
-            {isPartnerStore && (
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                borderRadius: '24px',
-                padding: '1.75rem',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                textAlign: 'center',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'default',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-5px)';
-                e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.2)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-              }}
-              >
-                <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>📦</div>
-                <div style={{ color: '#10b981', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
-                  {orderStats.packing}
-                </div>
-                <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  {language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်'}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
@@ -4066,6 +4037,181 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 🚀 新增：待打包订单列表模态框 */}
+      {showPackingListModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(10px)'
+        }}
+        onClick={() => setShowPackingListModal(false)}
+        >
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.95)',
+            padding: '2.5rem',
+            borderRadius: '32px',
+            maxWidth: '700px',
+            width: '95%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              paddingBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ 
+                  width: '48px', 
+                  height: '48px', 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem'
+                }}>📦</div>
+                <h2 style={{
+                  color: 'white',
+                  margin: 0,
+                  fontSize: '1.75rem',
+                  fontWeight: '800'
+                }}>
+                  {language === 'zh' ? '待打包订单' : language === 'en' ? 'Orders to Pack' : 'ထုပ်ပိုးရန်ကျန်သောအော်ဒါများ'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowPackingListModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >✕</button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+              {userPackages.filter(pkg => pkg.status === '打包中').length > 0 ? (
+                userPackages.filter(pkg => pkg.status === '打包中').map((pkg: any) => (
+                  <div
+                    key={pkg.id}
+                    style={{
+                      padding: '1.5rem',
+                      marginBottom: '1rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '20px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                        {t.packageId}
+                      </div>
+                      <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px' }}>
+                        {pkg.id}
+                      </div>
+                      <div style={{ display: 'flex', gap: '15px' }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
+                          📅 {pkg.create_time || pkg.created_at || '-'}
+                        </div>
+                        {pkg.cod_amount > 0 && (
+                          <div style={{ color: '#fca5a5', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                            💰 {pkg.cod_amount.toLocaleString()} MMK
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowPackingListModal(false);
+                        handleStartPacking(pkg);
+                      }}
+                      style={{
+                        padding: '12px 24px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontWeight: '800',
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 8px 15px rgba(16, 185, 129, 0.3)',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      📦 {language === 'zh' ? '开始打包' : language === 'en' ? 'Start Packing' : 'ထုပ်ပိုးရန်စတင်ပါ'}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '1.2rem', fontWeight: '700' }}>
+                    {language === 'zh' ? '暂无待打包订单' : language === 'en' ? 'No orders to pack' : 'ထုပ်ပိုးရန်အော်ဒါမရှိပါ'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1.5rem' }}>
+              <button
+                onClick={() => setShowPackingListModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '16px',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              >
+                {t.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🚀 新增：打包模态框 (PackingModal) */}
       {showPackingModal && packingOrderData && (
         <div style={{
