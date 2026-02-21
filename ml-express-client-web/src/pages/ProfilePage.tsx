@@ -47,6 +47,7 @@ const ProfilePage: React.FC = () => {
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
   const [showPackingModal, setShowPackingModal] = useState(false); // 🚀 新增：显示打包模态框
   const [showPackingListModal, setShowPackingListModal] = useState(false); // 🚀 新增：显示待打包订单列表模态框
+  const [showPendingAcceptListModal, setShowPendingAcceptListModal] = useState(false); // 🚀 新增：显示待接单订单列表模态框
   const [packingOrderData, setPackingOrderData] = useState<any>(null); // 🚀 新增：打包订单数据
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({}); // 🚀 新增：打包清单选中项
   const [showPasswordModal, setShowPasswordModal] = useState(false); // 显示密码修改模态框
@@ -668,27 +669,28 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：商家接单功能
-  const handleAcceptOrder = async () => {
-    if (!selectedPackage?.id) return;
+  const handleAcceptOrder = async (targetPkg?: any) => {
+    const pkgToAccept = targetPkg || selectedPackage;
+    if (!pkgToAccept?.id) return;
     
     try {
       setLoading(true);
       
       // 检查当前状态是否是待确认
-      if (selectedPackage.status !== '待确认') {
+      if (pkgToAccept.status !== '待确认') {
         alert(language === 'zh' ? '该订单状态已变更，无法接单' : 'Order status has changed, cannot accept');
         return;
       }
 
       // 更新状态为“打包中”
-      const success = await packageService.updatePackageStatus(selectedPackage.id, '打包中');
+      const success = await packageService.updatePackageStatus(pkgToAccept.id, '打包中');
       
       if (success) {
         alert(language === 'zh' ? '接单成功！请开始打包商品。' : 'Order accepted! Please start packing the items.');
         // 刷新本地数据
-        const updatedPackage = { ...selectedPackage, status: '打包中' };
-        setSelectedPackage(updatedPackage);
-        setUserPackages(prev => prev.map(p => p.id === selectedPackage.id ? updatedPackage : p));
+        const updatedPackage = { ...pkgToAccept, status: '打包中' };
+        if (!targetPkg) setSelectedPackage(updatedPackage);
+        setUserPackages(prev => prev.map(p => p.id === pkgToAccept.id ? updatedPackage : p));
       } else {
         throw new Error('Update failed');
       }
@@ -1440,8 +1442,7 @@ const ProfilePage: React.FC = () => {
                 overflow: 'hidden'
               }}
               onClick={() => {
-                // 自动搜索或过滤出待接单订单（后续可增强）
-                window.scrollTo({ top: document.getElementById('packages-section')?.offsetTop || 1000, behavior: 'smooth' });
+                setShowPendingAcceptListModal(true);
               }}
               onMouseOver={(e) => {
                 e.currentTarget.style.transform = 'translateY(-5px) scale(1.02)';
@@ -4190,6 +4191,180 @@ const ProfilePage: React.FC = () => {
             <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1.5rem' }}>
               <button
                 onClick={() => setShowPackingListModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '16px',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              >
+                {t.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：待接单订单列表模态框 */}
+      {showPendingAcceptListModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(10px)'
+        }}
+        onClick={() => setShowPendingAcceptListModal(false)}
+        >
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.95)',
+            padding: '2.5rem',
+            borderRadius: '32px',
+            maxWidth: '700px',
+            width: '95%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              paddingBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ 
+                  width: '48px', 
+                  height: '48px', 
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  borderRadius: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem'
+                }}>🔔</div>
+                <h2 style={{
+                  color: 'white',
+                  margin: 0,
+                  fontSize: '1.75rem',
+                  fontWeight: '800'
+                }}>
+                  {language === 'zh' ? '待接单订单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်းနေသည်'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowPendingAcceptListModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >✕</button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+              {userPackages.filter(pkg => pkg.status === '待确认').length > 0 ? (
+                userPackages.filter(pkg => pkg.status === '待确认').map((pkg: any) => (
+                  <div
+                    key={pkg.id}
+                    style={{
+                      padding: '1.5rem',
+                      marginBottom: '1rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '20px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                        {t.packageId}
+                      </div>
+                      <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px' }}>
+                        {pkg.id}
+                      </div>
+                      <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
+                          📅 {pkg.create_time || pkg.created_at || '-'}
+                        </div>
+                        {pkg.cod_amount > 0 && (
+                          <div style={{ color: '#fbbf24', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                            💰 {pkg.cod_amount.toLocaleString()} MMK
+                          </div>
+                        )}
+                        <div style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                          💵 {pkg.price ? `${pkg.price.replace('MMK', '').trim()} MMK` : '-'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleAcceptOrder(pkg)}
+                      style={{
+                        padding: '12px 24px',
+                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontWeight: '800',
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 8px 15px rgba(245, 158, 11, 0.3)',
+                        transition: 'all 0.3s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      🤝 {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept' : 'လက်ခံရန်'}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '1.2rem', fontWeight: '700' }}>
+                    {language === 'zh' ? '暂无待接单订单' : language === 'en' ? 'No pending orders' : 'လက်ခံရန်အော်ဒါမရှိပါ'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1.5rem' }}>
+              <button
+                onClick={() => setShowPendingAcceptListModal(false)}
                 style={{
                   width: '100%',
                   padding: '14px',
