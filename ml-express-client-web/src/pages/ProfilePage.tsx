@@ -702,6 +702,40 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：商家取消订单功能（商品卖完时）
+  const handleCancelOrder = async (pkg: any) => {
+    if (!pkg?.id) return;
+    
+    const confirmMsg = language === 'zh' 
+      ? '确定要取消此订单吗？（此操作不可逆，通常用于商品已售罄的情况）' 
+      : language === 'en' 
+      ? 'Are you sure you want to cancel this order? (This action is irreversible, typically used when items are sold out)' 
+      : 'ဤအော်ဒါကို ပယ်ဖျက်ရန် သေချာပါသလား? (ပစ္စည်းပြတ်လပ်သွားသောအခါတွင် အသုံးပြုရန်)';
+      
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setLoading(true);
+      
+      // 更新状态为“已取消”
+      const success = await packageService.updatePackageStatus(pkg.id, '已取消');
+      
+      if (success) {
+        alert(language === 'zh' ? '订单已成功取消' : language === 'en' ? 'Order cancelled successfully' : 'အော်ဒါကို ပယ်ဖျက်ပြီးပါပြီ');
+        // 刷新本地数据
+        const updatedPackage = { ...pkg, status: '已取消' };
+        setUserPackages(prev => prev.map(p => p.id === pkg.id ? updatedPackage : p));
+      } else {
+        throw new Error('Cancel failed');
+      }
+    } catch (error) {
+      LoggerService.error('取消订单失败:', error);
+      alert(language === 'zh' ? '操作失败，请重试' : 'Operation failed, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 🚀 新增：开始打包功能
   const handleStartPacking = (pkg: any) => {
     setPackingOrderData(pkg);
@@ -812,6 +846,7 @@ const ProfilePage: React.FC = () => {
       '运输中': '#8b5cf6',
       '已送达': '#10b981',
       '待收款': '#ef4444',
+      '已取消': '#94a3b8', // 🚀 灰色
       '已完成': '#6b7280'
     };
     return statusMap[status] || '#6b7280';
@@ -822,6 +857,7 @@ const ProfilePage: React.FC = () => {
     if (status === '待收款') return language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်';
     if (status === '待确认') return language === 'zh' ? '待接单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်းနေသည်';
     if (status === '打包中') return language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်';
+    if (status === '已取消') return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်လိုက်သည်';
     return status;
   };
 
@@ -4330,26 +4366,53 @@ const ProfilePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleAcceptOrder(pkg)}
-                      style={{
-                        padding: '12px 24px',
-                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontWeight: '800',
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        boxShadow: '0 8px 15px rgba(245, 158, 11, 0.3)',
-                        transition: 'all 0.3s ease',
-                        whiteSpace: 'nowrap'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                      onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                      🤝 {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept' : 'လက်ခံရန်'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => handleCancelOrder(pkg)}
+                        style={{
+                          padding: '12px 20px',
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          color: '#fca5a5',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '12px',
+                          fontWeight: '800',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        ✕ {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်'}
+                      </button>
+                      <button
+                        onClick={() => handleAcceptOrder(pkg)}
+                        style={{
+                          padding: '12px 24px',
+                          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontWeight: '800',
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 8px 15px rgba(245, 158, 11, 0.3)',
+                          transition: 'all 0.3s ease',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                      >
+                        🤝 {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept' : 'လက်ခံရန်'}
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
