@@ -202,6 +202,7 @@ export default function DeliveryAlerts() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all'); // all, pending, resolved
   const [severityFilter, setSeverityFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState(''); // 🚀 新增：搜索词
   const [selectedAlert, setSelectedAlert] = useState<DeliveryAlert | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
@@ -270,7 +271,10 @@ export default function DeliveryAlerts() {
             
             // 🚀 新增：触发语音播报
             const alertTypeZh = getAlertTypeText(newAlert.alert_type);
-            speakNotification(`发现新配送警报：${newAlert.courier_name}${alertTypeZh}`);
+            const distanceInfo = newAlert.distance_from_destination 
+              ? `，距离目标点 ${Math.round(newAlert.distance_from_destination)} 米`
+              : '';
+            speakNotification(`发现新配送警报：${newAlert.courier_name}${alertTypeZh}${distanceInfo}。请及时处理。`);
           }
         }
       )
@@ -283,7 +287,7 @@ export default function DeliveryAlerts() {
       subscription.unsubscribe();
       clearInterval(statsInterval);
     };
-  }, [filter, severityFilter]);
+  }, [filter, severityFilter, searchTerm]);
 
   const loadAlerts = async () => {
     try {
@@ -301,6 +305,16 @@ export default function DeliveryAlerts() {
       
       if (severityFilter !== 'all') {
         filteredAlerts = filteredAlerts.filter(alert => alert.severity === severityFilter);
+      }
+      
+      // 🚀 新增：根据搜索词过滤
+      if (searchTerm.trim() !== '') {
+        const term = searchTerm.toLowerCase();
+        filteredAlerts = filteredAlerts.filter(alert => 
+          alert.courier_name.toLowerCase().includes(term) || 
+          alert.package_id.toLowerCase().includes(term) ||
+          alert.title.toLowerCase().includes(term)
+        );
       }
       
       setAlerts(filteredAlerts);
@@ -424,11 +438,11 @@ export default function DeliveryAlerts() {
   // 📊 获取严重程度对应的扣分
   const getSeverityPoints = (severity: string) => {
     switch (severity) {
-      case 'low': return 1;
-      case 'medium': return 3;
-      case 'high': return 5;
-      case 'critical': return 10;
-      default: return 1;
+      case 'low': return 5; // 🚀 调整：最低扣 5 分
+      case 'medium': return 15; // 🚀 调整：中等扣 15 分
+      case 'high': return 30; // 🚀 调整：高等扣 30 分
+      case 'critical': return 50; // 🚀 调整：紧急/虚假妥投扣 50 分
+      default: return 5;
     }
   };
 
@@ -451,21 +465,39 @@ export default function DeliveryAlerts() {
     try {
       const success = await createViolationRecord(selectedAlert);
       if (success) {
+        // 🚀 新增：同步扣除骑手的信用分
+        const { data: courierData } = await supabase
+          .from('couriers')
+          .select('credit_score')
+          .eq('id', selectedAlert.courier_id)
+          .single();
+        
+        const currentScore = courierData?.credit_score ?? 100;
+        const newScore = Math.max(0, currentScore - violationForm.penalty_points);
+
+        await supabase
+          .from('couriers')
+          .update({ 
+            credit_score: newScore,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedAlert.courier_id);
+
         // 记录操作日志
         await logAdminAction({
           action_type: 'create_violation',
           target_type: 'courier',
           target_id: selectedAlert.courier_id,
           target_name: selectedAlert.courier_name,
-          action_description: `为骑手 ${selectedAlert.courier_name} 创建违规记录：${violationForm.violation_type}`,
-          new_values: violationForm
+          action_description: `为骑手 ${selectedAlert.courier_name} 创建违规记录并扣除信用分 ${violationForm.penalty_points} (新分值: ${newScore})`,
+          new_values: { ...violationForm, new_credit_score: newScore }
         });
 
         // 更新警报状态
         await handleUpdateStatus(selectedAlert.id, 'resolved');
         setShowViolationModal(false);
         loadViolationRecords();
-        window.alert('违规记录创建成功！');
+        window.alert(`违规记录创建成功！骑手信用分已降至 ${newScore}`);
       }
     } catch (error) {
       console.error('保存违规记录失败:', error);
@@ -742,6 +774,42 @@ export default function DeliveryAlerts() {
     }
   };
 
+  // 🚀 新增：导出 CSV 功能
+  const handleExportCSV = () => {
+    if (alerts.length === 0) return;
+    
+    const headers = [
+      'ID', 'Time', 'Courier', 'PackageID', 'Type', 'Severity', 'Status', 'Distance(m)', 'Description'
+    ];
+    
+    const rows = alerts.map(alert => [
+      alert.id,
+      new Date(alert.created_at).toLocaleString('zh-CN'),
+      alert.courier_name,
+      alert.package_id,
+      getAlertTypeText(alert.alert_type),
+      alert.severity,
+      alert.status,
+      alert.distance_from_destination?.toFixed(0) || '',
+      alert.description.replace(/,/g, ' ')
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `delivery_alerts_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical':
@@ -793,6 +861,8 @@ export default function DeliveryAlerts() {
   // 获取违规类型颜色
   const getViolationTypeColor = (alertType: string) => {
     switch (alertType) {
+      case 'rider_report':
+        return '#3b82f6'; // 蓝色 - 骑手申报
       case 'location_violation':
         return '#e53e3e'; // 红色 - 位置违规
       case 'delivery_confirmation':
@@ -810,6 +880,8 @@ export default function DeliveryAlerts() {
 
   const getAlertTypeText = (type: string) => {
     switch (type) {
+      case 'rider_report':
+        return '📢 骑手申报';
       case 'location_violation':
         return '📍 确认点过远';
       case 'delivery_confirmation':
@@ -1023,6 +1095,25 @@ export default function DeliveryAlerts() {
               </select>
             </div>
 
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
+                {language === 'zh' ? '搜索骑手/包裹' : language === 'en' ? 'Search Courier/Package' : 'ရှာဖွေရန်'}
+              </label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={language === 'zh' ? '搜索姓名、ID...' : language === 'en' ? 'Search name, ID...' : 'ရှာဖွေရန်...'}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+
             <button
               onClick={() => setVoiceEnabled(!voiceEnabled)}
               style={{
@@ -1084,6 +1175,53 @@ export default function DeliveryAlerts() {
               }}
             >
               🗑️ {language === 'zh' ? '清空所有' : language === 'en' ? 'Clear All' : 'အားလုံးဖျက်မည်'}
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              disabled={loading || alerts.length === 0}
+              style={{
+                marginTop: '28px',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+                color: 'white',
+                fontSize: '1rem',
+                cursor: (loading || alerts.length === 0) ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.3s'
+              }}
+            >
+              📥 {language === 'zh' ? '导出报表' : language === 'en' ? 'Export CSV' : 'အစီရင်ခံစာ ထုတ်ရန်'}
+            </button>
+
+            <button
+              onClick={() => {
+                const pendingIds = alerts.filter(a => a.status === 'pending').map(a => a.id);
+                if (pendingIds.length > 0) {
+                  if (window.confirm(`确定要批量确认 ${pendingIds.length} 个待处理警报吗？`)) {
+                    handleBatchAction('acknowledge', pendingIds);
+                  }
+                } else {
+                  window.alert('没有待处理的警报');
+                }
+              }}
+              disabled={loading || alerts.filter(a => a.status === 'pending').length === 0}
+              style={{
+                marginTop: '28px',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                color: 'white',
+                fontSize: '1rem',
+                cursor: (loading || alerts.filter(a => a.status === 'pending').length === 0) ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+                transition: 'all 0.3s'
+              }}
+            >
+              ✅ {language === 'zh' ? '批量确认' : language === 'en' ? 'Bulk Acknowledge' : 'အစုလိုက်အတည်ပြုရန်'}
             </button>
           </div>
         </div>
@@ -1569,12 +1707,13 @@ export default function DeliveryAlerts() {
               </button>
               
               {selectedAlert.status === 'pending' && (
-                <>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', width: '100%' }}>
                   <button
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'acknowledged')}
                     disabled={processing}
                     style={{
-                      padding: '12px 24px',
+                      flex: 1,
+                      padding: '12px',
                       borderRadius: '8px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
@@ -1590,7 +1729,8 @@ export default function DeliveryAlerts() {
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'resolved')}
                     disabled={processing}
                     style={{
-                      padding: '12px 24px',
+                      flex: 1,
+                      padding: '12px',
                       borderRadius: '8px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
@@ -1606,7 +1746,8 @@ export default function DeliveryAlerts() {
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'dismissed')}
                     disabled={processing}
                     style={{
-                      padding: '12px 24px',
+                      flex: 1,
+                      padding: '12px',
                       borderRadius: '8px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
@@ -1618,7 +1759,7 @@ export default function DeliveryAlerts() {
                   >
                     ❌ {t.dismiss}
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>

@@ -754,6 +754,61 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
   const currentT = t[language];
 
+  // 生成可用时间段 (09:00 - 18:00, 30分钟间隔)
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let hour = 9; hour < 18; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      slots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    slots.push('18:00');
+    return slots;
+  }, []);
+
+  // 过滤出当前日期之后的时间
+  const availableTimeSlots = useMemo(() => {
+    if (selectedDate !== 'Today') return timeSlots;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return timeSlots.filter(slot => {
+      const [hour, minute] = slot.split(':').map(Number);
+      // 🚀 逻辑优化：预留至少 60 分钟准备时间 (1小时)
+      // 如果当前是 9:30，最早只能选 10:30
+      const slotTotalMinutes = hour * 60 + minute;
+      const nowTotalMinutes = currentHour * 60 + currentMinute;
+      
+      return slotTotalMinutes >= nowTotalMinutes + 60;
+    });
+  }, [selectedDate, timeSlots]);
+
+  // 当可用时间段变化时，如果当前选择的时间已失效，自动重置
+  useEffect(() => {
+    if (showTimePicker && selectedDate === 'Today' && selectedTime) {
+      if (!availableTimeSlots.includes(selectedTime)) {
+        setSelectedTime('');
+      }
+    }
+  }, [availableTimeSlots, showTimePicker, selectedDate, selectedTime]);
+
+  // 初始化选择日期：逻辑优化，如果今日已截止自动选明天
+  useEffect(() => {
+    if (showTimePicker && !selectedDate) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      // 如果当前时间 + 1小时 (60分钟) 已经超过了最晚营业时间 18:00
+      if (currentHour * 60 + currentMinute + 60 > 18 * 60) {
+        setSelectedDate('Tomorrow');
+      } else {
+        setSelectedDate('Today');
+      }
+    }
+  }, [showTimePicker]);
+
   // 包裹类型选项（与Web端一致）- 使用 useMemo 优化
   const packageTypes = useMemo(() => [
     { value: '文件', label: currentT.packageTypes.document },
@@ -2402,24 +2457,34 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         <View style={styles.timePickerOverlay}>
           <View style={styles.timePickerContent}>
             <LinearGradient
-              colors={['#2c5282', '#2d3748']}
+              colors={['#1e3a8a', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.timePickerHeader}
             >
               <View style={styles.timePickerHeaderContent}>
-                <Text style={styles.timePickerTitle}>{currentT.timePicker.title}</Text>
-                <Text style={styles.timePickerSubtitle}>{currentT.timePicker.subtitle}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="time" size={24} color="#fbbf24" style={{ marginRight: 10 }} />
+                  <View>
+                    <Text style={styles.timePickerTitle}>{currentT.timePicker.title}</Text>
+                    <Text style={styles.timePickerSubtitle}>{currentT.timePicker.subtitle}</Text>
+                  </View>
+                </View>
               </View>
               <TouchableOpacity
                 onPress={() => setShowTimePicker(false)}
                 style={styles.timePickerCloseButton}
               >
-                <Text style={styles.timePickerCloseText}>✕</Text>
+                <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </LinearGradient>
 
             <View style={styles.timePickerBody}>
               <View style={styles.quickSelectSection}>
-                <Text style={styles.quickSelectTitle}>{currentT.timePicker.selectDate}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <Ionicons name="calendar-outline" size={18} color="#64748b" style={{ marginRight: 6 }} />
+                  <Text style={styles.quickSelectTitle}>{currentT.timePicker.selectDate}</Text>
+                </View>
                 <View style={styles.quickSelectGrid}>
                   <TouchableOpacity
                     style={[
@@ -2428,6 +2493,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                     ]}
                     onPress={() => setSelectedDate('Today')}
                   >
+                    <Ionicons 
+                      name={selectedDate === 'Today' ? "checkmark-circle" : "ellipse-outline"} 
+                      size={20} 
+                      color={selectedDate === 'Today' ? "#3b82f6" : "#cbd5e1"} 
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={[styles.quickSelectButtonText, selectedDate === 'Today' && { color: '#3b82f6' }]}>
                       {currentT.timePicker.today}
                     </Text>
@@ -2439,6 +2510,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                     ]}
                     onPress={() => setSelectedDate('Tomorrow')}
                   >
+                    <Ionicons 
+                      name={selectedDate === 'Tomorrow' ? "checkmark-circle" : "ellipse-outline"} 
+                      size={20} 
+                      color={selectedDate === 'Tomorrow' ? "#3b82f6" : "#cbd5e1"} 
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={[styles.quickSelectButtonText, selectedDate === 'Tomorrow' && { color: '#3b82f6' }]}>
                       {currentT.timePicker.tomorrow}
                     </Text>
@@ -2446,21 +2523,42 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                 </View>
               </View>
 
-              <View style={styles.customTimeSection}>
-                <Text style={styles.customTimeTitle}>{currentT.timePicker.selectTime}</Text>
-                <View style={styles.dateTimeRow}>
-                  <View style={styles.dateTimeInput}>
-                    <Text style={styles.dateTimeLabel}>{currentT.timePicker.workingHours}</Text>
-                    <TextInput
-                      style={styles.dateTimeTextInput}
-                      value={selectedTime}
-                      onChangeText={setSelectedTime}
-                      placeholder="例如: 14:30"
-                      placeholderTextColor="#94a3b8"
-                      keyboardType="numbers-and-punctuation"
-                    />
+              <View style={styles.timeSlotsSection}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="time-outline" size={18} color="#64748b" style={{ marginRight: 6 }} />
+                    <Text style={styles.timeSlotsTitle}>{currentT.timePicker.selectTime}</Text>
                   </View>
+                  <Text style={{ fontSize: 12, color: '#94a3b8' }}>{currentT.timePicker.workingHours}</Text>
                 </View>
+                
+                <ScrollView 
+                  style={styles.timeSlotsContainer} 
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.timeSlotsGrid}
+                >
+                  {availableTimeSlots.length > 0 ? (
+                    availableTimeSlots.map((slot) => (
+                      <TouchableOpacity
+                        key={slot}
+                        style={[
+                          styles.timeSlotButton,
+                          selectedTime === slot && styles.timeSlotButtonActive
+                        ]}
+                        onPress={() => setSelectedTime(slot)}
+                      >
+                        <Text style={[
+                          styles.timeSlotText,
+                          selectedTime === slot && styles.timeSlotTextActive
+                        ]}>{slot}</Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
+                      <Text style={{ color: '#94a3b8' }}>今日配送已截止，请选择明日</Text>
+                    </View>
+                  )}
+                </ScrollView>
               </View>
             </View>
 
@@ -2485,8 +2583,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               >
                 <LinearGradient
                   colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={styles.timePickerConfirmGradient}
                 >
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={styles.timePickerConfirmText}>{currentT.timePicker.confirm}</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -3427,8 +3528,9 @@ const baseStyles = StyleSheet.create({
   timePickerContent: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
-    width: '100%',
+    width: '92%',
     maxWidth: 400,
+    maxHeight: '85%',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -3437,8 +3539,8 @@ const baseStyles = StyleSheet.create({
     elevation: 16,
   },
   timePickerHeader: {
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -3447,124 +3549,132 @@ const baseStyles = StyleSheet.create({
     flex: 1,
   },
   timePickerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   timePickerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.9)',
   },
   timePickerCloseButton: {
-    width: 32,
+    width: 30,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 15,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  timePickerCloseText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
   timePickerBody: {
-    padding: 24,
+    padding: 20,
   },
   quickSelectSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   quickSelectTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 12,
   },
   quickSelectGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
+    marginTop: 12,
   },
   quickSelectButton: {
     flex: 1,
-    minWidth: '45%',
     backgroundColor: '#f8fafc',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   quickSelectButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#475569',
+    fontWeight: '700',
+    color: '#64748b',
   },
-  customTimeSection: {
-    marginBottom: 24,
+  timeSlotsSection: {
+    height: 220, // 固定高度防止重叠
   },
-  customTimeTitle: {
-    fontSize: 16,
+  timeSlotsTitle: {
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 12,
   },
-  dateTimeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateTimeInput: {
+  timeSlotsContainer: {
+    marginTop: 8,
     flex: 1,
   },
-  dateTimeLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
+  timeSlotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'flex-start',
+    paddingBottom: 10,
   },
-  dateTimeTextInput: {
+  timeSlotButton: {
+    width: '31.3%', // 精确计算宽度
     backgroundColor: '#f8fafc',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: '#1e293b',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  timeSlotButtonActive: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff',
+  },
+  timeSlotText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  timeSlotTextActive: {
+    color: '#3b82f6',
   },
   timePickerButtons: {
     flexDirection: 'row',
     gap: 12,
-    padding: 24,
-    paddingTop: 0,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: '#fff',
   },
   timePickerCancelButton: {
     flex: 1,
     backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   timePickerCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#64748b',
   },
   timePickerConfirmButton: {
-    flex: 1,
+    flex: 2,
     borderRadius: 12,
     overflow: 'hidden',
   },
   timePickerConfirmGradient: {
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   timePickerConfirmText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#ffffff',
   },

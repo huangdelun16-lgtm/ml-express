@@ -22,6 +22,7 @@ import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
+import PackingModal from '../components/PackingModal';
 
 const { width } = Dimensions.get('window');
 
@@ -50,6 +51,7 @@ interface Order {
   customer_rating?: number;
   customer_comment?: string;
   cod_amount?: number;
+  payment_method?: string; // 🚀 新增支付方式
 }
 
 export default function MyOrdersScreen({ navigation, route }: any) {
@@ -73,6 +75,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+
+  // 打包模态框状态
+  const [showPackingModal, setShowPackingModal] = useState(false);
+  const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
 
   // 翻译
   const translations: any = {
@@ -192,8 +198,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 状态过滤器
   const statusFilters = [
     { key: 'all', label: t.all, color: '#6b7280' },
-    { key: '待取件', label: t.pending, color: '#f59e0b' },
     { key: '待确认', label: language === 'zh' ? '待接单' : 'Pending', color: '#f97316' },
+    { key: '打包中', label: language === 'zh' ? '打包中' : 'Packing', color: '#10b981' },
+    { key: '待取件', label: t.pending, color: '#f59e0b' },
     { key: '已取件', label: t.pickedUp, color: '#3b82f6' },
     { key: '配送中', label: t.inTransit, color: '#8b5cf6' },
     { key: '已送达', label: t.delivered, color: '#10b981' },
@@ -382,6 +389,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     // 中文状态映射
     const statusMap: {[key: string]: string} = {
       '待确认': language === 'zh' ? '待接单' : 'Pending',
+      '打包中': language === 'zh' ? '打包中' : 'Packing',
       '待取件': t.statusTypes['pending'] || status,
       '已取件': t.statusTypes['picked_up'] || status,
       '配送中': t.statusTypes['in_transit'] || status,
@@ -414,7 +422,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const handleMerchantAccept = async (orderId: string, paymentMethod: string) => {
     try {
       showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
-      const newStatus = paymentMethod === 'cash' ? '待收款' : '待取件';
+      const newStatus = '打包中'; // 🚀 改为打包中
       
       const { error } = await supabase
         .from('packages')
@@ -423,7 +431,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
       if (error) throw error;
       
-      showToast(language === 'zh' ? '接单成功' : 'Accepted', 'success');
+      showToast(language === 'zh' ? '接单成功，请打包' : 'Accepted, please pack', 'success');
       onRefresh();
     } catch (error) {
       Alert.alert('错误', '接单失败');
@@ -748,10 +756,26 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   
                   <TouchableOpacity 
                     style={[styles.merchantsButton, styles.merchantsAcceptButton]}
-                    onPress={() => handleMerchantAccept(order.id, order.payment_method)}
+                    onPress={() => handleMerchantAccept(order.id, order.payment_method || 'cash')}
                   >
                     <Ionicons name="checkmark-circle-outline" size={18} color="white" />
                     <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* 🚀 新增：商家打包完成按钮 */}
+              {userType === 'merchant' && order.status === '打包中' && (
+                <View style={styles.merchantsActionRow}>
+                  <TouchableOpacity 
+                    style={[styles.merchantsButton, styles.merchantsAcceptButton, { backgroundColor: '#10b981' }]}
+                    onPress={() => {
+                      setPackingOrderData(order);
+                      setShowPackingModal(true);
+                    }}
+                  >
+                    <Ionicons name="cube-outline" size={18} color="white" />
+                    <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '开始打包' : 'Start Packing'}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -761,6 +785,38 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* 🚀 打包核对单 Modal */}
+      <PackingModal
+        visible={showPackingModal}
+        orderData={packingOrderData}
+        language={language}
+        onComplete={async () => {
+          if (!packingOrderData) return;
+          try {
+            showLoading(language === 'zh' ? '提交中...' : 'Processing...', 'package');
+            const newStatus = packingOrderData.payment_method === 'cash' ? '待收款' : '待取件';
+            const { error } = await supabase
+              .from('packages')
+              .update({ status: newStatus, updated_at: new Date().toISOString() })
+              .eq('id', packingOrderData.id);
+
+            if (error) throw error;
+            
+            showToast(language === 'zh' ? '打包完成' : 'Packing Done', 'success');
+            setShowPackingModal(false);
+            setPackingOrderData(null);
+            
+            // 发送全局通知，刷新其他页面的状态
+            DeviceEventEmitter.emit('order_status_updated');
+            onRefresh();
+          } catch (error) {
+            Alert.alert('错误', '提交失败，请重试');
+          } finally {
+            hideLoading();
+          }
+        }}
+      />
     </View>
   );
 }

@@ -1,11 +1,13 @@
 {
   "expo": {
+    "version": "2.2.2",
     "extra": {
       "eas": {
         "projectId": "7da5ae54-bcf3-4379-8104-a078c05e3d0d"
       }
     },
     "android": {
+      "versionCode": 47,
       "package": "com.amt349.marketlinkexpress"
     }
   }

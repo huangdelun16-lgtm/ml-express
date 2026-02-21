@@ -45,28 +45,49 @@ export default function LoginScreen({ navigation }: any) {
 
     try {
       // ===== 员工登录 =====
+      console.log('🚀 开始执行登录请求:', username);
       const account = await adminAccountService.login(username, password);
       
       if (account) {
+        console.log('✅ 登录验证通过, 开始存储用户信息:', account.username);
         const userId = account.id || '';
-        await AsyncStorage.setItem('currentUserId', userId);
-        await AsyncStorage.setItem('currentUser', account.username);
-        await AsyncStorage.setItem('currentUserName', account.employee_name);
-        await AsyncStorage.setItem('currentUserRole', account.role);
-        await AsyncStorage.setItem('currentUserPosition', account.position || '');
+        const userUsername = account.username || '';
+        const userEmployeeName = account.employee_name || '';
+        const userRole = account.role || 'operator';
+        const userPosition = account.position || '';
+
+        // 批量保存，增加错误检查
+        try {
+          await Promise.all([
+            AsyncStorage.setItem('currentUserId', userId),
+            AsyncStorage.setItem('currentUser', userUsername),
+            AsyncStorage.setItem('currentUserName', userEmployeeName),
+            AsyncStorage.setItem('currentUserRole', userRole),
+            AsyncStorage.setItem('currentUserPosition', userPosition)
+          ]);
+        } catch (storageError) {
+          console.error('❌ AsyncStorage 保存失败:', storageError);
+        }
         
-        // 🚀 核心：清除 Supabase Auth 状态，不再绑定
-        await supabase.auth.signOut();
+        // 🚀 核心：安全地尝试清除 Supabase Auth 状态
+        try {
+          if (supabase.auth) {
+            await supabase.auth.signOut().catch(e => console.warn('Supabase signOut ignored:', e));
+          }
+        } catch (authError) {
+          console.warn('Supabase auth check failed:', authError);
+        }
         
         let courierId = '';
         
-        if (account.position === '骑手' || account.position === '骑手队长') {
+        if (userPosition === '骑手' || userPosition === '骑手队长') {
+          console.log('🛵 检测到骑手身份，同步骑手数据...');
           try {
             // 1. 尝试查找现有骑手记录
             let { data: courierData, error: fetchError } = await supabase
               .from('couriers')
               .select('*')
-              .eq('name', account.employee_name)
+              .eq('name', userEmployeeName)
               .maybeSingle();
             
             // 2. 如果不存在，则创建一个新的骑手记录
@@ -76,12 +97,13 @@ export default function LoginScreen({ navigation }: any) {
                 .from('couriers')
                 .insert([{
                   id: `COU${Date.now()}`,
-                  name: account.employee_name,
-                  phone: account.phone,
-                  employee_id: account.employee_id,
+                  name: userEmployeeName,
+                  phone: account.phone || '',
+                  employee_id: account.employee_id || '',
                   status: 'active',
-                  vehicle_type: account.position === '骑手队长' ? 'car' : 'motorcycle',
-                  last_active: new Date().toISOString()
+                  vehicle_type: userPosition === '骑手队长' ? 'car' : 'motorcycle',
+                  last_active: new Date().toISOString(),
+                  credit_score: 100 // 🚀 初始信用分
                 }])
                 .select()
                 .single();
@@ -102,15 +124,19 @@ export default function LoginScreen({ navigation }: any) {
                 .update({ 
                   last_active: new Date().toISOString(), 
                   status: 'active',
-                  employee_id: account.employee_id, // 确保员工编号同步
+                  employee_id: account.employee_id || '', // 确保员工编号同步
                 })
                 .eq('id', courierId);
               
               await AsyncStorage.setItem('currentCourierId', courierId);
               await AsyncStorage.setItem('currentUserName', courierData.name);
               
-              // 启动后台位置追踪
-              await locationService.startBackgroundTracking();
+              // 启动后台位置追踪 (增加错误捕获，防止权限拒绝导致崩溃)
+              try {
+                await locationService.startBackgroundTracking();
+              } catch (locError) {
+                console.warn('📍 启动位置追踪被跳过:', locError);
+              }
             }
           } catch (error) {
             console.error('Courier data sync error:', error);
@@ -129,6 +155,7 @@ export default function LoginScreen({ navigation }: any) {
           console.warn('推送注册失败，但不影响登录:', nsError);
         }
         
+        console.log('🏁 登录流程全部完成，跳转主页');
         navigation.replace('Main');
       } else {
         Alert.alert(
@@ -177,7 +204,7 @@ export default function LoginScreen({ navigation }: any) {
             </View>
             <Text style={styles.title}>MARKET LINK EXPRESS</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>STAFF PORTAL</Text>
+              <Text style={styles.badgeText}>COURIER PORTAL</Text>
             </View>
           </View>
 
@@ -243,6 +270,22 @@ export default function LoginScreen({ navigation }: any) {
                   </>
                 )}
               </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.registerLink}
+              onPress={() => {
+                Alert.alert(
+                  language === 'zh' ? '申请入驻' : 'Apply to Join',
+                  language === 'zh' 
+                    ? '想要成为 ML Express 的骑手吗？请联系我们的地推人员或拨打客服热线进行申请。' 
+                    : 'Want to become an ML Express rider? Please contact our local staff or call customer service to apply.'
+                );
+              }}
+            >
+              <Text style={styles.registerLinkText}>
+                {language === 'zh' ? '没有账号？申请加入骑手' : 'No account? Apply to join'}
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.footer}>
@@ -401,5 +444,16 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.3)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+    padding: 10,
+  },
+  registerLinkText: {
+    color: '#60a5fa',
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

@@ -32,6 +32,7 @@ export default function ProfileScreen({ navigation }: any) {
     todayDeliveryFee: 0,
     todayCOD: 0,
     todayIncome: 0,
+    creditScore: 100, // 🚀 新增：信用分
   });
 
   useFocusEffect(
@@ -279,8 +280,11 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{stats.inProgress}</Text>
-              <Text style={styles.statLabel}>{language === 'zh' ? '配送中' : language === 'my' ? 'ပို့ဆောင်နေဆဲ' : 'Active'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="star" size={16} color="#fbbf24" />
+                <Text style={styles.statNumber}>{stats.creditScore}</Text>
+              </View>
+              <Text style={styles.statLabel}>{language === 'zh' ? '信用分' : language === 'my' ? 'ယုံကြည်မှုရမှတ်' : 'Credit'}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>

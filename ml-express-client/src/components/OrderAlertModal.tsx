@@ -13,6 +13,7 @@ import {
   ScrollView,
   Image,
   Platform,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,9 +103,27 @@ const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
   );
 };
 
-export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatusUpdate, onAccepted }: any) => {
+export const OrderAlertModal = ({ 
+  visible, 
+  orders = [], // 🚀 改为数组
+  onClose, 
+  language, 
+  onStatusUpdate, 
+  onAccepted,
+  onDeclineSuccess 
+}: any) => {
+  const [selectedIndex, setSelectedIndex] = useState(0); // 🚀 当前选择的订单索引
   const [isProcessing, setIsProcessing] = useState(false);
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({});
+
+  // 🚀 当订单数组变化时，确保索引合法
+  useEffect(() => {
+    if (selectedIndex >= orders.length) {
+      setSelectedIndex(Math.max(0, orders.length - 1));
+    }
+  }, [orders.length]);
+
+  const orderData = orders[selectedIndex]; // 🚀 当前选中的订单数据
 
   useEffect(() => {
     let isActive = true;
@@ -232,7 +251,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
     if (!orderData || isProcessing) return;
     setIsProcessing(true);
     try {
-      const newStatus = orderData.payment_method === 'cash' ? '待收款' : '待取件';
+      const newStatus = '打包中'; // 🚀 改为“打包中”
       const { error } = await supabase
         .from('packages')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -247,7 +266,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
         Alert.alert('错误', '打印失败，请检查打印机连接');
       }
       onAccepted?.(orderData);
-      onClose();
+      // 注意：App.tsx 中 onAccepted 会调用 removePendingOrder，所以这里不需要手动处理索引
     } catch (error) {
       console.error('接单失败:', error);
       Alert.alert('错误', '接单失败，请检查网络');
@@ -329,7 +348,7 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
               }
 
               onStatusUpdate?.();
-              onClose();
+              onDeclineSuccess?.(orderData.id);
             } catch (err) {
               console.error('拒绝接单失败:', err);
               Alert.alert('错误', '操作失败，请重试');
@@ -400,21 +419,77 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
     );
   };
 
+  // 🚀 渲染订单选择列表
+  const renderOrderSelector = () => {
+    if (orders.length <= 1) return null;
+
+    return (
+      <View style={styles.orderSelectorContainer}>
+        <Text style={styles.selectorHint}>
+          {language === 'zh' ? `共有 ${orders.length} 个待处理订单 (点击选择)` : `Total ${orders.length} orders pending`}
+        </Text>
+        <FlatList
+          horizontal
+          data={orders}
+          keyExtractor={(item) => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 10 }}
+          renderItem={({ item, index }) => (
+            <TouchableOpacity
+              onPress={() => setSelectedIndex(index)}
+              style={[
+                styles.orderTab,
+                selectedIndex === index && styles.orderTabActive
+              ]}
+            >
+              <View style={styles.tabContent}>
+                <Text style={[styles.tabId, selectedIndex === index && styles.tabIdActive]}>
+                  #{item.id.slice(-5)}
+                </Text>
+                <Text style={[styles.tabTime, selectedIndex === index && styles.tabTimeActive]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+              {selectedIndex === index && (
+                <View style={styles.activeIndicator} />
+              )}
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  };
+
+  if (!orderData && visible) {
+    return (
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <ActivityIndicator size="large" color="white" />
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '85%', position: 'relative' }]}>
+        <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '90%', position: 'relative' }]}>
           <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="notifications" size={32} color="#fbbf24" />
+            <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+              <View style={styles.headerIconContainer}>
+                <Ionicons name="notifications" size={24} color="#fbbf24" />
+              </View>
+              <View style={{ width: 40 }} />
             </View>
-            <Text style={styles.modalTitle}>{language === 'zh' ? '您有新的订单！' : 'New Order!'}</Text>
-            <View style={styles.badgeContainer}>
-              <Text style={styles.orderIdBadge}>
-                {language === 'zh' ? '订单编号：' : 'Order No: '}
-                <Text style={{ fontWeight: '900', fontSize: 18 }}>#{orderData?.id?.slice(-5)}</Text>
-              </Text>
-            </View>
+            
+            <Text style={styles.modalTitle}>
+              {language === 'zh' ? '新订单提醒' : 'New Order Alert'}
+            </Text>
+
+            {renderOrderSelector()}
           </LinearGradient>
 
           <ScrollView
@@ -430,13 +505,16 @@ export const OrderAlertModal = ({ visible, orderData, onClose, language, onStatu
                   {orderData?.id && (
                     <QRCode 
                       value={orderData.id} 
-                      size={140}
+                      size={120}
                       color="#1e293b"
                       backgroundColor="white"
                     />
                   )}
                 </View>
                 <Text style={styles.qrHint}>{language === 'zh' ? '由骑手扫描此码取件' : 'Scan for pickup'}</Text>
+                <View style={styles.idBadgeLarge}>
+                  <Text style={styles.idBadgeText}>#{orderData?.id}</Text>
+                </View>
               </View>
 
               {/* 商家信息 (寄件人) */}
@@ -547,25 +625,33 @@ const swipeStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#f8fafc', borderRadius: 32, width: '92%', ...theme.shadows.large },
-  header: { padding: 24, alignItems: 'center', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  iconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 2, borderColor: '#fbbf24' },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: 'white', textAlign: 'center' },
-  badgeContainer: { marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
-  orderIdBadge: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
+  modalContent: { backgroundColor: '#f8fafc', borderRadius: 32, width: '94%', ...theme.shadows.large },
+  header: { paddingVertical: 16, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  closeButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
+  headerIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#fbbf24' },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: 'white', textAlign: 'center', marginTop: 8 },
   
-  qrSection: { alignItems: 'center', marginBottom: 20, backgroundColor: 'white', padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
-  qrLabel: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 12 },
-  qrContainer: { padding: 10, backgroundColor: 'white', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  qrHint: { marginTop: 12, fontSize: 12, color: '#64748b', fontWeight: '600' },
+  orderSelectorContainer: { marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  selectorHint: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', marginTop: 8, fontWeight: '600' },
+  orderTab: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, marginRight: 10, minWidth: 100, alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
+  orderTabActive: { backgroundColor: 'white', borderColor: '#fbbf24' },
+  tabContent: { alignItems: 'center' },
+  tabId: { color: 'white', fontSize: 14, fontWeight: '900' },
+  tabIdActive: { color: '#1e3a8a' },
+  tabTime: { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 2 },
+  tabTimeActive: { color: '#64748b' },
+  activeIndicator: { position: 'absolute', bottom: -12, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fbbf24' },
+
+  qrSection: { alignItems: 'center', marginBottom: 20, backgroundColor: 'white', padding: 16, borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0' },
+  qrLabel: { fontSize: 15, fontWeight: '900', color: '#1e293b', marginBottom: 10 },
+  qrContainer: { padding: 8, backgroundColor: 'white', borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  qrHint: { marginTop: 10, fontSize: 11, color: '#64748b', fontWeight: '600' },
+  idBadgeLarge: { marginTop: 12, backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+  idBadgeText: { fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#475569', fontWeight: '700' },
 
   infoSection: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#1e3a8a', textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 14, fontWeight: '900', color: '#1e3a8a', textTransform: 'uppercase' },
   infoCard: { backgroundColor: 'white', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   cardValue: { fontSize: 16, fontWeight: '900', color: '#1e293b', marginBottom: 4 },
   cardSubValue: { fontSize: 13, color: '#64748b', marginTop: 2, lineHeight: 18 },

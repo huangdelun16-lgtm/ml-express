@@ -639,6 +639,75 @@ export const packageService = {
       console.error('获取包裹详情异常:', err);
       return null;
     }
+  },
+
+  /**
+   * 🚀 新增：骑手异常上报
+   */
+  async reportAnomaly(reportData: {
+    packageId: string;
+    courierId: string;
+    courierName: string;
+    anomalyType: string;
+    description: string;
+    location?: { latitude: number, longitude: number }
+  }): Promise<boolean> {
+    try {
+      console.log('📝 正在提交异常上报:', reportData);
+      
+      // 1. 获取包裹详情
+      const { data: pkg } = await supabase
+        .from('packages')
+        .select('receiver_latitude, receiver_longitude, sender_name, receiver_name')
+        .eq('id', reportData.packageId)
+        .single();
+
+      // 2. 插入到 delivery_alerts 表
+      const { error } = await supabase
+        .from('delivery_alerts')
+        .insert([{
+          package_id: reportData.packageId,
+          courier_id: reportData.courierId,
+          courier_name: reportData.courierName,
+          alert_type: 'rider_report',
+          severity: 'medium',
+          title: `骑手主动上报: ${reportData.anomalyType}`,
+          description: reportData.description,
+          courier_latitude: reportData.location?.latitude || 0,
+          courier_longitude: reportData.location?.longitude || 0,
+          destination_latitude: pkg?.receiver_latitude || 0,
+          destination_longitude: pkg?.receiver_longitude || 0,
+          status: 'pending',
+          metadata: {
+            report_type: reportData.anomalyType,
+            sender: pkg?.sender_name,
+            receiver: pkg?.receiver_name
+          }
+        }]);
+
+      if (error) throw error;
+
+      // 🚀 新增：同时更新包裹状态为“异常上报”，确保全端同步
+      await supabase
+        .from('packages')
+        .update({ status: '异常上报', updated_at: new Date().toISOString() })
+        .eq('id', reportData.packageId);
+
+      // 3. 记录审计日志
+      await auditLogService.log({
+        user_id: reportData.courierId,
+        user_name: reportData.courierName,
+        action_type: 'create',
+        module: 'packages',
+        target_id: reportData.packageId,
+        action_description: `骑手提交异常上报: ${reportData.anomalyType}`
+      });
+
+      return true;
+    } catch (error) {
+      console.error('❌ 异常上报失败:', error);
+      return false;
+    }
   }
 };
 

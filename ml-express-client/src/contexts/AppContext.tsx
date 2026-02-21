@@ -13,8 +13,10 @@ interface AppContextType {
   // 🚀 新增：全屏订单提醒控制
   showOrderAlert: boolean;
   setShowOrderAlert: (show: boolean) => void;
-  newOrderData: any;
-  setNewOrderData: (data: any) => void;
+  pendingOrders: any[];
+  setPendingOrders: (orders: any[]) => void;
+  addPendingOrder: (order: any) => void;
+  removePendingOrder: (orderId: string) => void;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -25,14 +27,35 @@ interface AppProviderProps {
 export function AppProvider({ children }: AppProviderProps) {
   const [language, setLanguageState] = useState<Language>('zh');
   const [showOrderAlert, setShowOrderAlert] = useState(false);
-  const [newOrderData, setNewOrderData] = useState<any>(null);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const subscriptionRef = useRef<any>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null); // 🚀 新增：报警循环引用
   const [userType, setUserType] = useState<string | null>(null);
 
+  // 🚀 新增：添加待处理订单
+  const addPendingOrder = (order: any) => {
+    setPendingOrders(prev => {
+      // 防止重复添加
+      if (prev.some(o => o.id === order.id)) return prev;
+      return [order, ...prev]; // 新订单排在最前面
+    });
+    setShowOrderAlert(true);
+  };
+
+  // 🚀 新增：移除待处理订单
+  const removePendingOrder = (orderId: string) => {
+    setPendingOrders(prev => {
+      const filtered = prev.filter(o => o.id !== orderId);
+      if (filtered.length === 0) {
+        setShowOrderAlert(false);
+      }
+      return filtered;
+    });
+  };
+
   // 🚀 核心优化：报警循环 (每 15 秒响一次)
   useEffect(() => {
-    if (showOrderAlert && newOrderData) {
+    if (showOrderAlert && pendingOrders.length > 0) {
       const playAlarm = () => {
         // 1. 震动 (设置了重复，但为了保险每 15 秒重新触发一次)
         Vibration.cancel();
@@ -40,10 +63,10 @@ export function AppProvider({ children }: AppProviderProps) {
 
         // 2. 语音播报
         const speakText = language === 'my' 
-          ? 'သင့်မှာ အော်ဒါအသစ်ရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ' 
+          ? `သင့်မှာ အော်ဒါအသစ် ${pendingOrders.length} ခုရှိပါတယ်၊ ကျေးဇူးပြု၍ လက်ခံပေးပါ` 
           : language === 'en' 
-          ? 'You have a new order, please accept' 
-          : '你有新的订单，请接单';
+          ? `You have ${pendingOrders.length} new orders, please accept` 
+          : `你有 ${pendingOrders.length} 个新订单，请接单`;
         
         Speech.stop();
         Speech.speak(speakText, { 
@@ -57,7 +80,7 @@ export function AppProvider({ children }: AppProviderProps) {
           const ns = require('../services/notificationService').default.getInstance();
           ns.sendSystemAnnouncementNotification({
             title: language === 'zh' ? '📦 新订单提醒' : 'New Order',
-            message: `${language === 'zh' ? '订单号' : 'Order ID'}: ${newOrderData.id}`,
+            message: `${language === 'zh' ? '你有新订单等待处理' : 'You have new orders pending'}`,
             priority: 'high'
           });
         } catch (e) {
@@ -85,7 +108,7 @@ export function AppProvider({ children }: AppProviderProps) {
         clearInterval(alarmIntervalRef.current);
       }
     };
-  }, [showOrderAlert, language, newOrderData]);
+  }, [showOrderAlert, language, pendingOrders.length]);
 
   // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
   // 修复：使用 useEffect 调用 API，而不是在渲染逻辑中条件性使用 Hook
@@ -161,9 +184,7 @@ export function AppProvider({ children }: AppProviderProps) {
               console.log('🔔 全局监听到新订单消息:', { id: newOrder.id, status: newOrder.status });
               
               if (newOrder.status === '待确认') {
-                setNewOrderData(newOrder);
-                setShowOrderAlert(true);
-                // 🚀 报警逻辑已移至独立的 useEffect 循环处理
+                addPendingOrder(newOrder);
               }
             })
             .subscribe((status) => {
@@ -190,20 +211,17 @@ export function AppProvider({ children }: AppProviderProps) {
         if (!currentUserStr) return;
         const user = JSON.parse(currentUserStr);
         
-        if (user.user_type === 'merchant' && user.id && !showOrderAlert) {
+        if (user.user_type === 'merchant' && user.id) {
           const { data: missingOrders, error } = await supabase
             .from('packages')
             .select('*')
             .eq('delivery_store_id', user.id)
             .eq('status', '待确认')
-            .order('created_at', { ascending: false })
-            .limit(1);
+            .order('created_at', { ascending: false });
           
           if (!error && missingOrders && missingOrders.length > 0) {
-            console.log('🔍 轮询发现未提醒订单:', missingOrders[0].id);
-            setNewOrderData(missingOrders[0]);
-            setShowOrderAlert(true);
-            // 🚀 报警逻辑已移至独立的 useEffect 循环处理
+            console.log('🔍 轮询发现待处理订单:', missingOrders.length);
+            missingOrders.forEach(order => addPendingOrder(order));
           }
         }
       } catch (err) {
@@ -236,8 +254,10 @@ export function AppProvider({ children }: AppProviderProps) {
       setLanguage,
       showOrderAlert,
       setShowOrderAlert,
-      newOrderData,
-      setNewOrderData
+      pendingOrders,
+      setPendingOrders,
+      addPendingOrder,
+      removePendingOrder
     }}>
       {children}
     </AppContext.Provider>

@@ -44,6 +44,9 @@ const ProfilePage: React.FC = () => {
   const [showPickupCodeModal, setShowPickupCodeModal] = useState(false); // 显示寄件码模态框
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(''); // 二维码数据URL
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
+  const [showPackingModal, setShowPackingModal] = useState(false); // 🚀 新增：显示打包模态框
+  const [packingOrderData, setPackingOrderData] = useState<any>(null); // 🚀 新增：打包订单数据
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({}); // 🚀 新增：打包清单选中项
   const [showPasswordModal, setShowPasswordModal] = useState(false); // 显示密码修改模态框
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -675,14 +678,13 @@ const ProfilePage: React.FC = () => {
         return;
       }
 
-      // 更新状态为“待取件”
-      // 因为商城订单如果是 VIP 下单，货款已经从余额扣除了，所以接单后直接进入待取件状态
-      const success = await packageService.updatePackageStatus(selectedPackage.id, '待取件');
+      // 更新状态为“打包中”
+      const success = await packageService.updatePackageStatus(selectedPackage.id, '打包中');
       
       if (success) {
-        alert(language === 'zh' ? '接单成功！请等待快递员取件。' : 'Order accepted! Please wait for courier pickup.');
+        alert(language === 'zh' ? '接单成功！请开始打包商品。' : 'Order accepted! Please start packing the items.');
         // 刷新本地数据
-        const updatedPackage = { ...selectedPackage, status: '待取件' };
+        const updatedPackage = { ...selectedPackage, status: '打包中' };
         setSelectedPackage(updatedPackage);
         setUserPackages(prev => prev.map(p => p.id === selectedPackage.id ? updatedPackage : p));
       } else {
@@ -691,6 +693,53 @@ const ProfilePage: React.FC = () => {
     } catch (error) {
       LoggerService.error('接单失败:', error);
       alert(language === 'zh' ? '接单失败，请重试' : 'Accept failed, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🚀 新增：开始打包功能
+  const handleStartPacking = (pkg: any) => {
+    setPackingOrderData(pkg);
+    setCheckedItems({});
+    setShowPackingModal(true);
+    setShowPackageDetailModal(false);
+  };
+
+  // 🚀 新增：切换打包项勾选状态
+  const toggleItem = (itemId: string) => {
+    setCheckedItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  // 🚀 新增：完成打包逻辑
+  const handleCompletePacking = async () => {
+    if (!packingOrderData) return;
+
+    try {
+      setLoading(true);
+      
+      // 确定新的状态：如果已支付（如 VIP 余额支付）则进入待取件，否则进入待收款
+      // 实际上对于商家，统称为“待取件”或“待收款”，我们这里统一逻辑
+      const isPaid = packingOrderData.payment_method === 'balance' || packingOrderData.payment_status === 'paid';
+      const nextStatus = isPaid ? '待取件' : '待收款';
+      
+      const success = await packageService.updatePackageStatus(packingOrderData.id, nextStatus);
+      
+      if (success) {
+        alert(language === 'zh' ? '打包完成！快递员将很快上门取件。' : 'Packing complete! Courier will arrive soon.');
+        setShowPackingModal(false);
+        setPackingOrderData(null);
+        // 刷新本地列表
+        setUserPackages(prev => prev.map(p => p.id === packingOrderData.id ? { ...p, status: nextStatus } : p));
+      } else {
+        throw new Error('Status update failed');
+      }
+    } catch (error) {
+      LoggerService.error('打包完成更新失败:', error);
+      alert(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -753,6 +802,7 @@ const ProfilePage: React.FC = () => {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: string } = {
       '待确认': '#fbbf24', // 🚀 琥珀色
+      '打包中': '#10b981', // 🚀 绿色
       '待取件': '#f59e0b',
       '已取件': '#3b82f6',
       '运输中': '#8b5cf6',
@@ -767,6 +817,7 @@ const ProfilePage: React.FC = () => {
   const getStatusText = (status: string) => {
     if (status === '待收款') return language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်';
     if (status === '待确认') return language === 'zh' ? '待接单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်းနေသည်';
+    if (status === '打包中') return language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်';
     return status;
   };
 
@@ -810,6 +861,7 @@ const ProfilePage: React.FC = () => {
   const orderStats = {
     total: userPackages.length,
     pendingConfirmation: userPackages.filter(pkg => pkg.status === '待确认').length, // 🚀 待确认
+    packing: userPackages.filter(pkg => pkg.status === '打包中').length, // 🚀 打包中
     pendingPickup: userPackages.filter(pkg => pkg.status === '待取件' || pkg.status === '待收款').length,
     inTransit: userPackages.filter(pkg => pkg.status === '运输中' || pkg.status === '已取件').length,
     completed: userPackages.filter(pkg => pkg.status === '已送达' || pkg.status === '已完成').length
@@ -1409,6 +1461,37 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
 
+            {/* 打包中 (仅限合伙店铺显示) */}
+            {isPartnerStore && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                borderRadius: '24px',
+                padding: '1.75rem',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                textAlign: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'default',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+              }}
+              >
+                <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>📦</div>
+                <div style={{ color: '#10b981', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+                  {orderStats.packing}
+                </div>
+                <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်'}
+                </div>
+              </div>
+            )}
+
             {/* 待取件 */}
             <div style={{
               background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.05) 100%)',
@@ -1495,6 +1578,37 @@ const ProfilePage: React.FC = () => {
                 {t.completed}
               </div>
             </div>
+
+            {/* 🚀 新增：打包中 */}
+            {isPartnerStore && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                borderRadius: '24px',
+                padding: '1.75rem',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                textAlign: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'default',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+              }}
+              >
+                <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>📦</div>
+                <div style={{ color: '#10b981', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+                  {orderStats.packing}
+                </div>
+                <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်'}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
@@ -2292,41 +2406,73 @@ const ProfilePage: React.FC = () => {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setShowPackageDetailModal(true);
-                    }}
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.25)',
-                      color: 'white',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      padding: '0.5rem 1.5rem',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.3s ease',
-                      width: '100%',
-                      maxWidth: '200px',
-                      marginTop: '0.5rem',
-                      display: 'block',
-                      marginLeft: 'auto',
-                      marginRight: 'auto'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.4)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    {t.viewDetails}
-                  </button>
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'center',
+                    marginTop: '1rem'
+                  }}>
+                    <button
+                      onClick={() => {
+                        setSelectedPackage(pkg);
+                        setShowPackageDetailModal(true);
+                      }}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.25)',
+                        color: 'white',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        padding: '0.5rem 1.5rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                        transition: 'all 0.3s ease',
+                        flex: 1,
+                        maxWidth: '150px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.4)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      {t.viewDetails}
+                    </button>
+
+                    {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
+                    {isPartnerStore && pkg.status === '打包中' && (
+                      <button
+                        onClick={() => handleStartPacking(pkg)}
+                        style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1.5rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '900',
+                          transition: 'all 0.3s ease',
+                          flex: 1,
+                          maxWidth: '150px',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(16, 185, 129, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                        }}
+                      >
+                        📦 {language === 'zh' ? '开始打包' : language === 'en' ? 'Start Packing' : 'ထုပ်ပိုးရန်စတင်ပါ'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               </div>
@@ -2742,48 +2888,67 @@ const ProfilePage: React.FC = () => {
                 )}
               </div>
 
-              {/* 🚀 新增：商家接单功能按钮 */}
-              {isPartnerStore && selectedPackage.status === '待确认' && (
-                <button
-                  onClick={handleAcceptOrder}
-                  disabled={loading}
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '1rem 2rem',
-                    borderRadius: '12px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '1.1rem',
-                    fontWeight: '900',
-                    transition: 'all 0.3s ease',
-                    width: '100%',
-                    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    marginBottom: '0.5rem'
-                  }}
-                  onMouseOver={(e) => {
-                    if (!loading) {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 12px 25px rgba(16, 185, 129, 0.4)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!loading) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)';
-                    }
-                  }}
-                >
-                  {loading ? (
-                    <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
-                  ) : (
-                    <>✅ {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept Order' : 'အော်ဒါလက်ခံရန်'}</>
+              {/* 🚀 新增：商家接单/开始打包功能按钮 */}
+              {isPartnerStore && (
+                <>
+                  {selectedPackage.status === '待确认' && (
+                    <button
+                      onClick={handleAcceptOrder}
+                      disabled={loading}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '1rem 2rem',
+                        borderRadius: '12px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        fontSize: '1.1rem',
+                        fontWeight: '900',
+                        transition: 'all 0.3s ease',
+                        width: '100%',
+                        boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        marginBottom: '0.5rem'
+                      }}
+                    >
+                      {loading ? (
+                        <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                      ) : (
+                        <>✅ {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept Order' : 'အော်ဒါလက်ခံရန်'}</>
+                      )}
+                    </button>
                   )}
-                </button>
+
+                  {selectedPackage.status === '打包中' && (
+                    <button
+                      onClick={() => handleStartPacking(selectedPackage)}
+                      disabled={loading}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '1rem 2rem',
+                        borderRadius: '12px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        fontSize: '1.1rem',
+                        fontWeight: '900',
+                        transition: 'all 0.3s ease',
+                        width: '100%',
+                        boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        marginBottom: '0.5rem'
+                      }}
+                    >
+                      <>📦 {language === 'zh' ? '开始打包' : language === 'en' ? 'Start Packing' : 'ထုပ်ပိုးရန်စတင်ပါ'}</>
+                    </button>
+                  )}
+                </>
               )}
 
               {/* 关闭按钮 */}
@@ -3896,6 +4061,191 @@ const ProfilePage: React.FC = () => {
               >
                 {loading ? <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div> : '确认已支付'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🚀 新增：打包模态框 (PackingModal) */}
+      {showPackingModal && packingOrderData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}
+        onClick={() => !loading && setShowPackingModal(false)}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '35px',
+            width: '100%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* 打包窗口页眉 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              padding: '2.5rem 2rem',
+              textAlign: 'center',
+              position: 'relative'
+            }}>
+              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>📦</div>
+              <h2 style={{ color: 'white', fontSize: '2rem', fontWeight: '950', margin: 0 }}>
+                {language === 'zh' ? '订单打包中' : language === 'en' ? 'Order Packing' : 'အော်ဒါထုပ်ပိုးနေသည်'}
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1rem', marginTop: '0.5rem', fontWeight: '600' }}>
+                {t.packageId}: {packingOrderData.id}
+              </p>
+              {!loading && (
+                <button 
+                  onClick={() => setShowPackingModal(false)}
+                  style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.2)', border: 'none', width: '36px', height: '36px', borderRadius: '18px', color: 'white', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
+                >✕</button>
+              )}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              {/* 商品清单 */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ color: '#1e293b', fontSize: '1.2rem', fontWeight: '900', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  📋 {language === 'zh' ? '核对商品清单' : language === 'en' ? 'Checklist' : 'ပစ္စည်းစာရင်းစစ်ဆေးရန်'}
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {(() => {
+                    // 解析商品信息
+                    const productsMatch = packingOrderData.description?.match(/\[商品清单: (.*?)\]/);
+                    const productItems = productsMatch ? productsMatch[1].split(', ') : [];
+                    
+                    if (productItems.length === 0) {
+                      return (
+                        <div style={{ padding: '2rem', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+                          <p style={{ color: '#64748b', fontWeight: '600' }}>
+                            {language === 'zh' ? '暂无详细商品清单，请核对包裹内容' : 'No detailed list, please check package content'}
+                          </p>
+                          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '1rem', cursor: 'pointer' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={checkedItems['default']} 
+                              onChange={() => toggleItem('default')}
+                              style={{ width: '24px', height: '24px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#1e293b' }}>
+                              {language === 'zh' ? '确认商品已备齐' : 'Confirm all items ready'}
+                            </span>
+                          </label>
+                        </div>
+                      );
+                    }
+
+                    return productItems.map((item: string, index: number) => (
+                      <div 
+                        key={index}
+                        onClick={() => toggleItem(`item-${index}`)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '15px',
+                          padding: '1.2rem',
+                          background: checkedItems[`item-${index}`] ? 'rgba(16, 185, 129, 0.05)' : '#f8fafc',
+                          borderRadius: '18px',
+                          border: `2px solid ${checkedItems[`item-${index}`] ? '#10b981' : '#f1f5f9'}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          border: `2px solid ${checkedItems[`item-${index}`] ? '#10b981' : '#cbd5e1'}`,
+                          backgroundColor: checkedItems[`item-${index}`] ? '#10b981' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '1rem'
+                        }}>
+                          {checkedItems[`item-${index}`] && '✓'}
+                        </div>
+                        <span style={{ 
+                          fontSize: '1.1rem', 
+                          fontWeight: '700', 
+                          color: checkedItems[`item-${index}`] ? '#64748b' : '#1e293b',
+                          textDecoration: checkedItems[`item-${index}`] ? 'line-through' : 'none',
+                          flex: 1
+                        }}>
+                          {item}
+                        </span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* 订单备注 */}
+              {packingOrderData.description && !packingOrderData.description.includes('商品清单') && (
+                <div style={{ background: '#fffbeb', padding: '1.5rem', borderRadius: '20px', border: '1px solid #fde68a', marginBottom: '2rem' }}>
+                  <h4 style={{ color: '#92400e', margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: '900' }}>💡 {language === 'zh' ? '客户备注' : 'Customer Note'}</h4>
+                  <p style={{ color: '#b45309', margin: 0, fontSize: '1rem', fontWeight: '600' }}>{packingOrderData.description}</p>
+                </div>
+              )}
+            </div>
+
+            {/* 底部操作栏 */}
+            <div style={{ padding: '2rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={handleCompletePacking}
+                disabled={loading || (() => {
+                  const productsMatch = packingOrderData.description?.match(/\[商品清单: (.*?)\]/);
+                  const productItems = productsMatch ? productsMatch[1].split(', ') : [];
+                  if (productItems.length === 0) return !checkedItems['default'];
+                  return productItems.some((_: any, index: number) => !checkedItems[`item-${index}`]);
+                })()}
+                style={{
+                  width: '100%',
+                  padding: '1.2rem',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  fontSize: '1.2rem',
+                  fontWeight: '950',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)',
+                  transition: 'all 0.3s ease',
+                  opacity: (() => {
+                    const productsMatch = packingOrderData.description?.match(/\[商品清单: (.*?)\]/);
+                    const productItems = productsMatch ? productsMatch[1].split(', ') : [];
+                    const allChecked = productItems.length === 0 ? checkedItems['default'] : !productItems.some((_: any, index: number) => !checkedItems[`item-${index}`]);
+                    return allChecked && !loading ? 1 : 0.6;
+                  })()
+                }}
+              >
+                {loading ? (
+                  <div className="spinner" style={{ width: '24px', height: '24px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
+                ) : (
+                  language === 'zh' ? '确认打包完成' : 'Confirm Packing Done'
+                )}
+              </button>
+              <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', marginTop: '1rem', fontWeight: '600' }}>
+                {language === 'zh' ? '请确保所有商品已备齐并打包好' : 'Please ensure all items are packed securely'}
+              </p>
             </div>
           </div>
         </div>

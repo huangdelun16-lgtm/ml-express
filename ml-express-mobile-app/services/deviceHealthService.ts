@@ -15,6 +15,7 @@ export interface HealthReport {
     enabled: boolean;
     accuracy?: number; // meters
     isPrecise: boolean;
+    isMocked: boolean; // 🚀 新增：是否使用模拟定位
   };
   storage: {
     freeSpace: number; // bytes
@@ -27,6 +28,7 @@ export interface HealthReport {
   device: {
     modelName: string | null;
     osVersion: string | null;
+    isDeveloperMode: boolean; // 🚀 新增：是否开启开发者模式
   };
 }
 
@@ -40,6 +42,7 @@ export const deviceHealthService = {
       device: {
         modelName: Device.modelName,
         osVersion: Device.osVersion,
+        isDeveloperMode: __DEV__, // 在 React Native 中，__DEV__ 可以作为一种基础判断
       }
     };
 
@@ -62,19 +65,22 @@ export const deviceHealthService = {
       
       let accuracy: number | undefined;
       let isPrecise = false;
+      let isMocked = false;
 
       if (status === 'granted' && enabled) {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         accuracy = loc.coords.accuracy || undefined;
         isPrecise = (accuracy !== undefined && accuracy < 50); // 50米精度内认为精确
+        isMocked = (loc as any).mocked || false; // 部分 Android 设备会返回 mocked 字段
       }
 
       report.location = {
         enabled: status === 'granted' && enabled,
         accuracy,
-        isPrecise
+        isPrecise,
+        isMocked
       };
-      if (!report.location.enabled || !isPrecise) report.isOk = false;
+      if (!report.location.enabled || !isPrecise || isMocked) report.isOk = false;
     } catch (e) {
       console.warn('Location check failed', e);
     }

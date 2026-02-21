@@ -16,11 +16,12 @@ import {
   Platform,
   StatusBar,
   Vibration,
+  TextInput
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import { packageService, deliveryStoreService, supabase } from '../services/supabase';
+import { packageService, deliveryStoreService, supabase, Package } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,27 +33,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { geofenceService } from '../services/geofenceService';
 import { DeviceHealthShield } from '../components/DeviceHealthShield';
-
-interface Package {
-  id: string;
-  sender_name: string;
-  sender_phone: string;
-  receiver_name: string;
-  receiver_phone: string;
-  receiver_address: string;
-  package_type: string;
-  weight: number;
-  description: string;
-  estimated_cost: number;
-  status: string;
-  courier: string;
-  created_at: string;
-  pickup_time?: string;
-  delivery_time?: string;
-  delivery_store_id?: string;
-  store_fee?: number | string;
-  payment_method?: string;
-}
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,6 +52,12 @@ const MyTasksScreen: React.FC = () => {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  
+  // 异常上报状态
+  const [showAnomalyModal, setShowAnomalyModal] = useState(false);
+  const [anomalyType, setAnomalyType] = useState('');
+  const [anomalyDescription, setAnomalyDescription] = useState('');
+  const [reporting, setReporting] = useState(false);
   
   // 扫码相关状态
   const [showScanModal, setShowScanModal] = useState(false);
@@ -307,7 +293,7 @@ const MyTasksScreen: React.FC = () => {
       const myPackages = allPackages.filter(pkg => {
         if (pkg.courier !== userName) return false;
         const s = normalizeStatus(pkg.status);
-        return ['待取件', '待收款', '已取件', '配送中', '已送达'].includes(s);
+        return ['待取件', '待收款', '已取件', '配送中', '已送达', '异常上报'].includes(s);
       }).map(pkg => ({
         ...pkg,
         status: normalizeStatus(pkg.status)
@@ -353,6 +339,7 @@ const MyTasksScreen: React.FC = () => {
     if (s.includes('配送中') || s.includes('配送进行中')) return '#9b59b6'; // 紫色 - 配送中
     if (s.includes('已取件')) return '#3498db'; // 蓝色 - 已取件
     if (s.includes('待取件') || s.includes('待收款')) return '#f39c12'; // 橙色 - 待取件
+    if (s.includes('异常上报')) return '#ef4444'; // 🚀 新增：红色 - 异常上报
     return '#95a5a6';
   };
 
@@ -364,6 +351,7 @@ const MyTasksScreen: React.FC = () => {
     if (s.includes('已取件')) return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
     if (s.includes('待取件')) return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
     if (s.includes('待收款')) return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
+    if (s.includes('异常上报')) return language === 'zh' ? '异常上报' : language === 'en' ? 'Anomaly' : 'မူမမှန်မှု';
     return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
   };
 
@@ -394,7 +382,7 @@ const MyTasksScreen: React.FC = () => {
     
     Alert.alert(
       language === 'zh' ? '确认收款' : language === 'en' ? 'Confirm Payment' : 'ငွေကောက်ခံမှုအတည်ပြုရန်',
-      `${language === 'zh' ? '确认已收到' : language === 'en' ? 'Confirm received' : 'လက်ခံရရှိပြီးဖြစ်ကြောင်း အတည်ပြုရန်'} ${selectedPackage.estimated_cost} ${language === 'zh' ? '吗？' : language === 'en' ? '?' : '?'}`,
+      `${language === 'zh' ? '确认已收到' : language === 'en' ? 'Confirm received' : 'လက်ခံရရှိပြီးဖြစ်ကြောင်း အတည်ပြုရန်'} ${selectedPackage.store_fee} ${language === 'zh' ? '吗？' : language === 'en' ? '?' : '?'}`,
       [
         { text: language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်', style: 'cancel' },
         {
@@ -446,6 +434,28 @@ const MyTasksScreen: React.FC = () => {
   const handleManualPickup = async () => {
     if (!selectedPackage) return;
     
+    // 🚀 新增：限制接单逻辑 - 信用分检查
+    try {
+      const courierId = await AsyncStorage.getItem('currentCourierId');
+      if (courierId) {
+        const { data: courierData } = await supabase
+          .from('couriers')
+          .select('credit_score')
+          .eq('id', courierId)
+          .single();
+        
+        const score = courierData?.credit_score ?? 100;
+        
+        if (score < 60) {
+          Alert.alert(
+            language === 'zh' ? '接单受限' : 'Account Restricted',
+            language === 'zh' ? `您的信用分过低 (${score})，已被限制接单。` : `Credit score too low (${score}). Account restricted.`
+          );
+          return;
+        }
+      }
+    } catch (e) {}
+
     Alert.alert(
       language === 'zh' ? '确认取件' : language === 'en' ? 'Confirm Pickup' : 'ကောက်ယူမှုကိုအတည်ပြုပါ',
       language === 'zh' ? '确定已收到此包裹吗？' : language === 'en' ? 'Are you sure you have received this package?' : 'ဤအထုပ်ကိုလက်ခံရရှိသည်မှာသေချာပါသလား?',
@@ -485,9 +495,34 @@ const MyTasksScreen: React.FC = () => {
     if (!capturedPhoto || !selectedPackage) return;
     try {
       setUploadingPhoto(true);
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
       
+      // 1. 🚀 防作弊检查
+      const { deviceHealthService } = require('../services/deviceHealthService');
+      const health = await deviceHealthService.performFullCheck();
+      
+      if (health.location.isMocked) {
+        Alert.alert('检测到异常', '禁止使用模拟定位进行送达操作');
+        return;
+      }
+
+      // 2. 🚀 距离检查
+      const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
+      
+      if (currentLoc && pkgData?.receiver_latitude) {
+        const dist = calculateDistance(
+          currentLoc.coords.latitude,
+          currentLoc.coords.longitude,
+          pkgData.receiver_latitude,
+          pkgData.receiver_longitude
+        );
+
+        if (dist > 200) {
+          Alert.alert('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再拍照。`);
+          return;
+        }
+      }
+
       const success = await packageService.updatePackageStatus(
         selectedPackage.id,
         '已送达',
@@ -513,16 +548,101 @@ const MyTasksScreen: React.FC = () => {
     }
   };
 
+  const handleReportAnomaly = async () => {
+    if (!selectedPackage) return;
+    if (!anomalyType || !anomalyDescription) {
+      Alert.alert('提示', '请选择异常类型并填写详细说明');
+      return;
+    }
+
+    try {
+      setReporting(true);
+      
+      // 获取当前位置
+      let locationData = undefined;
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (loc) locationData = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      } catch (e) {}
+
+      const success = await packageService.reportAnomaly({
+        packageId: selectedPackage.id,
+        courierId: currentCourierId,
+        courierName: currentCourierName,
+        anomalyType,
+        description: anomalyDescription,
+        location: locationData
+      });
+
+      if (success) {
+        // 🚀 更新本地状态为“异常上报”
+        setPackages(prev => {
+          const next = prev.map(p => p.id === selectedPackage.id ? { ...p, status: '异常上报' } : p);
+          cacheService.savePackages(next as any); // 🚀 兼容性修复：暂时使用 as any 规避接口细微差异
+          return next;
+        });
+
+        Alert.alert(
+          language === 'zh' ? '提交成功' : 'Reported Successfully',
+          language === 'zh' ? '异常已报备，平台将介入处理。感谢您的配合！' : 'Anomaly reported. The platform will intervene. Thank you for your cooperation!',
+          [{ text: '确定', onPress: async () => {
+            setShowAnomalyModal(false);
+            setAnomalyType('');
+            setAnomalyDescription('');
+            await loadMyPackages();
+          }}]
+        );
+      } else {
+        throw new Error('Submit failed');
+      }
+    } catch (error) {
+      Alert.alert('失败', '提交报备失败，请重试');
+    } finally {
+      setReporting(false);
+    }
+  };
+
   const handleScanCode = async (data: string) => {
     if (scannedOnce.current) return;
     scannedOnce.current = true;
-    setScannedData(data);
-    setScanning(false);
-    setShowScanModal(false);
     
-    if (data.startsWith('STORE_')) {
-      const storeId = data.replace('STORE_', '').split('_')[0];
-      try {
+    try {
+      setLoading(true);
+      
+      // 1. 🚀 防作弊检查
+      const { deviceHealthService } = require('../services/deviceHealthService');
+      const health = await deviceHealthService.performFullCheck();
+      if (health.location.isMocked) {
+        Alert.alert('检测到异常', '禁止使用模拟定位进行扫码操作');
+        return;
+      }
+
+      // 2. 🚀 距离检查 (如果是送达操作)
+      if (selectedPackage && selectedPackage.status !== '待取件') {
+        const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
+        
+        if (currentLoc && pkgData?.receiver_latitude) {
+          const dist = calculateDistance(
+            currentLoc.coords.latitude,
+            currentLoc.coords.longitude,
+            pkgData.receiver_latitude,
+            pkgData.receiver_longitude
+          );
+
+          if (dist > 200) {
+            Alert.alert('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再扫码。`);
+            return;
+          }
+        }
+      }
+
+      setScannedData(data);
+      setScanning(false);
+      setShowScanModal(false);
+      
+      if (data.startsWith('STORE_')) {
+        const storeId = data.replace('STORE_', '').split('_')[0];
         const storeDetails = await deliveryStoreService.getStoreById(storeId);
         const storeName = storeDetails ? storeDetails.store_name : `店铺${storeId}`;
         
@@ -538,11 +658,13 @@ const MyTasksScreen: React.FC = () => {
             }
           }
         }]);
-      } catch (error) {
-        Alert.alert('错误', '更新失败');
+      } else {
+        Alert.alert('扫码成功', `扫描结果: ${data}`);
       }
-    } else {
-      Alert.alert('扫码成功', `扫描结果: ${data}`);
+    } catch (error) {
+      Alert.alert('错误', '更新失败');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -626,8 +748,16 @@ const MyTasksScreen: React.FC = () => {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.gridActionBtn} onPress={() => setShowCameraModal(true)}>
                   <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']} style={styles.gridBtnGradient}>
-                    <Ionicons name="camera" size={26} color="#10b981" />
-                    <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照/扫码' : 'Proof'}</Text>
+                    <Ionicons 
+                      name={selectedPackage.status === '待取件' || selectedPackage.status === '待收款' ? "archive" : "checkmark-circle"} 
+                      size={26} 
+                      color="#10b981" 
+                    />
+                    <Text style={styles.gridBtnText}>
+                      {selectedPackage.status === '待取件' || selectedPackage.status === '待收款' 
+                        ? (language === 'zh' ? '立即取件' : 'Pickup') 
+                        : (language === 'zh' ? '完成配送' : 'Complete')}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -768,19 +898,25 @@ const MyTasksScreen: React.FC = () => {
               <Text style={styles.modalTitle}>📷 {language === 'zh' ? '选择操作' : 'Operation'}</Text>
               <TouchableOpacity onPress={() => setShowCameraModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
-            <View style={[styles.modalBody, { flexDirection: 'row', gap: 16, flexWrap: 'wrap' }]}>
+            <View style={[styles.modalBody, { flexDirection: 'row', gap: 12, flexWrap: 'wrap' }]}>
               {selectedPackage?.status === '待取件' ? (
                 <>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
-                      <Ionicons name="qr-code" size={32} color="white" />
+                      <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码取件' : 'Scan'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={handleManualPickup}>
                     <LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}>
-                      <Ionicons name="hand-right" size={32} color="white" />
+                      <Ionicons name="hand-right" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '手动取件' : 'Manual'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}>
+                    <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
+                      <Ionicons name="warning" size={28} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -788,14 +924,20 @@ const MyTasksScreen: React.FC = () => {
                 <>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={handleOpenCamera}>
                     <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}>
-                      <Ionicons name="camera" size={32} color="white" />
+                      <Ionicons name="camera" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照送达' : 'Photo'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
-                      <Ionicons name="qr-code" size={32} color="white" />
+                      <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码送达' : 'Scan'}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}>
+                    <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
+                      <Ionicons name="warning" size={28} color="white" />
+                      <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -915,7 +1057,7 @@ const MyTasksScreen: React.FC = () => {
                       (selectedPackage as any).receiver_latitude || 0,
                       (selectedPackage as any).receiver_longitude || 0
                     );
-                    const isWithinRange = dist <= 50;
+                    const isWithinRange = dist <= 200; // 🚀 统一为 200 米
                     
                     return (
                   <LinearGradient
@@ -938,9 +1080,7 @@ const MyTasksScreen: React.FC = () => {
                         <Text style={[styles.uploadButtonTextFixed, isWithinRange && { fontSize: 18, fontWeight: '900' }]}>
                       {uploadingPhoto 
                         ? (language === 'zh' ? '正在上传...' : 'Uploading...') 
-                            : (isWithinRange 
-                                ? (language === 'zh' ? '🎯 在范围内，确认送达' : '🎯 In Range, Confirm')
-                                : (language === 'zh' ? '确认送达' : 'Confirm'))}
+                        : (language === 'zh' ? (isWithinRange ? '🎯 确认送达' : '确认送达') : 'Confirm')}
                     </Text>
                   </LinearGradient>
                     );
@@ -948,6 +1088,104 @@ const MyTasksScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🚀 异常上报模态框 */}
+      <Modal visible={showAnomalyModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.glassModal, { backgroundColor: '#fff', maxWidth: 450 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: '#f1f5f9' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="warning" size={24} color="#ef4444" />
+                </View>
+                <Text style={[styles.modalTitle, { color: '#ef4444' }]}>
+                  {language === 'zh' ? '异常场景申报' : 'Anomaly Report'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAnomalyModal(false)} style={[styles.closeBtn, { backgroundColor: '#f1f5f9' }]}>
+                <Ionicons name="close" size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* 引导语 */}
+              <View style={{ backgroundColor: '#fef2f2', padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#fee2e2' }}>
+                <Text style={{ color: '#991b1b', fontSize: 13, lineHeight: 20, fontWeight: '600' }}>
+                  {language === 'zh' 
+                    ? '💡 遇到问题请先报备，平台将核实免责。严禁在未送达的情况下直接点击“确认送达”，虚假点击将面临平台重罚！' 
+                    : '💡 Please report issues first. The platform will verify and exempt liability. Do not mark as "Delivered" without actual delivery; false clicks result in heavy penalties!'}
+                </Text>
+              </View>
+
+              {/* 异常类型选择 */}
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
+                🚩 {language === 'zh' ? '选择异常类型' : 'Anomaly Type'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {['联系不上收件人', '地址错误/无法送达', '收件人拒绝签收', '包裹损坏', '其他异常'].map((type) => (
+                  <TouchableOpacity 
+                    key={type}
+                    onPress={() => setAnomalyType(type)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      backgroundColor: anomalyType === type ? '#fee2e2' : '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: anomalyType === type ? '#ef4444' : '#e2e8f0',
+                    }}
+                  >
+                    <Text style={{ color: anomalyType === type ? '#ef4444' : '#64748b', fontSize: 13, fontWeight: '600' }}>{type}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 详细说明 */}
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
+                📝 {language === 'zh' ? '详细说明' : 'Description'}
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderRadius: 16,
+                  padding: 16,
+                  color: '#1e293b',
+                  fontSize: 14,
+                  minHeight: 100,
+                  textAlignVertical: 'top',
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  marginBottom: 24,
+                }}
+                placeholder={language === 'zh' ? '请描述具体情况，如：拨打收件人电话3次未接通...' : 'Describe the situation...'}
+                placeholderTextColor="#94a3b8"
+                multiline
+                numberOfLines={4}
+                value={anomalyDescription}
+                onChangeText={setAnomalyDescription}
+              />
+
+              <TouchableOpacity 
+                style={[{ height: 56, borderRadius: 16, overflow: 'hidden' }, (reporting || !anomalyType || !anomalyDescription) && styles.disabledBtn]} 
+                onPress={handleReportAnomaly}
+                disabled={reporting || !anomalyType || !anomalyDescription}
+              >
+                <LinearGradient colors={['#ef4444', '#dc2626']} style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+                  {reporting ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={20} color="white" />
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{language === 'zh' ? '提交报备' : 'Submit Report'}</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+              
+              <View style={{ height: 20 }} />
+            </ScrollView>
           </View>
         </View>
       </Modal>
