@@ -84,6 +84,7 @@ const ProfilePage: React.FC = () => {
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
   const reviewImageInputRef = useRef<HTMLInputElement>(null);
 
   const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
@@ -488,6 +489,18 @@ const ProfilePage: React.FC = () => {
       LoggerService.debug('包裹列表:', packages);
       
       setUserPackages(packages);
+
+      // 🚀 新增：获取已评价的订单ID列表
+      if (packages.length > 0) {
+        const { data: reviews } = await supabase
+          .from('store_reviews')
+          .select('order_id')
+          .eq('user_id', currentUser.id);
+        
+        if (reviews) {
+          setReviewedOrderIds(new Set(reviews.map(r => r.order_id)));
+        }
+      }
     } catch (error) {
       LoggerService.error('加载包裹列表失败:', error);
       setUserPackages([]);
@@ -799,6 +812,14 @@ const ProfilePage: React.FC = () => {
       const result = await reviewService.createReview(reviewData);
       if (result.success) {
         alert(language === 'zh' ? '评价提交成功！感谢您的反馈。' : 'Review submitted! Thank you.');
+        
+        // 🚀 更新已评价ID列表，让按钮立即消失
+        setReviewedOrderIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(reviewOrder.id);
+          return newSet;
+        });
+
         setShowReviewSubmitModal(false);
         // 刷新包裹列表以更新状态（如果需要显示已评价标签）
         await loadUserPackages();
@@ -2628,8 +2649,8 @@ const ProfilePage: React.FC = () => {
                       {t.viewDetails}
                     </button>
 
-                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 */}
-                    {!isPartnerStore && (pkg.status === '已送达' || pkg.status === '已完成') && (
+                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
+                    {!isPartnerStore && (pkg.status === '已送达' || pkg.status === '已完成') && !reviewedOrderIds.has(pkg.id) && (
                       <button
                         onClick={() => handleOpenReviewModal(pkg)}
                         style={{
