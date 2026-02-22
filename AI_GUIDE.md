@@ -1040,6 +1040,19 @@ CI=true npm run build
 
 ---
 
+### 🛠️ 移动端构建指南 (iOS/Android)
+
+#### 1. iOS 构建新版本 (IPA)
+构建新版本的 iOS 应用时，必须同步修改以下原生配置文件，否则 EAS Build 可能会回退到旧版本号：
+- **`ml-express-client/ios/MARKETLINKEXPRESS/Info.plist`**: 修改 `CFBundleShortVersionString` (版本号) 和 `CFBundleVersion` (构建编号)。
+- **`ml-express-client/ios/MARKETLINKEXPRESS.xcodeproj/project.pbxproj`**: 修改 `MARKETING_VERSION` (版本号) 和 `CURRENT_PROJECT_VERSION` (构建编号)。
+
+#### 2. Android 构建新版本 (APK/AAB)
+构建新版本的 Android 应用时，需要修改：
+- **`ml-express-client/android/app/build.gradle`**: 修改 `versionName` (版本号) 和 `versionCode` (构建编号)。
+
+---
+
 ## 📋 版本信息
 
 *最后更新：2026年2月6日*  

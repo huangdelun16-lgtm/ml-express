@@ -130,6 +130,24 @@ export interface RechargeRequest {
   updated_at?: string;
 }
 
+// 商店评价接口
+export interface StoreReview {
+  id: string;
+  store_id: string;
+  order_id: string;
+  user_id: string;
+  user_name: string;
+  rating: number;
+  comment: string;
+  images: string[];
+  reply_text?: string;
+  replied_at?: string;
+  is_anonymous: boolean;
+  status: 'pending' | 'published' | 'hidden';
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {
   // 获取所有包裹（用于跟踪页面）
@@ -1148,6 +1166,129 @@ export const rechargeService = {
     } catch (error: any) {
       LoggerService.error('创建充值申请失败:', error?.message || '未知错误');
       return { success: false, error };
+    }
+  }
+};
+
+// 评价服务
+export const reviewService = {
+  // 提交评价
+  async createReview(reviewData: Omit<StoreReview, 'id' | 'created_at' | 'updated_at' | 'status'>) {
+    try {
+      const { data, error } = await supabase
+        .from('store_reviews')
+        .insert([{
+          ...reviewData,
+          status: 'published', // 默认发布，后期可改为 pending 进入审核流
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('提交评价失败:', error?.message || '未知错误');
+      return { success: false, error };
+    }
+  },
+
+  // 获取店铺评价列表
+  async getStoreReviews(storeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('store_reviews')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      LoggerService.error('获取评价列表失败:', error?.message || '未知错误');
+      return [];
+    }
+  },
+
+  // 获取店铺评分统计
+  async getStoreReviewStats(storeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('store_reviews')
+        .select('rating')
+        .eq('store_id', storeId)
+        .eq('status', 'published');
+
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        return { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+      }
+
+      const count = data.length;
+      const sum = data.reduce((acc, curr) => acc + curr.rating, 0);
+      const average = parseFloat((sum / count).toFixed(1));
+      
+      const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      data.forEach(r => {
+        const rating = r.rating as keyof typeof distribution;
+        distribution[rating] = (distribution[rating] || 0) + 1;
+      });
+
+      return { average, count, distribution };
+    } catch (error: any) {
+      LoggerService.error('获取评价统计失败:', error?.message || '未知错误');
+      return { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+    }
+  },
+
+  // 商家回复评价
+  async replyToReview(reviewId: string, replyText: string) {
+    try {
+      const { data, error } = await supabase
+        .from('store_reviews')
+        .update({
+          reply_text: replyText,
+          replied_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', reviewId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('回复评价失败:', error?.message || '未知错误');
+      return { success: false, error };
+    }
+  },
+
+  // 上传评价图片
+  async uploadReviewImage(userId: string, file: File): Promise<string | null> {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `review_${userId}_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('review_images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('review_images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      LoggerService.error('上传评价图片失败:', error?.message || '未知错误');
+      return null;
     }
   }
 };
