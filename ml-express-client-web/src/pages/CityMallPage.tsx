@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deliveryStoreService, DeliveryStore } from '../services/supabase';
+import { deliveryStoreService, DeliveryStore, reviewService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
 import LoggerService from '../services/LoggerService';
@@ -13,6 +13,11 @@ const CityMallPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
+  const [storeReviewStats, setStoreReviewStats] = useState<Record<string, any>>({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedStoreForReviews, setSelectedStoreForReviews] = useState<any>(null);
+  const [currentStoreReviews, setCurrentStoreReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   const regions = [
     { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
@@ -59,10 +64,34 @@ const CityMallPage: React.FC = () => {
     try {
       const data = await deliveryStoreService.getActiveStores();
       setStores(data);
+      
+      // 🚀 加载所有店铺的评价统计
+      const statsPromises = data.map(store => reviewService.getStoreReviewStats(store.id));
+      const statsResults = await Promise.all(statsPromises);
+      
+      const statsMap: Record<string, any> = {};
+      data.forEach((store, index) => {
+        statsMap[store.id] = statsResults[index];
+      });
+      setStoreReviewStats(statsMap);
     } catch (error) {
       LoggerService.error('Failed to load stores:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStoreReviews = async (store: any) => {
+    setSelectedStoreForReviews(store);
+    setShowReviewModal(true);
+    setLoadingReviews(true);
+    try {
+      const reviews = await reviewService.getStoreReviews(store.id);
+      setCurrentStoreReviews(reviews);
+    } catch (error) {
+      LoggerService.error('Failed to load reviews:', error);
+    } finally {
+      setLoadingReviews(false);
     }
   };
 
@@ -437,6 +466,31 @@ const CityMallPage: React.FC = () => {
                           ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : t.mall.closedNow)}
                         </span>
                       </div>
+
+                      {/* 🚀 新增：评价统计显示 */}
+                      {storeReviewStats[store.id] && storeReviewStats[store.id].count > 0 && (
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            loadStoreReviews(store);
+                          }}
+                          style={{ 
+                            marginTop: '0.8rem', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', color: '#fbbf24', fontSize: '0.9rem' }}>
+                            {'★'.repeat(Math.round(storeReviewStats[store.id].average))}
+                            {'☆'.repeat(5 - Math.round(storeReviewStats[store.id].average))}
+                          </div>
+                          <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: '700' }}>
+                            {storeReviewStats[store.id].average} ({storeReviewStats[store.id].count} {language === 'zh' ? '条评价' : 'Reviews'})
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -509,6 +563,152 @@ const CityMallPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 🚀 新增：店铺评价详情弹窗 */}
+      {showReviewModal && selectedStoreForReviews && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.5rem'
+        }}
+        onClick={() => setShowReviewModal(false)}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '32px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+            position: 'relative'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* 页眉 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+              padding: '2.5rem 2rem',
+              textAlign: 'center',
+              position: 'relative'
+            }}>
+              <button 
+                onClick={() => setShowReviewModal(false)}
+                style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.2)', border: 'none', width: '36px', height: '36px', borderRadius: '12px', color: 'white', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >✕</button>
+              
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⭐</div>
+              <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: 0 }}>
+                {selectedStoreForReviews.store_name}
+              </h2>
+              
+              {storeReviewStats[selectedStoreForReviews.id] && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '1rem' }}>
+                  <div style={{ color: '#fbbf24', fontSize: '1.2rem', fontWeight: '900' }}>
+                    {storeReviewStats[selectedStoreForReviews.id].average} / 5.0
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', fontWeight: '600' }}>
+                    {storeReviewStats[selectedStoreForReviews.id].count} {language === 'zh' ? '条评价' : 'Reviews'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 评分分布 */}
+            {storeReviewStats[selectedStoreForReviews.id] && (
+              <div style={{ padding: '1.5rem 2rem', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[5, 4, 3, 2, 1].map(star => {
+                    const count = storeReviewStats[selectedStoreForReviews.id].distribution[star] || 0;
+                    const total = storeReviewStats[selectedStoreForReviews.id].count;
+                    const percent = total > 0 ? (count / total) * 100 : 0;
+                    return (
+                      <div key={star} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ width: '30px', fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b' }}>{star} ⭐</span>
+                        <div style={{ flex: 1, height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: `${percent}%`, height: '100%', background: star >= 4 ? '#10b981' : star === 3 ? '#fbbf24' : '#ef4444', borderRadius: '4px' }}></div>
+                        </div>
+                        <span style={{ width: '30px', fontSize: '0.85rem', color: '#94a3b8', textAlign: 'right' }}>{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 评论列表 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              {loadingReviews ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #f1f5f9', borderTop: '4px solid #3b82f6', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
+                </div>
+              ) : currentStoreReviews.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {currentStoreReviews.map((review) => (
+                    <div key={review.id} style={{ paddingBottom: '1.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b' }}>
+                            {review.is_anonymous ? '匿' : (review.user_name?.charAt(0).toUpperCase() || 'U')}
+                          </div>
+                          <span style={{ fontWeight: '700', fontSize: '0.95rem', color: '#1e293b' }}>
+                            {review.is_anonymous ? (language === 'zh' ? '匿名用户' : 'Anonymous') : review.user_name}
+                          </span>
+                        </div>
+                        <div style={{ color: '#fbbf24', fontSize: '0.8rem' }}>
+                          {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                        </div>
+                      </div>
+                      <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 1rem 0' }}>{review.comment}</p>
+                      
+                      {review.images && review.images.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                          {review.images.map((img: string, idx: number) => (
+                            <img key={idx} src={img} alt="Review" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                          ))}
+                        </div>
+                      )}
+
+                      {review.reply_text && (
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '14px', borderLeft: '4px solid #3b82f6', marginTop: '0.5rem' }}>
+                          <div style={{ color: '#3b82f6', fontSize: '0.8rem', fontWeight: '800', marginBottom: '4px' }}>
+                            {language === 'zh' ? '商家回复' : 'Merchant Reply'}
+                          </div>
+                          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>{review.reply_text}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  {language === 'zh' ? '暂无评价内容' : 'No review content yet'}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '1.5rem 2rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                style={{ width: '100%', padding: '12px', borderRadius: '14px', background: '#1e293b', color: 'white', border: 'none', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {t.profile.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {

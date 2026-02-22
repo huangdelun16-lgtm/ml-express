@@ -786,7 +786,7 @@ const ProfilePage: React.FC = () => {
     try {
       setIsSubmittingReview(true);
       const reviewData = {
-        store_id: reviewOrder.delivery_store_id || 'default_store', // 如果没有store_id，使用默认
+        store_id: reviewOrder.delivery_store_id || '00000000-0000-0000-0000-000000000000', // 使用 UUID 格式的零值作为 fallback
         order_id: reviewOrder.id,
         user_id: currentUser.id,
         user_name: currentUser.name || 'User',
