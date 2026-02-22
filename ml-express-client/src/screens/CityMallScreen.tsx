@@ -18,10 +18,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { deliveryStoreService, merchantService } from '../services/supabase';
+import { deliveryStoreService, merchantService, reviewService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import { theme } from '../config/theme';
 import BackToHomeButton from '../components/BackToHomeButton';
+import LoggerService from '../services/LoggerService';
 
 const { width } = Dimensions.get('window');
 
@@ -46,6 +47,11 @@ export default function CityMallScreen({ navigation }: any) {
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
   const [productMatches, setProductMatches] = useState<Record<string, string[]>>({});
   const [searchingProducts, setSearchingProducts] = useState(false);
+  const [storeReviewStats, setStoreReviewStats] = useState<Record<string, any>>({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedStoreForReviews, setSelectedStoreForReviews] = useState<any>(null);
+  const [currentStoreReviews, setCurrentStoreReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   const regions = [
     { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
@@ -71,7 +77,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: '正在营业',
       closedNow: '休息中',
       closedToday: '今日暂停营业',
-      selectRegion: '选择地区'
+      selectRegion: '选择地区',
+      reviews: '条评价',
+      noReviews: '暂无评价内容',
+      merchantReply: '商家回复',
+      close: '关闭'
     },
     en: {
       title: 'City Mall',
@@ -86,7 +96,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: 'Open Now',
       closedNow: 'Closed',
       closedToday: 'Closed Today',
-      selectRegion: 'Select Region'
+      selectRegion: 'Select Region',
+      reviews: 'Reviews',
+      noReviews: 'No reviews yet',
+      merchantReply: 'Merchant Reply',
+      close: 'Close'
     },
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
@@ -101,7 +115,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: 'ဆိုင်ဖွင့်ထားသည်',
       closedNow: 'ဆိုင်ပိတ်ထားသည်',
       closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
-      selectRegion: 'ဒေသရွေးချယ်ပါ'
+      selectRegion: 'ဒေသရွေးချယ်ပါ',
+      reviews: 'ခု မှတ်ချက်',
+      noReviews: 'မှတ်ချက်မရှိသေးပါ',
+      merchantReply: 'ဆိုင်၏ပြန်လည်ဖြေကြားချက်',
+      close: 'ပိတ်မည်'
     },
   }[language] || {
     title: 'City Mall',
@@ -150,10 +168,34 @@ export default function CityMallScreen({ navigation }: any) {
     try {
       const data = await deliveryStoreService.getActiveStores();
       setStores(data);
+
+      // 🚀 加载所有店铺的评价统计
+      const statsPromises = data.map(store => reviewService.getStoreReviewStats(store.id));
+      const statsResults = await Promise.all(statsPromises);
+      
+      const statsMap: Record<string, any> = {};
+      data.forEach((store, index) => {
+        statsMap[store.id] = statsResults[index];
+      });
+      setStoreReviewStats(statsMap);
     } catch (error) {
       console.error('Failed to load stores:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStoreReviews = async (store: any) => {
+    setSelectedStoreForReviews(store);
+    setShowReviewModal(true);
+    setLoadingReviews(true);
+    try {
+      const reviews = await reviewService.getStoreReviews(store.id);
+      setCurrentStoreReviews(reviews);
+    } catch (error) {
+      LoggerService.error('Failed to load reviews:', error);
+    } finally {
+      setLoadingReviews(false);
     }
   };
 
@@ -330,6 +372,26 @@ export default function CityMallScreen({ navigation }: any) {
                 </Text>
               </View>
             </View>
+            
+            {/* 🚀 新增：评价统计显示 */}
+            {storeReviewStats[item.id] && storeReviewStats[item.id].count > 0 && (
+              <TouchableOpacity 
+                style={styles.reviewStatsContainer}
+                onPress={() => loadStoreReviews(item)}
+              >
+                <View style={styles.starsRow}>
+                  <Text style={styles.starsText}>
+                    {'★'.repeat(Math.round(storeReviewStats[item.id].average))}
+                    <Text style={{ color: 'rgba(255,255,255,0.2)' }}>
+                      {'★'.repeat(5 - Math.round(storeReviewStats[item.id].average))}
+                    </Text>
+                  </Text>
+                </View>
+                <Text style={styles.reviewCountText}>
+                  {storeReviewStats[item.id].average} ({storeReviewStats[item.id].count} {t.reviews})
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -456,6 +518,128 @@ export default function CityMallScreen({ navigation }: any) {
           }
         />
       )}
+
+      {/* 🚀 新增：店铺评价详情弹窗 */}
+      <Modal
+        visible={showReviewModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReviewModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* 页眉 */}
+            <LinearGradient
+              colors={['#3b82f6', '#1e40af']}
+              style={styles.modalHeader}
+            >
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowReviewModal(false)}
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+              
+              <View style={styles.modalHeaderIconContainer}>
+                <Text style={{ fontSize: 40 }}>⭐</Text>
+              </View>
+              <Text style={styles.modalStoreName}>
+                {selectedStoreForReviews?.store_name}
+              </Text>
+              
+              {selectedStoreForReviews && storeReviewStats[selectedStoreForReviews.id] && (
+                <View style={styles.modalHeaderStats}>
+                  <Text style={styles.modalAverageScore}>
+                    {storeReviewStats[selectedStoreForReviews.id].average} / 5.0
+                  </Text>
+                  <Text style={styles.modalReviewCount}>
+                    • {storeReviewStats[selectedStoreForReviews.id].count} {t.reviews}
+                  </Text>
+                </View>
+              )}
+            </LinearGradient>
+
+            {/* 评分分布 */}
+            {selectedStoreForReviews && storeReviewStats[selectedStoreForReviews.id] && (
+              <View style={styles.distributionContainer}>
+                {[5, 4, 3, 2, 1].map(star => {
+                  const count = storeReviewStats[selectedStoreForReviews.id].distribution[star] || 0;
+                  const total = storeReviewStats[selectedStoreForReviews.id].count;
+                  const percent = total > 0 ? (count / total) * 100 : 0;
+                  return (
+                    <View key={star} style={styles.distributionRow}>
+                      <Text style={styles.starLabel}>{star} ⭐</Text>
+                      <View style={styles.progressBarBg}>
+                        <View style={[
+                          styles.progressBarFill, 
+                          { width: `${percent}%`, backgroundColor: star >= 4 ? '#10b981' : star === 3 ? '#fbbf24' : '#ef4444' }
+                        ]} />
+                      </View>
+                      <Text style={styles.countLabel}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* 评论列表 */}
+            <ScrollView style={styles.reviewsList}>
+              {loadingReviews ? (
+                <View style={{ padding: 40 }}>
+                  <ActivityIndicator color="#3b82f6" />
+                </View>
+              ) : currentStoreReviews.length > 0 ? (
+                currentStoreReviews.map((review) => (
+                  <View key={review.id} style={styles.reviewItem}>
+                    <View style={styles.reviewUserRow}>
+                      <View style={styles.userInfoLeft}>
+                        <View style={styles.userAvatar}>
+                          <Text style={styles.avatarText}>
+                            {review.is_anonymous ? '匿' : (review.user_name?.charAt(0).toUpperCase() || 'U')}
+                          </Text>
+                        </View>
+                        <Text style={styles.userNameText}>
+                          {review.is_anonymous ? (language === 'zh' ? '匿名用户' : 'Anonymous') : review.user_name}
+                        </Text>
+                      </View>
+                      <Text style={styles.reviewStars}>
+                        {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                      </Text>
+                    </View>
+                    <Text style={styles.reviewComment}>{review.comment}</Text>
+                    
+                    {review.images && review.images.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewImagesScroll}>
+                        {review.images.map((img: string, idx: number) => (
+                          <Image key={idx} source={{ uri: img }} style={styles.reviewImageThumb} />
+                        ))}
+                      </ScrollView>
+                    )}
+
+                    {review.reply_text && (
+                      <View style={styles.merchantReplyBox}>
+                        <Text style={styles.replyLabel}>{t.merchantReply}</Text>
+                        <Text style={styles.replyContent}>{review.reply_text}</Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.noReviewsContainer}>
+                  <Text style={styles.noReviewsText}>{t.noReviews}</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalFooterButton}
+              onPress={() => setShowReviewModal(false)}
+            >
+              <Text style={styles.modalFooterButtonText}>{t.close}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -643,6 +827,207 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  // 🚀 新增评价样式
+  reviewStatsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  starsRow: {
+    flexDirection: 'row',
+  },
+  starsText: {
+    color: '#fbbf24',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  reviewCountText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 32,
+    width: '100%',
+    maxHeight: '85%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    right: 20,
+    top: 20,
+    zIndex: 10,
+  },
+  modalHeaderIconContainer: {
+    marginBottom: 10,
+  },
+  modalStoreName: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  modalHeaderStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 10,
+  },
+  modalAverageScore: {
+    color: '#fbbf24',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  modalReviewCount: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  distributionContainer: {
+    padding: 20,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  distributionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 6,
+  },
+  starLabel: {
+    width: 35,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  countLabel: {
+    width: 25,
+    fontSize: 12,
+    color: '#94a3b8',
+    textAlign: 'right',
+  },
+  reviewsList: {
+    padding: 20,
+  },
+  reviewItem: {
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 20,
+  },
+  reviewUserRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  userInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  userNameText: {
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#1e293b',
+  },
+  reviewStars: {
+    color: '#fbbf24',
+    fontSize: 12,
+  },
+  reviewComment: {
+    color: '#475569',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  reviewImagesScroll: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  reviewImageThumb: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  merchantReplyBox: {
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+  },
+  replyLabel: {
+    color: '#3b82f6',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  replyContent: {
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  noReviewsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  noReviewsText: {
+    color: '#94a3b8',
+    fontSize: 14,
+  },
+  modalFooterButton: {
+    padding: 16,
+    backgroundColor: '#1e293b',
+    margin: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalFooterButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
