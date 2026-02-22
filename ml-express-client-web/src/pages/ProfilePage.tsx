@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService } from '../services/supabase';
+import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview } from '../services/supabase';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
@@ -67,6 +67,15 @@ const ProfilePage: React.FC = () => {
   const [lastOrderCheckTime, setLastOrderCheckTime] = useState<number>(Date.now()); // 🚀 新增：上次订单检测时间
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
   const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
+  
+  // 🚀 新增：评价管理状态
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [storeReviews, setStoreReviews] = useState<StoreReview[]>([]);
+  const [reviewStats, setReviewStats] = useState({ average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } });
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+
   const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
   const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
   const voiceActivationRef = useRef<HTMLAudioElement | null>(null); // 🚀 新增：用于激活音频上下文的引用
@@ -501,13 +510,48 @@ const ProfilePage: React.FC = () => {
     }
   }, [currentUser, isPartnerStore, storeInfo, selectedMonth]);
 
+  // 🚀 新增：加载店铺评价逻辑
+  const loadStoreReviews = useCallback(async () => {
+    if (!currentUser?.id || !isPartnerStore) return;
+    try {
+      setLoadingReviews(true);
+      const [reviews, stats] = await Promise.all([
+        reviewService.getStoreReviews(currentUser.id),
+        reviewService.getStoreReviewStats(currentUser.id)
+      ]);
+      setStoreReviews(reviews);
+      setReviewStats(stats);
+    } catch (error) {
+      LoggerService.error('加载评价失败:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  }, [currentUser, isPartnerStore]);
+
+  // 🚀 新增：商家回复评价逻辑
+  const handleReplyReview = async (reviewId: string) => {
+    if (!replyText.trim()) return;
+    try {
+      const result = await reviewService.replyToReview(reviewId, replyText);
+      if (result.success) {
+        alert(language === 'zh' ? '回复成功' : language === 'en' ? 'Reply sent' : 'ပြန်လည်ဖြေကြားပြီးပါပြီ');
+        setReplyText('');
+        setReplyingToId(null);
+        await loadStoreReviews(); // 重新加载
+      }
+    } catch (error) {
+      LoggerService.error('回复失败:', error);
+    }
+  };
+
   useEffect(() => {
     loadUserPackages();
     if (isPartnerStore) {
       loadPartnerCODStats();
       loadProducts(); // 🚀 新增：加载店铺商品
+      loadStoreReviews(); // 🚀 新增：加载评价
     }
-  }, [loadUserPackages, isPartnerStore, loadPartnerCODStats]);
+  }, [loadUserPackages, isPartnerStore, loadPartnerCODStats, loadStoreReviews]);
 
   // 🚀 新增：商家订单实时监控逻辑
   useEffect(() => {
@@ -1638,6 +1682,38 @@ const ProfilePage: React.FC = () => {
                 {t.completed}
               </div>
             </div>
+
+            {/* 🚀 新增：店铺评价 (仅限合伙店铺显示) */}
+            {isPartnerStore && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(217, 119, 6, 0.05) 100%)',
+                borderRadius: '24px',
+                padding: '1.75rem',
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                textAlign: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+              }}
+              onClick={() => setShowReviewsModal(true)}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(251, 191, 36, 0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+              }}
+              >
+                <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>⭐</div>
+                <div style={{ color: '#fbbf24', fontSize: '2.2rem', fontWeight: '950', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+                  {reviewStats.average || '0.0'}
+                </div>
+                <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  {language === 'zh' ? `${reviewStats.count} 条评价` : language === 'en' ? `${reviewStats.count} Reviews` : `${reviewStats.count} ခု မှတ်ချက်`}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
@@ -4674,6 +4750,228 @@ const ProfilePage: React.FC = () => {
               <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', marginTop: '1rem', fontWeight: '600' }}>
                 {language === 'zh' ? '请确保所有商品已备齐并打包好' : 'Please ensure all items are packed securely'}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🚀 新增：店铺评价管理模态框 (ReviewsModal) */}
+      {showReviewsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(10px)'
+        }}
+        onClick={() => setShowReviewsModal(false)}
+        >
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.95)',
+            padding: '2.5rem',
+            borderRadius: '32px',
+            maxWidth: '800px',
+            width: '95%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* 页眉 */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              paddingBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  borderRadius: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  boxShadow: '0 10px 20px rgba(245, 158, 11, 0.3)'
+                }}>⭐</div>
+                <div>
+                  <h2 style={{ color: 'white', margin: 0, fontSize: '1.75rem', fontWeight: '800' }}>
+                    {language === 'zh' ? '店铺评价管理' : language === 'en' ? 'Review Management' : 'ဆိုင်မှတ်ချက်များ စီမံခန့်ခွဲမှု'}
+                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                    <span style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>{reviewStats.average} / 5.0</span>
+                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>• {reviewStats.count} {language === 'zh' ? '条评价' : 'Reviews'}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReviewsModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >✕</button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+              {loadingReviews ? (
+                <div style={{ textAlign: 'center', padding: '5rem' }}>
+                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #fbbf24', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
+                </div>
+              ) : storeReviews.length > 0 ? (
+                storeReviews.map((review) => (
+                  <div
+                    key={review.id}
+                    style={{
+                      padding: '1.5rem',
+                      marginBottom: '1.5rem',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    {/* 用户信息和评分 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#475569' }}>
+                          {review.is_anonymous ? '匿' : (review.user_name?.charAt(0).toUpperCase() || 'U')}
+                        </div>
+                        <div>
+                          <div style={{ color: 'white', fontWeight: '700', fontSize: '1rem' }}>
+                            {review.is_anonymous ? (language === 'zh' ? '匿名用户' : 'Anonymous') : review.user_name}
+                          </div>
+                          <div style={{ color: '#fbbf24', fontSize: '0.85rem' }}>
+                            {'⭐'.repeat(review.rating)}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>
+                        {review.created_at ? new Date(review.created_at).toLocaleDateString() : ''}
+                      </div>
+                    </div>
+
+                    {/* 评论内容 */}
+                    <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: '1rem', lineHeight: '1.6', marginBottom: '1.25rem', whiteSpace: 'pre-wrap' }}>
+                      {review.comment}
+                    </div>
+
+                    {/* 图片预览 */}
+                    {review.images && review.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                        {review.images.map((img, idx) => (
+                          <img 
+                            key={idx} 
+                            src={img} 
+                            alt="Review" 
+                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)' }} 
+                            onClick={() => window.open(img, '_blank')}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 商家回复部分 */}
+                    {review.reply_text ? (
+                      <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '18px', borderLeft: '4px solid #fbbf24' }}>
+                        <div style={{ color: '#fbbf24', fontSize: '0.85rem', fontWeight: '800', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{language === 'zh' ? '商家回复' : 'Merchant Reply'}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 'normal' }}>
+                            {review.replied_at ? new Date(review.replied_at).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                          {review.reply_text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '1rem' }}>
+                        {replyingToId === review.id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <textarea
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder={language === 'zh' ? '输入您的回复内容...' : 'Type your reply...'}
+                              style={{ width: '100%', minHeight: '80px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+                            />
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button
+                                onClick={() => setReplyingToId(null)}
+                                style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}
+                              >{t.close}</button>
+                              <button
+                                onClick={() => handleReplyReview(review.id)}
+                                style={{ flex: 2, padding: '10px', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '800', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}
+                              >{language === 'zh' ? '提交回复' : 'Submit Reply'}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setReplyingToId(review.id);
+                              setReplyText('');
+                            }}
+                            style={{ padding: '8px 20px', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem' }}
+                          >
+                            💬 {language === 'zh' ? '回复评价' : 'Reply'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: '5rem 2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>✨</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '1.2rem', fontWeight: '700' }}>
+                    {language === 'zh' ? '店铺暂无评价' : 'No reviews yet'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1.5rem' }}>
+              <button
+                onClick={() => setShowReviewsModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '16px',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              >
+                {t.close}
+              </button>
             </div>
           </div>
         </div>
