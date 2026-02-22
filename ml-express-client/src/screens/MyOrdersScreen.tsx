@@ -11,11 +11,14 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { packageService, supabase } from '../services/supabase';
+import * as ImagePicker from 'expo-image-picker';
+import { packageService, supabase, reviewService } from '../services/supabase';
+import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
@@ -23,6 +26,7 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
+import { Modal, TextInput } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -79,6 +83,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 打包模态框状态
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
+
+  // 🚀 新增：评价管理状态
+  const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
+  const [showReviewSubmitModal, setShowReviewSubmitModal] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // 翻译
   const translations: any = {
@@ -315,6 +329,18 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       });
       setOrders(data);
       filterOrders(data, selectedStatus);
+
+      // 🚀 新增：获取已评价的订单ID列表
+      if (data.length > 0) {
+        const { data: reviews } = await supabase
+          .from('store_reviews')
+          .select('order_id')
+          .eq('user_id', userId);
+        
+        if (reviews) {
+          setReviewedOrderIds(new Set(reviews.map(r => r.order_id)));
+        }
+      }
     } catch (error: any) {
       errorService.handleError(error, { context: 'MyOrdersScreen.loadOrders' });
     } finally {
@@ -416,6 +442,108 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 查看详情
   const handleViewDetail = (orderId: string) => {
     navigation.navigate('OrderDetail', { orderId });
+  };
+
+  // 🚀 新增：评价相关逻辑
+  const handleOpenReviewModal = (order: any) => {
+    setReviewOrder(order);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewImages([]);
+    setShowReviewSubmitModal(true);
+  };
+
+  const handleReviewImagePick = async () => {
+    if (reviewImages.length >= 6) {
+      showToast(language === 'zh' ? '最多上传6张图片' : 'Max 6 images', 'warning');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(language === 'zh' ? '权限错误' : 'Permission Error', language === 'zh' ? '需要相册访问权限来上传评价图片' : 'Need photo library access');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: 6 - reviewImages.length,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        setIsUploadingReviewImage(true);
+        const newImages = [...reviewImages];
+        
+        for (const asset of result.assets) {
+          const url = await reviewService.uploadReviewImage(customerId, asset.uri);
+          if (url) {
+            newImages.push(url);
+          }
+        }
+        
+        setReviewImages(newImages.slice(0, 6));
+      }
+    } catch (error) {
+      LoggerService.error('上传评价图片失败:', error);
+      showToast(language === 'zh' ? '上传图片失败' : 'Upload failed', 'error');
+    } finally {
+      setIsUploadingReviewImage(false);
+    }
+  };
+
+  const handleRemoveReviewImage = (index: number) => {
+    const newImages = [...reviewImages];
+    newImages.splice(index, 1);
+    setReviewImages(newImages);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewOrder || !customerId) return;
+    if (!reviewComment.trim()) {
+      Alert.alert(language === 'zh' ? '提示' : 'Alert', language === 'zh' ? '请输入评价内容' : 'Please enter review');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      
+      const userData = await AsyncStorage.getItem('currentUser');
+      const user = userData ? JSON.parse(userData) : null;
+
+      const reviewData = {
+        store_id: reviewOrder.delivery_store_id || '00000000-0000-0000-0000-000000000000',
+        order_id: reviewOrder.id,
+        user_id: customerId,
+        user_name: user?.name || 'User',
+        rating: reviewRating,
+        comment: reviewComment,
+        images: reviewImages,
+        is_anonymous: false
+      };
+
+      const result = await reviewService.createReview(reviewData);
+      if (result.success) {
+        showToast(language === 'zh' ? '评价提交成功' : 'Review submitted', 'success');
+        
+        // 更新已评价列表
+        setReviewedOrderIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(reviewOrder.id);
+          return newSet;
+        });
+        
+        setShowReviewSubmitModal(false);
+      } else {
+        throw new Error('Submit failed');
+      }
+    } catch (error) {
+      Alert.alert('错误', '提交评价失败');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   // 🚀 新增：商家接单
@@ -740,6 +868,17 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                     <Text style={styles.detailButtonText}>{t.detail}</Text>
                     <Text style={styles.detailButtonIcon}>→</Text>
                   </TouchableOpacity>
+                  
+                  {/* 🚀 新增：评价按钮 */}
+                  {userType !== 'merchant' && (order.status === '已送达' || order.status === '已完成') && !reviewedOrderIds.has(order.id) && (
+                    <TouchableOpacity
+                      style={[styles.detailButton, { backgroundColor: '#fbbf24', marginLeft: 8 }]}
+                      onPress={() => handleOpenReviewModal(order)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.detailButtonText, { color: '#ffffff' }]}>⭐ {t.rate}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
 
@@ -817,6 +956,115 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           }
         }}
       />
+
+      {/* 🚀 新增：评价弹窗 */}
+      <Modal
+        visible={showReviewSubmitModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <LinearGradient
+              colors={['#fbbf24', '#f59e0b']}
+              style={styles.modalHeader}
+            >
+              <Text style={styles.modalTitle}>{language === 'zh' ? '评价订单' : 'Rate Order'}</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowReviewSubmitModal(false)}
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.ratingContainer}>
+                <Text style={styles.ratingLabel}>{language === 'zh' ? '点击星星评分' : 'Tap to Rate'}</Text>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                      <Ionicons 
+                        name={star <= reviewRating ? "star" : "star-outline"} 
+                        size={40} 
+                        color="#fbbf24" 
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.ratingText}>
+                  {reviewRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
+                   reviewRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
+                   reviewRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
+                   reviewRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
+                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
+                </Text>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '评价内容' : 'Comment'}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  multiline
+                  numberOfLines={4}
+                  placeholder={language === 'zh' ? '分享您的使用体验...' : 'Share your experience...'}
+                  value={reviewComment}
+                  onChangeText={setReviewComment}
+                />
+              </View>
+
+              {/* 🚀 新增：评价图片区域 */}
+              <View style={styles.reviewImageContainer}>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '上传照片 (选填)' : 'Upload Photos (Optional)'}</Text>
+                <View style={styles.reviewImageGrid}>
+                  {reviewImages.map((img, index) => (
+                    <View key={index} style={styles.reviewImageWrapper}>
+                      <Image source={{ uri: img }} style={styles.reviewImage} />
+                      <TouchableOpacity 
+                        style={styles.removeImageIcon}
+                        onPress={() => handleRemoveReviewImage(index)}
+                      >
+                        <Ionicons name="close-circle" size={22} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {reviewImages.length < 6 && (
+                    <TouchableOpacity 
+                      style={styles.addImageButton}
+                      onPress={handleReviewImagePick}
+                      disabled={isUploadingReviewImage}
+                    >
+                      {isUploadingReviewImage ? (
+                        <ActivityIndicator color="#94a3b8" />
+                      ) : (
+                        <>
+                          <Ionicons name="camera-outline" size={30} color="#94a3b8" />
+                          <Text style={styles.addImageText}>{language === 'zh' ? '照片' : 'Photos'}</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.submitButton, isSubmittingReview && { opacity: 0.7 }]}
+                onPress={handleSubmitReview}
+                disabled={isSubmittingReview}
+              >
+                {isSubmittingReview ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitButtonText}>{language === 'zh' ? '提交评价' : 'Submit'}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1148,5 +1396,151 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  // 🚀 新增评价 Modal 样式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 25,
+    width: '100%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    padding: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  ratingContainer: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  ratingLabel: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 10,
+    fontWeight: '600',
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  ratingText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fbbf24',
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 10,
+  },
+  textInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 15,
+    padding: 15,
+    minHeight: 120,
+    fontSize: 16,
+    color: '#1e293b',
+    textAlignVertical: 'top',
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  submitButton: {
+    backgroundColor: '#fbbf24',
+    paddingVertical: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#fbbf24',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // 🚀 新增评价图片样式
+  reviewImageContainer: {
+    marginBottom: 20,
+  },
+  reviewImageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  reviewImageWrapper: {
+    width: (width - 80) / 3, // 三列布局
+    aspectRatio: 1,
+    borderRadius: 12,
+    position: 'relative',
+  },
+  reviewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  removeImageIcon: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: 'white',
+    borderRadius: 11,
+    zIndex: 1,
+  },
+  addImageButton: {
+    width: (width - 80) / 3,
+    aspectRatio: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  addImageText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 4,
+    fontWeight: '600',
   },
 });
