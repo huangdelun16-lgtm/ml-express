@@ -76,6 +76,16 @@ const ProfilePage: React.FC = () => {
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
 
+  // 🚀 新增：客户评价提交状态
+  const [showReviewSubmitModal, setShowReviewSubmitModal] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const reviewImageInputRef = useRef<HTMLInputElement>(null);
+
   const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
   const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
   const voiceActivationRef = useRef<HTMLAudioElement | null>(null); // 🚀 新增：用于激活音频上下文的引用
@@ -729,6 +739,77 @@ const ProfilePage: React.FC = () => {
       alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
             language === 'en' ? 'Failed to update password, please try again later' : 
             'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
+    }
+  };
+
+  // 🚀 新增：客户评价相关逻辑
+  const handleOpenReviewModal = (pkg: any) => {
+    setReviewOrder(pkg);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewImages([]);
+    setShowReviewSubmitModal(true);
+  };
+
+  const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !currentUser?.id) return;
+
+    try {
+      setIsUploadingReviewImage(true);
+      const uploadPromises = Array.from(files).map(file => 
+        reviewService.uploadReviewImage(currentUser.id, file)
+      );
+      
+      const urls = await Promise.all(uploadPromises);
+      const validUrls = urls.filter((url): url is string => url !== null);
+      
+      setReviewImages(prev => [...prev, ...validUrls].slice(0, 6)); // 最多6张
+    } catch (error) {
+      LoggerService.error('上传评价图片失败:', error);
+    } finally {
+      setIsUploadingReviewImage(false);
+    }
+  };
+
+  const handleRemoveReviewImage = (index: number) => {
+    setReviewImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewOrder || !currentUser?.id) return;
+    if (!reviewComment.trim()) {
+      alert(language === 'zh' ? '请输入评价内容' : 'Please enter review comment');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      const reviewData = {
+        store_id: reviewOrder.delivery_store_id || 'default_store', // 如果没有store_id，使用默认
+        order_id: reviewOrder.id,
+        user_id: currentUser.id,
+        user_name: currentUser.name || 'User',
+        rating: reviewRating,
+        comment: reviewComment,
+        images: reviewImages,
+        is_anonymous: false
+      };
+
+      const result = await reviewService.createReview(reviewData);
+      if (result.success) {
+        alert(language === 'zh' ? '评价提交成功！感谢您的反馈。' : 'Review submitted! Thank you.');
+        setShowReviewSubmitModal(false);
+        // 刷新包裹列表以更新状态（如果需要显示已评价标签）
+        await loadUserPackages();
+      } else {
+        throw new Error('Submit failed');
+      }
+    } catch (error) {
+      LoggerService.error('提交评价失败:', error);
+      alert(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -2546,6 +2627,37 @@ const ProfilePage: React.FC = () => {
                     >
                       {t.viewDetails}
                     </button>
+
+                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 */}
+                    {!isPartnerStore && (pkg.status === '已送达' || pkg.status === '已完成') && (
+                      <button
+                        onClick={() => handleOpenReviewModal(pkg)}
+                        style={{
+                          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1.5rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: 'bold',
+                          transition: 'all 0.3s ease',
+                          flex: 1,
+                          maxWidth: '150px',
+                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(245, 158, 11, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+                        }}
+                      >
+                        ⭐ {language === 'zh' ? '评价订单' : language === 'en' ? 'Rate Order' : 'မှတ်ချက်ပေးရန်'}
+                      </button>
+                    )}
 
                     {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
                     {isPartnerStore && pkg.status === '打包中' && (
@@ -4971,6 +5083,199 @@ const ProfilePage: React.FC = () => {
                 onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
               >
                 {t.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：客户提交评价模态框 (ReviewSubmitModal) */}
+      {showReviewSubmitModal && reviewOrder && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}
+        onClick={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '35px',
+            width: '100%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* 页眉 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              padding: '2rem',
+              textAlign: 'center',
+              position: 'relative'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⭐</div>
+              <h2 style={{ color: 'white', fontSize: '1.75rem', fontWeight: '950', margin: 0 }}>
+                {language === 'zh' ? '评价您的订单' : 'Rate Your Order'}
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                {t.packageId}: {reviewOrder.id}
+              </p>
+              {!isSubmittingReview && (
+                <button 
+                  onClick={() => setShowReviewSubmitModal(false)}
+                  style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.1)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', cursor: 'pointer' }}
+                >✕</button>
+              )}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              {/* 星级评分 */}
+              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{ color: '#475569', fontSize: '1rem', fontWeight: '700', marginBottom: '1rem' }}>
+                  {language === 'zh' ? '总体满意度' : 'Overall Satisfaction'}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span 
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      style={{ 
+                        fontSize: '2.5rem', 
+                        cursor: 'pointer',
+                        color: star <= reviewRating ? '#fbbf24' : '#e2e8f0',
+                        transition: 'transform 0.2s ease',
+                        transform: star <= reviewRating ? 'scale(1.1)' : 'scale(1)'
+                      }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <div style={{ color: '#fbbf24', fontSize: '0.9rem', fontWeight: '800', marginTop: '0.5rem' }}>
+                  {reviewRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
+                   reviewRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
+                   reviewRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
+                   reviewRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
+                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
+                </div>
+              </div>
+
+              {/* 评价文字 */}
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '800', display: 'block', marginBottom: '0.75rem' }}>
+                  {language === 'zh' ? '您的评价' : 'Your Review'}
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder={language === 'zh' ? '写下您的真实评价，帮助我们做得更好...' : 'Share your experience...'}
+                  style={{ 
+                    width: '100%', 
+                    minHeight: '120px', 
+                    background: '#f8fafc', 
+                    border: '2px solid #f1f5f9', 
+                    borderRadius: '20px', 
+                    padding: '1rem', 
+                    color: '#1e293b', 
+                    fontSize: '1rem', 
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+
+              {/* 图片上传 */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '800', display: 'block', marginBottom: '0.75rem' }}>
+                  {language === 'zh' ? '上传照片 (选填)' : 'Upload Photos (Optional)'}
+                </label>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {reviewImages.map((img, index) => (
+                    <div key={index} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
+                      <button 
+                        onClick={() => handleRemoveReviewImage(index)}
+                        style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
+                      >✕</button>
+                    </div>
+                  ))}
+                  {reviewImages.length < 6 && (
+                    <div 
+                      onClick={() => !isUploadingReviewImage && reviewImageInputRef.current?.click()}
+                      style={{ 
+                        width: '80px', 
+                        height: '80px', 
+                        border: '2px dashed #cbd5e1', 
+                        borderRadius: '12px', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer',
+                        background: '#f8fafc'
+                      }}
+                    >
+                      {isUploadingReviewImage ? (
+                        <div className="spinner" style={{ width: '20px', height: '20px', border: '2px solid #cbd5e1', borderTop: '2px solid #fbbf24', borderRadius: '50%' }}></div>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '1.5rem', color: '#94a3b8' }}>+</span>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>照片</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  ref={reviewImageInputRef} 
+                  onChange={handleReviewImageUpload} 
+                  style={{ display: 'none' }} 
+                />
+              </div>
+            </div>
+
+            {/* 底部按钮 */}
+            <div style={{ padding: '2rem', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={handleSubmitReview}
+                disabled={isSubmittingReview || !reviewComment.trim()}
+                style={{
+                  width: '100%',
+                  padding: '1.2rem',
+                  borderRadius: '20px',
+                  background: isSubmittingReview || !reviewComment.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  color: 'white',
+                  border: 'none',
+                  fontSize: '1.2rem',
+                  fontWeight: '950',
+                  cursor: isSubmittingReview || !reviewComment.trim() ? 'not-allowed' : 'pointer',
+                  boxShadow: isSubmittingReview || !reviewComment.trim() ? 'none' : '0 10px 25px rgba(245, 158, 11, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {isSubmittingReview ? (
+                  <div className="spinner" style={{ width: '24px', height: '24px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
+                ) : (
+                  language === 'zh' ? '提交评价' : 'Submit Review'
+                )}
               </button>
             </div>
           </div>
