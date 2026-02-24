@@ -135,6 +135,15 @@ export default function LoginScreen({ navigation }: any) {
         hideLoading();
 
         if (result.success && result.data) {
+          // 🚀 核心逻辑：生成唯一的会话 ID
+          const newSessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          
+          // 更新数据库中的会话 ID
+          await supabase
+            .from('users')
+            .update({ current_session_id: newSessionId })
+            .eq('id', result.data.id);
+
           // 保存用户信息到本地（保存完整用户对象）
           await AsyncStorage.setItem('currentUser', JSON.stringify(result.data));
           await AsyncStorage.setItem('userId', result.data.id);
@@ -143,6 +152,7 @@ export default function LoginScreen({ navigation }: any) {
           await AsyncStorage.setItem('userPhone', result.data.phone);
           // 确保 user_type 正确
           await AsyncStorage.setItem('userType', 'customer');
+          await AsyncStorage.setItem('currentSessionId', newSessionId);
           
           // 🚀 新增：注册并保存推送令牌
           try {
@@ -209,6 +219,14 @@ export default function LoginScreen({ navigation }: any) {
         };
 
         // 保存商家信息
+        const newSessionId = `SESS_MER_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        
+        // 更新数据库中的会话 ID
+        await supabase
+          .from('delivery_stores')
+          .update({ current_session_id: newSessionId })
+          .eq('id', store.id);
+
         await AsyncStorage.setItem('currentUser', JSON.stringify(merchantsUser));
         await AsyncStorage.setItem('userId', store.id);
         await AsyncStorage.setItem('userEmail', store.email || store.store_code);
@@ -216,6 +234,7 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userPhone', store.contact_phone || '');
         await AsyncStorage.setItem('userType', 'merchant');
         await AsyncStorage.setItem('currentStoreCode', store.store_code);
+        await AsyncStorage.setItem('currentSessionId', newSessionId);
 
         // 🚀 新增：注册并保存推送令牌（商家使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
         // 如果商家也需要推送，建议将推送令牌也保存到 delivery_stores 表

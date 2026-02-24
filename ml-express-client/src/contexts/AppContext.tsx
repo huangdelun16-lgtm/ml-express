@@ -3,7 +3,7 @@ import LoggerService from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import * as Speech from 'expo-speech';
-import { Vibration, Platform } from 'react-native';
+import { Vibration, Platform, Alert } from 'react-native';
 import * as KeepAwake from 'expo-keep-awake';
 
 type Language = 'zh' | 'en' | 'my';
@@ -31,6 +31,8 @@ export function AppProvider({ children }: AppProviderProps) {
   const subscriptionRef = useRef<any>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null); // 🚀 新增：报警循环引用
   const [userType, setUserType] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null); // 🚀 新增：用户ID状态
+  const [sessionId, setSessionId] = useState<string | null>(null); // 🚀 新增：本地会话ID状态
 
   // 🚀 新增：添加待处理订单
   const addPendingOrder = (order: any) => {
@@ -133,11 +135,15 @@ export function AppProvider({ children }: AppProviderProps) {
         }
 
         const currentUserStr = await AsyncStorage.getItem('currentUser');
+        const savedSessionId = await AsyncStorage.getItem('currentSessionId'); // 🚀 获取本地 Session ID
+        
         if (currentUserStr) {
           const user = JSON.parse(currentUserStr);
           let finalUserType = user.user_type || 'customer';
           if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
           setUserType(finalUserType);
+          setUserId(user.id);
+          setSessionId(savedSessionId);
         }
       } catch (error) {
         LoggerService.error('加载初始设置失败:', error);
@@ -157,6 +163,44 @@ export function AppProvider({ children }: AppProviderProps) {
         let finalUserType = user.user_type || 'customer';
         if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
         setUserType(finalUserType); // 同步更新 userType 状态
+        setUserId(user.id);
+
+        // 🚀 新增：多设备登录检查逻辑
+        const checkSession = async () => {
+          const localSessionId = await AsyncStorage.getItem('currentSessionId');
+          if (!user.id || !localSessionId) return;
+
+          const table = finalUserType === 'merchant' ? 'delivery_stores' : 'users';
+          const { data, error } = await supabase
+            .from(table)
+            .select('current_session_id')
+            .eq('id', user.id)
+            .single();
+          
+          if (!error && data && data.current_session_id && data.current_session_id !== localSessionId) {
+            console.log('🛑 [AppContext] 检测到账号在其他设备登录');
+            Alert.alert(
+              '登录状态异常',
+              '您的账号已在其他设备登录，当前设备已被强制下线。',
+              [{ 
+                text: '确定', 
+                onPress: async () => {
+                  await AsyncStorage.multiRemove([
+                    'currentUser', 'userId', 'userEmail', 'userName', 
+                    'userPhone', 'userType', 'currentStoreCode', 'currentSessionId'
+                  ]);
+                  // 刷新 App
+                  const Updates = require('expo-updates');
+                  Updates.reloadAsync();
+                } 
+              }]
+            );
+          }
+        };
+
+        // 每 30 秒检查一次会话
+        const sessionTimer = setInterval(checkSession, 30000);
+        checkSession(); // 立即检查一次
 
         if (finalUserType === 'merchant' && user.id) {
           console.log('✅ 检测到商家账号，建立全局订单监听:', user.id);

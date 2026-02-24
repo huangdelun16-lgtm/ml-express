@@ -14,7 +14,44 @@ import { locationService } from './services/locationService';
 import { packageService, supabase } from './services/supabase';
 import NetInfo from '@react-native-community/netinfo';
 import * as Speech from 'expo-speech';
+import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import { Vibration } from 'react-native';
+
+// 🚀 定义后台定位任务名称
+const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
+
+// 🚀 注册后台任务（必须在全局作用域定义）
+TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }: any) => {
+  if (error) {
+    console.error('后台位置任务错误:', error);
+    return;
+  }
+  if (data) {
+    const { locations } = data;
+    const location = locations[0];
+    if (location) {
+      // 在这里执行后台位置同步逻辑
+      try {
+        const courierId = await AsyncStorage.getItem('currentCourierId');
+        if (courierId) {
+          const { latitude, longitude } = location.coords;
+          await supabase
+            .from('couriers')
+            .update({ 
+              last_latitude: latitude, 
+              last_longitude: longitude,
+              last_location_update: new Date().toISOString() 
+            })
+            .eq('id', courierId);
+          console.log('✅ [后台任务] 位置同步成功:', latitude, longitude);
+        }
+      } catch (e) {
+        console.warn('❌ [后台任务] 位置同步失败:', e);
+      }
+    }
+  }
+});
 
 // 保持启动页可见
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -258,21 +295,57 @@ function MainTabs() {
 
 // 🚀 全局订单实时监控组件
 // 负责在 App 运行期间监听新订单分配，并强制执行语音和震动提醒
+// 🚀 新增：会话同步检查逻辑
 const GlobalOrderMonitor = () => {
   const [courierName, setCourierName] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const announcedOrders = useRef<Set<string>>(new Set()); // 记录本轮已播报过的订单 ID
   
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
+        const id = await AsyncStorage.getItem('currentUserId');
         const name = await AsyncStorage.getItem('currentUserName');
+        const localSessionId = await AsyncStorage.getItem('currentSessionId');
+
+        // 1. 同步 ID 和 姓名状态
+        if (id !== userId) setUserId(id);
         if (name && name.trim() !== (courierName || '').trim()) {
           console.log('👤 [监控器] 检测到骑手登录:', name.trim());
           setCourierName(name.trim());
         } else if (!name && courierName) {
           console.log('👤 [监控器] 检测到骑手登出');
           setCourierName(null);
+          setUserId(null);
           announcedOrders.current.clear();
+        }
+
+        // 2. 🚀 核心逻辑：多设备登录检查
+        if (id && localSessionId) {
+          const { data, error } = await supabase
+            .from('users')
+            .select('current_session_id')
+            .eq('id', id)
+            .single();
+          
+          if (!error && data && data.current_session_id && data.current_session_id !== localSessionId) {
+            console.log('🛑 [监控器] 检测到账号在其他设备登录');
+            Alert.alert(
+              '登录状态异常',
+              '您的账号已在其他设备登录，当前设备已被强制下线。',
+              [{ 
+                text: '确定', 
+                onPress: async () => {
+                  await AsyncStorage.multiRemove([
+                    'currentUserId', 'currentUser', 'currentUserName', 
+                    'currentUserRole', 'currentUserPosition', 'currentSessionId'
+                  ]);
+                  // 强制刷新页面或跳转回登录页
+                  // 注意：此处需要有某种方式触发页面跳转，或者通过 AppContext 强制 logout
+                } 
+              }]
+            );
+          }
         }
       } catch (e) {
         console.error('检查登录状态失败:', e);
@@ -280,9 +353,9 @@ const GlobalOrderMonitor = () => {
     };
 
     checkLoginStatus();
-    const timer = setInterval(checkLoginStatus, 5000); // 降低轮询频率至 5s，减少开销
+    const timer = setInterval(checkLoginStatus, 15000); // 15秒检查一次即可，避免过于频繁
     return () => clearInterval(timer);
-  }, [courierName]);
+  }, [courierName, userId]);
 
   useEffect(() => {
     if (!courierName) return;

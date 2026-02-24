@@ -16,17 +16,20 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.courier",
-      "buildNumber": "62",
+      "buildNumber": "63",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
           "maps"
         ],
-        "NSLocationWhenInUseUsageDescription": "需要获取您的位置来显示配送路线和导航",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "需要获取您的位置来提供实时配送服务",
+        "NSLocationWhenInUseUsageDescription": "MARKET LINK STAFF需要访问您的位置信息以在地图上显示配送路线、导航并计算到目的地的距离。",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MARKET LINK STAFF需要持续访问您的位置信息（即使在后台运行），以便实时同步您的配送进度给客户，并记录配送轨迹以保障配送安全。",
+        "NSLocationAlwaysUsageDescription": "MARKET LINK STAFF需要持续访问您的位置信息（即使在后台运行），以便实时同步您的配送进度给客户，并记录配送轨迹以保障配送安全。",
         "NSCameraUsageDescription": "需要访问您的相机以扫描包裹二维码和中转码。",
         "UIBackgroundModes": [
-          "location"
+          "location",
+          "fetch",
+          "remote-notification"
         ]
       },
       "config": {
@@ -71,7 +74,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "需要获取您的位置来提供实时配送服务和显示配送路线。",
+          "locationAlwaysAndWhenInUsePermission": "MARKET LINK STAFF需要持续访问您的位置信息（即使在后台运行），以便实时同步您的配送进度给客户，并记录配送轨迹以保障配送安全。",
+          "locationAlwaysPermission": "MARKET LINK STAFF需要持续访问您的位置信息（即使在后台运行），以便实时同步您的配送进度给客户，并记录配送轨迹以保障配送安全。",
+          "locationWhenInUsePermission": "MARKET LINK STAFF需要访问您的位置信息以在地图上显示配送路线、导航并计算到目的地的距离。",
           "isAndroidBackgroundLocationEnabled": true
         }
       ],

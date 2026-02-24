@@ -24,6 +24,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
@@ -829,15 +830,32 @@ export default function MapScreen({ navigation }: any) {
     }
   }, []);
 
-  const stopLocationTracking = useCallback(() => {
+  const stopLocationTracking = useCallback(async () => {
+    // 1. 停止前台监听
     if (locationIntervalRef.current) {
       if ((locationIntervalRef.current as any).remove) {
         (locationIntervalRef.current as any).remove();
       } else {
-      clearInterval(locationIntervalRef.current);
+        clearInterval(locationIntervalRef.current);
       }
       locationIntervalRef.current = null;
     }
+
+    // 2. 🚀 停止后台持续定位任务
+    try {
+      const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
+      const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+      if (!isExpoGo) {
+        const isStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK);
+        if (isStarted) {
+          await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK);
+          console.log('✅ [后台任务] 已停止');
+        }
+      }
+    } catch (err) {
+      console.error('❌ [后台任务] 停止失败:', err);
+    }
+
     setIsLocationTracking(false);
     lastLocationConfigRef.current = null;
   }, []);
@@ -876,7 +894,37 @@ export default function MapScreen({ navigation }: any) {
       
       setIsLocationTracking(true);
 
-      // 🚀 核心优化：使用 watchPositionAsync 替代定时器，实现更精准和实时的平滑追踪
+      // 🚀 核心优化 1：启动后台持续定位任务 (通过苹果审核的关键)
+      const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
+      const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+      
+      if (!isExpoGo) {
+        try {
+          const isStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK);
+          if (!isStarted) {
+            await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
+              accuracy: locationConfig.accuracy,
+              timeInterval: locationConfig.timeInterval,
+              distanceInterval: locationConfig.distanceInterval,
+              // 🚀 iOS 专属：显示蓝色持续定位指示器（苹果审核最看重这一点）
+              showsBackgroundLocationIndicator: true,
+              foregroundService: {
+                notificationTitle: language === 'zh' ? '正在追踪您的配送进度' : 'Tracking Delivery',
+                notificationBody: language === 'zh' ? '骑手 App 正在后台运行以同步位置' : 'App is running in background',
+                notificationColor: '#2c5282',
+              },
+            });
+            console.log('✅ [后台任务] 启动成功');
+          }
+        } catch (err) {
+          console.error('❌ [后台任务] 启动失败:', err);
+          // 仅在非开发模式下且不是由于权限问题导致时抛出严重错误
+        }
+      } else {
+        console.log('💡 [开发提示] Expo Go 环境，跳过官方后台任务启动以避免崩溃');
+      }
+
+      // 🚀 核心优化 2：使用 watchPositionAsync 保持前台精准追踪
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: locationConfig.accuracy,
@@ -949,13 +997,31 @@ export default function MapScreen({ navigation }: any) {
 
   const requestLocationPermission = useCallback(async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const c = await Location.getCurrentPositionAsync({});
+      // 1. 请求前台权限
+      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      if (foregroundStatus === 'granted') {
+        const c = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setLocation({ latitude: c.coords.latitude, longitude: c.coords.longitude });
+        
+        // 2. 🚀 关键：请求后台权限 (这是通过苹果审核的必要步骤)
+        // 增加安全检查：避免在 Expo Go 或不支持的环境中崩溃
+        const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+        if (!isExpoGo && (Platform.OS === 'ios' || Platform.OS === 'android')) {
+          const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+          if (backgroundStatus !== 'granted') {
+            console.warn('⚠️ 后台位置权限被拒绝，将无法在后台持续追踪配送进度');
+          }
+        }
+      } else {
+        Alert.alert(
+          language === 'zh' ? '需要位置权限' : 'Location Required',
+          language === 'zh' ? '请在设置中开启位置权限，以便我们为您提供导航和配送追踪。' : 'Please enable location permissions in settings for navigation and tracking.'
+        );
       }
-    } catch (e) {}
-  }, []);
+    } catch (e) {
+      console.error('请求权限异常:', e);
+    }
+  }, [language]);
 
   const loadDeliveryStores = useCallback(async () => {
     try {

@@ -58,12 +58,22 @@ export default function LoginScreen({ navigation }: any) {
 
         // 批量保存，增加错误检查
         try {
+          // 🚀 核心逻辑：生成唯一的会话 ID
+          const newSessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          
+          // 更新数据库中的会话 ID
+          await supabase
+            .from('users')
+            .update({ current_session_id: newSessionId })
+            .eq('id', userId);
+
           await Promise.all([
             AsyncStorage.setItem('currentUserId', userId),
             AsyncStorage.setItem('currentUser', userUsername),
             AsyncStorage.setItem('currentUserName', userEmployeeName),
             AsyncStorage.setItem('currentUserRole', userRole),
-            AsyncStorage.setItem('currentUserPosition', userPosition)
+            AsyncStorage.setItem('currentUserPosition', userPosition),
+            AsyncStorage.setItem('currentSessionId', newSessionId) // 本地也存一份
           ]);
         } catch (storageError) {
           console.error('❌ AsyncStorage 保存失败:', storageError);
