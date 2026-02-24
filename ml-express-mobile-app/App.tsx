@@ -322,8 +322,9 @@ const GlobalOrderMonitor = () => {
 
         // 2. 🚀 核心逻辑：多设备登录检查
         if (id && localSessionId) {
+          // 🚀 修正：骑手端应该检查 admin_accounts 表
           const { data, error } = await supabase
-            .from('users')
+            .from('admin_accounts')
             .select('current_session_id')
             .eq('id', id)
             .single();
@@ -340,8 +341,9 @@ const GlobalOrderMonitor = () => {
                     'currentUserId', 'currentUser', 'currentUserName', 
                     'currentUserRole', 'currentUserPosition', 'currentSessionId'
                   ]);
-                  // 强制刷新页面或跳转回登录页
-                  // 注意：此处需要有某种方式触发页面跳转，或者通过 AppContext 强制 logout
+                  // 强制退出并重新加载
+                  const Updates = require('expo-updates');
+                  Updates.reloadAsync();
                 } 
               }]
             );

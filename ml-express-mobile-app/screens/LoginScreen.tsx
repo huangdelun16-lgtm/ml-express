@@ -61,11 +61,20 @@ export default function LoginScreen({ navigation }: any) {
           // 🚀 核心逻辑：生成唯一的会话 ID
           const newSessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
           
-          // 更新数据库中的会话 ID
+          // 🚀 修正：更新 admin_accounts 表（或 couriers 表，取决于您的账号体系）
+          // 这里我们同时更新 admin_accounts 表
           await supabase
-            .from('users')
+            .from('admin_accounts')
             .update({ current_session_id: newSessionId })
             .eq('id', userId);
+
+          // 如果是骑手，也要同步更新 couriers 表中的会话
+          if (userPosition === '骑手' || userPosition === '骑手队长') {
+            await supabase
+              .from('couriers')
+              .update({ current_session_id: newSessionId })
+              .eq('employee_id', account.employee_id || ''); // 通过员工编号关联
+          }
 
           await Promise.all([
             AsyncStorage.setItem('currentUserId', userId),
