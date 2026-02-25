@@ -1014,6 +1014,35 @@ export const merchantService = {
     return this.updateProduct(productId, { is_available: isAvailable });
   },
 
+  // 🚀 新增：搜索商品 (Web版)
+  async searchProductsByName(query: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          delivery_stores (
+            id,
+            store_name,
+            address,
+            phone,
+            store_type,
+            operating_hours,
+            is_closed_today
+          )
+        `)
+        .ilike('name', `%${query}%`)
+        .eq('is_available', true)
+        .limit(20);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      LoggerService.error('搜索商品失败:', error?.message || '未知错误');
+      return [];
+    }
+  },
+
   // 上传商品图片 (Web版)
   async uploadProductImage(storeId: string, file: File): Promise<string | null> {
     try {

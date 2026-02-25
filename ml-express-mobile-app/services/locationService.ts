@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { Platform, Alert } from 'react-native';
 
-const BACKGROUND_LOCATION_TASK = 'background-location-task';
+const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
 
 // 🚀 坐标平滑处理状态
 let lastLat = 0;
@@ -14,7 +14,7 @@ const SMOOTHING_FACTOR = 0.35; // 卡尔曼滤波简易版系数：越小越平�
 /**
  * 定义后台任务
  */
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) => {
+TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }: any) => {
   if (error) {
     console.error('后台位置任务错误:', error);
     return;
@@ -82,7 +82,10 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
     await supabase
       .from('couriers')
       .update({
-        last_active: new Date().toISOString()
+        last_active: new Date().toISOString(),
+        last_latitude: latitude,
+        last_longitude: longitude,
+        last_location_update: new Date().toISOString()
       })
       .eq('id', courierId);
 
@@ -150,16 +153,17 @@ export const locationService = {
    * 真正开启位置更新
    */
   async enableUpdates() {
-    const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+    const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TRACKING_TASK);
     if (isTaskRegistered) {
       // 如果已注册，先停止再启动，确保配置更新
-      try { await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK); } catch (e) {}
+      try { await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK); } catch (e) {}
     }
 
-    await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+    await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
       accuracy: Location.Accuracy.BestForNavigation, // 🚀 升级为导航最高精度
       timeInterval: 5000, // 🚀 缩短至 5 秒采集一次，处理动态频率逻辑
       distanceInterval: 10, // 🚀 缩短至 10 米位移触发
+      showsBackgroundLocationIndicator: true, // 🚀 iOS 专属：显示蓝色持续定位指示器
       foregroundService: {
         notificationTitle: "ML Express 配送员助手正在运行",
         notificationBody: "保持后台运行以接收新订单并记录配送轨迹",
@@ -177,9 +181,9 @@ export const locationService = {
    */
   async stopBackgroundTracking() {
     try {
-      const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+      const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TRACKING_TASK);
       if (isTaskRegistered) {
-        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+        await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK);
         console.log('🛑 后台位置追踪已停止');
       }
     } catch (err) {

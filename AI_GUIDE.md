@@ -1053,6 +1053,22 @@ CI=true npm run build
 
 ---
 
+### 🛡️ 系统安全与账号规范
+
+#### 1. 单设备登录限制 (Single Device Restriction)
+为了保障账号安全，全系统（客户端 App、骑手端 App、客户端 Web）均启用了单设备登录限制：
+- **实现原理**: 登录时生成唯一 `current_session_id` 并存储于数据库。App 会定时校验本地 Session 是否与数据库一致。
+- **强制下线**: 若检测到账号在另一台设备登录，原设备会弹出警告并强制清除缓存、重启至登录页。
+- **涉及表**: `users` (客户), `admin_accounts` (员工), `delivery_stores` (商家)。
+
+#### 2. 后台定位合规 (iOS Guideline 2.5.4)
+骑手端 App 必须确保后台持续定位功能正常运行以通过 Apple 审核：
+- **后台任务**: 使用 `LOCATION_TRACKING_TASK` 进行位置同步。
+- **视觉反馈**: 必须开启 `showsBackgroundLocationIndicator: true`，在 iOS 状态栏显示蓝色定位图标。
+- **权限描述**: 在 `Info.plist` 中必须包含极其详尽的 `NSLocationAlwaysAndWhenInUseUsageDescription`。
+
+---
+
 ## 📋 版本信息
 
 *最后更新：2026年2月6日*  

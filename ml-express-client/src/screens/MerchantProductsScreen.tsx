@@ -29,7 +29,7 @@ import Toast from '../components/Toast';
 const { width } = Dimensions.get('window');
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
-  const { storeId, storeName } = route.params;
+  const { storeId, storeName, highlightProductId, autoAddProductId } = route.params || {}; // 🚀 增加解析新参数
   const { language } = useApp();
   const { addToCart, cartCount, cartItems } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
@@ -163,6 +163,19 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     checkViewMode();
     loadProducts();
   }, []);
+
+  // 🚀 响应来自商城的跳转指令（高亮或自动加车）
+  useEffect(() => {
+    if (!loading && products.length > 0) {
+      if (autoAddProductId) {
+        const product = products.find(p => p.id === autoAddProductId);
+        if (product && product.is_available) {
+          updateItemQuantity(autoAddProductId, 1);
+          showToast(language === 'zh' ? '已为您自动选中商品' : 'Product auto-selected', 'success');
+        }
+      }
+    }
+  }, [loading, products]);
 
   const checkViewMode = async () => {
     const currentUserId = await AsyncStorage.getItem('userId');
@@ -514,7 +527,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       <TouchableOpacity 
         style={[
           styles.productCard, 
-          isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' }
+          isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' },
+          item.id === highlightProductId && styles.highlightedCard // 🚀 高亮显示
         ]}
         onPress={() => !isReadOnly && handleOpenEditProduct(item)}
         activeOpacity={isReadOnly ? 1 : 0.7}
@@ -994,6 +1008,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     ...theme.shadows.small,
+  },
+  highlightedCard: {
+    borderColor: '#3b82f6',
+    borderWidth: 2,
+    backgroundColor: '#eff6ff',
   },
   selectCircle: {
     width: 22,

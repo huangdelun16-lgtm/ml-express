@@ -19,39 +19,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Vibration } from 'react-native';
 
 // 🚀 定义后台定位任务名称
-const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
-
-// 🚀 注册后台任务（必须在全局作用域定义）
-TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }: any) => {
-  if (error) {
-    console.error('后台位置任务错误:', error);
-    return;
-  }
-  if (data) {
-    const { locations } = data;
-    const location = locations[0];
-    if (location) {
-      // 在这里执行后台位置同步逻辑
-      try {
-        const courierId = await AsyncStorage.getItem('currentCourierId');
-        if (courierId) {
-          const { latitude, longitude } = location.coords;
-          await supabase
-            .from('couriers')
-            .update({ 
-              last_latitude: latitude, 
-              last_longitude: longitude,
-              last_location_update: new Date().toISOString() 
-            })
-            .eq('id', courierId);
-          console.log('✅ [后台任务] 位置同步成功:', latitude, longitude);
-        }
-      } catch (e) {
-        console.warn('❌ [后台任务] 位置同步失败:', e);
-      }
-    }
-  }
-});
+// 已迁移至 services/locationService.ts
 
 // 保持启动页可见
 SplashScreen.preventAutoHideAsync().catch(() => {});

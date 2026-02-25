@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deliveryStoreService, DeliveryStore, reviewService } from '../services/supabase';
+import { deliveryStoreService, DeliveryStore, reviewService, merchantService, bannerService, Banner } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
 import LoggerService from '../services/LoggerService';
@@ -13,6 +13,11 @@ const CityMallPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
+  const [selectedCategory, setSelectedCategory] = useState<string>('全部'); // 🚀 新增
+  const [searchMode, setSearchMode] = useState<'stores' | 'products'>('stores'); // 🚀 新增
+  const [foundProducts, setFoundProducts] = useState<any[]>([]); // 🚀 新增
+  const [searchingProducts, setSearchingProducts] = useState(false); // 🚀 新增
+  const [banners, setBanners] = useState<Banner[]>([]); // 🚀 新增
   const [storeReviewStats, setStoreReviewStats] = useState<Record<string, any>>({});
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedStoreForReviews, setSelectedStoreForReviews] = useState<any>(null);
@@ -28,6 +33,61 @@ const CityMallPage: React.FC = () => {
     { id: 'LSO', zh: '腊戌', en: 'Lashio', my: 'လားရှိုး' },
     { id: 'MSE', zh: '木姐', en: 'Muse', my: 'မူဆယ်' }
   ];
+
+  const categories = [
+    { id: '全部', zh: '全部', en: 'All', my: 'အားလုံး', icon: 'grid-outline' },
+    { id: '餐厅', zh: '餐饮', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
+    { id: '生鲜', zh: '生鲜', en: 'Fresh', my: 'လတ်ဆတ်စာ', icon: 'leaf-outline' },
+    { id: '生活用品', zh: '生活', en: 'Daily', my: 'လူသုံးကုန်', icon: 'cart-outline' },
+    { id: '茶铺', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
+    { id: '饮料和小吃', zh: '零食', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
+  ];
+
+  const uiT = {
+    zh: {
+      searchPlaceholder: '搜索商户或商品...',
+      storesTab: '店铺',
+      productsTab: '商品',
+      allStores: '全部分类',
+      noStores: '该区域暂无商户',
+      noProducts: '未搜索到相关商品',
+      visitStore: '进入店铺',
+      addToCart: '查看详情',
+      partnerTag: '深度合作 🤝',
+    },
+    en: {
+      searchPlaceholder: 'Search store or product...',
+      storesTab: 'Stores',
+      productsTab: 'Products',
+      allStores: 'All Categories',
+      noStores: 'No stores found',
+      noProducts: 'No products found',
+      visitStore: 'Visit Store',
+      addToCart: 'View Detail',
+      partnerTag: 'Partner 🤝',
+    },
+    my: {
+      searchPlaceholder: 'ဆိုင် သို့မဟုတ် ပစ္စည်းရှာရန်...',
+      storesTab: 'ဆိုင်များ',
+      productsTab: 'ကုန်ပစ္စည်းများ',
+      allStores: 'ကဏ္ဍအားလုံး',
+      noStores: 'ဆိုင်များမရှိသေးပါ',
+      noProducts: 'ကုန်ပစ္စည်းမရှိပါ',
+      visitStore: 'ဆိုင်သို့ဝင်ရန်',
+      addToCart: 'အသေးစိတ်ကြည့်ရန်',
+      partnerTag: 'Partner 🤝',
+    }
+  }[language as 'zh' | 'en' | 'my'] || {
+    searchPlaceholder: 'Search store or product...',
+    storesTab: 'Stores',
+    productsTab: 'Products',
+    allStores: 'All Categories',
+    noStores: 'No stores found',
+    noProducts: 'No products found',
+    visitStore: 'Visit Store',
+    addToCart: 'View Detail',
+    partnerTag: 'Partner 🤝',
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -51,7 +111,36 @@ const CityMallPage: React.FC = () => {
       }
     }
     loadStores();
+    loadBanners();
   }, []);
+
+  // 🚀 商品实时搜索逻辑
+  useEffect(() => {
+    const query = searchText.trim();
+    if (!query) {
+      setFoundProducts([]);
+      setSearchingProducts(false);
+      return;
+    }
+    
+    const timer = setTimeout(async () => {
+      setSearchingProducts(true);
+      const results = await merchantService.searchProductsByName(query);
+      setFoundProducts(results);
+      setSearchingProducts(false);
+    }, 400);
+    
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  const loadBanners = async () => {
+    try {
+      const data = await bannerService.getActiveBanners();
+      setBanners(data);
+    } catch (error) {
+      console.warn('Failed to load banners');
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('ml-express-customer');
@@ -148,9 +237,10 @@ const CityMallPage: React.FC = () => {
   // 🚀 核心逻辑：过滤并排序店铺（营业中的排在前面，休息中的排在最后）
   const filteredStores = stores
     .filter(store => {
-      const matchesSearch = store.store_name.toLowerCase().includes(searchText.toLowerCase()) ||
-        (store.store_code && store.store_code.toLowerCase().includes(searchText.toLowerCase())) ||
-        (store.store_type && store.store_type.toLowerCase().includes(searchText.toLowerCase()));
+      const searchLower = searchText.toLowerCase();
+      const matchesSearch = store.store_name.toLowerCase().includes(searchLower) ||
+        (store.store_code && store.store_code.toLowerCase().includes(searchLower)) ||
+        (store.store_type && store.store_type.toLowerCase().includes(searchLower));
       
       const storeAddr = (store.address || '').toUpperCase();
       let storeRegion = 'MDY';
@@ -163,7 +253,24 @@ const CityMallPage: React.FC = () => {
       else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
       else storeRegion = 'MDY';
 
-      return matchesSearch && storeRegion === selectedRegion;
+      const matchesRegion = storeRegion === selectedRegion;
+
+      // 🚀 分类过滤逻辑
+      let matchesCategory = true;
+      if (selectedCategory !== '全部') {
+        const type = store.store_type || '';
+        if (selectedCategory === '餐厅') {
+          matchesCategory = type.includes('餐') || type.includes('饭') || type.includes('Food') || type.includes('Restaurant');
+        } else if (selectedCategory === '生鲜') {
+          matchesCategory = type.includes('鲜') || type.includes('菜') || type.includes('肉') || type.includes('Fresh') || type.includes('Market');
+        } else if (selectedCategory === '生活用品') {
+          matchesCategory = type.includes('活') || type.includes('杂') || type.includes('超市') || type.includes('Mart') || type.includes('Shop');
+        } else {
+          matchesCategory = type.includes(selectedCategory);
+        }
+      }
+
+      return matchesSearch && matchesRegion && matchesCategory;
     })
     .sort((a, b) => {
       const statusA = checkStoreOpenStatus(a);
@@ -243,7 +350,7 @@ const CityMallPage: React.FC = () => {
               }}>🔍</div>
               <input
                 type="text"
-                placeholder={t.mall.searchPlaceholder}
+                placeholder={uiT.searchPlaceholder}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 style={{
@@ -258,9 +365,132 @@ const CityMallPage: React.FC = () => {
                 }}
               />
             </div>
+            {searchingProducts && (
+              <div style={{ color: 'white', marginTop: '10px', fontSize: '0.9rem' }}>正在搜索商品...</div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 🚀 精选 Banner 区域 */}
+      {banners.length > 0 && !searchText.trim() && (
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '2rem auto 0', 
+          padding: '0 1.5rem',
+          display: 'flex',
+          gap: '1.5rem',
+          overflowX: 'auto',
+          paddingBottom: '1rem'
+        }} className="banner-scroll">
+          <style>{`
+            .banner-scroll::-webkit-scrollbar { height: 6px; }
+            .banner-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); borderRadius: 10px; }
+          `}</style>
+          {banners.map((banner) => (
+            <div 
+              key={banner.id}
+              onClick={() => {
+                if (banner.link_url?.startsWith('store:')) {
+                  navigate(`/mall/${banner.link_url.split(':')[1]}`);
+                } else if (banner.link_url?.startsWith('category:')) {
+                  setSelectedCategory(banner.link_url.split(':')[1]);
+                }
+              }}
+              style={{
+                minWidth: '450px',
+                height: '180px',
+                background: `linear-gradient(135deg, ${banner.bg_color_start || '#3b82f6'} 0%, ${banner.bg_color_end || '#1e40af'} 100%)`,
+                borderRadius: '24px',
+                padding: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                transition: 'transform 0.3s ease',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <div style={{ flex: 1, color: 'white' }}>
+                <h3 style={{ fontSize: '1.8rem', fontWeight: '900', marginBottom: '0.5rem' }}>
+                  {language === 'my' ? banner.burmese_title : banner.title}
+                </h3>
+                <p style={{ fontSize: '1rem', opacity: 0.9, marginBottom: '1rem' }}>{banner.subtitle}</p>
+                <span style={{ 
+                  background: 'rgba(255,255,255,0.2)', 
+                  padding: '0.4rem 1rem', 
+                  borderRadius: '10px',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold'
+                }}>{uiT.partnerTag}</span>
+              </div>
+              {banner.image_url && (
+                <img 
+                  src={banner.image_url} 
+                  alt={banner.title} 
+                  style={{ width: '130px', height: '130px', borderRadius: '16px', objectFit: 'cover', marginLeft: '1rem' }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 🚀 分类聚合滑动条 */}
+      {!searchText.trim() && (
+        <div style={{ maxWidth: '1200px', margin: '2rem auto 0', padding: '0 1.5rem' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '2rem', 
+            overflowX: 'auto', 
+            paddingBottom: '1rem' 
+          }} className="category-scroll">
+            <style>{`.category-scroll::-webkit-scrollbar { display: none; }`}</style>
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat.id;
+              return (
+                <div 
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    gap: '0.8rem',
+                    cursor: 'pointer',
+                    minWidth: '80px'
+                  }}
+                >
+                  <div style={{ 
+                    width: '64px', 
+                    height: '64px', 
+                    borderRadius: '20px',
+                    background: isActive ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.8rem',
+                    transition: 'all 0.3s ease',
+                    boxShadow: isActive ? '0 10px 20px rgba(59, 130, 246, 0.3)' : 'none',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    {getStoreIcon(cat.id === '全部' ? 'default' : cat.id)}
+                  </div>
+                  <span style={{ 
+                    color: isActive ? 'white' : 'rgba(255,255,255,0.7)', 
+                    fontWeight: isActive ? '900' : '600',
+                    fontSize: '0.9rem'
+                  }}>
+                    {cat[language as 'zh' | 'en' | 'my'] || cat.en}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 🚀 地区选择栏 - 优化为高级玻璃拟态效果 */}
       <div style={{ 
@@ -373,181 +603,250 @@ const CityMallPage: React.FC = () => {
             <p style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.mall.loading}</p>
           </div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
-            gap: '2.5rem' 
-          }}>
-            {filteredStores.map((store: any) => {
-              const status = checkStoreOpenStatus(store);
-              return (
-                <div 
-                  key={store.id}
-                  onClick={() => {
-                    if (!status.isOpen) {
-                      alert(t.mall.closedToday);
-                      return;
-                    }
-                    navigate(`/mall/${store.id}`);
-                  }}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    borderRadius: '30px',
-                    padding: '2rem',
-                    cursor: status.isOpen ? 'pointer' : 'not-allowed',
-                    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                    boxShadow: '0 10px 20px rgba(0,0,0,0.05)',
-                    position: 'relative',
-                    border: '1px solid rgba(255,255,255,0.8)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    opacity: status.isOpen ? 1 : 0.8 // 休息中店铺半透明
-                  }}
-                  onMouseOver={(e) => {
-                    if (status.isOpen) {
-                      e.currentTarget.style.transform = 'translateY(-12px)';
-                      e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
-                      e.currentTarget.style.background = '#ffffff';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (status.isOpen) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.8rem' }}>
-                    <div style={{ 
-                      width: '80px', 
-                      height: '80px', 
-                      borderRadius: '24px', 
-                      background: homeBackground, 
-                      display: 'flex', 
-                      justifyContent: 'center', 
-                      alignItems: 'center',
-                      fontSize: '2.8rem',
-                      marginRight: '1.5rem',
-                      boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                      color: 'white',
-                      filter: status.isOpen ? 'none' : 'grayscale(1)' // 休息中图标变灰
-                    }}>
-                      {getStoreIcon(store.store_type)}
+          <div>
+            {/* 🚀 商品显示模式 */}
+            {searchMode === 'products' && searchText.trim() ? (
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                gap: '2rem' 
+              }}>
+                {foundProducts.map((product: any) => {
+                  const store = product.delivery_stores;
+                  const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
+                  return (
+                    <div 
+                      key={product.id}
+                      onClick={() => navigate(`/mall/${store.id}?highlight=${product.id}`)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '24px',
+                        padding: '1.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        border: '1px solid rgba(255,255,255,0.8)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-8px)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      <img 
+                        src={product.image_url || 'https://via.placeholder.com/150'} 
+                        alt={product.name} 
+                        style={{ width: '100%', height: '180px', borderRadius: '16px', objectFit: 'cover' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>
+                        <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: '1.4', height: '2.8rem', overflow: 'hidden' }}>{product.description}</p>
+                        <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#1e40af' }}>{Number(product.price).toLocaleString()} MMK</span>
+                          {product.original_price && (
+                            <span style={{ fontSize: '0.9rem', color: '#94a3b8', textDecoration: 'line-through' }}>{Number(product.original_price).toLocaleString()} MMK</span>
+                          )}
+                        </div>
+                        {store && (
+                          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.85rem' }}>
+                            <span>🏪</span>
+                            <span style={{ fontWeight: 'bold' }}>{store.store_name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ 
+                        marginTop: 'auto', 
+                        padding: '0.8rem', 
+                        background: storeStatus.isOpen ? '#1e40af' : '#94a3b8', 
+                        color: 'white', 
+                        textAlign: 'center', 
+                        borderRadius: '12px',
+                        fontWeight: 'bold'
+                      }}>
+                        {storeStatus.isOpen ? uiT.addToCart : t.mall.closedNow}
+                      </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ 
-                        fontSize: '1.4rem', 
-                        fontWeight: '900', 
-                        color: status.isOpen ? '#0f172a' : '#64748b', 
-                        marginBottom: '0.6rem',
-                        lineHeight: '1.2'
-                      }}>{store.store_name}</h3>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                        <span style={{ 
-                          background: '#eff6ff', 
-                          color: '#1e40af', 
-                          fontSize: '0.8rem', 
-                          padding: '0.3rem 0.8rem', 
-                          borderRadius: '10px',
-                          fontWeight: '800',
-                          textTransform: 'uppercase'
+                  );
+                })}
+              </div>
+            ) : (
+              /* 🚀 店铺显示模式 (原有逻辑) */
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
+                gap: '2.5rem' 
+              }}>
+                {filteredStores.map((store: any) => {
+                  const status = checkStoreOpenStatus(store);
+                  return (
+                    <div 
+                      key={store.id}
+                      onClick={() => {
+                        if (!status.isOpen) {
+                          alert(t.mall.closedToday);
+                          return;
+                        }
+                        navigate(`/mall/${store.id}`);
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '30px',
+                        padding: '2rem',
+                        cursor: status.isOpen ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        boxShadow: '0 10px 20px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        border: '1px solid rgba(255,255,255,0.8)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        opacity: status.isOpen ? 1 : 0.8 // 休息中店铺半透明
+                      }}
+                      onMouseOver={(e) => {
+                        if (status.isOpen) {
+                          e.currentTarget.style.transform = 'translateY(-12px)';
+                          e.currentTarget.style.boxShadow = '0 30px 60px rgba(0,0,0,0.15)';
+                          e.currentTarget.style.background = '#ffffff';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (status.isOpen) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.8rem' }}>
+                        <div style={{ 
+                          width: '80px', 
+                          height: '80px', 
+                          borderRadius: '24px', 
+                          background: homeBackground, 
+                          display: 'flex', 
+                          justifyContent: 'center', 
+                          alignItems: 'center',
+                          fontSize: '2.8rem',
+                          marginRight: '1.5rem',
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+                          color: 'white',
+                          filter: status.isOpen ? 'none' : 'grayscale(1)' // 休息中图标变灰
                         }}>
-                          {store.store_type}
-                        </span>
-                        <span style={{ 
-                          background: status.isOpen ? '#dcfce7' : '#fee2e2', 
-                          color: status.isOpen ? '#15803d' : '#ef4444', 
-                          fontSize: '0.8rem', 
-                          padding: '0.3rem 0.8rem', 
-                          borderRadius: '10px',
-                          fontWeight: '800'
-                        }}>
-                          ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : t.mall.closedNow)}
-                        </span>
+                          {getStoreIcon(store.store_type)}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ 
+                            fontSize: '1.4rem', 
+                            fontWeight: '900', 
+                            color: status.isOpen ? '#0f172a' : '#64748b', 
+                            marginBottom: '0.6rem',
+                            lineHeight: '1.2'
+                          }}>{store.store_name}</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                            <span style={{ 
+                              background: '#eff6ff', 
+                              color: '#1e40af', 
+                              fontSize: '0.8rem', 
+                              padding: '0.3rem 0.8rem', 
+                              borderRadius: '10px',
+                              fontWeight: '800',
+                              textTransform: 'uppercase'
+                            }}>
+                              {store.store_type}
+                            </span>
+                            <span style={{ 
+                              background: status.isOpen ? '#dcfce7' : '#fee2e2', 
+                              color: status.isOpen ? '#15803d' : '#ef4444', 
+                              fontSize: '0.8rem', 
+                              padding: '0.3rem 0.8rem', 
+                              borderRadius: '10px',
+                              fontWeight: '800'
+                            }}>
+                              ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : t.mall.closedNow)}
+                            </span>
+                          </div>
+
+                          {/* 🚀 新增：评价统计显示 */}
+                          {storeReviewStats[store.id] && storeReviewStats[store.id].count > 0 && (
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadStoreReviews(store);
+                              }}
+                              style={{ 
+                                marginTop: '0.8rem', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <div style={{ display: 'flex', color: '#fbbf24', fontSize: '0.9rem' }}>
+                                {'★'.repeat(Math.round(storeReviewStats[store.id].average))}
+                                {'☆'.repeat(5 - Math.round(storeReviewStats[store.id].average))}
+                              </div>
+                              <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: '700' }}>
+                                {storeReviewStats[store.id].average} ({storeReviewStats[store.id].count} {language === 'zh' ? '条评价' : 'Reviews'})
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* 🚀 新增：评价统计显示 */}
-                      {storeReviewStats[store.id] && storeReviewStats[store.id].count > 0 && (
-                        <div 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            loadStoreReviews(store);
-                          }}
-                          style={{ 
-                            marginTop: '0.8rem', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <div style={{ display: 'flex', color: '#fbbf24', fontSize: '0.9rem' }}>
-                            {'★'.repeat(Math.round(storeReviewStats[store.id].average))}
-                            {'☆'.repeat(5 - Math.round(storeReviewStats[store.id].average))}
-                          </div>
-                          <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: '700' }}>
-                            {storeReviewStats[store.id].average} ({storeReviewStats[store.id].count} {language === 'zh' ? '条评价' : 'Reviews'})
-                          </span>
+                      <div style={{ 
+                        background: '#f8fafc', 
+                        borderRadius: '20px', 
+                        padding: '1.5rem', 
+                        gap: '1rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        marginBottom: '1.8rem',
+                        border: '1px solid #f1f5f9',
+                        opacity: status.isOpen ? 1 : 0.6
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                          <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
+                          <span style={{ fontWeight: '600' }}>{t.mall.operatingHours}:</span>
+                          <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                          <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
+                          <span style={{ fontWeight: '600' }}>{t.mall.contact}:</span>
+                          <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
+                          <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
+                          <span style={{ 
+                            whiteSpace: 'nowrap', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis',
+                            color: '#1e293b',
+                            fontWeight: '500',
+                            maxWidth: '180px'
+                          }} title={store.address}>{store.address}</span>
+                        </div>
+                      </div>
 
-                  <div style={{ 
-                    background: '#f8fafc', 
-                    borderRadius: '20px', 
-                    padding: '1.5rem', 
-                    gap: '1rem', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    marginBottom: '1.8rem',
-                    border: '1px solid #f1f5f9',
-                    opacity: status.isOpen ? 1 : 0.6
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>⏰</span>
-                      <span style={{ fontWeight: '600' }}>{t.mall.operatingHours}:</span>
-                      <span style={{ marginLeft: 'auto', color: '#1e293b', fontWeight: '700' }}>{store.operating_hours || '09:00 - 21:00'}</span>
+                      <div style={{ 
+                        textAlign: 'right', 
+                        marginTop: 'auto', 
+                        fontWeight: '900', 
+                        color: status.isOpen ? '#1e40af' : '#94a3b8',
+                        fontSize: '1.2rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: '0.6rem'
+                      }}>
+                        {status.isOpen ? uiT.visitStore : t.mall.closedToday} <span style={{ fontSize: '1.6rem' }}>{status.isOpen ? '→' : '🔒'}</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
-                      <span style={{ fontWeight: '600' }}>{t.mall.contact}:</span>
-                      <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
-                      <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
-                      <span style={{ 
-                        whiteSpace: 'nowrap', 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis',
-                        color: '#1e293b',
-                        fontWeight: '500',
-                        maxWidth: '180px'
-                      }}>{store.address}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    textAlign: 'right', 
-                    marginTop: 'auto', 
-                    fontWeight: '900', 
-                    color: status.isOpen ? '#1e40af' : '#94a3b8',
-                    fontSize: '1.2rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    gap: '0.6rem'
-                  }}>
-                    {status.isOpen ? t.mall.visitStore : t.mall.closedToday} <span style={{ fontSize: '1.6rem' }}>{status.isOpen ? '→' : '🔒'}</span>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        {!loading && filteredStores.length === 0 && (
+        {!loading && (searchMode === 'stores' ? filteredStores.length === 0 : foundProducts.length === 0) && (
           <div style={{ 
             textAlign: 'center', 
             padding: '10rem 0', 
@@ -557,9 +856,15 @@ const CityMallPage: React.FC = () => {
             borderRadius: '40px',
             border: '2px dashed rgba(255, 255, 255, 0.3)'
           }}>
-            <div style={{ fontSize: '7rem', marginBottom: '1.5rem', opacity: 0.8 }}>🏢</div>
-            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>{t.mall.noStores}</h3>
-            <p style={{ marginTop: '0.8rem', fontSize: '1.1rem', opacity: 0.9 }}>请尝试切换其他地区或搜索关键词</p>
+            <div style={{ fontSize: '7rem', marginBottom: '1.5rem', opacity: 0.8 }}>
+              {searchMode === 'stores' ? '🏢' : '📦'}
+            </div>
+            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>
+              {searchMode === 'stores' ? uiT.noStores : uiT.noProducts}
+            </h3>
+            <p style={{ marginTop: '0.8rem', fontSize: '1.1rem', opacity: 0.9 }}>
+              {searchMode === 'stores' ? '请尝试切换其他地区或搜索关键词' : '换个关键词搜搜看吧'}
+            </p>
           </div>
         )}
       </div>

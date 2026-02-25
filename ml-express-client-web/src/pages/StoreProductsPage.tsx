@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { merchantService, deliveryStoreService, Product, DeliveryStore } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
@@ -9,6 +9,7 @@ import LoggerService from '../services/LoggerService';
 const StoreProductsPage: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
+  const location = useLocation(); // 🚀 新增
   const { language, setLanguage, t } = useLanguage();
   const { addToCart, cartCount } = useCart();
   
@@ -17,6 +18,8 @@ const StoreProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  const productRefs = useRef<Record<string, HTMLDivElement | null>>({}); // 🚀 新增用于滚动定位
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -47,6 +50,18 @@ const StoreProductsPage: React.FC = () => {
       ]);
       setStore(storeData);
       setProducts(productsData);
+
+      // 🚀 处理高亮或自动加车逻辑
+      const params = new URLSearchParams(location.search);
+      const highlightId = params.get('highlight');
+      if (highlightId) {
+        // 自动增加该商品数量
+        setItemQuantities(prev => ({ ...prev, [highlightId]: 1 }));
+        // 延迟一点点等待列表渲染后滚动
+        setTimeout(() => {
+          productRefs.current[highlightId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
     } catch (error) {
       LoggerService.error('Failed to load store data:', error);
     } finally {
@@ -322,28 +337,35 @@ const StoreProductsPage: React.FC = () => {
               }}>
                 {products.map((product: any) => {
                   const qty = itemQuantities[product.id] || 0;
+                  const isHighlighted = new URLSearchParams(location.search).get('highlight') === product.id;
                   return (
                     <div 
                       key={product.id}
+                      ref={el => productRefs.current[product.id] = el}
                       style={{
                         background: 'rgba(255, 255, 255, 0.95)',
                         borderRadius: '24px',
                         overflow: 'hidden',
-                        boxShadow: '0 8px 16px rgba(0,0,0,0.03)',
+                        boxShadow: isHighlighted ? '0 0 0 3px #3b82f6, 0 15px 30px rgba(59, 130, 246, 0.2)' : '0 8px 16px rgba(0,0,0,0.03)',
                         border: '1px solid rgba(255,255,255,0.8)',
                         display: 'flex',
                         flexDirection: 'column',
-                        transition: 'all 0.3s ease'
+                        transition: 'all 0.3s ease',
+                        transform: isHighlighted ? 'scale(1.02)' : 'none'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-6px)';
-                        e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.08)';
-                        e.currentTarget.style.background = '#ffffff';
+                        if (!isHighlighted) {
+                          e.currentTarget.style.transform = 'translateY(-6px)';
+                          e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.08)';
+                          e.currentTarget.style.background = '#ffffff';
+                        }
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.03)';
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                        if (!isHighlighted) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.03)';
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                        }
                       }}
                     >
                       <div style={{ height: '180px', background: '#f8fafc', position: 'relative' }}>
