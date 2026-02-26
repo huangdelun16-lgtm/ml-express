@@ -21,6 +21,17 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
+// 🚀 新增：订单二维码子组件 (解决 Rule of Hooks 问题)
+const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
+  const [qrUrl, setQrUrl] = useState('');
+  useEffect(() => {
+    if (orderId) {
+      QRCode.toDataURL(orderId).then(setQrUrl);
+    }
+  }, [orderId]);
+  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px' }} alt="QR" /> : null;
+};
+
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t: allT } = useLanguage();
@@ -67,6 +78,7 @@ const ProfilePage: React.FC = () => {
   const [lastOrderCheckTime, setLastOrderCheckTime] = useState<number>(Date.now()); // 🚀 新增：上次订单检测时间
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
   const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
+  const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({}); // 🚀 新增：商品价格映射
   
   // 🚀 新增：评价管理状态
   const [showReviewsModal, setShowReviewsModal] = useState(false);
@@ -182,6 +194,13 @@ const ProfilePage: React.FC = () => {
       setLoadingProducts(true);
       const data = await merchantService.getStoreProducts(currentUser.id);
       setProducts(data);
+      
+      // 🚀 新增：构建商品价格映射
+      const priceMap = data.reduce<Record<string, number>>((acc, product) => {
+        acc[product.name] = product.price;
+        return acc;
+      }, {});
+      setProductPriceMap(priceMap);
     } catch (error) {
       LoggerService.error('加载商品失败:', error);
     } finally {
@@ -835,6 +854,121 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：商家接单功能
+  // 🚀 新增：自动打印小票功能
+  const handlePrintReceipt = async (orderData: any) => {
+    if (!orderData) return;
+    
+    try {
+      const qrDataUrl = await QRCode.toDataURL(orderData.id, { margin: 1, width: 180 });
+      
+      // 解析商品信息
+      const itemsMatch = orderData.description?.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
+      const productItems = itemsMatch ? itemsMatch[1].split(', ') : [];
+      const parsedItems = productItems.map((item: string) => {
+        const match = item.match(/^(.+?)\s*x(\d+)$/i);
+        if (!match) return { label: item, qty: 1, price: undefined };
+        const name = match[1].trim();
+        const qty = Number(match[2]) || 1;
+        const unitPrice = productPriceMap[name];
+        return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
+      });
+
+      const itemPayMatch = orderData.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+      const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
+      const deliveryFee = parseFloat(orderData.price?.replace(/[^0-9.]/g, '') || '0');
+      const computedItemTotal = parsedItems.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+      const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
+      const totalFee = deliveryFee + finalItemTotal;
+      const paymentText = orderData.payment_method === 'cash' ? (language === 'zh' ? '现金支付' : 'Cash') : (language === 'zh' ? '余额支付' : 'Balance');
+      const orderIdShort = `#${orderData.id.slice(-5)}`;
+
+      const html = `
+        <html>
+          <head>
+            <style>
+              body { font-family: sans-serif; padding: 20px; color: #111827; width: 300px; margin: 0 auto; line-height: 1.4; }
+              .title { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 5px; }
+              .subtitle { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 15px; }
+              .section { border-top: 1px dashed #d1d5db; padding: 10px 0; margin-top: 5px; }
+              .row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px; align-items: flex-start; }
+              .label { color: #6b7280; min-width: 50px; }
+              .value { font-weight: 600; text-align: right; flex: 1; margin-left: 10px; }
+              .item-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
+              .total-row { font-size: 15px; font-weight: 900; border-top: 1px solid #000; margin-top: 10px; padding-top: 8px; }
+              .qr-box { text-align: center; margin: 15px 0; }
+              .qr-box img { width: 140px; height: 140px; }
+              .footer-note { text-align: center; font-size: 10px; color: #9ca3af; margin-top: 20px; font-style: italic; }
+            </style>
+          </head>
+          <body>
+            <div class="title">MARKET LINK EXPRESS</div>
+            <div class="subtitle">订单号 ${orderIdShort}</div>
+            
+            <div class="qr-box">
+              <img src="${qrDataUrl}" />
+              <div style="font-size: 11px; font-weight: bold; margin-top: 5px;">取件码: ${orderData.id}</div>
+            </div>
+
+            <div class="section">
+              <div class="row"><span class="label">商家:</span><span class="value">${orderData.sender_name || '-'}</span></div>
+              <div class="row"><span class="label">电话:</span><span class="value">${orderData.sender_phone || '-'}</span></div>
+              <div class="row"><span class="label">地址:</span><span class="value">${orderData.sender_address || '-'}</span></div>
+            </div>
+
+            <div class="section">
+              <div class="row"><span class="label">客户:</span><span class="value">${orderData.receiver_name || '-'}</span></div>
+              <div class="row"><span class="label">电话:</span><span class="value">${orderData.receiver_phone || '-'}</span></div>
+              <div class="row"><span class="label">地址:</span><span class="value">${orderData.receiver_address || '-'}</span></div>
+            </div>
+
+            <div class="section">
+              <div class="row"><span class="label">支付:</span><span class="value">${paymentText}</span></div>
+              ${parsedItems.map((item: any) => `
+                <div class="item-row">
+                  <span>• ${item.label} x${item.qty}</span>
+                  <span>${item.price ? `${item.price.toLocaleString()} MMK` : '-'}</span>
+                </div>
+              `).join('')}
+              <div class="row"><span class="label">跑腿费:</span><span class="value">${deliveryFee.toLocaleString()} MMK</span></div>
+              <div class="row total-row"><span>合计:</span><span>${totalFee.toLocaleString()} MMK</span></div>
+            </div>
+
+            <div class="footer-note">请保留此票据用于对账，感谢使用！</div>
+          </body>
+        </html>
+      `;
+
+      // 🚀 Web 端静默打印逻辑
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+        
+        // 等待图片加载完成再打印
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          // 打印后移除 iframe
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 500);
+      }
+    } catch (error) {
+      LoggerService.error('生成小票失败:', error);
+    }
+  };
+
   const handleAcceptOrder = async (targetPkg?: any) => {
     const pkgToAccept = targetPkg || selectedPackage;
     if (!pkgToAccept?.id) return;
@@ -852,7 +986,10 @@ const ProfilePage: React.FC = () => {
       const success = await packageService.updatePackageStatus(pkgToAccept.id, '打包中');
       
       if (success) {
-        alert(language === 'zh' ? '接单成功！请开始打包商品。' : 'Order accepted! Please start packing the items.');
+        // 🚀 核心优化：接单成功后自动打印小票
+        handlePrintReceipt(pkgToAccept);
+        
+        alert(language === 'zh' ? '接单成功！小票已自动打印，请开始打包商品。' : 'Order accepted! Receipt printed, please start packing.');
         // 刷新本地数据
         const updatedPackage = { ...pkgToAccept, status: '打包中' };
         if (!targetPkg) setSelectedPackage(updatedPackage);
@@ -4581,92 +4718,132 @@ const ProfilePage: React.FC = () => {
             
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
               {userPackages.filter(pkg => pkg.status === '待确认').length > 0 ? (
-                userPackages.filter(pkg => pkg.status === '待确认').map((pkg: any) => (
-                  <div
-                    key={pkg.id}
-                    style={{
-                      padding: '1.5rem',
-                      marginBottom: '1rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '20px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
-                        {t.packageId}
-                      </div>
-                      <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px' }}>
-                        {pkg.id}
-                      </div>
-                      <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem' }}>
-                          📅 {pkg.create_time || pkg.created_at || '-'}
-                        </div>
-                        {pkg.cod_amount > 0 && (
-                          <div style={{ color: '#fbbf24', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                            💰 {pkg.cod_amount.toLocaleString()} MMK
+                userPackages.filter(pkg => pkg.status === '待确认').map((pkg: any) => {
+                  // 解析商品信息
+                  const itemsMatch = pkg.description?.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
+                  const productItems = itemsMatch ? itemsMatch[1].split(', ') : [];
+                  const parsedItems = productItems.map((item: string) => {
+                    const match = item.match(/^(.+?)\s*x(\d+)$/i);
+                    if (!match) return { label: item, qty: 1 };
+                    return { label: match[1].trim(), qty: Number(match[2]) || 1 };
+                  });
+
+                  return (
+                    <div
+                      key={pkg.id}
+                      style={{
+                        padding: '2rem',
+                        marginBottom: '2rem',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '28px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.5rem',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      {/* 订单 ID 和 二维码区域 */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                            {t.packageId}
                           </div>
-                        )}
-                        <div style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                          💵 {pkg.price ? `${pkg.price.replace('MMK', '').trim()} MMK` : '-'}
+                          <div style={{ color: '#fbbf24', fontSize: '1.4rem', fontWeight: '900' }}>
+                            #{pkg.id}
+                          </div>
+                          <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', marginTop: '8px' }}>
+                            📅 {pkg.create_time || pkg.created_at || '-'}
+                          </div>
+                        </div>
+                        <div style={{ background: 'white', padding: '10px', borderRadius: '16px' }}>
+                          <OrderQRCode orderId={pkg.id} />
                         </div>
                       </div>
+
+                      {/* 信息网格 */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        {/* 商家信息 */}
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ color: '#3b82f6', fontSize: '0.8rem', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>商家信息</div>
+                          <div style={{ color: 'white', fontWeight: '700', fontSize: '1rem' }}>{pkg.sender_name}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginTop: '4px' }}>{pkg.sender_phone}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginTop: '4px' }}>{pkg.sender_address}</div>
+                        </div>
+                        {/* 客户信息 */}
+                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>客户信息</div>
+                          <div style={{ color: 'white', fontWeight: '700', fontSize: '1rem' }}>{pkg.receiver_name}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginTop: '4px' }}>{pkg.receiver_phone}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginTop: '4px' }}>{pkg.receiver_address}</div>
+                        </div>
+                      </div>
+
+                      {/* 商品清单 */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.2rem', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: '900', marginBottom: '12px', textTransform: 'uppercase' }}>商品清单</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {parsedItems.map((item: any, idx: number) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'white', fontSize: '0.95rem' }}>
+                              <span>• {item.label}</span>
+                              <span style={{ fontWeight: '900' }}>x{item.qty}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>支付方式: {pkg.payment_method === 'cash' ? '现金支付' : '余额支付'}</span>
+                          <span style={{ color: '#10b981', fontWeight: '900', fontSize: '1.1rem' }}>{pkg.price ? `${pkg.price.replace('MMK', '').trim()} MMK` : '-'}</span>
+                        </div>
+                      </div>
+
+                      {/* 客户备注 */}
+                      {pkg.notes && (
+                        <div style={{ background: 'rgba(251, 191, 36, 0.1)', padding: '1rem', borderRadius: '18px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: '900', marginBottom: '4px' }}>💡 客户备注</div>
+                          <div style={{ color: 'white', fontSize: '0.95rem' }}>{pkg.notes}</div>
+                        </div>
+                      )}
+
+                      {/* 操作按钮 */}
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                          onClick={() => handleCancelOrder(pkg)}
+                          style={{
+                            flex: 1,
+                            padding: '1rem',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#fca5a5',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '16px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          ✕ 拒绝接单
+                        </button>
+                        <button
+                          onClick={() => handleAcceptOrder(pkg)}
+                          style={{
+                            flex: 2,
+                            padding: '1rem',
+                            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '16px',
+                            fontWeight: '900',
+                            fontSize: '1.1rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 8px 20px rgba(245, 158, 11, 0.3)',
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          🤝 立即接单 (自动打单)
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        onClick={() => handleCancelOrder(pkg)}
-                        style={{
-                          padding: '12px 20px',
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          color: '#fca5a5',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '12px',
-                          fontWeight: '800',
-                          fontSize: '0.9rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}
-                      >
-                        ✕ {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်'}
-                      </button>
-                      <button
-                        onClick={() => handleAcceptOrder(pkg)}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '12px',
-                          fontWeight: '800',
-                          fontSize: '0.9rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 8px 15px rgba(245, 158, 11, 0.3)',
-                          transition: 'all 0.3s ease',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                      >
-                        🤝 {language === 'zh' ? '立即接单' : language === 'en' ? 'Accept' : 'လက်ခံရန်'}
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
