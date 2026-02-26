@@ -39,14 +39,16 @@ const TimeWheelPicker: React.FC<{
   label: string,
   icon: string 
 }> = ({ value, onChange, label, icon }) => {
-  const [hour, minute] = value.split(':');
+  const parts = (value || '09:00').split(':');
+  const hour = parts[0] || '09';
+  const minute = parts[1] || '00';
   
   const handleHourChange = (newHour: string) => {
-    onChange(`${newHour}:${minute}`);
+    onChange(`${newHour.padStart(2, '0')}:${minute}`);
   };
   
   const handleMinuteChange = (newMinute: string) => {
-    onChange(`${hour}:${newMinute}`);
+    onChange(`${hour}:${newMinute.padStart(2, '0')}`);
   };
 
   return (
@@ -57,68 +59,66 @@ const TimeWheelPicker: React.FC<{
       border: '1px solid rgba(255, 255, 255, 0.1)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '1rem',
-      flex: 1
+      gap: '1.2rem',
+      flex: 1,
+      minWidth: '200px'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase' }}>
-        <span>{icon}</span> {label}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', fontWeight: '800', textTransform: 'uppercase' }}>
+        <span style={{ fontSize: '1.2rem' }}>{icon}</span> {label}
       </div>
       
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        gap: '12px',
-        padding: '10px',
-        background: 'rgba(0,0,0,0.2)',
+        gap: '1.5rem',
+        padding: '15px',
+        background: 'rgba(0,0,0,0.3)',
         borderRadius: '20px',
-        border: '1px solid rgba(255,255,255,0.05)'
+        border: '1px solid rgba(255,255,255,0.05)',
+        boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
       }}>
         {/* 小时滚轮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
           <button 
-            onClick={() => handleHourChange(String((parseInt(hour) + 1) % 24).padStart(2, '0'))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+            onClick={() => handleHourChange(String((parseInt(hour) + 1) % 24))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >▲</button>
           <div style={{ 
-            fontSize: '2rem', 
+            fontSize: '2.2rem', 
             fontWeight: '900', 
             color: 'white', 
-            background: 'linear-gradient(180deg, #fff 0%, #cbd5e1 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            fontFamily: 'monospace',
             padding: '5px 10px'
           }}>
-            {hour}
+            {hour.padStart(2, '0')}
           </div>
           <button 
-            onClick={() => handleHourChange(String((parseInt(hour) - 1 + 24) % 24).padStart(2, '0'))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+            onClick={() => handleHourChange(String((parseInt(hour) - 1 + 24) % 24))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >▼</button>
         </div>
 
-        <div style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fbbf24', marginTop: '5px' }}>:</div>
+        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#fbbf24', marginTop: '2px' }}>:</div>
 
         {/* 分钟滚轮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
           <button 
-            onClick={() => handleMinuteChange(String((parseInt(minute) + 5) % 60).padStart(2, '0'))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+            onClick={() => handleMinuteChange(String((parseInt(minute) + 5) % 60))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >▲</button>
           <div style={{ 
-            fontSize: '2rem', 
+            fontSize: '2.2rem', 
             fontWeight: '900', 
             color: 'white',
-            background: 'linear-gradient(180deg, #fff 0%, #cbd5e1 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            fontFamily: 'monospace',
             padding: '5px 10px'
           }}>
-            {minute}
+            {minute.padStart(2, '0')}
           </div>
           <button 
-            onClick={() => handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60).padStart(2, '0'))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+            onClick={() => handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >▼</button>
         </div>
       </div>
@@ -2458,7 +2458,13 @@ const ProfilePage: React.FC = () => {
                       })()}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1.5rem', zIndex: 1, flexDirection: window.innerWidth < 640 ? 'column' : 'row' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '1.5rem', 
+                      zIndex: 1, 
+                      flexDirection: 'column', // 🚀 强制改为垂直排列，确保移动端显示完整
+                      width: '100%' 
+                    }}>
                       <TimeWheelPicker 
                         label={t.openingTime}
                         icon="🌅"
@@ -2469,8 +2475,16 @@ const ProfilePage: React.FC = () => {
                         }}
                       />
                       
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: '30px', height: '2px', background: 'rgba(255,255,255,0.1)', borderRadius: '1px' }} />
+                      {/* 🚀 优化分割线：在垂直排列时显示更美观 */}
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px',
+                        padding: '0 1rem'
+                      }}>
+                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>TO</div>
+                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
                       </div>
 
                       <TimeWheelPicker 
