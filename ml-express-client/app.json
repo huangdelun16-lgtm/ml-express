@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
-    "version": "2.2.4",
+    "version": "2.2.4", 
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

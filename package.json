@@ -1,6 +1,6 @@
 {
   "name": "market-link-express",
-  "version": "2.2.2",
+  "version": "2.2.4",
   "description": "MARKET LINK EXPRESS - 缅甸专业快递服务",
   "private": true,
   "dependencies": {
