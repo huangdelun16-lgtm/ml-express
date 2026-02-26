@@ -32,6 +32,100 @@ const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
   return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px' }} alt="QR" /> : null;
 };
 
+// 🚀 新增：高级滚动时间选择器组件
+const TimeWheelPicker: React.FC<{ 
+  value: string, 
+  onChange: (val: string) => void, 
+  label: string,
+  icon: string 
+}> = ({ value, onChange, label, icon }) => {
+  const [hour, minute] = value.split(':');
+  
+  const handleHourChange = (newHour: string) => {
+    onChange(`${newHour}:${minute}`);
+  };
+  
+  const handleMinuteChange = (newMinute: string) => {
+    onChange(`${hour}:${newMinute}`);
+  };
+
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.05)',
+      padding: '1.5rem',
+      borderRadius: '24px',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1rem',
+      flex: 1
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase' }}>
+        <span>{icon}</span> {label}
+      </div>
+      
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        gap: '12px',
+        padding: '10px',
+        background: 'rgba(0,0,0,0.2)',
+        borderRadius: '20px',
+        border: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        {/* 小时滚轮 */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button 
+            onClick={() => handleHourChange(String((parseInt(hour) + 1) % 24).padStart(2, '0'))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+          >▲</button>
+          <div style={{ 
+            fontSize: '2rem', 
+            fontWeight: '900', 
+            color: 'white', 
+            background: 'linear-gradient(180deg, #fff 0%, #cbd5e1 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            padding: '5px 10px'
+          }}>
+            {hour}
+          </div>
+          <button 
+            onClick={() => handleHourChange(String((parseInt(hour) - 1 + 24) % 24).padStart(2, '0'))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+          >▼</button>
+        </div>
+
+        <div style={{ fontSize: '1.5rem', fontWeight: '900', color: '#fbbf24', marginTop: '5px' }}>:</div>
+
+        {/* 分钟滚轮 */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button 
+            onClick={() => handleMinuteChange(String((parseInt(minute) + 5) % 60).padStart(2, '0'))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+          >▲</button>
+          <div style={{ 
+            fontSize: '2rem', 
+            fontWeight: '900', 
+            color: 'white',
+            background: 'linear-gradient(180deg, #fff 0%, #cbd5e1 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            padding: '5px 10px'
+          }}>
+            {minute}
+          </div>
+          <button 
+            onClick={() => handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60).padStart(2, '0'))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '1.2rem' }}
+          >▼</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t: allT } = useLanguage();
@@ -2316,173 +2410,113 @@ const ProfilePage: React.FC = () => {
 
                   {/* 营业时间设置 */}
                   <div style={{ 
-                    background: 'rgba(15, 23, 42, 0.3)',
-                    padding: '2rem',
-                    borderRadius: '30px',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    padding: '2.5rem',
+                    borderRadius: '35px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '1.5rem',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+                    gap: '2rem',
+                    boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}>
-                    <div style={{ color: 'white', fontWeight: '900', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '1.4rem' }}>📝</span> {t.operatingHours}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.openingTime}</label>
-                        <div style={{ display: 'flex', gap: '5px' }}>
-                          <select 
-                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00')[0]}
-                          onChange={(e) => {
-                              const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '00');
-                              const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
-                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${e.target.value}:${oldMin} - ${end}` }));
-                          }}
-                          style={{ 
-                              flex: 1,
-                            background: 'white', 
-                            border: 'none', 
-                            borderRadius: '15px', 
-                            padding: '12px', 
-                            color: '#1e293b', 
-                            outline: 'none', 
-                            cursor: 'pointer', 
-                            fontWeight: '900',
-                            fontSize: '1rem',
-                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                              appearance: 'none',
-                              textAlign: 'center'
-                            }}
-                          >
-                            {Array.from({ length: 24 }).map((_, i) => (
-                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                          <span style={{ color: 'white', fontWeight: 'bold', alignSelf: 'center' }}>:</span>
-                          <select 
-                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00')[1]}
-                            onChange={(e) => {
-                              const [oldHour, _] = parseTimeParts(businessStatus.operating_hours.split(' - ')[0], '09:00');
-                              const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
-                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${oldHour}:${e.target.value} - ${end}` }));
-                            }}
-                            style={{ 
-                              flex: 1,
-                              background: 'white', 
-                              border: 'none', 
-                              borderRadius: '15px', 
-                              padding: '12px', 
-                              color: '#1e293b', 
-                              outline: 'none', 
-                              cursor: 'pointer', 
-                              fontWeight: '900',
-                              fontSize: '1rem',
-                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                              appearance: 'none',
-                              textAlign: 'center'
-                            }}
-                          >
-                            {Array.from({ length: 60 }).map((_, i) => (
-                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.closingTime}</label>
-                        <div style={{ display: 'flex', gap: '5px' }}>
-                          <select 
-                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00')[0]}
-                          onChange={(e) => {
-                              const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
-                              const [_, oldMin] = parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '00');
-                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${e.target.value}:${oldMin}` }));
-                          }}
-                          style={{ 
-                              flex: 1,
-                            background: 'white', 
-                            border: 'none', 
-                            borderRadius: '15px', 
-                            padding: '12px', 
-                            color: '#1e293b', 
-                            outline: 'none', 
-                            cursor: 'pointer', 
-                            fontWeight: '900', 
-                            fontSize: '1rem',
-                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                              appearance: 'none',
-                              textAlign: 'center'
-                            }}
-                          >
-                            {Array.from({ length: 24 }).map((_, i) => (
-                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                          <span style={{ color: 'white', fontWeight: 'bold', alignSelf: 'center' }}>:</span>
-                          <select 
-                            value={parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00')[1]}
-                            onChange={(e) => {
-                              const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
-                              const [oldHour, _] = parseTimeParts(businessStatus.operating_hours.split(' - ')[1], '21:00');
-                              setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${oldHour}:${e.target.value}` }));
-                            }}
-                            style={{ 
-                              flex: 1,
-                              background: 'white', 
-                              border: 'none', 
-                              borderRadius: '15px', 
-                              padding: '12px', 
-                              color: '#1e293b', 
-                              outline: 'none', 
-                              cursor: 'pointer', 
-                              fontWeight: '900',
-                              fontSize: '1rem',
-                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                              appearance: 'none',
-                              textAlign: 'center'
-                            }}
-                          >
-                            {Array.from({ length: 60 }).map((_, i) => (
-                              <option key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    {/* 背景发光效果 */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50px',
+                      right: '-50px',
+                      width: '150px',
+                      height: '150px',
+                      background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+                      zIndex: 0
+                    }} />
 
-                  {/* 🚀 新增：保存按钮 */}
-                  <button
-                    onClick={() => handleUpdateStoreStatus(businessStatus)}
-                    style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '20px',
-                      padding: '1.2rem',
-                      fontSize: '1.2rem',
-                      fontWeight: '900',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.8rem',
-                      marginTop: '1rem'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-3px)';
-                      e.currentTarget.style.boxShadow = '0 15px 30px rgba(16, 185, 129, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(16, 185, 129, 0.3)';
-                    }}
-                  >
-                    <span>💾</span> {t.save}
-                  </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
+                      <div style={{ color: 'white', fontWeight: '900', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '1.4rem' }}>⏰</span>
+                        </div>
+                        {t.operatingHours}
+                      </div>
+                      
+                      {/* 营业时长预览 */}
+                      {(() => {
+                        const start = businessStatus.operating_hours.split(' - ')[0];
+                        const end = businessStatus.operating_hours.split(' - ')[1];
+                        const [sH, sM] = start.split(':').map(Number);
+                        const [eH, eM] = end.split(':').map(Number);
+                        let duration = (eH * 60 + eM) - (sH * 60 + sM);
+                        if (duration < 0) duration += 24 * 60; // 跨天
+                        const h = Math.floor(duration / 60);
+                        const m = duration % 60;
+                        return (
+                          <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '6px 15px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: '800' }}>
+                            {language === 'zh' ? `营业时长: ${h}小时${m > 0 ? `${m}分钟` : ''}` : `Duration: ${h}h ${m > 0 ? `${m}m` : ''}`}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1.5rem', zIndex: 1, flexDirection: window.innerWidth < 640 ? 'column' : 'row' }}>
+                      <TimeWheelPicker 
+                        label={t.openingTime}
+                        icon="🌅"
+                        value={businessStatus.operating_hours.split(' - ')[0]}
+                        onChange={(val) => {
+                          const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                          setBusinessStatus(prev => ({ ...prev, operating_hours: `${val} - ${end}` }));
+                        }}
+                      />
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '30px', height: '2px', background: 'rgba(255,255,255,0.1)', borderRadius: '1px' }} />
+                      </div>
+
+                      <TimeWheelPicker 
+                        label={t.closingTime}
+                        icon="🌙"
+                        value={businessStatus.operating_hours.split(' - ')[1] || '21:00'}
+                        onChange={(val) => {
+                          const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                          setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${val}` }));
+                        }}
+                      />
+                    </div>
+
+                    {/* 🚀 新增：保存按钮 */}
+                    <button
+                      onClick={() => handleUpdateStoreStatus(businessStatus)}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '20px',
+                        padding: '1.2rem',
+                        fontSize: '1.1rem',
+                        fontWeight: '900',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 10px 25px rgba(30, 64, 175, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.8rem',
+                        marginTop: '0.5rem',
+                        zIndex: 1
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                        e.currentTarget.style.boxShadow = '0 15px 35px rgba(30, 64, 175, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(30, 64, 175, 0.3)';
+                      }}
+                    >
+                      <span>💾</span> {t.save}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
