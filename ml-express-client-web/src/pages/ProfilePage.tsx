@@ -244,8 +244,11 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：店铺营业状态临时状态（用于保存前修改）
   const [businessStatus, setBusinessStatus] = useState({
     is_closed_today: false,
-    operating_hours: '09:00 - 21:00'
+    operating_hours: '09:00 - 21:00',
+    vacation_dates: [] as string[] // 🚀 新增：休假日期
   });
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [tempVacationDate, setTempVacationDate] = useState('');
 
   // 🚀 24小时时间解析助手
   const parseTimeParts = (timeStr: string, defaultTime: string) => {
@@ -279,6 +282,49 @@ const ProfilePage: React.FC = () => {
       newYear += 1;
     }
     setSelectedMonth(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+  };
+
+  // 🚀 新增：临时延时/早关逻辑
+  const handleExtendHour = async () => {
+    const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+    const [h, m] = end.split(':').map(Number);
+    const newH = (h + 1) % 24;
+    const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    const newHours = `${businessStatus.operating_hours.split(' - ')[0]} - ${newTime}`;
+    
+    setBusinessStatus(prev => ({
+      ...prev,
+      operating_hours: newHours
+    }));
+    
+    // 🚀 立即保存到数据库
+    await handleUpdateStoreStatus({ operating_hours: newHours });
+  };
+
+  const handleCloseImmediately = async () => {
+    setBusinessStatus(prev => ({ ...prev, is_closed_today: true }));
+    // 🚀 立即保存到数据库
+    await handleUpdateStoreStatus({ is_closed_today: true });
+  };
+
+  const handleAddVacationDate = () => {
+    if (!tempVacationDate) return;
+    if (businessStatus.vacation_dates.includes(tempVacationDate)) {
+      alert(language === 'zh' ? '该日期已在休假列表中' : 'Date already in list');
+      return;
+    }
+    setBusinessStatus(prev => ({
+      ...prev,
+      vacation_dates: [...prev.vacation_dates, tempVacationDate].sort()
+    }));
+    setTempVacationDate('');
+  };
+
+  const handleRemoveVacationDate = (date: string) => {
+    setBusinessStatus(prev => ({
+      ...prev,
+      vacation_dates: prev.vacation_dates.filter(d => d !== date)
+    }));
   };
 
   // 🚀 新增：店铺商品管理逻辑
@@ -440,7 +486,9 @@ const ProfilePage: React.FC = () => {
       if (result.success) {
         setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
         // 🚀 优化：根据状态显示不同的通知
-        if (updates.is_closed_today !== undefined) {
+        if (updates.vacation_dates !== undefined) {
+          alert(language === 'zh' ? '休假计划已更新' : 'Vacation schedule updated');
+        } else if (updates.is_closed_today !== undefined) {
           alert(updates.is_closed_today 
             ? (language === 'zh' ? '今日暂停服务已开启' : language === 'en' ? 'Service suspended today' : 'ယနေ့ ဝန်ဆောင်မှု ရပ်နားထားပါသည်')
             : (language === 'zh' ? '营业状态已恢复' : language === 'en' ? 'Business resumed' : 'လုပ်ငန်း ပြန်လည်စတင်ပါပြီ')
@@ -554,7 +602,8 @@ const ProfilePage: React.FC = () => {
               setStoreInfo(store);
               setBusinessStatus({
                 is_closed_today: store.is_closed_today || false,
-                operating_hours: store.operating_hours || '09:00 - 21:00'
+                operating_hours: store.operating_hours || '09:00 - 21:00',
+                vacation_dates: store.vacation_dates || []
               });
             }
           } catch (error) {
@@ -2052,12 +2101,12 @@ const ProfilePage: React.FC = () => {
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && storeInfo && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 380px',
+              display: 'flex',
+              flexDirection: 'column',
               gap: '2rem',
               marginBottom: '3rem'
             }}>
-              {/* 左侧：代收款统计 */}
+              {/* 代收款统计 */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px)',
@@ -2317,7 +2366,7 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 右侧：营业状态管理 */}
+              {/* 营业状态管理 */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px)',
@@ -2328,98 +2377,192 @@ const ProfilePage: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '2.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.15)', paddingBottom: '2rem' }}>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px', 
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    borderRadius: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '2rem',
-                    boxShadow: '0 10px 20px rgba(239, 68, 68, 0.4)'
-                  }}>⏰</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{t.businessManagement}</h3>
-                    {storeInfo?.updated_at && (
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>
-                        ⏱️ {t.lastUpdated}: {new Date(storeInfo.updated_at).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.15)', paddingBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                    <div style={{ 
+                      width: '56px', 
+                      height: '56px', 
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      borderRadius: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '2rem',
+                      boxShadow: '0 10px 20px rgba(239, 68, 68, 0.4)'
+                    }}>⏰</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{t.businessManagement}</h3>
+                      {storeInfo?.updated_at && (
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '600', marginTop: '4px' }}>
+                          ⏱️ {t.lastUpdated}: {new Date(storeInfo.updated_at).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    {/* 休假模式入口 */}
+                    <button
+                      onClick={() => setShowVacationModal(true)}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '8px 16px',
+                        borderRadius: '12px',
+                        fontSize: '0.9rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                    >
+                      📅 {language === 'zh' ? '预设休假' : 'Vacation'}
+                      {businessStatus.vacation_dates.length > 0 && (
+                        <span style={{ background: '#3b82f6', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.75rem' }}>
+                          {businessStatus.vacation_dates.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* 今日营业开关 */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      gap: '12px',
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      padding: '8px 16px',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{t.closedToday}</span>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }));
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '24px',
+                          borderRadius: '12px',
+                          backgroundColor: businessStatus.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          border: 'none',
+                          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          padding: 0,
+                          zIndex: 100
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '9px',
+                          backgroundColor: 'white',
+                          position: 'absolute',
+                          top: '3px',
+                          left: businessStatus.is_closed_today ? '27px' : '3px',
+                          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                        }} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                  {/* 今日营业开关 */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    background: 'rgba(15, 23, 42, 0.3)',
-                    padding: '1.8rem',
-                    borderRadius: '30px',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-                  }}>
-                    <div style={{ flex: 1, paddingRight: '1rem' }}>
-                      <div style={{ color: 'white', fontWeight: '900', fontSize: '1.2rem', marginBottom: '6px' }}>{t.closedToday}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '500', lineHeight: '1.4' }}>开启后用户将看到“休息中”，无法下单</div>
-                    </div>
-                    
-                    {/* 🚀 修正：使用 businessStatus 本地状态，点击后即刻有反应 */}
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }));
-                      }}
+                  {/* 🚀 临时快捷操作栏 */}
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleExtendHour}
                       style={{
-                        width: '68px',
-                        height: '36px',
-                        borderRadius: '18px',
-                        backgroundColor: businessStatus.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
-                        position: 'relative',
+                        flex: 1,
+                        minWidth: '180px',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        color: '#10b981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
                         cursor: 'pointer',
-                        border: '2px solid rgba(255,255,255,0.3)',
-                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                        padding: 0,
-                        zIndex: 100,
-                        boxShadow: businessStatus.is_closed_today ? '0 0 15px rgba(239, 68, 68, 0.5)' : 'none'
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
-                      <div style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '13px',
-                        backgroundColor: 'white',
-                        position: 'absolute',
-                        top: '3px',
-                        left: businessStatus.is_closed_today ? '37px' : '3px',
-                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
-                      }} />
+                      ⏳ {language === 'zh' ? '今晚延长打烊 1 小时' : 'Extend 1 Hour'}
+                    </button>
+
+                    <button
+                      onClick={handleCloseImmediately}
+                      style={{
+                        flex: 1,
+                        minWidth: '180px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      🛑 {language === 'zh' ? '即刻打烊 (食材售罄)' : 'Close Immediately'}
                     </button>
                   </div>
 
                   {/* 营业时间设置 */}
                   <div style={{ 
                     background: 'rgba(15, 23, 42, 0.4)',
-                    padding: '2.5rem',
+                    padding: '2rem 2.5rem',
                     borderRadius: '35px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: 'row', // 改为水平排列
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                     gap: '2rem',
                     boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    flexWrap: 'wrap'
                   }}>
                     {/* 背景发光效果 */}
                     <div style={{
@@ -2432,100 +2575,88 @@ const ProfilePage: React.FC = () => {
                       zIndex: 0
                     }} />
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
-                      <div style={{ color: 'white', fontWeight: '900', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', zIndex: 1, flex: 1, flexWrap: 'wrap' }}>
+                      <div style={{ color: 'white', fontWeight: '900', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '12px', minWidth: '140px' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <span style={{ fontSize: '1.4rem' }}>⏰</span>
                         </div>
                         {t.operatingHours}
                       </div>
-                      
-                      {/* 营业时长预览 */}
-                      {(() => {
-                        const start = businessStatus.operating_hours.split(' - ')[0];
-                        const end = businessStatus.operating_hours.split(' - ')[1];
-                        const [sH, sM] = start.split(':').map(Number);
-                        const [eH, eM] = end.split(':').map(Number);
-                        let duration = (eH * 60 + eM) - (sH * 60 + sM);
-                        if (duration < 0) duration += 24 * 60; // 跨天
-                        const h = Math.floor(duration / 60);
-                        const m = duration % 60;
-                        return (
-                          <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '6px 15px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: '800' }}>
-                            {language === 'zh' ? `营业时长: ${h}小时${m > 0 ? `${m}分钟` : ''}` : `Duration: ${h}h ${m > 0 ? `${m}m` : ''}`}
-                          </div>
-                        );
-                      })()}
-                    </div>
 
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '1.5rem', 
-                      zIndex: 1, 
-                      flexDirection: 'column', // 🚀 强制改为垂直排列，确保移动端显示完整
-                      width: '100%' 
-                    }}>
-                      <TimeWheelPicker 
-                        label={t.openingTime}
-                        icon="🌅"
-                        value={businessStatus.operating_hours.split(' - ')[0]}
-                        onChange={(val) => {
-                          const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
-                          setBusinessStatus(prev => ({ ...prev, operating_hours: `${val} - ${end}` }));
-                        }}
-                      />
-                      
-                      {/* 🚀 优化分割线：在垂直排列时显示更美观 */}
                       <div style={{ 
                         display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px',
-                        padding: '0 1rem'
+                        gap: '1.5rem', 
+                        alignItems: 'center'
                       }}>
-                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>TO</div>
-                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
+                        <TimeWheelPicker 
+                          label="OPEN TIME"
+                          icon="🌅"
+                          value={businessStatus.operating_hours.split(' - ')[0]}
+                          onChange={(val) => {
+                            const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${val} - ${end}` }));
+                          }}
+                        />
+                        
+                        <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '1.2rem', fontWeight: '900' }}>→</div>
 
-                      <TimeWheelPicker 
-                        label={t.closingTime}
-                        icon="🌙"
-                        value={businessStatus.operating_hours.split(' - ')[1] || '21:00'}
-                        onChange={(val) => {
-                          const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
-                          setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${val}` }));
-                        }}
-                      />
+                        <TimeWheelPicker 
+                          label="CLOSED TIME"
+                          icon="🌙"
+                          value={businessStatus.operating_hours.split(' - ')[1] || '21:00'}
+                          onChange={(val) => {
+                            const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                            setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${val}` }));
+                          }}
+                        />
+
+                        {/* 营业时长预览 */}
+                        {(() => {
+                          const start = businessStatus.operating_hours.split(' - ')[0];
+                          const end = businessStatus.operating_hours.split(' - ')[1];
+                          const [sH, sM] = start.split(':').map(Number);
+                          const [eH, eM] = end.split(':').map(Number);
+                          let duration = (eH * 60 + eM) - (sH * 60 + sM);
+                          if (duration < 0) duration += 24 * 60; // 跨天
+                          const h = Math.floor(duration / 60);
+                          const m = duration % 60;
+                          return (
+                            <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '6px 15px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '800', marginLeft: '10px', whiteSpace: 'nowrap' }}>
+                              {language === 'zh' ? `时长: ${h}h${m > 0 ? `${m}m` : ''}` : `Dur: ${h}h ${m > 0 ? `${m}m` : ''}`}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
 
-                    {/* 🚀 新增：保存按钮 */}
+                    {/* 保存按钮 - 缩小并美化 */}
                     <button
                       onClick={() => handleUpdateStoreStatus(businessStatus)}
                       style={{
                         background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '20px',
-                        padding: '1.2rem',
-                        fontSize: '1.1rem',
+                        borderRadius: '16px',
+                        padding: '0.8rem 2rem',
+                        fontSize: '1rem',
                         fontWeight: '900',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
-                        boxShadow: '0 10px 25px rgba(30, 64, 175, 0.3)',
+                        boxShadow: '0 8px 20px rgba(30, 64, 175, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '0.8rem',
-                        marginTop: '0.5rem',
-                        zIndex: 1
+                        gap: '0.6rem',
+                        zIndex: 1,
+                        whiteSpace: 'nowrap'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                        e.currentTarget.style.boxShadow = '0 15px 35px rgba(30, 64, 175, 0.4)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 25px rgba(30, 64, 175, 0.4)';
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(30, 64, 175, 0.3)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(30, 64, 175, 0.3)';
                       }}
                     >
                       <span>💾</span> {t.save}
@@ -5524,6 +5655,64 @@ const ProfilePage: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：休假计划管理模态框 */}
+      {showVacationModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            borderRadius: '32px', width: '100%', maxWidth: '500px',
+            padding: '30px', border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+              <h3 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '900', margin: 0 }}>📅 {language === 'zh' ? '预设休假计划' : 'Vacation Planning'}</h3>
+              <button onClick={() => setShowVacationModal(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '15px' }}>添加休假日期，系统将在这些日期自动设为歇业状态。</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="date" 
+                  value={tempVacationDate}
+                  onChange={(e) => setTempVacationDate(e.target.value)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                />
+                <button 
+                  onClick={handleAddVacationDate}
+                  style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0 20px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                >添加</button>
+              </div>
+            </div>
+
+            <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {businessStatus.vacation_dates.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.2)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '15px' }}>暂无休假计划</div>
+              ) : (
+                businessStatus.vacation_dates.map(date => (
+                  <div key={date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ color: 'white', fontWeight: 'bold', fontFamily: 'monospace' }}>{date}</span>
+                    <button onClick={() => handleRemoveVacationDate(date)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>移除</button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                handleUpdateStoreStatus({ vacation_dates: businessStatus.vacation_dates });
+                setShowVacationModal(false);
+              }}
+              style={{ width: '100%', padding: '15px', borderRadius: '15px', background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white', border: 'none', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 10px 20px rgba(30, 64, 175, 0.3)' }}
+            >保存计划 💾</button>
           </div>
         </div>
       )}

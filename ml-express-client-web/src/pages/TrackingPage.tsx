@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { packageService } from '../services/supabase';
+import { packageService, supabase } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -39,6 +39,12 @@ const TrackingPage: React.FC = () => {
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [courierLocation, setCourierLocation] = useState<any>(null);
+  
+  // 🚀 优化：平滑移动动画相关
+  const [animatedCourierLocation, setAnimatedCourierLocation] = useState<any>(null);
+  const targetLocationRef = useRef<any>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [selectedMarker, setSelectedMarker] = useState<'package' | 'courier' | null>(null);
 
@@ -67,38 +73,106 @@ const TrackingPage: React.FC = () => {
     window.location.reload();
   };
 
-  // 自动刷新快递员位置
+  // 自动刷新快递员位置逻辑已优化为实时订阅
   useEffect(() => {
-    let refreshInterval: NodeJS.Timeout;
+    let channel: any = null;
     
-    if (trackingResult && trackingResult.courier) {
-      // 立即加载一次
-      loadCourierLocation(trackingResult.courier);
+    const animate = () => {
+      setAnimatedCourierLocation((prev: any) => {
+        if (!prev || !targetLocationRef.current) return targetLocationRef.current;
+        
+        const lerp = (start: number, end: number, amt: number) => (1 - amt) * start + amt * end;
+        const speed = 0.05; // 平滑度
+        
+        const nextLat = lerp(prev.lat, targetLocationRef.current.lat, speed);
+        const nextLng = lerp(prev.lng, targetLocationRef.current.lng, speed);
+        
+        // 如果距离非常近了，直接设为目标点
+        if (Math.abs(nextLat - targetLocationRef.current.lat) < 0.00001 && 
+            Math.abs(nextLng - targetLocationRef.current.lng) < 0.00001) {
+          return targetLocationRef.current;
+        }
+        
+        return { ...prev, lat: nextLat, lng: nextLng };
+      });
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    const activeStatuses = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
+    if (trackingResult && activeStatuses.includes(trackingResult.status) && trackingResult.courier) {
+      console.log('📡 启动 Web 实时追踪:', trackingResult.courier);
       
-      // 每10秒刷新一次
-      refreshInterval = setInterval(() => {
-        loadCourierLocation(trackingResult.courier);
-      }, 10000);
+      // 1. 获取骑手 ID
+      supabase
+        .from('couriers')
+        .select('id, phone, vehicle_type')
+        .eq('name', trackingResult.courier)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const courierId = data.id;
+            
+            // 获取初始位置
+            supabase
+              .from('courier_locations')
+              .select('latitude, longitude, last_active')
+              .eq('courier_id', courierId)
+              .single()
+              .then(({ data: locData }) => {
+                if (locData) {
+                  const initialLoc = { 
+                    lat: locData.latitude, 
+                    lng: locData.longitude,
+                    name: trackingResult.courier,
+                    phone: data.phone,
+                    vehicle: data.vehicle_type === 'car' ? '汽车' : '摩托车',
+                    last_active: locData.last_active
+                  };
+                  targetLocationRef.current = initialLoc;
+                  setAnimatedCourierLocation(initialLoc);
+                  setCourierLocation(initialLoc);
+                  setMapCenter({ lat: locData.latitude, lng: locData.longitude });
+                  
+                  // 启动动画循环
+                  animationFrameRef.current = requestAnimationFrame(animate);
+                }
+              });
+
+            // 订阅实时更新
+            channel = supabase
+              .channel(`web-rider-tracking-${courierId}`)
+              .on(
+                'postgres_changes',
+                {
+                  event: 'UPDATE',
+                  schema: 'public',
+                  table: 'courier_locations',
+                  filter: `courier_id=eq.${courierId}`
+                },
+                (payload) => {
+                  console.log('📍 Web 收到位置更新:', payload.new);
+                  const newLoc = {
+                    lat: payload.new.latitude,
+                    lng: payload.new.longitude,
+                    name: trackingResult.courier,
+                    phone: data.phone,
+                    vehicle: data.vehicle_type === 'car' ? '汽车' : '摩托车',
+                    last_active: payload.new.last_active
+                  };
+                  targetLocationRef.current = newLoc;
+                  setCourierLocation(newLoc);
+                }
+              )
+              .subscribe();
+          }
+        });
     }
+
     return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
+      if (channel) supabase.removeChannel(channel);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [trackingResult]);
-
-  // 加载快递员位置（带隐私权限检查）
-  const loadCourierLocation = async (courierName: string) => {
-    // 客户端版本：不提供实时位置跟踪功能
-    // 只显示包裹状态信息
-    try {
-      // 客户端不提供实时跟踪功能
-      // 只显示包裹基本信息
-      setCourierLocation(null);
-    } catch (error) {
-      LoggerService.error('加载快递员位置失败:', error);
-    }
-  };
 
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
@@ -153,7 +227,7 @@ const TrackingPage: React.FC = () => {
         }
         // 加载快递员位置
         if (foundPackage.courier) {
-          loadCourierLocation(foundPackage.courier);
+          // 由于已改为实时订阅，这里可以保持逻辑
         }
       } else {
         alert(t.tracking.notFound);
@@ -492,10 +566,10 @@ const TrackingPage: React.FC = () => {
                           onClick={() => setSelectedMarker('package')}
                         />
                         
-                        {/* 快递员位置标记 */}
-                        {courierLocation && (
+                        {/* 快递员位置标记 (使用动画坐标实现平滑移动) */}
+                        {animatedCourierLocation && (
                           <Marker
-                            position={{ lat: courierLocation.lat, lng: courierLocation.lng }}
+                            position={{ lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng }}
                             icon={{
                               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                                 <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -509,7 +583,6 @@ const TrackingPage: React.FC = () => {
                               anchor: new window.google.maps.Point(25, 25)
                             }}
                             onClick={() => setSelectedMarker('courier')}
-                            animation={window.google.maps.Animation.BOUNCE}
                           />
                         )}
 
@@ -534,9 +607,9 @@ const TrackingPage: React.FC = () => {
                         )}
 
                         {/* 快递员信息窗口 */}
-                        {selectedMarker === 'courier' && courierLocation && (
+                        {selectedMarker === 'courier' && animatedCourierLocation && (
                           <InfoWindow
-                            position={{ lat: courierLocation.lat, lng: courierLocation.lng }}
+                            position={{ lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng }}
                             onCloseClick={() => setSelectedMarker(null)}
                           >
                             <div style={{ padding: '0.5rem' }}>
@@ -607,7 +680,7 @@ const TrackingPage: React.FC = () => {
                   </div>
 
                   {/* 骑手位置信息或隐私提示 */}
-                  {trackingResult.status === '配送中' && (
+                  {['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(trackingResult.status) && (
                     <>
                       {courierLocation ? (
                         <div style={{ 

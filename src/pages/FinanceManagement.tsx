@@ -498,7 +498,11 @@ const FinanceManagement: React.FC = () => {
     totalKm: 0, // 总送货公里数
     merchantsCollection: 0, // 总合伙商家代收款
     totalPlatformPayment: 0, // 总平台支付 (余额支付)
-    totalStartingFee: 0 // 总订单起步费
+    totalStartingFee: 0, // 总订单起步费
+    monthlyRiderFee: 0, // 骑手当月收入总额
+    monthlyRiderCount: 0, // 骑手当月收入笔数
+    dailyRiderFee: 0, // 骑手当日收入总额
+    dailyRiderCount: 0 // 骑手当日收入笔数
   });
 
   const getPlatformPaymentAmount = (description?: string): number => {
@@ -596,13 +600,17 @@ const FinanceManagement: React.FC = () => {
 
       const packageCount = settledPackageCount;
       
-      // 计算快递员公里费用（只统计已送达包裹的送货距离，不包含取件距离）
-      const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500; 
+      // 计算快递员送货费用 (跑腿费 - 起步价)
+      const BASE_FEE = pricingSettings.base_fee || 1500;
+      const courierKmCost = deliveredPackages.reduce((sum, pkg) => {
+        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+        const riderFee = Math.max(0, pkgPrice - BASE_FEE);
+        return sum + riderFee;
+      }, 0);
+
       const totalKm = deliveredPackages.reduce((sum, pkg) => {
-        // 只计算送货距离，不包含取件距离
         return sum + (pkg.delivery_distance || 0);
       }, 0);
-      const courierKmCost = totalKm * COURIER_KM_RATE;
 
       // 总合伙商家代收款 = 已送达 + 骑手已结清 + 商家未结清
       const merchantsCollection = packages.reduce((sum, pkg) => {
@@ -613,10 +621,36 @@ const FinanceManagement: React.FC = () => {
         return sum + codAmount;
       }, 0);
       
-      // 计算总订单起步费 (所有已送达订单 * 1500)
-      const BASE_STARTING_FEE = 1500;
-      const totalStartingFee = deliveredPackages.length * BASE_STARTING_FEE;
+      // 计算总订单起步费 (所有已送达订单 * 起步价)
+      const totalStartingFee = deliveredPackages.length * BASE_FEE;
       
+      // 🚀 新增：计算当月和当日骑手收入统计
+      const now_current = new Date();
+      const currentMonthKey = `${now_current.getFullYear()}-${String(now_current.getMonth() + 1).padStart(2, '0')}`;
+      
+      let monthlyRiderFee = 0;
+      let monthlyRiderCount = 0;
+      let dailyRiderFee = 0;
+      let dailyRiderCount = 0;
+
+      deliveredPackages.forEach(pkg => {
+        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+        const riderShare = Math.max(0, pkgPrice - BASE_FEE);
+        const dateKey = getDateKey(pkg.delivery_time || pkg.updated_at || pkg.created_at);
+        
+        // 当月统计
+        if (dateKey && dateKey.startsWith(currentMonthKey)) {
+          monthlyRiderFee += riderShare;
+          monthlyRiderCount++;
+        }
+        
+        // 当日统计 (基于 cashCollectionDate)
+        if (dateKey && dateKey === cashCollectionDate) {
+          dailyRiderFee += riderShare;
+          dailyRiderCount++;
+        }
+      });
+
       setSummary({
         totalIncome,
         totalExpense,
@@ -630,7 +664,11 @@ const FinanceManagement: React.FC = () => {
         totalKm,
         merchantsCollection,
         totalPlatformPayment,
-        totalStartingFee
+        totalStartingFee,
+        monthlyRiderFee,
+        monthlyRiderCount,
+        dailyRiderFee,
+        dailyRiderCount
       });
     };
     
@@ -863,22 +901,25 @@ const FinanceManagement: React.FC = () => {
         const totalKm = pkgs.reduce((sum, pkg) => sum + (pkg.delivery_distance || 0), 0);
         const relatedPackageIds = pkgs.map(p => p.id);
         
-        // 从账号管理中获取骑手的基本工资
+        // 计算公里提成 (现在改为: 总跑腿费 - 起步价)
+        const BASE_FEE = pricingSettings.base_fee || 1500;
+        const kmFee = pkgs.reduce((sum, pkg) => {
+          const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+          return sum + Math.max(0, pkgPrice - BASE_FEE);
+        }, 0);
+        
+        // 从账号管理中获取骑手的基本工资 (严格以员工账号设置的工资为准)
         const courierAccount = adminAccounts.find(account => 
           account.employee_name === courierId && 
           (account.position === '骑手' || account.position === '骑手队长')
         );
         
-        const DEFAULT_BASE_SALARY = 200000;
         const baseSalary = courierAccount?.salary && courierAccount.salary > 0 
           ? courierAccount.salary 
-          : DEFAULT_BASE_SALARY;
+          : 0;
         
-        const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500; 
-        const DELIVERY_BONUS_RATE = 1000; 
-        
-        const kmFee = totalKm * COURIER_KM_RATE; 
-        const deliveryBonus = totalDeliveries * DELIVERY_BONUS_RATE;
+        const deliveryBonusRate = pricingSettings.delivery_bonus_rate || 0; 
+        const deliveryBonus = totalDeliveries * deliveryBonusRate;
         
         const grossSalary = baseSalary + kmFee + deliveryBonus;
         const netSalary = grossSalary;
@@ -1439,12 +1480,18 @@ const FinanceManagement: React.FC = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
               gap: '18px'
             }}
           >
-            {/* 第一行 */}
+            {/* 排列规则：1排3张卡片 - 严格执行用户要求的顺序 */}
+            
+            {/* 第一排：核心财务状况 */}
             {renderSummaryCard(t.totalIncome, summary.totalIncome, t.totalIncomeDesc, '#4cd137')}
+            {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
+            {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
+
+            {/* 第二排：收支明细与代收 */}
             {renderSummaryCard(
               language === 'my' ? 'စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု' : '总平台支付 (余额支付)', 
               summary.totalPlatformPayment, 
@@ -1452,13 +1499,17 @@ const FinanceManagement: React.FC = () => {
               '#3b82f6',
               () => handlePlatformPaymentClick()
             )}
-            {renderSummaryCard(t.totalStartingFee, summary.totalStartingFee, t.totalStartingFeeDesc, '#a29bfe')}
+            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handleMerchantCollectionClick())}
             {renderSummaryCard(t.totalMerchantCollection, summary.merchantsCollection, t.merchantsCollectionDesc, '#ef4444', () => handlePendingPaymentsClick())}
             
-            {/* 第二行 */}
-            {renderSummaryCard(t.totalExpense, summary.totalExpense, t.totalExpenseDesc, '#ff7979')}
-            {renderSummaryCard(t.netProfit, summary.netProfit, t.netProfitDesc, summary.netProfit >= 0 ? '#00cec9' : '#ff7675')}
-            {renderSummaryCard(t.pendingPayments, summary.pendingPayments, t.pendingAmountDesc, '#fbc531', () => handleMerchantCollectionClick())}
+            {/* 第三排：成本与分成 */}
+            {renderSummaryCard(t.totalStartingFee, summary.totalStartingFee, t.totalStartingFeeDesc, '#a29bfe')}
+            {renderSummaryCard(
+              t.courierKmCost, 
+              summary.courierKmCost, 
+              `${language === 'zh' ? '骑手分得总额 (总跑腿费 - 总起步价)' : 'Total rider share (Delivery fee - Base fee)'} (起步价: ${pricingSettings.base_fee || 1500} MMK)`, 
+              '#fd79a8'
+            )}
             {renderSummaryCard(
               t.orderIncome,
               summary.packageIncome,
@@ -1470,7 +1521,6 @@ const FinanceManagement: React.FC = () => {
               ),
               '#6c5ce7'
             )}
-            {renderSummaryCard(t.courierKmCost, summary.courierKmCost, `${t.courierFeeDesc}: ${summary.totalKm.toFixed(2)} KM (${pricingSettings.courier_km_rate} MMK/KM)`, '#fd79a8')}
           </div>
         )}
 
@@ -3964,9 +4014,9 @@ const FinanceManagement: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {pricingSettings.courier_km_rate || 500} MMK
+                    {pricingSettings.base_fee || 1500} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>每公里费率</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>基础起步价 (平台收费)</div>
                 </div>
                 <div style={{
                   background: 'rgba(253, 121, 168, 0.2)',
@@ -3978,7 +4028,7 @@ const FinanceManagement: React.FC = () => {
                   <div style={{ color: '#fd79a8', fontSize: '1.5rem', fontWeight: 'bold' }}>
                     {summary.courierKmCost.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>送货费用总额</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手分得总额 (总费 - 起步价)</div>
                 </div>
                 <div style={{
                   background: 'rgba(253, 121, 168, 0.2)',
@@ -3995,9 +4045,9 @@ const FinanceManagement: React.FC = () => {
               </div>
             </div>
 
-            {/* 骑手收入统计 */}
+            {/* 骑手收入统计 (当月) */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>💰 骑手佣金统计</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>💰 骑手收入统计 (当月)</h4>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -4012,9 +4062,9 @@ const FinanceManagement: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'income' && r.category.includes('佣金')).length}
+                    {summary.monthlyRiderCount}
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手收入笔数</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>当月送达总笔数</div>
                 </div>
                 <div style={{
                   background: 'rgba(34, 197, 94, 0.2)',
@@ -4024,16 +4074,16 @@ const FinanceManagement: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'income' && r.category.includes('佣金')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                    {summary.monthlyRiderFee.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手收入总额</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>当月骑手收入总额</div>
                 </div>
               </div>
             </div>
 
-            {/* 骑手支出统计 */}
+            {/* 骑手收入统计 (当日) */}
             <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>骑手支出统计</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>⏰ 骑手收入统计 (当日 - {cashCollectionDate})</h4>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -4041,28 +4091,28 @@ const FinanceManagement: React.FC = () => {
                 marginBottom: '16px'
               }}>
                 <div style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  background: 'rgba(251, 197, 49, 0.15)',
+                  border: '1px solid rgba(251, 197, 49, 0.3)',
                   borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center'
                 }}>
-                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'expense' && r.category.includes('骑手')).length}
+                  <div style={{ color: '#fbc531', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {summary.dailyRiderCount}
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手支出笔数</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>当日送达总笔数</div>
                 </div>
                 <div style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  background: 'rgba(251, 197, 49, 0.15)',
+                  border: '1px solid rgba(251, 197, 49, 0.3)',
                   borderRadius: '12px',
                   padding: '16px',
                   textAlign: 'center'
                 }}>
-                  <div style={{ color: '#ef4444', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    {records.filter(r => r.record_type === 'expense' && r.category.includes('骑手')).reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString()} MMK
+                  <div style={{ color: '#fbc531', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {summary.dailyRiderFee.toLocaleString()} MMK
                   </div>
-                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>骑手支出总额</div>
+                  <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>当日骑手收入总额</div>
                 </div>
               </div>
             </div>
@@ -4082,26 +4132,31 @@ const FinanceManagement: React.FC = () => {
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手ID</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达包裹数</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>总送货距离</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送货费用</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手收入 (总费 - 起步价)</th>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>平均每单距离</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
                       // 按骑手分组统计
-                      const courierStats: Record<string, { count: number, totalKm: number }> = {};
-                      const COURIER_KM_RATE = pricingSettings.courier_km_rate || 500;
+                      const courierStats: Record<string, { count: number, totalKm: number, totalRiderFee: number }> = {};
+                      const BASE_FEE = pricingSettings.base_fee || 1500;
                       
                       packages.filter(pkg => pkg.status === '已送达' && pkg.courier && pkg.courier !== '待分配').forEach(pkg => {
                         const courierId = pkg.courier;
                         if (!courierStats[courierId]) {
-                          courierStats[courierId] = { count: 0, totalKm: 0 };
+                          courierStats[courierId] = { count: 0, totalKm: 0, totalRiderFee: 0 };
                         }
+                        
+                        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                        const riderFee = Math.max(0, pkgPrice - BASE_FEE);
+                        
                         courierStats[courierId].count++;
                         courierStats[courierId].totalKm += (pkg.delivery_distance || 0);
+                        courierStats[courierId].totalRiderFee += riderFee;
                       });
                       
-                      const courierList = Object.entries(courierStats).sort((a, b) => b[1].totalKm - a[1].totalKm);
+                      const courierList = Object.entries(courierStats).sort((a, b) => b[1].totalRiderFee - a[1].totalRiderFee);
                       
                       if (courierList.length === 0) {
                         return (
@@ -4115,7 +4170,6 @@ const FinanceManagement: React.FC = () => {
                       
                       return courierList.map(([courierId, stats]) => {
                         const avgKm = stats.totalKm / stats.count;
-                        const cost = stats.totalKm * COURIER_KM_RATE;
                         
                         return (
                           <tr key={courierId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
@@ -4132,7 +4186,7 @@ const FinanceManagement: React.FC = () => {
                             </td>
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
                               <span style={{ color: '#fd79a8', fontWeight: 'bold' }}>
-                                {cost.toLocaleString()} MMK
+                                {stats.totalRiderFee.toLocaleString()} MMK
                               </span>
                             </td>
                             <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
@@ -4147,9 +4201,9 @@ const FinanceManagement: React.FC = () => {
               </div>
             </div>
 
-            {/* 骑手收支记录表格 */}
+            {/* 骑手当日送货费用明细表 */}
             <div style={{ marginTop: '24px' }}>
-              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📄 最近骑手佣金记录</h4>
+              <h4 style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '12px' }}>📄 骑手送货费用 (当日明细 - {cashCollectionDate})</h4>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
@@ -4160,48 +4214,64 @@ const FinanceManagement: React.FC = () => {
                   <thead>
                     <tr style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
                       <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手ID</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>类型</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>金额</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>状态</th>
-                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>日期</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>订单号</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>总跑腿费</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>起步价(平台)</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>骑手应得</th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontSize: '0.9rem' }}>送达时间</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {records.filter(r => r.category.includes('佣金') || r.category.includes('骑手')).slice(0, 10).map((record) => (
-                      <tr key={record.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {record.courier_id || 'N/A'}
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.8rem',
-                            background: record.record_type === 'income' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                            color: record.record_type === 'income' ? '#22c55e' : '#ef4444'
-                          }}>
-                            {record.record_type === 'income' ? '收入' : '支出'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {record.amount?.toLocaleString()} {record.currency}
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.8rem',
-                            background: record.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
-                            color: record.status === 'completed' ? '#22c55e' : '#fbbf24'
-                          }}>
-                            {record.status === 'completed' ? '已完成' : '待处理'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
-                          {new Date(record.record_date).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const BASE_FEE = pricingSettings.base_fee || 1500;
+                      const todayDelivered = packages.filter(pkg => {
+                        if (pkg.status !== '已送达' && pkg.status !== '已完成') return false;
+                        const dateKey = getDateKey(pkg.delivery_time || pkg.updated_at || pkg.created_at);
+                        return dateKey === cashCollectionDate;
+                      }).sort((a, b) => {
+                        const timeA = new Date(a.delivery_time || a.updated_at || 0).getTime();
+                        const timeB = new Date(b.delivery_time || b.updated_at || 0).getTime();
+                        return timeB - timeA;
+                      });
+
+                      if (todayDelivered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)' }}>
+                              所选日期内无配送完成记录
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return todayDelivered.map((pkg) => {
+                        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
+                        const riderShare = Math.max(0, pkgPrice - BASE_FEE);
+                        
+                        return (
+                          <tr key={pkg.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <td style={{ padding: '12px', color: 'white', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                              {pkg.courier || 'N/A'}
+                            </td>
+                            <td style={{ padding: '12px', color: '#74b9ff', fontSize: '0.85rem' }}>
+                              {pkg.id}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+                              {pkgPrice.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.9rem' }}>
+                              {BASE_FEE.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '12px', color: '#fd79a8', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                              {riderShare.toLocaleString()} MMK
+                            </td>
+                            <td style={{ padding: '12px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.8rem' }}>
+                              {pkg.delivery_time ? new Date(pkg.delivery_time).toLocaleTimeString() : 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

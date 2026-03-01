@@ -160,6 +160,15 @@ const settingDefinitions: SettingDefinition[] = [
     suffix: 'MMK/公里'
   },
   {
+    key: 'pricing.delivery_bonus_rate',
+    label: '每单配送奖金 (MMK/单)',
+    description: '每完成一笔配送订单给予骑手的额外奖金。如果设置为 0 则代表不发放配送奖金。',
+    category: 'pricing',
+    type: 'number',
+    defaultValue: 1000,
+    suffix: 'MMK/单'
+  },
+  {
     key: 'notification.sms_enabled',
     label: '启用短信通知',
     description: '开启后将在订单状态变更时向客户发送短信提醒。',
@@ -742,55 +751,65 @@ const SystemSettings: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: isMobile ? '12px' : '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: isMobile ? '12px' : '24px' }}>
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '16px',
-            padding: '18px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(40px)',
+            borderRadius: '24px',
+            padding: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
             color: 'white',
             maxHeight: 'calc(100vh - 160px)',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
           }}
         >
-          <h2 style={{ fontSize: '1.15rem', margin: '0 0 12px 0' }}>设置分类</h2>
-          <p style={{ opacity: 0.75, fontSize: '0.9rem', lineHeight: 1.5 }}>
-            按照功能模块集中管理系统参数，点击分类即可切换对应配置。
-          </p>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>⚙️</div>
+              <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '800' }}>设置分类</h2>
+            </div>
+            <p style={{ opacity: 0.6, fontSize: '0.88rem', lineHeight: 1.5, margin: 0 }}>
+              按模块管理系统参数，实时同步生效。
+            </p>
+          </div>
           
-          {/* 快捷功能入口 */}
-          <div style={{ marginTop: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* 快捷功能入口 - 优化视觉效果 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <button
               onClick={() => navigate('/admin/accounts')}
               style={{
                 width: '100%',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: '4px',
-                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(124, 58, 237, 0.3) 100%)',
-                border: '1px solid rgba(167, 139, 250, 0.6)',
-                borderRadius: '14px',
-                padding: '14px',
+                alignItems: 'center',
+                gap: '12px',
+                background: 'rgba(139, 92, 246, 0.15)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                borderRadius: '16px',
+                padding: '12px 16px',
                 color: 'white',
                 textAlign: 'left',
                 cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)'
+                transition: 'all 0.3s ease',
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.3)';
+                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
+                e.currentTarget.style.transform = 'translateX(5px)';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+                e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                e.currentTarget.style.transform = 'translateX(0)';
               }}
             >
-              <span style={{ fontSize: '1.3rem' }}>👥</span>
-              <span style={{ fontWeight: 600 }}>账号管理</span>
-              <span style={{ opacity: 0.85, fontSize: '0.88rem', lineHeight: 1.4 }}>管理员工登录账号与权限</span>
+              <div style={{ width: '40px', height: '40px', background: 'rgba(139, 92, 246, 0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>👥</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>账号管理</div>
+                <div style={{ opacity: 0.5, fontSize: '0.75rem' }}>登录账号与权限</div>
+              </div>
             </button>
 
             <button
@@ -798,61 +817,84 @@ const SystemSettings: React.FC = () => {
               style={{
                 width: '100%',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: '4px',
-                background: 'linear-gradient(135deg, rgba(245, 101, 101, 0.3) 0%, rgba(220, 38, 38, 0.3) 100%)',
-                border: '1px solid rgba(252, 165, 165, 0.6)',
-                borderRadius: '14px',
-                padding: '14px',
+                alignItems: 'center',
+                gap: '12px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '16px',
+                padding: '12px 16px',
                 color: 'white',
                 textAlign: 'left',
                 cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                boxShadow: '0 4px 12px rgba(245, 101, 101, 0.2)'
+                transition: 'all 0.3s ease',
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 101, 101, 0.3)';
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                e.currentTarget.style.transform = 'translateX(5px)';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 101, 101, 0.2)';
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                e.currentTarget.style.transform = 'translateX(0)';
               }}
             >
-              <span style={{ fontSize: '1.3rem' }}>👁️</span>
-              <span style={{ fontWeight: 600 }}>员工监督</span>
-              <span style={{ opacity: 0.85, fontSize: '0.88rem', lineHeight: 1.4 }}>实时监控员工行为与操作日志</span>
+              <div style={{ width: '40px', height: '40px', background: 'rgba(239, 68, 68, 0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>👁️</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>员工监督</div>
+                <div style={{ opacity: 0.5, fontSize: '0.75rem' }}>操作日志与监控</div>
+              </div>
             </button>
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '14px' }}>
-            <p style={{ opacity: 0.6, fontSize: '0.85rem', marginBottom: '10px' }}>系统配置</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {categories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveTab(category.id)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '4px',
-                    background: activeTab === category.id ? 'rgba(49, 130, 206, 0.35)' : 'transparent',
-                    border: activeTab === category.id ? '1px solid rgba(144,205,244,0.8)' : '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '14px',
-                    padding: '14px',
-                    color: 'white',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.25s ease'
-                  }}
-                >
-                  <span style={{ fontSize: '1.3rem' }}>{category.icon}</span>
-                  <span style={{ fontWeight: 600 }}>{category.name}</span>
-                  <span style={{ opacity: 0.75, fontSize: '0.88rem', lineHeight: 1.4 }}>{category.description}</span>
-                </button>
-              ))}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
+            <p style={{ opacity: 0.4, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', paddingLeft: '8px' }}>系统核心配置</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {categories.map(category => {
+                const isActive = activeTab === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setActiveTab(category.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      background: isActive ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.2) 100%)' : 'transparent',
+                      border: isActive ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
+                      borderRadius: '16px',
+                      padding: '12px 16px',
+                      color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.color = 'white';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                      }
+                    }}
+                  >
+                    <span style={{ fontSize: '1.4rem', filter: isActive ? 'none' : 'grayscale(0.5) opacity(0.7)' }}>{category.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: isActive ? 800 : 600, fontSize: '0.95rem', display: 'block' }}>{category.name}</span>
+                      {isActive && (
+                        <span style={{ opacity: 0.6, fontSize: '0.75rem', display: 'block', marginTop: '2px' }}>{category.description.slice(0, 15)}...</span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div style={{ width: '4px', height: '20px', background: '#3b82f6', borderRadius: '2px', position: 'absolute', right: '12px' }} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -860,34 +902,37 @@ const SystemSettings: React.FC = () => {
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '16px',
-            padding: '24px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(40px)',
+            borderRadius: '24px',
+            padding: '32px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
             color: 'white',
             minHeight: 'calc(100vh - 160px)',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)'
           }}
         >
-          <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{ 
-                width: '50px', 
-                height: '50px', 
-                borderRadius: '15px', 
-                background: 'rgba(255,255,255,0.1)', 
+                width: '64px', 
+                height: '64px', 
+                borderRadius: '18px', 
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                fontSize: '1.8rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                fontSize: '2.4rem',
+                boxShadow: '0 8px 20px rgba(30, 64, 175, 0.3)',
+                border: '2px solid rgba(255,255,255,0.2)'
               }}>
                 {categories.find(category => category.id === activeTab)?.icon}
               </div>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, color: 'white', letterSpacing: '0.5px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: 'white', letterSpacing: '0.5px' }}>
                   {categories.find(category => category.id === activeTab)?.name || '系统设置'}
                 </h2>
-                <p style={{ margin: '4px 0 0 0', opacity: 0.7, fontSize: '0.95rem' }}>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.6, fontSize: '1rem', fontWeight: '500' }}>
                   {categories.find(category => category.id === activeTab)?.description}
                 </p>
               </div>
@@ -896,17 +941,17 @@ const SystemSettings: React.FC = () => {
             {/* 计费规则专属：领区选择器 */}
             {activeTab === 'pricing' && (
               <div style={{ 
-                background: 'linear-gradient(135deg, rgba(49, 130, 206, 0.2) 0%, rgba(44, 82, 130, 0.3) 100%)', 
+                background: 'rgba(255, 255, 255, 0.08)', 
                 padding: '12px 20px', 
                 borderRadius: '16px', 
-                border: '1px solid rgba(144, 205, 244, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
               }}>
-                <label style={{ fontSize: '0.95rem', fontWeight: 700, color: '#90cdf4', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>📍</span> {language === 'zh' ? '当前配置领区' : 'Region'}:
+                <label style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  领区中心
                 </label>
                 <select
                   value={selectedRegion}
@@ -915,20 +960,19 @@ const SystemSettings: React.FC = () => {
                     setHasChanges(false); 
                   }}
                   style={{
-                    padding: '10px 16px',
+                    padding: '8px 16px',
                     borderRadius: '10px',
                     border: '1px solid rgba(255,255,255,0.2)',
                     background: 'rgba(15, 32, 60, 0.8)',
                     color: 'white',
-                    fontSize: '1rem',
+                    fontSize: '0.95rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    outline: 'none',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                    outline: 'none'
                   }}
                 >
                   {REGIONS.map(r => (
-                    <option key={r.id} value={r.id} style={{ color: '#000', fontWeight: 'normal' }}>
+                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
                       {r.name} ({r.prefix})
                     </option>
                   ))}
@@ -938,12 +982,15 @@ const SystemSettings: React.FC = () => {
           </div>
 
           {loading ? (
-            <div style={{ color: 'rgba(255,255,255,0.7)' }}>正在加载配置，请稍候...</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
+              <div>正在加载配置...</div>
+            </div>
           ) : (
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: activeTab === 'pricing' ? 'repeat(2, 1fr)' : '1fr',
-              gap: isMobile ? '12px' : '16px' 
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))',
+              gap: '24px' 
             }}>
               {currentDefinitions.map(def => {
                 const metadata = settingsMetadata[def.key];
@@ -951,69 +998,55 @@ const SystemSettings: React.FC = () => {
                   <div
                     key={def.key}
                     style={{
-                      background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.7) 0%, rgba(15, 32, 60, 0.5) 100%)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: '20px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '24px',
                       padding: '24px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                      transition: 'transform 0.3s ease, border-color 0.3s ease'
+                      gap: '16px',
+                      transition: 'all 0.3s ease',
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(144, 205, 244, 0.4)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.transform = 'translateY(-4px)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#ebf8ff' }}>{def.label}</h3>
-                        <p style={{ margin: '6px 0 0 0', opacity: 0.7, fontSize: '0.9rem', lineHeight: 1.6, color: '#a0aec0' }}>{def.description}</p>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{def.label}</h3>
+                        <p style={{ margin: '4px 0 0 0', opacity: 0.5, fontSize: '0.88rem', lineHeight: 1.5 }}>{def.description}</p>
                       </div>
                       {def.suffix && def.type !== 'switch' && (
-                        <div style={{ 
-                          background: 'rgba(255,255,255,0.1)', 
-                          padding: '4px 10px', 
-                          borderRadius: '8px', 
-                          fontSize: '0.8rem', 
-                          color: '#90cdf4',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap' 
-                        }}>
+                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6' }}>
                           {def.suffix}
                         </div>
                       )}
                     </div>
 
-                    <div style={{ marginTop: '8px' }}>
+                    <div>
                       {renderInput(def)}
                     </div>
 
                     {(def.helpText || metadata) && (
-                      <div style={{ 
-                        marginTop: '12px',
-                        paddingTop: '12px',
-                        borderTop: '1px solid rgba(255,255,255,0.05)',
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        flexWrap: 'wrap', 
-                        gap: '8px' 
-                      }}>
-                        {def.helpText && (
-                          <span style={{ color: '#ecc94b', fontSize: '0.85rem', fontWeight: 500 }}>
-                            💡 {def.helpText}
-                          </span>
-                        )}
-                        {metadata && (metadata.updated_at || metadata.updated_by) && (
-                          <span style={{ opacity: 0.5, fontSize: '0.75rem', color: '#cbd5e0' }}>
-                            ⏱️ {language === 'zh' ? '最近更新' : 'Updated'}: {formatTimestamp(metadata.updated_at)}
-                            {metadata.updated_by ? ` · ${metadata.updated_by}` : ''}
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                        {def.helpText ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', fontSize: '0.8rem', fontWeight: 600 }}>
+                            <span>💡</span>
+                            <span>{def.helpText}</span>
+                          </div>
+                        ) : <div />}
+                        {metadata && (
+                          <span style={{ opacity: 0.3, fontSize: '0.7rem', color: 'white' }}>
+                            {formatTimestamp(metadata.updated_at)}
                           </span>
                         )}
                       </div>

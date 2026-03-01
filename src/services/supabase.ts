@@ -169,6 +169,7 @@ export interface DeliveryStore {
   created_at?: string;
   updated_at?: string;
   balance?: number; // 🚀 新增：账户余额
+  vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
 }
 
 export interface Banner {

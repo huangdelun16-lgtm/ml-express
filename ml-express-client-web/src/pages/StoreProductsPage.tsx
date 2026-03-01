@@ -101,6 +101,14 @@ const StoreProductsPage: React.FC = () => {
     if (!store) return { isOpen: true }; // 加载中默认允许
     if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
     
+    // 🚀 检查预设休假计划
+    if (store.vacation_dates && Array.isArray(store.vacation_dates)) {
+      const today = new Date().toISOString().split('T')[0];
+      if (store.vacation_dates.includes(today)) {
+        return { isOpen: false, reason: 'vacation' };
+      }
+    }
+    
     try {
       const hours = store.operating_hours || '09:00 - 21:00';
       const [start, end] = hours.split(' - ');
@@ -231,7 +239,24 @@ const StoreProductsPage: React.FC = () => {
                     </h1>
                     <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.5rem' }}>
                       <span style={{ background: '#fbbf24', color: '#92400e', padding: '0.2rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                        {store.store_type}
+                        {(() => {
+                          const type = store.store_type;
+                          const mapping: any = {
+                            'restaurant': { zh: '餐厅', en: 'Dining', my: 'စားသောက်ဆိုင်' },
+                            'drinks_snacks': { zh: '饮料小吃', en: 'Snacks', my: 'မုန့်မျိုးစုံ' },
+                            'breakfast': { zh: '早点铺', en: 'Breakfast', my: 'မနက်စာဆိုင်' },
+                            'cake_shop': { zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်' },
+                            'tea_shop': { zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်' },
+                            'flower_shop': { zh: '鲜花店', en: 'Flowers', my: 'ပန်းဆိုင်' },
+                            'clothing_store': { zh: '服装店', en: 'Clothing', my: 'အဝတ်အထည်ဆိုင်' },
+                            'grocery': { zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်' },
+                            'hardware_store': { zh: '五金店', en: 'Hardware', my: 'ဟာ့ဒ်ဝဲလ်ဆိုင်' },
+                            'supermarket': { zh: '超市', en: 'Supermarket', my: 'စူပါမားကတ်' },
+                            'transit_station': { zh: '中转站', en: 'Hub', my: 'အချက်အချာဌာန' },
+                            'other': { zh: '其它', en: 'Other', my: 'အခြား' }
+                          };
+                          return mapping[type]?.[language] || mapping[type]?.zh || type;
+                        })()}
                       </span>
                       {(() => {
                         const status = checkStoreOpenStatus();
@@ -244,7 +269,7 @@ const StoreProductsPage: React.FC = () => {
                             fontSize: '0.8rem', 
                             fontWeight: 'bold' 
                           }}>
-                            ● {status.isOpen ? t.store.openNow : (status.reason === 'closed_today' ? t.store.closedToday : t.store.closedNow)}
+                            ● {status.isOpen ? t.store.openNow : (status.reason === 'closed_today' ? t.store.closedToday : (status.reason === 'vacation' ? (language === 'zh' ? '预设休假中' : 'On Vacation') : t.store.closedNow))}
                           </span>
                         );
                       })()}

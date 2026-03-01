@@ -23,6 +23,8 @@ const CityMallPage: React.FC = () => {
   const [selectedStoreForReviews, setSelectedStoreForReviews] = useState<any>(null);
   const [currentStoreReviews, setCurrentStoreReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [nearbyStores, setNearbyStores] = useState<DeliveryStore[]>([]); // 🚀 新增
+  const [recommendedStores, setRecommendedStores] = useState<DeliveryStore[]>([]); // 🚀 新增
 
   const regions = [
     { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
@@ -36,11 +38,18 @@ const CityMallPage: React.FC = () => {
 
   const categories = [
     { id: '全部', zh: '全部', en: 'All', my: 'အားလုံး', icon: 'grid-outline' },
-    { id: '餐厅', zh: '餐饮', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
-    { id: '生鲜', zh: '生鲜', en: 'Fresh', my: 'လတ်ဆတ်စာ', icon: 'leaf-outline' },
-    { id: '生活用品', zh: '生活', en: 'Daily', my: 'လူသုံးကုန်', icon: 'cart-outline' },
-    { id: '茶铺', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
-    { id: '饮料和小吃', zh: '零食', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
+    { id: 'restaurant', zh: '餐厅', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
+    { id: 'drinks_snacks', zh: '饮料小吃', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
+    { id: 'breakfast', zh: '早点铺', en: 'Breakfast', my: 'မနက်စာဆိုင်', icon: 'sunny-outline' },
+    { id: 'cake_shop', zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်', icon: 'heart-outline' },
+    { id: 'tea_shop', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
+    { id: 'flower_shop', zh: '鲜花店', en: 'Flowers', my: 'ပန်းဆိုင်', icon: 'flower-outline' },
+    { id: 'clothing_store', zh: '服装店', en: 'Clothing', my: 'အဝတ်အထည်ဆိုင်', icon: 'shirt-outline' },
+    { id: 'grocery', zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်', icon: 'cart-outline' },
+    { id: 'hardware_store', zh: '五金店', en: 'Hardware', my: 'ဟာ့ဒ်ဝဲလ်ဆိုင်', icon: 'build-outline' },
+    { id: 'supermarket', zh: '超市', en: 'Supermarket', my: 'စူပါမားကတ်', icon: 'basket-outline' },
+    { id: 'transit_station', zh: '中转站', en: 'Hub', my: 'အချက်အချာဌာန', icon: 'bus-outline' },
+    { id: 'other', zh: '其它', en: 'Other', my: 'အခြား', icon: 'ellipsis-horizontal-outline' },
   ];
 
   const uiT = {
@@ -54,6 +63,9 @@ const CityMallPage: React.FC = () => {
       visitStore: '进入店铺',
       addToCart: '查看详情',
       partnerTag: '深度合作 🤝',
+      nearbyPopular: '附近热门商户',
+      guessYouLike: '猜你喜欢',
+      allMerchants: '所有入驻商户',
     },
     en: {
       searchPlaceholder: 'Search store or product...',
@@ -65,6 +77,9 @@ const CityMallPage: React.FC = () => {
       visitStore: 'Visit Store',
       addToCart: 'View Detail',
       partnerTag: 'Partner 🤝',
+      nearbyPopular: 'Nearby Popular',
+      guessYouLike: 'Recommended for You',
+      allMerchants: 'All Registered Merchants',
     },
     my: {
       searchPlaceholder: 'ဆိုင် သို့မဟုတ် ပစ္စည်းရှာရန်...',
@@ -76,6 +91,9 @@ const CityMallPage: React.FC = () => {
       visitStore: 'ဆိုင်သို့ဝင်ရန်',
       addToCart: 'အသေးစိတ်ကြည့်ရန်',
       partnerTag: 'Partner 🤝',
+      nearbyPopular: 'အနီးနားရှိ လူကြိုက်များသောဆိုင်များ',
+      guessYouLike: 'သင့်အတွက် အကြံပြုချက်',
+      allMerchants: 'ဆိုင်အားလုံး',
     }
   }[language as 'zh' | 'en' | 'my'] || {
     searchPlaceholder: 'Search store or product...',
@@ -184,20 +202,78 @@ const CityMallPage: React.FC = () => {
     }
   };
 
+  // 🚀 计算推荐和热门店铺逻辑 (与 App 端同步)
+  useEffect(() => {
+    if (stores.length > 0) {
+      // 1. 猜你喜欢 (评分最高)
+      const recommended = [...stores]
+        .filter(s => !s.is_closed_today)
+        .sort((a, b) => {
+          const ratingA = storeReviewStats[a.id]?.average || 0;
+          const ratingB = storeReviewStats[b.id]?.average || 0;
+          return ratingB - ratingA;
+        })
+        .slice(0, 8);
+      setRecommendedStores(recommended);
+
+      // 2. 附近热门 (当前领区评分最高)
+      const nearby = stores
+        .filter(s => {
+          const addr = (s.address || '').toUpperCase();
+          let sRegion = 'MDY';
+          if (addr.includes('YGN')) sRegion = 'YGN';
+          else if (addr.includes('POL')) sRegion = 'POL';
+          else if (addr.includes('NPW')) sRegion = 'NPW';
+          else if (addr.includes('TGI')) sRegion = 'TGI';
+          else if (addr.includes('LASHIO')) sRegion = 'LSO';
+          else if (addr.includes('MUSE')) sRegion = 'MSE';
+          return sRegion === selectedRegion && !s.is_closed_today;
+        })
+        .sort((a, b) => {
+          const ratingA = storeReviewStats[a.id]?.average || 0;
+          const ratingB = storeReviewStats[b.id]?.average || 0;
+          return ratingB - ratingA;
+        })
+        .slice(0, 8);
+      setNearbyStores(nearby);
+    }
+  }, [stores, selectedRegion, storeReviewStats]);
+
   const getStoreIcon = (type: string) => {
     const t = (type || '').toLowerCase();
     switch (t) {
-      case '餐厅': case 'restaurant': return '🍽️';
-      case '茶铺': case 'tea_shop': return '🍵';
-      case '饮料和小吃': case 'drinks_snacks': return '🥤';
-      case '杂货店': case 'grocery': return '🛒';
+      case 'restaurant': return '🍽️';
+      case 'tea_shop': return '🍵';
+      case 'drinks_snacks': return '🥤';
+      case 'grocery': return '🛒';
+      case 'supermarket': return '🏪';
+      case 'breakfast': return '🍳';
+      case 'cake_shop': return '🎂';
+      case 'flower_shop': return '💐';
+      case 'clothing_store': return '👕';
+      case 'hardware_store': return '🔧';
+      case 'transit_station': return '🚚';
       default: return '🏪';
     }
+  };
+
+  const getStoreTypeLabel = (type: string) => {
+    const category = categories.find(c => c.id === type);
+    if (!category) return type;
+    return (category as any)[language] || category.zh;
   };
 
   // 🚀 新增：判断店铺是否正在营业
   const checkStoreOpenStatus = (store: DeliveryStore) => {
     if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    
+    // 🚀 检查预设休假计划
+    if (store.vacation_dates && Array.isArray(store.vacation_dates)) {
+      const today = new Date().toISOString().split('T')[0];
+      if (store.vacation_dates.includes(today)) {
+        return { isOpen: false, reason: 'vacation' };
+      }
+    }
     
     try {
       const hours = store.operating_hours || '09:00 - 21:00';
@@ -258,16 +334,7 @@ const CityMallPage: React.FC = () => {
       // 🚀 分类过滤逻辑
       let matchesCategory = true;
       if (selectedCategory !== '全部') {
-        const type = store.store_type || '';
-        if (selectedCategory === '餐厅') {
-          matchesCategory = type.includes('餐') || type.includes('饭') || type.includes('Food') || type.includes('Restaurant');
-        } else if (selectedCategory === '生鲜') {
-          matchesCategory = type.includes('鲜') || type.includes('菜') || type.includes('肉') || type.includes('Fresh') || type.includes('Market');
-        } else if (selectedCategory === '生活用品') {
-          matchesCategory = type.includes('活') || type.includes('杂') || type.includes('超市') || type.includes('Mart') || type.includes('Shop');
-        } else {
-          matchesCategory = type.includes(selectedCategory);
-        }
+        matchesCategory = store.store_type === selectedCategory;
       }
 
       return matchesSearch && matchesRegion && matchesCategory;
@@ -588,7 +655,99 @@ const CityMallPage: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1200px', margin: '3rem auto', padding: '0 1rem' }}>
+      <div style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 1rem' }}>
+        {/* 🚀 推荐和热门区域 (仅在非搜索模式显示) */}
+        {!searchText.trim() && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', marginBottom: '3.5rem' }}>
+            
+            {/* 附近热门 */}
+            {nearbyStores.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    🔥 {uiT.nearbyPopular}
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', gap: '1.5rem', overflowX: 'auto', paddingBottom: '1rem' }} className="h-scroll">
+                  {nearbyStores.map(store => (
+                    <div 
+                      key={store.id} 
+                      onClick={() => navigate(`/mall/${store.id}`)}
+                      style={{ 
+                        minWidth: '220px', 
+                        background: 'rgba(255,255,255,0.1)', 
+                        borderRadius: '24px', 
+                        padding: '1.5rem', 
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      className="h-card"
+                    >
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                        {getStoreIcon(store.store_type)}
+                      </div>
+                      <h4 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>⭐ {storeReviewStats[store.id]?.average || '5.0'}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{getStoreTypeLabel(store.store_type)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 猜你喜欢 */}
+            {recommendedStores.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    ✨ {uiT.guessYouLike}
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', gap: '1.5rem', overflowX: 'auto', paddingBottom: '1rem' }} className="h-scroll">
+                  {recommendedStores.map(store => (
+                    <div 
+                      key={store.id} 
+                      onClick={() => navigate(`/mall/${store.id}`)}
+                      style={{ 
+                        minWidth: '220px', 
+                        background: 'rgba(255,255,255,0.1)', 
+                        borderRadius: '24px', 
+                        padding: '1.5rem', 
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      className="h-card"
+                    >
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                        {getStoreIcon(store.store_type)}
+                      </div>
+                      <h4 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>⭐ {storeReviewStats[store.id]?.average || '5.0'}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{getStoreTypeLabel(store.store_type)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <style>{`
+              .h-scroll::-webkit-scrollbar { height: 4px; }
+              .h-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); borderRadius: 10px; }
+              .h-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+            `}</style>
+
+            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '1rem' }}>
+              🏪 {uiT.allMerchants}
+            </h2>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '8rem 0' }}>
             <div className="spinner" style={{ 
@@ -746,21 +905,21 @@ const CityMallPage: React.FC = () => {
                               color: '#1e40af', 
                               fontSize: '0.8rem', 
                               padding: '0.3rem 0.8rem', 
-                              borderRadius: '10px',
+                              borderRadius: '10px', 
                               fontWeight: '800',
                               textTransform: 'uppercase'
                             }}>
-                              {store.store_type}
+                              {getStoreTypeLabel(store.store_type)}
                             </span>
                             <span style={{ 
                               background: status.isOpen ? '#dcfce7' : '#fee2e2', 
                               color: status.isOpen ? '#15803d' : '#ef4444', 
                               fontSize: '0.8rem', 
                               padding: '0.3rem 0.8rem', 
-                              borderRadius: '10px',
+                              borderRadius: '10px', 
                               fontWeight: '800'
                             }}>
-                              ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : t.mall.closedNow)}
+                              ● {status.isOpen ? t.mall.openNow : (status.reason === 'closed_today' ? t.mall.closedToday : (status.reason === 'vacation' ? (language === 'zh' ? '预设休假中' : 'On Vacation') : t.mall.closedNow))}
                             </span>
                           </div>
 

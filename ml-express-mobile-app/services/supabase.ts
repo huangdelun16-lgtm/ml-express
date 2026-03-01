@@ -178,6 +178,7 @@ export interface DeliveryStore {
   status: 'active' | 'inactive' | 'maintenance';
   created_at: string;
   updated_at: string;
+  vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
 }
 
 // 管理员账号服务

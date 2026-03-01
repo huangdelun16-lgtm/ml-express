@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -36,7 +36,7 @@ interface DeliveryStore {
   store_type: string;
   status: string;
   operating_hours: string;
-  is_closed_today?: boolean; // 🚀 新增
+  is_closed_today?: boolean;
 }
 
 export default function CityMallScreen({ navigation }: any) {
@@ -46,9 +46,9 @@ export default function CityMallScreen({ navigation }: any) {
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
-  const [selectedCategory, setSelectedCategory] = useState<string>('全部'); // 🚀 新增
-  const [searchMode, setSearchMode] = useState<'stores' | 'products'>('stores'); // 🚀 新增
-  const [foundProducts, setFoundProducts] = useState<any[]>([]); // 🚀 新增
+  const [selectedCategory, setSelectedCategory] = useState<string>('全部');
+  const [searchMode, setSearchMode] = useState<'stores' | 'products'>('stores');
+  const [foundProducts, setFoundProducts] = useState<any[]>([]);
   const [productMatches, setProductMatches] = useState<Record<string, string[]>>({});
   const [searchingProducts, setSearchingProducts] = useState(false);
   const [storeReviewStats, setStoreReviewStats] = useState<Record<string, any>>({});
@@ -56,7 +56,9 @@ export default function CityMallScreen({ navigation }: any) {
   const [selectedStoreForReviews, setSelectedStoreForReviews] = useState<any>(null);
   const [currentStoreReviews, setCurrentStoreReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
-  const [banners, setBanners] = useState<Banner[]>([]); // 🚀 新增
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [nearbyStores, setNearbyStores] = useState<DeliveryStore[]>([]);
+  const [recommendedStores, setRecommendedStores] = useState<DeliveryStore[]>([]);
 
   const regions = [
     { id: 'MDY', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး' },
@@ -70,14 +72,21 @@ export default function CityMallScreen({ navigation }: any) {
 
   const categories = [
     { id: '全部', zh: '全部', en: 'All', my: 'အားလုံး', icon: 'grid-outline' },
-    { id: '餐厅', zh: '餐饮', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
-    { id: '生鲜', zh: '生鲜', en: 'Fresh', my: 'လတ်ဆတ်စာ', icon: 'leaf-outline' },
-    { id: '生活用品', zh: '生活', en: 'Daily', my: 'လူသုံးကုန်', icon: 'cart-outline' },
-    { id: '茶铺', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
-    { id: '饮料和小吃', zh: '零食', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
+    { id: 'restaurant', zh: '餐厅', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
+    { id: 'drinks_snacks', zh: '饮料小吃', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
+    { id: 'breakfast', zh: '早点铺', en: 'Breakfast', my: 'မနက်စာဆိုင်', icon: 'sunny-outline' },
+    { id: 'cake_shop', zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်', icon: 'heart-outline' },
+    { id: 'tea_shop', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
+    { id: 'flower_shop', zh: '鲜花店', en: 'Flowers', my: 'ပန်းဆိုင်', icon: 'flower-outline' },
+    { id: 'clothing_store', zh: '服装店', en: 'Clothing', my: 'အဝတ်အထည်ဆိုင်', icon: 'shirt-outline' },
+    { id: 'grocery', zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်', icon: 'cart-outline' },
+    { id: 'hardware_store', zh: '五金店', en: 'Hardware', my: 'ဟာ့ဒ်ဝဲလ်ဆိုင်', icon: 'build-outline' },
+    { id: 'supermarket', zh: '超市', en: 'Supermarket', my: 'စူပါမားကတ်', icon: 'basket-outline' },
+    { id: 'transit_station', zh: '中转站', en: 'Hub', my: 'အချက်အချာဌာန', icon: 'bus-outline' },
+    { id: 'other', zh: '其它', en: 'Other', my: 'အခြား', icon: 'ellipsis-horizontal-outline' },
   ];
 
-  const t = {
+  const t: any = {
     zh: {
       title: '同城商场',
       searchPlaceholder: '搜索商户或商品...',
@@ -101,6 +110,9 @@ export default function CityMallScreen({ navigation }: any) {
       noProducts: '未搜索到相关商品',
       addToCart: '加入购物车',
       price: '价格',
+      nearbyPopular: '附近热门',
+      guessYouLike: '猜你喜欢',
+      allMerchants: '所有商户',
     },
     en: {
       title: 'City Mall',
@@ -125,6 +137,9 @@ export default function CityMallScreen({ navigation }: any) {
       noProducts: 'No products found',
       addToCart: 'Add to Cart',
       price: 'Price',
+      nearbyPopular: 'Nearby Popular',
+      guessYouLike: 'Recommended',
+      allMerchants: 'All Merchants',
     },
     my: {
       title: 'မြို့တွင်းဈေးဝယ်စင်တာ',
@@ -149,12 +164,13 @@ export default function CityMallScreen({ navigation }: any) {
       noProducts: 'ကုန်ပစ္စည်းမရှိပါ',
       addToCart: 'ခြင်းထဲသို့ထည့်ရန်',
       price: 'ဈေးနှုန်း',
+      nearbyPopular: 'အနီးနားရှိ လူကြိုက်များသောဆိုင်များ',
+      guessYouLike: 'သင့်အတွက် အကြံပြုချက်',
+      allMerchants: 'ဆိုင်အားလုံး',
     },
   }[language] || {
     title: 'City Mall',
     searchPlaceholder: 'Search store name...',
-    productMatches: 'Matching items',
-    searchingProducts: 'Searching products...',
     allStores: 'All Categories',
     noStores: 'No stores found',
     operatingHours: 'Hours',
@@ -168,7 +184,6 @@ export default function CityMallScreen({ navigation }: any) {
 
   useEffect(() => {
     const initializeData = async () => {
-      // 尝试从用户信息中获取默认地区
       try {
         const userStr = await AsyncStorage.getItem('currentUser');
         if (userStr) {
@@ -188,7 +203,7 @@ export default function CityMallScreen({ navigation }: any) {
         console.warn('Failed to detect user region');
       }
       loadStores();
-      loadBanners(); // 🚀 新增
+      loadBanners();
     };
     initializeData();
   }, []);
@@ -208,7 +223,6 @@ export default function CityMallScreen({ navigation }: any) {
       const data = await deliveryStoreService.getActiveStores();
       setStores(data);
 
-      // 🚀 加载所有店铺的评价统计
       const statsPromises = data.map(store => reviewService.getStoreReviewStats(store.id));
       const statsResults = await Promise.all(statsPromises);
       
@@ -260,10 +274,7 @@ export default function CityMallScreen({ navigation }: any) {
       const results = await merchantService.searchProductsByName(query);
       if (isCancelled) return;
       
-      setFoundProducts(results); // 🚀 保存搜索到的商品
-      
-      // 如果搜索到了商品，且当前不是搜索模式，自动切换到商品模式或者保持
-      // 这里可以根据需求决定是否自动切换
+      setFoundProducts(results);
       
       const matchMap: Record<string, string[]> = {};
       results.forEach((item: any) => {
@@ -282,18 +293,35 @@ export default function CityMallScreen({ navigation }: any) {
     };
   }, [searchText]);
 
-  // 🚀 核心逻辑：判断店铺是否正在营业
+  const getDetectedRegion = (address?: string) => {
+    const addr = (address || '').toUpperCase();
+    if (addr.includes('YANGON') || addr.includes('YGN')) return 'YGN';
+    if (addr.includes('PYIN OO LWIN') || addr.includes('POL')) return 'POL';
+    if (addr.includes('NAYPYIDAW') || addr.includes('NPW')) return 'NPW';
+    if (addr.includes('TAUNGGYI') || addr.includes('TGI')) return 'TGI';
+    if (addr.includes('LASHIO') || addr.includes('LSO')) return 'LSO';
+    if (addr.includes('MUSE') || addr.includes('MSE')) return 'MSE';
+    return 'MDY';
+  };
+
   const checkStoreOpenStatus = (store: DeliveryStore) => {
-    if (store.is_closed_today) return { isOpen: false, reason: 'closed_today' };
+    const isClosed = !!store.is_closed_today;
+    if (isClosed) return { isOpen: false, reason: 'closed_today' };
+    
+    // 🚀 检查预设休假计划
+    if (store.vacation_dates && Array.isArray(store.vacation_dates)) {
+      const today = new Date().toISOString().split('T')[0];
+      if (store.vacation_dates.includes(today)) {
+        return { isOpen: false, reason: 'vacation' };
+      }
+    }
     
     try {
       const hours = store.operating_hours || '09:00 - 21:00';
-      // 使用正则兼容 "09:00 - 21:00" 和 "09:00-21:00"
       const parts = hours.split(/\s*-\s*/);
       if (parts.length < 2) return { isOpen: true, reason: 'parse_error' };
       
       const [start, end] = parts;
-      
       const now = new Date();
       const currentTime = now.getHours() * 60 + now.getMinutes();
       
@@ -303,14 +331,11 @@ export default function CityMallScreen({ navigation }: any) {
       const startTime = startHour * 60 + startMin;
       const endTime = endHour * 60 + endMin;
       
-      // 🚀 24小时算法优化：处理跨子夜的营业时间（如 22:00 - 02:00）
       if (startTime <= endTime) {
-        // 普通情况：09:00 - 21:00
-      if (currentTime >= startTime && currentTime <= endTime) {
-        return { isOpen: true, reason: 'open' };
+        if (currentTime >= startTime && currentTime <= endTime) {
+          return { isOpen: true, reason: 'open' };
         }
       } else {
-        // 跨子夜情况：22:00 - 02:00
         if (currentTime >= startTime || currentTime <= endTime) {
           return { isOpen: true, reason: 'open' };
         }
@@ -321,65 +346,85 @@ export default function CityMallScreen({ navigation }: any) {
     }
   };
 
-  const filteredStores = stores
-    .filter(store => {
-      const searchLower = searchText.toLowerCase();
-      const matchesSearch = store.store_name.toLowerCase().includes(searchLower) ||
-        (store.store_code && store.store_code.toLowerCase().includes(searchLower)) ||
-        Boolean(productMatches[store.id]?.length);
-      
-      const storeAddr = (store.address || '').toUpperCase();
-      let storeRegion = 'MDY';
-      
-      if (storeAddr.includes('YANGON') || storeAddr.includes('YGN')) storeRegion = 'YGN';
-      else if (storeAddr.includes('PYIN OO LWIN') || storeAddr.includes('POL')) storeRegion = 'POL';
-      else if (storeAddr.includes('NAYPYIDAW') || storeAddr.includes('NPW')) storeRegion = 'NPW';
-      else if (storeAddr.includes('TAUNGGYI') || storeAddr.includes('TGI')) storeRegion = 'TGI';
-      else if (storeAddr.includes('LASHIO') || storeAddr.includes('LSO')) storeRegion = 'LSO';
-      else if (storeAddr.includes('MUSE') || storeAddr.includes('MSE')) storeRegion = 'MSE';
-      else storeRegion = 'MDY';
-
-      const matchesRegion = storeRegion === selectedRegion;
-      
-      // 🚀 分类过滤逻辑
-      let matchesCategory = true;
-      if (selectedCategory !== '全部') {
-        // 支持模糊匹配分类，例如 '餐厅' 匹配 '餐饮'
-        const type = store.store_type || '';
-        if (selectedCategory === '餐厅') {
-          matchesCategory = type.includes('餐') || type.includes('饭') || type.includes('Food') || type.includes('Restaurant');
-        } else if (selectedCategory === '生鲜') {
-          matchesCategory = type.includes('鲜') || type.includes('菜') || type.includes('肉') || type.includes('Fresh') || type.includes('Market');
-        } else if (selectedCategory === '生活用品') {
-          matchesCategory = type.includes('活') || type.includes('杂') || type.includes('超市') || type.includes('Mart') || type.includes('Shop');
-        } else {
-          matchesCategory = type.includes(selectedCategory);
+  const filteredStores = useMemo(() => {
+    return stores
+      .filter(store => {
+        const searchLower = searchText.toLowerCase();
+        const matchesSearch = store.store_name.toLowerCase().includes(searchLower) ||
+          (store.store_code && store.store_code.toLowerCase().includes(searchLower)) ||
+          Boolean(productMatches[store.id]?.length);
+        
+        const storeRegion = getDetectedRegion(store.address);
+        const matchesRegion = storeRegion === selectedRegion;
+        
+        let matchesCategory = true;
+        if (selectedCategory !== '全部') {
+          matchesCategory = store.store_type === selectedCategory;
         }
-      }
 
-      return matchesSearch && matchesRegion && matchesCategory;
-    })
-    .sort((a, b) => {
-      const matchA = Boolean(productMatches[a.id]?.length);
-      const matchB = Boolean(productMatches[b.id]?.length);
-      if (matchA !== matchB) return matchA ? -1 : 1;
-      const statusA = checkStoreOpenStatus(a);
-      const statusB = checkStoreOpenStatus(b);
-      if (statusA.isOpen === statusB.isOpen) return 0;
-      return statusA.isOpen ? -1 : 1; // 营业中的排前面
-    });
+        return matchesSearch && matchesRegion && matchesCategory;
+      })
+      .sort((a, b) => {
+        const matchA = Boolean(productMatches[a.id]?.length);
+        const matchB = Boolean(productMatches[b.id]?.length);
+        if (matchA !== matchB) return matchA ? -1 : 1;
+        const statusA = checkStoreOpenStatus(a);
+        const statusB = checkStoreOpenStatus(b);
+        if (statusA.isOpen === statusB.isOpen) return 0;
+        return statusA.isOpen ? -1 : 1;
+      });
+  }, [stores, searchText, productMatches, selectedRegion, selectedCategory]);
+
+  useEffect(() => {
+    if (stores.length > 0) {
+      const recommended = [...stores]
+        .filter(s => !s.is_closed_today)
+        .sort((a, b) => {
+          const ratingA = storeReviewStats[a.id]?.average || 0;
+          const ratingB = storeReviewStats[b.id]?.average || 0;
+          return ratingB - ratingA;
+        })
+        .slice(0, 6);
+      setRecommendedStores(recommended);
+
+      const nearby = stores
+        .filter(s => {
+          const sRegion = getDetectedRegion(s.address);
+          return sRegion === selectedRegion && !s.is_closed_today;
+        })
+        .sort((a, b) => {
+          const ratingA = storeReviewStats[a.id]?.average || 0;
+          const ratingB = storeReviewStats[b.id]?.average || 0;
+          return ratingB - ratingA;
+        })
+        .slice(0, 6);
+      setNearbyStores(nearby);
+    }
+  }, [stores, selectedRegion, storeReviewStats]);
+
+  const getStoreTypeLabel = (type: string) => {
+    const category = categories.find(c => c.id === type);
+    if (!category) return type;
+    return (category as any)[language] || category.zh;
+  };
 
   const getStoreIcon = (type: string) => {
     switch (type) {
-      case '餐厅': return '🍽️';
-      case '茶铺': return '🍵';
-      case '饮料和小吃': return '🥤';
-      case '杂货店': return '🛒';
+      case 'restaurant': return '🍽️';
+      case 'tea_shop': return '🍵';
+      case 'drinks_snacks': return '🥤';
+      case 'grocery': return '🛒';
+      case 'supermarket': return '🏪';
+      case 'breakfast': return '🍳';
+      case 'cake_shop': return '🎂';
+      case 'flower_shop': return '💐';
+      case 'clothing_store': return '👕';
+      case 'hardware_store': return '🔧';
+      case 'transit_station': return '🚚';
       default: return '🏪';
     }
   };
 
-  // 🚀 新增：渲染商品项
   const renderProductItem = ({ item }: { item: any }) => {
     const store = item.delivery_stores;
     const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
@@ -455,6 +500,33 @@ export default function CityMallScreen({ navigation }: any) {
     );
   };
 
+  const renderHorizontalStoreItem = (item: DeliveryStore) => {
+    const status = checkStoreOpenStatus(item);
+    const stats = storeReviewStats[item.id];
+    
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.hStoreCard}
+        onPress={() => navigation.navigate('MerchantProducts', { storeId: item.id, storeName: item.store_name })}
+      >
+        <View style={styles.hStoreIconContainer}>
+          <Text style={styles.hStoreIcon}>{getStoreIcon(item.store_type)}</Text>
+          {!status.isOpen && (
+            <View style={styles.hStoreClosedOverlay}>
+              <Text style={styles.hStoreClosedText}>{t.closedNow}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.hStoreName} numberOfLines={1}>{item.store_name}</Text>
+        <View style={styles.hStoreStats}>
+          <Text style={styles.hStoreRating}>⭐ {stats?.average || '5.0'}</Text>
+          <Text style={styles.hStoreDistance}>{getStoreTypeLabel(item.store_type).slice(0, 4)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderStoreItem = ({ item }: { item: DeliveryStore }) => {
     const status = checkStoreOpenStatus(item);
     const matchedProducts = productMatches[item.id] || [];
@@ -463,7 +535,7 @@ export default function CityMallScreen({ navigation }: any) {
       <TouchableOpacity
         style={[
           styles.storeCard,
-          !status.isOpen && { opacity: 0.7 } // 休息中透明度
+          !status.isOpen && { opacity: 0.7 }
         ]}
         onPress={() => {
           if (!status.isOpen) {
@@ -500,7 +572,7 @@ export default function CityMallScreen({ navigation }: any) {
             )}
             <View style={styles.tagContainer}>
               <View style={styles.typeTag}>
-                <Text style={styles.typeTagText}>{item.store_type}</Text>
+                <Text style={styles.typeTagText}>{getStoreTypeLabel(item.store_type)}</Text>
               </View>
               <View style={[
                 styles.statusTag,
@@ -510,12 +582,11 @@ export default function CityMallScreen({ navigation }: any) {
                   styles.statusTagText,
                   { color: status.isOpen ? '#15803d' : '#ef4444' }
                 ]}>
-                  {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : t.closedNow)}
+                  {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : (status.reason === 'vacation' ? (language === 'zh' ? '预设休假' : 'Vacation') : t.closedNow))}
                 </Text>
               </View>
             </View>
             
-            {/* 🚀 新增：评价统计显示 */}
             {storeReviewStats[item.id] && storeReviewStats[item.id].count > 0 && (
               <TouchableOpacity 
                 style={styles.reviewStatsContainer}
@@ -564,6 +635,235 @@ export default function CityMallScreen({ navigation }: any) {
     );
   };
 
+  const listData = useMemo(() => {
+    if (loading) return [];
+    
+    const baseItems = [];
+    
+    // 🚀 第一项：固定 Header (标题 + 搜索) - 虽然它在列表里，但我们想让它滑走
+    baseItems.push({ type: 'header', id: 'list-header' });
+    
+    // 🚀 第二项：Region 地区选择 (配合 stickyHeaderIndices={[1]} 实现吸顶)
+    baseItems.push({ type: 'region', id: 'sticky-region' });
+
+    if (!searchText.trim()) {
+      baseItems.push({ type: 'categories', id: 'categories' });
+      baseItems.push({ type: 'banners', id: 'banners' });
+      baseItems.push({ type: 'nearby', id: 'nearby' });
+      baseItems.push({ type: 'recommended', id: 'recommended' });
+      baseItems.push({ type: 'all_title', id: 'all_title' });
+      baseItems.push(...filteredStores.map(s => ({ ...s, type: 'store' })));
+    } else {
+      baseItems.push({ type: 'search_tabs', id: 'search_tabs' });
+      if (searchMode === 'stores') {
+        baseItems.push(...filteredStores.map(s => ({ ...s, type: 'store' })));
+      } else {
+        baseItems.push(...foundProducts.map(p => ({ ...p, type: 'product' })));
+      }
+    }
+    
+    return baseItems;
+  }, [loading, searchText, filteredStores, foundProducts, searchMode, nearbyStores, recommendedStores, selectedRegion, selectedCategory, storeReviewStats]);
+
+  const renderItem = ({ item }: { item: any }) => {
+    switch (item.type) {
+      case 'header':
+        return (
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>{t.title}</Text>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#94a3b8" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={t.searchPlaceholder}
+                  placeholderTextColor="#9ca3af"
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+              </View>
+              {searchingProducts && (
+                <Text style={styles.searchHint}>{t.searchingProducts}</Text>
+              )}
+            </View>
+          </View>
+        );
+      case 'region':
+        return (
+          <View style={styles.regionContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.regionScroll}>
+              {regions.map((region) => (
+                <TouchableOpacity
+                  key={region.id}
+                  onPress={() => {
+                    Vibration.vibrate(10);
+                    setSelectedRegion(region.id);
+                  }}
+                  style={[
+                    styles.regionTab,
+                    selectedRegion === region.id && styles.regionTabActive
+                  ]}
+                >
+                  <Text style={[
+                    styles.regionTabText,
+                    selectedRegion === region.id && styles.regionTabTextActive
+                  ]}>
+                    {language === 'zh' ? region.zh : (language === 'en' ? region.en : region.my)}
+                  </Text>
+                  {selectedRegion === region.id && (
+                    <View style={styles.activeIndicator} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
+      case 'categories':
+        return (
+          <View style={styles.categoryContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  onPress={() => {
+                    Vibration.vibrate(10);
+                    setSelectedCategory(cat.id);
+                  }}
+                  style={[
+                    styles.categoryItem,
+                    selectedCategory === cat.id && styles.categoryItemActive
+                  ]}
+                >
+                  <View style={[
+                    styles.categoryIconCircle,
+                    selectedCategory === cat.id && styles.categoryIconCircleActive
+                  ]}>
+                    <Ionicons 
+                      name={cat.icon as any} 
+                      size={20} 
+                      color={selectedCategory === cat.id ? '#fff' : '#94a3b8'} 
+                    />
+                  </View>
+                  <Text style={[
+                    styles.categoryText,
+                    selectedCategory === cat.id && styles.categoryTextActive
+                  ]}>
+                    {language === 'zh' ? cat.zh : (language === 'en' ? cat.en : cat.my)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
+      case 'banners':
+        if (banners.length === 0) return null;
+        return (
+          <View style={styles.bannerContainer}>
+            <FlatList
+              data={banners}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id || Math.random().toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.bannerItem}
+                  onPress={() => {
+                    if (item.link_url) {
+                      if (item.link_url.startsWith('store:')) {
+                        const storeId = item.link_url.split(':')[1];
+                        navigation.navigate('MerchantProducts', { storeId, storeName: language === 'zh' ? item.title : item.burmese_title });
+                      } else if (item.link_url.startsWith('category:')) {
+                        const catId = item.link_url.split(':')[1];
+                        setSelectedCategory(catId);
+                      }
+                    }
+                  }}
+                >
+                  <LinearGradient
+                    colors={[item.bg_color_start || '#3b82f6', item.bg_color_end || '#1e40af']}
+                    style={styles.bannerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={styles.bannerTextContainer}>
+                      <Text style={styles.bannerTitle}>
+                        {language === 'my' ? item.burmese_title : item.title}
+                      </Text>
+                      {item.subtitle && (
+                        <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
+                      )}
+                      <View style={styles.bannerTag}>
+                        <Text style={styles.bannerTagText}>Partner 🤝</Text>
+                      </View>
+                    </View>
+                    {item.image_url && (
+                      <Image source={{ uri: item.image_url }} style={styles.bannerImage} />
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        );
+      case 'search_tabs':
+        return (
+          <View style={styles.searchTabsContainer}>
+            <TouchableOpacity 
+              style={[styles.searchTab, searchMode === 'stores' && styles.searchTabActive]}
+              onPress={() => setSearchMode('stores')}
+            >
+              <Text style={[styles.searchTabText, searchMode === 'stores' && styles.searchTabTextActive]}>
+                {t.storesTab} ({filteredStores.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.searchTab, searchMode === 'products' && styles.searchTabActive]}
+              onPress={() => setSearchMode('products')}
+            >
+              <Text style={[styles.searchTabText, searchMode === 'products' && styles.searchTabTextActive]}>
+                {t.productsTab} ({foundProducts.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      case 'nearby':
+        if (nearbyStores.length === 0) return null;
+        return (
+          <View style={styles.sectionContainer}>
+            <View style={[styles.sectionHeader, { paddingHorizontal: 20 }]}>
+              <Text style={styles.sectionTitle}>🔥 {t.nearbyPopular}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+              <View style={{ width: 20 }} />
+              {nearbyStores.map(renderHorizontalStoreItem)}
+            </ScrollView>
+          </View>
+        );
+      case 'recommended':
+        if (recommendedStores.length === 0) return null;
+        return (
+          <View style={styles.sectionContainer}>
+            <View style={[styles.sectionHeader, { paddingHorizontal: 20 }]}>
+              <Text style={styles.sectionTitle}>✨ {t.guessYouLike}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+              <View style={{ width: 20 }} />
+              {recommendedStores.map(renderHorizontalStoreItem)}
+            </ScrollView>
+          </View>
+        );
+      case 'all_title':
+        return <Text style={[styles.sectionTitle, { marginLeft: 20, marginTop: 10, marginBottom: 15 }]}>🏪 {t.allMerchants}</Text>;
+      case 'store':
+        return renderStoreItem({ item });
+      case 'product':
+        return renderProductItem({ item });
+      default:
+        return null;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -573,7 +873,6 @@ export default function CityMallScreen({ navigation }: any) {
         style={StyleSheet.absoluteFill}
       />
       
-      {/* 背景装饰性圆圈 */}
       <View style={{
         position: 'absolute',
         top: -100,
@@ -585,180 +884,23 @@ export default function CityMallScreen({ navigation }: any) {
         zIndex: 0
       }} />
 
-      <View style={styles.header}>
-        <BackToHomeButton navigation={navigation} color="white" />
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{t.title}</Text>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#94a3b8" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={t.searchPlaceholder}
-              placeholderTextColor="#9ca3af"
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-          </View>
-          {searchingProducts && (
-            <Text style={styles.searchHint}>{t.searchingProducts}</Text>
-          )}
-        </View>
-      </View>
+      <View style={{ height: 0 }} />
 
-      {/* 🚀 新增：地区选择滑动条 */}
-      <View style={styles.regionContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.regionScroll}>
-          {regions.map((region) => (
-            <TouchableOpacity
-              key={region.id}
-              onPress={() => {
-                Vibration.vibrate(10);
-                setSelectedRegion(region.id);
-              }}
-              style={[
-                styles.regionTab,
-                selectedRegion === region.id && styles.regionTabActive
-              ]}
-            >
-              <Text style={[
-                styles.regionTabText,
-                selectedRegion === region.id && styles.regionTabTextActive
-              ]}>
-                {language === 'zh' ? region.zh : (language === 'en' ? region.en : region.my)}
-              </Text>
-              {selectedRegion === region.id && (
-                <View style={styles.activeIndicator} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* 🚀 新增：分类聚合滑动条 */}
-      <View style={styles.categoryContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => {
-                Vibration.vibrate(10);
-                setSelectedCategory(cat.id);
-              }}
-              style={[
-                styles.categoryItem,
-                selectedCategory === cat.id && styles.categoryItemActive
-              ]}
-            >
-              <View style={[
-                styles.categoryIconCircle,
-                selectedCategory === cat.id && styles.categoryIconCircleActive
-              ]}>
-                <Ionicons 
-                  name={cat.icon as any} 
-                  size={20} 
-                  color={selectedCategory === cat.id ? '#fff' : '#94a3b8'} 
-                />
-              </View>
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === cat.id && styles.categoryTextActive
-              ]}>
-                {language === 'zh' ? cat.zh : (language === 'en' ? cat.en : cat.my)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* 🚀 新增：精选推荐 Banner */}
-      {banners.length > 0 && (
-        <View style={styles.bannerContainer}>
-          <FlatList
-            data={banners}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id || Math.random().toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.bannerItem}
-                onPress={() => {
-                  if (item.link_url) {
-                    // 支持跳转到具体店铺或分类
-                    // 例如 link_url 可以是 "store:id" 或 "category:catId"
-                    if (item.link_url.startsWith('store:')) {
-                      const storeId = item.link_url.split(':')[1];
-                      navigation.navigate('MerchantProducts', { storeId, storeName: language === 'zh' ? item.title : item.burmese_title });
-                    } else if (item.link_url.startsWith('category:')) {
-                      const catId = item.link_url.split(':')[1];
-                      setSelectedCategory(catId);
-                    }
-                  }
-                }}
-              >
-                <LinearGradient
-                  colors={[item.bg_color_start || '#3b82f6', item.bg_color_end || '#1e40af']}
-                  style={styles.bannerGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.bannerTextContainer}>
-                    <Text style={styles.bannerTitle}>
-                      {language === 'my' ? item.burmese_title : item.title}
-                    </Text>
-                    {item.subtitle && (
-                      <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
-                    )}
-                    <View style={styles.bannerTag}>
-                      <Text style={styles.bannerTagText}>Partner 🤝</Text>
-                    </View>
-                  </View>
-                  {item.image_url && (
-                    <Image source={{ uri: item.image_url }} style={styles.bannerImage} />
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
-
-      {/* 🚀 新增：搜索结果切换标签 (仅在搜索时显示) */}
-      {searchText.trim().length > 0 && (
-        <View style={styles.searchTabsContainer}>
-          <TouchableOpacity 
-            style={[styles.searchTab, searchMode === 'stores' && styles.searchTabActive]}
-            onPress={() => setSearchMode('stores')}
-          >
-            <Text style={[styles.searchTabText, searchMode === 'stores' && styles.searchTabTextActive]}>
-              {t.storesTab} ({filteredStores.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.searchTab, searchMode === 'products' && styles.searchTabActive]}
-            onPress={() => setSearchMode('products')}
-          >
-            <Text style={[styles.searchTabText, searchMode === 'products' && styles.searchTabTextActive]}>
-              {t.productsTab} ({foundProducts.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {loading ? (
+      {loading && listData.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
         </View>
       ) : (
         <FlatList
-          data={searchMode === 'stores' || !searchText.trim() ? filteredStores : foundProducts}
-          keyExtractor={(item) => item.id}
-          renderItem={searchMode === 'stores' || !searchText.trim() ? renderStoreItem : renderProductItem}
+          data={listData}
+          keyExtractor={(item, index) => item.id || `${item.type}-${index}`}
+          renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          stickyHeaderIndices={[1]} // 🚀 锁定 listData[1] (Region)
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
           }
-          ListEmptyComponent={
+          ListEmptyComponent={!loading && (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
                 <Ionicons 
@@ -777,11 +919,10 @@ export default function CityMallScreen({ navigation }: any) {
                 }
               </Text>
             </View>
-          }
+          )}
         />
       )}
 
-      {/* 🚀 新增：店铺评价详情弹窗 */}
       <Modal
         visible={showReviewModal}
         transparent={true}
@@ -790,7 +931,6 @@ export default function CityMallScreen({ navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* 页眉 */}
             <LinearGradient
               colors={['#3b82f6', '#1e40af']}
               style={styles.modalHeader}
@@ -821,7 +961,6 @@ export default function CityMallScreen({ navigation }: any) {
               )}
             </LinearGradient>
 
-            {/* 评分分布 */}
             {selectedStoreForReviews && storeReviewStats[selectedStoreForReviews.id] && (
               <View style={styles.distributionContainer}>
                 {[5, 4, 3, 2, 1].map(star => {
@@ -844,7 +983,6 @@ export default function CityMallScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* 评论列表 */}
             <ScrollView style={styles.reviewsList}>
               {loadingReviews ? (
                 <View style={{ padding: 40 }}>
@@ -912,7 +1050,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
     paddingBottom: 15,
     paddingHorizontal: 20,
   },
@@ -948,10 +1086,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   regionContainer: {
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.98)', // 加深背景确保吸顶时盖住下方内容
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   regionScroll: {
     paddingHorizontal: 20,
@@ -989,7 +1127,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     borderRadius: 2,
   },
-  // 🚀 分类样式
   categoryContainer: {
     paddingVertical: 15,
     backgroundColor: 'transparent',
@@ -1032,7 +1169,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
   },
-  // 🚀 搜索标签样式
   searchTabsContainer: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -1059,7 +1195,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
   },
-  // 🚀 商品卡片样式
   productCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 20,
@@ -1156,7 +1291,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#475569',
     opacity: 0.5,
   },
-  // 🚀 Banner 样式
   bannerContainer: {
     height: 140,
     marginBottom: 10,
@@ -1210,7 +1344,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   listContent: {
-    padding: 20,
     paddingBottom: 40,
   },
   storeCard: {
@@ -1218,6 +1351,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 20,
+    marginHorizontal: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000',
@@ -1310,7 +1444,79 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  // 🚀 新增评价样式
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  hScroll: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  hStoreCard: {
+    width: 140,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  hStoreIconContainer: {
+    width: '100%',
+    height: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  hStoreIcon: {
+    fontSize: 32,
+  },
+  hStoreClosedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hStoreClosedText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  hStoreName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  hStoreStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hStoreRating: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  hStoreDistance: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   reviewStatsContainer: {
     flexDirection: 'row',
     alignItems: 'center',

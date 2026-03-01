@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from './../services/LoggerService';
 import {
   View,
@@ -12,8 +12,9 @@ import {
   Image,
   FlatList,
   RefreshControl,
+  Animated,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { packageService, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -68,6 +69,15 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  
+  // 🚀 优化：平滑移动动画
+  const riderAnimatedLocation = useRef(new AnimatedRegion({
+    latitude: 16.8661,
+    longitude: 96.1951,
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  })).current;
+
   const [isOnline, setIsOnline] = useState(true);
   const [mapError, setMapError] = useState(false);
   const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
@@ -188,7 +198,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       if (order) {
         setPackageData(order);
         
-        // 🚀 新增：获取骑手ID以进行实时追踪
+        // 🚀 新增：获取骑手ID以进行实时追踪 (优先匹配姓名，失败则匹配订单中的courier字段作为ID尝试)
         if (order.courier && order.courier !== '待分配') {
           supabase
             .from('couriers')
@@ -196,7 +206,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             .eq('name', order.courier)
             .single()
             .then(({ data }) => {
-              if (data) setCourierId(data.id);
+              if (data) {
+                setCourierId(data.id);
+              } else {
+                setCourierId(order.courier);
+              }
+            })
+            .catch(() => {
+              setCourierId(order.courier);
             });
         } else {
           setCourierId(null);
@@ -227,7 +244,11 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   useEffect(() => {
     let channel: any = null;
 
-    if (isOnline && packageData?.status === '配送中' && courierId) {
+    // 🚀 优化：扩大实时追踪的状态范围 (包括待取件、已取件、配送中、异常上报等)
+    const activeTrackingStatuses = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
+    const isTrackingActive = packageData && activeTrackingStatuses.includes(packageData.status);
+
+    if (isOnline && isTrackingActive && courierId) {
       console.log('📡 启动骑手实时追踪:', courierId);
       
       // 1. 获取初始位置
@@ -238,7 +259,9 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         .single()
         .then(({ data }) => {
           if (data) {
-            setRiderLocation({ latitude: data.latitude, longitude: data.longitude });
+            const initialLoc = { latitude: Number(data.latitude), longitude: Number(data.longitude) };
+            setRiderLocation(initialLoc);
+            riderAnimatedLocation.setValue(initialLoc);
           }
         });
 
@@ -255,10 +278,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           },
           (payload) => {
             console.log('📍 收到骑手位置更新:', payload.new);
-            setRiderLocation({
-              latitude: payload.new.latitude,
-              longitude: payload.new.longitude
-            });
+            const newLoc = {
+              latitude: Number(payload.new.latitude),
+              longitude: Number(payload.new.longitude)
+            };
+            setRiderLocation(newLoc);
+            
+            // 🚀 核心优化：执行平滑移动动画
+            riderAnimatedLocation.timing({
+              ...newLoc,
+              duration: 2000, // 2秒平滑过渡
+              useNativeDriver: false
+            }).start();
           }
         )
         .subscribe();
@@ -272,17 +303,34 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     };
   }, [packageData?.status, courierId, isOnline]);
 
-  // 当骑手位置更新时，自动平滑移动地图中心
+  // 当数据加载或骑手位置更新时，尝试调整地图视野
   useEffect(() => {
-    if (riderLocation && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: riderLocation.latitude,
-        longitude: riderLocation.longitude,
-        latitudeDelta: 0.03,
-        longitudeDelta: 0.03,
-      }, 1000);
+    if (mapRef.current && packageData) {
+      const coordinates = [];
+      if (packageData.sender_latitude && packageData.sender_longitude) {
+        coordinates.push({ latitude: Number(packageData.sender_latitude), longitude: Number(packageData.sender_longitude) });
+      }
+      if (packageData.receiver_latitude && packageData.receiver_longitude) {
+        coordinates.push({ latitude: Number(packageData.receiver_latitude), longitude: Number(packageData.receiver_longitude) });
+      }
+      if (riderLocation) {
+        coordinates.push({ latitude: Number(riderLocation.latitude), longitude: Number(riderLocation.longitude) });
+      }
+
+      if (coordinates.length >= 2) {
+        mapRef.current.fitToCoordinates(coordinates, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true,
+        });
+      } else if (coordinates.length === 1) {
+        mapRef.current.animateToRegion({
+          ...coordinates[0],
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }, 1000);
+      }
     }
-  }, [riderLocation]);
+  }, [packageData, riderLocation]);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -621,7 +669,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         {packageData && !loading && (
           <>
             {/* 实时地图追踪 */}
-            {packageData.status === '配送中' && (
+            {(['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status)) && (
               <View style={styles.mapContainer}>
                 {!isOnline || mapError ? (
                   <View style={styles.mapFallback}>
@@ -672,16 +720,17 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                         />
                       )}
 
-                      {/* 骑手标记 */}
+                      {/* 骑手标记 - 使用动画标记实现平滑移动 */}
                       {riderLocation && (
-                        <Marker
-                          coordinate={riderLocation}
-                          title="骑手正在赶来"
+                        <Marker.Animated
+                          coordinate={riderAnimatedLocation as any}
+                          title={language === 'zh' ? '骑手位置' : 'Rider Location'}
+                          anchor={{ x: 0.5, y: 0.5 }}
                         >
                           <View style={styles.riderMarker}>
                             <Text style={{ fontSize: 24 }}>🛵</Text>
                           </View>
-                        </Marker>
+                        </Marker.Animated>
                       )}
 
                       {/* 路线预览 */}

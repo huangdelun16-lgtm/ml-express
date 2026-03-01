@@ -90,6 +90,7 @@ export interface DeliveryStore {
   longitude?: number;
   created_at?: string;
   updated_at?: string;
+  vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
 }
 
 // 商品接口

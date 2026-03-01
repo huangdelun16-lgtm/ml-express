@@ -65,7 +65,6 @@ export default function BackToHomeButton({ navigation, position = 'topRight', st
     >
       <View style={styles.buttonContent}>
         <Text style={styles.icon}>🏠</Text>
-        <Text style={textStyle}>{currentT.backToHome}</Text>
       </View>
     </TouchableOpacity>
   );
