@@ -674,6 +674,27 @@ export const userService = {
       return { success: false, error: error.message };
     }
   },
+
+  // 更新用户信息
+  async updateUser(userId: string, updates: Partial<User>) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      LoggerService.error('更新用户信息失败:', error);
+      return { success: false, error };
+    }
+  },
   // 根据手机号获取用户
   async getUserByPhone(phone: string): Promise<User | null> {
     try {

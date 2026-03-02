@@ -22,7 +22,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import { feedbackService } from '../services/FeedbackService';
 
 export default function LoginScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, refreshSession } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const [loginType, setLoginType] = useState<'customer' | 'merchant'>('customer');
   const [email, setEmail] = useState('');
@@ -154,6 +154,9 @@ export default function LoginScreen({ navigation }: any) {
           await AsyncStorage.setItem('userType', 'customer');
           await AsyncStorage.setItem('currentSessionId', newSessionId);
           
+          // 🚀 核心优化：刷新全局会话上下文，确保本设备被识别为“最新登录”
+          await refreshSession();
+          
           // 🚀 新增：注册并保存推送令牌
           try {
             const NotificationService = require('../services/notificationService').default;
@@ -204,7 +207,7 @@ export default function LoginScreen({ navigation }: any) {
           id: store.id,
           name: store.store_name,
           email: store.email || store.store_code,
-          phone: store.contact_phone || '',
+          phone: store.phone || '',
           address: store.address || '',
           user_type: 'merchant', // 标记为商家
           status: 'active',
@@ -231,10 +234,13 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userId', store.id);
         await AsyncStorage.setItem('userEmail', store.email || store.store_code);
         await AsyncStorage.setItem('userName', store.store_name);
-        await AsyncStorage.setItem('userPhone', store.contact_phone || '');
+        await AsyncStorage.setItem('userPhone', store.phone || '');
         await AsyncStorage.setItem('userType', 'merchant');
         await AsyncStorage.setItem('currentStoreCode', store.store_code);
         await AsyncStorage.setItem('currentSessionId', newSessionId);
+
+        // 🚀 核心优化：刷新全局会话上下文，确保本设备被识别为“最新登录”
+        await refreshSession();
 
         // 🚀 新增：注册并保存推送令牌（商家使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
         // 如果商家也需要推送，建议将推送令牌也保存到 delivery_stores 表

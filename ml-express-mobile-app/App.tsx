@@ -270,7 +270,9 @@ const GlobalOrderMonitor = () => {
   const announcedOrders = useRef<Set<string>>(new Set()); // 记录本轮已播报过的订单 ID
   
   useEffect(() => {
-    const checkLoginStatus = async () => {
+    let checkSessionTimer: NodeJS.Timeout | null = null;
+
+    const checkLoginStatus = async (isInitial = false) => {
       try {
         const id = await AsyncStorage.getItem('currentUserId');
         const name = await AsyncStorage.getItem('currentUserName');
@@ -290,7 +292,6 @@ const GlobalOrderMonitor = () => {
 
         // 2. 🚀 核心逻辑：多设备登录检查
         if (id && localSessionId) {
-          // 🚀 修正：骑手端应该检查 admin_accounts 表
           const { data, error } = await supabase
             .from('admin_accounts')
             .select('current_session_id')
@@ -298,7 +299,10 @@ const GlobalOrderMonitor = () => {
             .single();
           
           if (!error && data && data.current_session_id && data.current_session_id !== localSessionId) {
-            console.log('🛑 [监控器] 检测到账号在其他设备登录');
+            console.log(`🛑 [监控器] 会话不匹配! DB: ${data.current_session_id}, Local: ${localSessionId}`);
+            
+            if (checkSessionTimer) clearInterval(checkSessionTimer);
+
             Alert.alert(
               '登录状态异常',
               '您的账号已在其他设备登录，当前设备已被强制下线。',
@@ -309,11 +313,11 @@ const GlobalOrderMonitor = () => {
                     'currentUserId', 'currentUser', 'currentUserName', 
                     'currentUserRole', 'currentUserPosition', 'currentSessionId'
                   ]);
-                  // 强制退出并重新加载
                   const Updates = require('expo-updates');
                   Updates.reloadAsync();
                 } 
-              }]
+              }],
+              { cancelable: false }
             );
           }
         }
@@ -322,9 +326,15 @@ const GlobalOrderMonitor = () => {
       }
     };
 
-    checkLoginStatus();
-    const timer = setInterval(checkLoginStatus, 15000); // 15秒检查一次即可，避免过于频繁
-    return () => clearInterval(timer);
+    checkLoginStatus(true);
+    // 延迟 5 秒执行第一次检查，避免登录竞态
+    const initialTimeout = setTimeout(() => checkLoginStatus(), 5000);
+    checkSessionTimer = setInterval(() => checkLoginStatus(), 15000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (checkSessionTimer) clearInterval(checkSessionTimer);
+    };
   }, [courierName, userId]);
 
   useEffect(() => {

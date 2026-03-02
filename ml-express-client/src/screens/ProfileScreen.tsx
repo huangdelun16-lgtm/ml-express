@@ -608,16 +608,31 @@ export default function ProfileScreen({ navigation }: any) {
       if (user.id && user.id !== 'guest') {
         // 🚀 实时从数据库同步最新余额和用户信息
         try {
-          console.log('🔄 正在同步数据库用户信息...', user.id);
-          const { data: latestUser, error: userError } = await supabase
-            .from('users')
-            .select('balance, user_type, name, phone, email')
+          console.log('🔄 正在同步数据库用户信息...', user.id, detectedUserType);
+          const isMerchant = detectedUserType === 'merchant';
+          const syncTable = isMerchant ? 'delivery_stores' : 'users';
+          const selectFields = isMerchant 
+            ? 'store_name, phone, email' 
+            : 'balance, user_type, name, phone, email';
+
+          const { data: latestRaw, error: userError } = await supabase
+            .from(syncTable)
+            .select(selectFields)
             .eq('id', user.id)
             .limit(1)
             .maybeSingle();
           
-          if (!userError && latestUser) {
-            console.log('✅ 同步成功:', latestUser);
+          if (!userError && latestRaw) {
+            console.log('✅ 同步成功:', latestRaw);
+            
+            // 映射字段供 UI 使用
+            const latestUser: any = { ...latestRaw };
+            if (detectedUserType === 'merchant') {
+              latestUser.name = latestRaw.store_name;
+              latestUser.phone = latestRaw.phone; // 使用正确的 phone 字段
+              latestUser.user_type = 'merchant';
+              latestUser.balance = 0; // 商家暂无余额字段
+            }
             const updatedBalance = Number(latestUser.balance) || 0;
             setAccountBalance(updatedBalance);
             
@@ -629,6 +644,11 @@ export default function ProfileScreen({ navigation }: any) {
               finalType = 'vip';
             }
             setUserType(finalType);
+
+            // 更新状态以反映最新数据
+            setUserName(latestUser.name || '');
+            setUserEmail(latestUser.email || '');
+            setUserPhone(latestUser.phone || '');
 
             // 🚀 同步更新本地缓存，防止下次打开显示旧数据
             const currentUserStr = await AsyncStorage.getItem('currentUser');
@@ -985,7 +1005,7 @@ export default function ProfileScreen({ navigation }: any) {
         email: editForm.email,
         phone: editForm.phone,
         address: editForm.address,
-      });
+      }, userType);
 
       if (result.success) {
         setUserName(editForm.name);
@@ -996,6 +1016,19 @@ export default function ProfileScreen({ navigation }: any) {
         await AsyncStorage.setItem('userName', editForm.name);
         await AsyncStorage.setItem('userEmail', editForm.email);
         await AsyncStorage.setItem('userPhone', editForm.phone);
+        
+        const currentUserStr = await AsyncStorage.getItem('currentUser');
+        if (currentUserStr) {
+          const user = JSON.parse(currentUserStr);
+          const updatedUser = { 
+            ...user, 
+            name: editForm.name, 
+            email: editForm.email, 
+            phone: editForm.phone,
+            address: editForm.address 
+          };
+          await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        }
 
         showToast(t.updateSuccess, 'success');
         setShowEditModal(false);

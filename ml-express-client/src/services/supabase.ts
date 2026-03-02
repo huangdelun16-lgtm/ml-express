@@ -279,21 +279,50 @@ export const customerService = {
     email?: string;
     phone?: string;
     address?: string;
-  }) {
+  }, userType: string = 'customer') {
     try {
+      const isMerchant = userType === 'merchant';
+      const table = isMerchant ? 'delivery_stores' : 'users';
+      
+      // 🚀 核心改进：显式构建 payload，绝不包含任何多余字段
+      const payload: any = {};
+      
+      if (isMerchant) {
+        // 商家表映射
+        if (updateData.name) payload.store_name = updateData.name;
+        if (updateData.phone) payload.phone = updateData.phone; // 数据库列名是 phone
+        if (updateData.email) payload.email = updateData.email;
+        if (updateData.address) payload.address = updateData.address;
+      } else {
+        // 客户表映射
+        if (updateData.name) payload.name = updateData.name;
+        if (updateData.phone) payload.phone = updateData.phone;
+        if (updateData.email) payload.email = updateData.email;
+        if (updateData.address) payload.address = updateData.address;
+      }
+
+      console.log(`[updateUser] 正在更新 ${table} 表, 载荷:`, payload);
+
       const { data, error } = await supabase
-        .from('users')
-        .update(updateData)
+        .from(table)
+        .update(payload)
         .eq('id', userId)
         .select()
         .single();
 
       if (error) {
-        LoggerService.error('更新用户信息失败:', error);
+        LoggerService.error(`更新用户信息失败 (${table}):`, error);
         throw error;
       }
 
-      return { success: true, data };
+      // 映射返回数据
+      const resultData = { ...data };
+      if (isMerchant) {
+        resultData.name = data.store_name;
+        // phone 已经是 data.phone
+      }
+
+      return { success: true, data: resultData };
     } catch (error: any) {
       LoggerService.error('更新用户信息失败:', error);
       return { 

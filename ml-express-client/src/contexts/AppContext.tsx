@@ -17,6 +17,8 @@ interface AppContextType {
   setPendingOrders: (orders: any[]) => void;
   addPendingOrder: (order: any) => void;
   removePendingOrder: (orderId: string) => void;
+  refreshPendingOrders: () => void;
+  refreshSession: () => Promise<void>;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -33,6 +35,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const [userType, setUserType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null); // 🚀 新增：用户ID状态
   const [sessionId, setSessionId] = useState<string | null>(null); // 🚀 新增：本地会话ID状态
+  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 🚀 新增：添加待处理订单
   const addPendingOrder = (order: any) => {
@@ -113,7 +116,6 @@ export function AppProvider({ children }: AppProviderProps) {
   }, [showOrderAlert, language, pendingOrders.length]);
 
   // 🚀 核心优化：商家账号自动开启“保持屏幕常亮”
-  // 修复：使用 useEffect 调用 API，而不是在渲染逻辑中条件性使用 Hook
   useEffect(() => {
     if (userType === 'merchant') {
       console.log('商家账号登录，激活屏幕常亮');
@@ -126,47 +128,60 @@ export function AppProvider({ children }: AppProviderProps) {
   }, [userType]);
 
   // 从本地存储加载语言设置和用户信息
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        const savedLang = await AsyncStorage.getItem('ml-express-language');
-        if (savedLang && (savedLang === 'zh' || savedLang === 'en' || savedLang === 'my')) {
-          setLanguageState(savedLang as Language);
-        }
-
-        const currentUserStr = await AsyncStorage.getItem('currentUser');
-        const savedSessionId = await AsyncStorage.getItem('currentSessionId'); // 🚀 获取本地 Session ID
-        
-        if (currentUserStr) {
-          const user = JSON.parse(currentUserStr);
-          let finalUserType = user.user_type || 'customer';
-          if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
-          setUserType(finalUserType);
-          setUserId(user.id);
-          setSessionId(savedSessionId);
-        }
-      } catch (error) {
-        LoggerService.error('加载初始设置失败:', error);
+  const loadInitialData = async () => {
+    try {
+      const savedLang = await AsyncStorage.getItem('ml-express-language');
+      if (savedLang && (savedLang === 'zh' || savedLang === 'en' || savedLang === 'my')) {
+        setLanguageState(savedLang as Language);
       }
-    };
-    loadInitialData();
-  }, []);
 
-  // 🚀 全局订单监听逻辑
-  useEffect(() => {
-    const setupOrderListener = async () => {
-      try {
-        const currentUserStr = await AsyncStorage.getItem('currentUser');
-        if (!currentUserStr) return;
-        
+      const currentUserStr = await AsyncStorage.getItem('currentUser');
+      const savedSessionId = await AsyncStorage.getItem('currentSessionId');
+      
+      if (currentUserStr) {
         const user = JSON.parse(currentUserStr);
         let finalUserType = user.user_type || 'customer';
         if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
-        setUserType(finalUserType); // 同步更新 userType 状态
+        setUserType(finalUserType);
         setUserId(user.id);
+        setSessionId(savedSessionId);
+      }
+    } catch (error) {
+      LoggerService.error('加载初始设置失败:', error);
+    }
+  };
 
-        // 🚀 新增：多设备登录检查逻辑
-        const checkSession = async () => {
+  // 🚀 全局订单监听逻辑
+  const setupOrderListener = async () => {
+    try {
+      // 1. 清理旧的资源
+      if (sessionTimerRef.current) {
+        clearInterval(sessionTimerRef.current);
+        sessionTimerRef.current = null;
+      }
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+
+      // 2. 加载当前用户信息
+      const currentUserStr = await AsyncStorage.getItem('currentUser');
+      if (!currentUserStr) {
+        setUserId(null);
+        setUserType(null);
+        return;
+      }
+      
+      const user = JSON.parse(currentUserStr);
+      let finalUserType = user.user_type || 'customer';
+      if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
+      
+      setUserType(finalUserType);
+      setUserId(user.id);
+
+      // 3. 多设备登录检查逻辑
+      const checkSession = async () => {
+        try {
           const localSessionId = await AsyncStorage.getItem('currentSessionId');
           if (!user.id || !localSessionId) return;
 
@@ -178,7 +193,12 @@ export function AppProvider({ children }: AppProviderProps) {
             .single();
           
           if (!error && data && data.current_session_id && data.current_session_id !== localSessionId) {
-            console.log('🛑 [AppContext] 检测到账号在其他设备登录');
+            console.log(`🛑 [AppContext] 会话不匹配! DB: ${data.current_session_id}, Local: ${localSessionId}`);
+            
+            if (sessionTimerRef.current) {
+              clearInterval(sessionTimerRef.current);
+            }
+            
             Alert.alert(
               '登录状态异常',
               '您的账号已在其他设备登录，当前设备已被强制下线。',
@@ -189,65 +209,56 @@ export function AppProvider({ children }: AppProviderProps) {
                     'currentUser', 'userId', 'userEmail', 'userName', 
                     'userPhone', 'userType', 'currentStoreCode', 'currentSessionId'
                   ]);
-                  // 刷新 App
                   const Updates = require('expo-updates');
                   Updates.reloadAsync();
                 } 
-              }]
+              }],
+              { cancelable: false }
             );
           }
-        };
-
-        // 每 30 秒检查一次会话
-        const sessionTimer = setInterval(checkSession, 30000);
-        checkSession(); // 立即检查一次
-
-        if (finalUserType === 'merchant' && user.id) {
-          console.log('✅ 检测到商家账号，建立全局订单监听:', user.id);
-          
-          // 如果已有监听，先清理
-          if (subscriptionRef.current) {
-            console.log('清理旧监听');
-            supabase.removeChannel(subscriptionRef.current);
-          }
-
-          // 🚀 增强版订阅设置：开启 ack 以提高稳定性
-          const subscription = supabase
-            .channel(`global-merchant-orders-${user.id}`, {
-              config: {
-                presence: { key: user.id },
-              }
-            })
-            .on('postgres_changes', { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'packages',
-              filter: `delivery_store_id=eq.${user.id}` 
-            }, payload => {
-              const newOrder = payload.new;
-              console.log('🔔 全局监听到新订单消息:', { id: newOrder.id, status: newOrder.status });
-              
-              if (newOrder.status === '待确认') {
-                addPendingOrder(newOrder);
-              }
-            })
-            .subscribe((status) => {
-              console.log('📡 Supabase 监听订阅状态:', status);
-              // 如果订阅断开，尝试重新建立连接
-              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                setTimeout(setupOrderListener, 5000);
-              }
-            });
-          
-          subscriptionRef.current = subscription;
+        } catch (e) {
+          console.warn('检查会话失败:', e);
         }
-      } catch (error) {
-        console.warn('建立订单监听失败:', error);
+      };
+
+      // 每 30 秒检查一次会话
+      sessionTimerRef.current = setInterval(checkSession, 30000);
+      // 延迟 5 秒执行第一次检查，避免登录时的竞态条件
+      setTimeout(checkSession, 5000);
+
+      // 4. 商家订单监听
+      if (finalUserType === 'merchant' && user.id) {
+        const subscription = supabase
+          .channel(`global-merchant-orders-${user.id}`)
+          .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'packages',
+            filter: `delivery_store_id=eq.${user.id}` 
+          }, payload => {
+            const newOrder = payload.new;
+            if (newOrder.status === '待确认') {
+              addPendingOrder(newOrder);
+            }
+          })
+          .subscribe();
+        
+        subscriptionRef.current = subscription;
       }
-    };
+    } catch (error) {
+      console.warn('建立订单监听失败:', error);
+    }
+  };
 
+  // 🚀 新增：手动刷新会话和监听
+  const refreshSession = async () => {
+    await setupOrderListener();
+  };
+
+  useEffect(() => {
+    loadInitialData();
     setupOrderListener();
-
+    
     // 🚀 增加轮询补丁频率，针对手机休眠时的补偿
     const pollMissingOrders = setInterval(async () => {
       try {
@@ -264,24 +275,23 @@ export function AppProvider({ children }: AppProviderProps) {
             .order('created_at', { ascending: false });
           
           if (!error && missingOrders && missingOrders.length > 0) {
-            console.log('🔍 轮询发现待处理订单:', missingOrders.length);
             missingOrders.forEach(order => addPendingOrder(order));
           }
         }
       } catch (err) {
         // 静默处理轮询错误
       }
-    }, 15000); // 缩短到 15 秒轮询一次
+    }, 15000);
 
     return () => {
-      console.log('清理监听和轮询');
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
       clearInterval(pollMissingOrders);
       Vibration.cancel();
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
       }
     };
-  }, [language, showOrderAlert]); // 增加 showOrderAlert 依赖，当弹窗消失后立刻恢复监听状态环境
+  }, [language, showOrderAlert]);
 
   const setLanguage = async (lang: Language) => {
     setLanguageState(lang);
@@ -295,13 +305,15 @@ export function AppProvider({ children }: AppProviderProps) {
   return (
     <AppContext.Provider value={{ 
       language, 
-      setLanguage,
-      showOrderAlert,
-      setShowOrderAlert,
-      pendingOrders,
-      setPendingOrders,
-      addPendingOrder,
-      removePendingOrder
+      setLanguage, 
+      showOrderAlert, 
+      setShowOrderAlert, 
+      pendingOrders, 
+      setPendingOrders, 
+      addPendingOrder, 
+      removePendingOrder,
+      refreshPendingOrders: () => loadInitialData(),
+      refreshSession
     }}>
       {children}
     </AppContext.Provider>

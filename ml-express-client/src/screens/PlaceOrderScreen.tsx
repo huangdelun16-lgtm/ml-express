@@ -909,7 +909,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             
             // 自动填充寄件人信息
             setSenderName(store.store_name);
-            setSenderPhone(store.contact_phone || store.manager_phone);
+            setSenderPhone(store.phone || store.manager_phone);
             setSenderAddress(store.address);
             
             // 自动设置坐标
@@ -1044,7 +1044,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     if (useMyInfo) {
       if (currentUser?.user_type === 'merchant' && merchantStore) {
         setSenderName(merchantStore.store_name);
-        setSenderPhone(merchantStore.contact_phone || merchantStore.manager_phone);
+        setSenderPhone(merchantStore.phone || merchantStore.manager_phone);
         // 如果没有地址，则使用店铺地址
         if (!senderAddress) {
             setSenderAddress(merchantStore.address);

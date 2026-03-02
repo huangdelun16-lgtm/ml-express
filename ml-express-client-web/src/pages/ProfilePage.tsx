@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview } from '../services/supabase';
+import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview, userService } from '../services/supabase';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
@@ -250,6 +250,16 @@ const ProfilePage: React.FC = () => {
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [tempVacationDate, setTempVacationDate] = useState('');
 
+  // 🚀 新增：编辑资料状态
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   // 🚀 24小时时间解析助手
   const parseTimeParts = (timeStr: string, defaultTime: string) => {
     try {
@@ -325,6 +335,71 @@ const ProfilePage: React.FC = () => {
       ...prev,
       vacation_dates: prev.vacation_dates.filter(d => d !== date)
     }));
+  };
+
+  // 🚀 新增：编辑资料逻辑
+  const handleOpenEditProfile = () => {
+    if (isPartnerStore && storeInfo) {
+      setEditProfileForm({
+        name: storeInfo.store_name || '',
+        phone: storeInfo.phone || storeInfo.manager_phone || '',
+        email: storeInfo.email || '',
+        address: storeInfo.address || ''
+      });
+    } else {
+      setEditProfileForm({
+        name: currentUser?.name || '',
+        phone: currentUser?.phone || '',
+        email: currentUser?.email || '',
+        address: currentUser?.address || ''
+      });
+    }
+    setShowEditProfileModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!currentUser?.id) return;
+    setIsSavingProfile(true);
+    try {
+      if (isPartnerStore && storeInfo) {
+        // 商家资料更新
+        const result = await deliveryStoreService.updateStoreInfo(storeInfo.id, {
+          store_name: editProfileForm.name,
+          phone: editProfileForm.phone,
+          email: editProfileForm.email,
+          address: editProfileForm.address
+        });
+        if (result.success) {
+          setStoreInfo(result.data);
+          alert(language === 'zh' ? '商家资料更新成功' : 'Merchant profile updated');
+          setShowEditProfileModal(false);
+        } else {
+          alert(language === 'zh' ? '更新失败，请重试' : 'Update failed');
+        }
+      } else {
+        // 客户资料更新
+        const result = await userService.updateUser(currentUser.id, {
+          name: editProfileForm.name,
+          phone: editProfileForm.phone,
+          email: editProfileForm.email,
+          address: editProfileForm.address
+        });
+        if (result.success) {
+          const updatedUser = { ...currentUser, ...result.data };
+          setCurrentUser(updatedUser);
+          localStorage.setItem('ml-express-customer', JSON.stringify(updatedUser));
+          alert(language === 'zh' ? '个人资料更新成功' : 'Profile updated');
+          setShowEditProfileModal(false);
+        } else {
+          alert(language === 'zh' ? '更新失败，请重试' : 'Update failed');
+        }
+      }
+    } catch (error) {
+      LoggerService.error('保存资料失败:', error);
+      alert(language === 'zh' ? '发生错误，请稍后重试' : 'An error occurred');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   // 🚀 新增：店铺商品管理逻辑
@@ -1610,6 +1685,37 @@ const ProfilePage: React.FC = () => {
                           : (currentUser.user_type === 'courier' ? 'Courier' : 'MEMBER'))
                     )}
                   </div>
+
+                  {/* 🚀 新增：编辑按钮 (图标形式，匹配 App) */}
+                  {!isGuest && (
+                    <button
+                      onClick={handleOpenEditProfile}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        marginLeft: '10px'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title={language === 'zh' ? '编辑资料' : 'Edit Profile'}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>📝</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* 🚀 新增：余额显示和充值按钮 */}
@@ -1665,6 +1771,45 @@ const ProfilePage: React.FC = () => {
                   </div>
                 )}
                 
+                {/* 🚀 新增：编辑资料按钮 */}
+                {!isGuest && (
+                  <button
+                    onClick={handleOpenEditProfile}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      fontSize: '0.95rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      whiteSpace: 'nowrap',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>📝</span>
+                    {language === 'zh' ? '编辑资料' : language === 'en' ? 'Edit Profile' : 'ကိုယ်ရေးအချက်အလက်ပြင်ဆင်ရန်'}
+                  </button>
+                )}
+
                 {/* 合伙店铺：修改密码按钮 */}
                 {isPartnerStore && (
                   <button
@@ -1809,7 +1954,7 @@ const ProfilePage: React.FC = () => {
                       <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>{t.phone}</span>
                     </div>
                     <span style={{ color: 'white', fontWeight: '800', fontSize: '1.25rem' }}>
-                      {storeInfo.manager_phone || currentUser.phone}
+                      {storeInfo.phone || storeInfo.manager_phone || currentUser.phone}
                     </span>
                   </div>
 
@@ -5713,6 +5858,73 @@ const ProfilePage: React.FC = () => {
               }}
               style={{ width: '100%', padding: '15px', borderRadius: '15px', background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white', border: 'none', fontWeight: '900', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 10px 20px rgba(30, 64, 175, 0.3)' }}
             >保存计划 💾</button>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：编辑个人资料模态框 */}
+      {showEditProfileModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            borderRadius: '32px', width: '100%', maxWidth: '500px',
+            padding: '30px', border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+              <h3 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '900', margin: 0 }}>📝 {language === 'zh' ? '编辑资料' : 'Edit Profile'}</h3>
+              <button onClick={() => setShowEditProfileModal(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '姓名/店名' : 'Name'}</label>
+                <input 
+                  type="text" 
+                  value={editProfileForm.name}
+                  onChange={(e) => setEditProfileForm({ ...editProfileForm, name: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '电话' : 'Phone'}</label>
+                <input 
+                  type="text" 
+                  value={editProfileForm.phone}
+                  onChange={(e) => setEditProfileForm({ ...editProfileForm, phone: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '邮箱' : 'Email'}</label>
+                <input 
+                  type="email" 
+                  value={editProfileForm.email}
+                  onChange={(e) => setEditProfileForm({ ...editProfileForm, email: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '详细地址' : 'Address'}</label>
+                <textarea 
+                  value={editProfileForm.address}
+                  onChange={(e) => setEditProfileForm({ ...editProfileForm, address: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', minHeight: '80px', resize: 'none' }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+              style={{ width: '100%', marginTop: '25px', padding: '15px', borderRadius: '15px', background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white', border: 'none', fontWeight: '900', fontSize: '1.1rem', cursor: isSavingProfile ? 'not-allowed' : 'pointer', boxShadow: '0 10px 20px rgba(30, 64, 175, 0.3)', opacity: isSavingProfile ? 0.7 : 1 }}
+            >
+              {isSavingProfile ? (language === 'zh' ? '保存中...' : 'Saving...') : (language === 'zh' ? '保存资料 💾' : 'Save Profile 💾')}
+            </button>
           </div>
         </div>
       )}
