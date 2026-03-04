@@ -82,6 +82,7 @@ export interface DeliveryStore {
   address: string;
   phone: string;
   manager_phone?: string;
+  email?: string;
   store_type: string;
   status: string;
   operating_hours?: string;
