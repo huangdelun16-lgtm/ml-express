@@ -3939,11 +3939,11 @@ const ProfilePage: React.FC = () => {
             background: 'rgba(0, 0, 0, 0.7)',
             backdropFilter: 'blur(10px)',
             display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 2000,
-            padding: '1rem'
-          }}
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 30000,
+          padding: '1rem'
+        }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowPasswordModal(false);
@@ -4192,34 +4192,60 @@ const ProfilePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(26, 54, 93, 0.8)',
+          background: 'rgba(15, 23, 42, 0.85)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000,
-          backdropFilter: 'blur(5px)'
+          zIndex: 30000,
+          backdropFilter: 'blur(10px)',
+          padding: '20px'
         }}>
           <div style={{
-            background: 'white',
-            padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
-            borderRadius: '15px',
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            padding: window.innerWidth < 768 ? '1.5rem' : '2.5rem',
+            borderRadius: '32px',
             maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 60px rgba(26, 54, 93, 0.3)'
+            width: '100%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
-            <h2 style={{
-              color: '#2c5282',
-              marginTop: 0,
-              marginBottom: '1.5rem',
-              fontSize: '1.5rem',
-              fontWeight: '600'
-            }}>
-              {codModalTitle || t.codOrders}
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', background: 'rgba(59, 130, 246, 0.2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>💰</div>
+                <h2 style={{
+                  color: 'white',
+                  margin: 0,
+                  fontSize: '1.5rem',
+                  fontWeight: '900'
+                }}>
+                  {codModalTitle || t.codOrders}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowCODOrdersModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: 'white',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ✕
+              </button>
+            </div>
             
-            <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
               {codOrders.length > 0 ? (
                 codOrders.map((order: any, index: number) => (
                   <div
@@ -4228,34 +4254,37 @@ const ProfilePage: React.FC = () => {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      padding: '1rem',
-                      marginBottom: '0.75rem',
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      padding: '1.25rem',
+                      marginBottom: '1rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                     }}
                   >
                     <div>
-                      <div style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.8rem', marginBottom: '4px', fontWeight: '700' }}>
                         {t.packageId}
                       </div>
-                      <div style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '600' }}>
+                      <div style={{ color: 'white', fontSize: '1rem', fontWeight: '800', fontFamily: 'monospace' }}>
                         {order.orderId}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: '#475569', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.8rem', marginBottom: '4px', fontWeight: '700' }}>
                         {t.codAmount}
                       </div>
-                      <div style={{ color: '#3b82f6', fontSize: '1.2rem', fontWeight: 'bold' }}>
-                        {order.codAmount.toLocaleString()} MMK
+                      <div style={{ color: '#fbbf24', fontSize: '1.3rem', fontWeight: '900' }}>
+                        {order.codAmount.toLocaleString()} <span style={{ fontSize: '0.8rem' }}>MMK</span>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-                  {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
+                <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.2)' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📭</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: '700' }}>
+                    {language === 'zh' ? '暂无订单' : language === 'en' ? 'No orders' : 'အော်ဒါမရှိပါ'}
+                  </div>
                 </div>
               )}
             </div>
@@ -4264,26 +4293,19 @@ const ProfilePage: React.FC = () => {
               onClick={() => setShowCODOrdersModal(false)}
               style={{
                 width: '100%',
-                marginTop: '1.5rem',
-                padding: '0.875rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                marginTop: '2rem',
+                padding: '14px',
+                background: 'rgba(255, 255, 255, 0.1)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '12px',
+                borderRadius: '16px',
                 fontSize: '1rem',
-                fontWeight: '600',
+                fontWeight: '800',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                transition: 'all 0.3s ease'
               }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
             >
               {t.close}
             </button>
@@ -4848,7 +4870,7 @@ const ProfilePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000,
+          zIndex: 30000,
           backdropFilter: 'blur(10px)'
         }}
         onClick={() => setShowPackingListModal(false)}
@@ -5022,7 +5044,7 @@ const ProfilePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000,
+          zIndex: 30000,
           backdropFilter: 'blur(10px)'
         }}
         onClick={() => setShowPendingAcceptListModal(false)}
@@ -5261,7 +5283,7 @@ const ProfilePage: React.FC = () => {
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.85)',
           backdropFilter: 'blur(10px)',
-          zIndex: 2000,
+          zIndex: 30000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -5448,7 +5470,7 @@ const ProfilePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000,
+          zIndex: 30000,
           backdropFilter: 'blur(10px)'
         }}
         onClick={() => setShowReviewsModal(false)}
@@ -5669,7 +5691,7 @@ const ProfilePage: React.FC = () => {
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.85)',
           backdropFilter: 'blur(10px)',
-          zIndex: 2000,
+          zIndex: 30000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -5857,7 +5879,7 @@ const ProfilePage: React.FC = () => {
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(10px)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px'
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 30000, padding: '20px'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
@@ -5915,64 +5937,109 @@ const ProfilePage: React.FC = () => {
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(10px)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px'
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 30000, padding: '20px'
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
             borderRadius: '32px', width: '100%', maxWidth: '500px',
-            padding: '30px', border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+            padding: '2.5rem', border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            position: 'relative'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-              <h3 style={{ color: 'white', fontSize: '1.5rem', fontWeight: '900', margin: 0 }}>📝 {language === 'zh' ? '编辑资料' : 'Edit Profile'}</h3>
-              <button onClick={() => setShowEditProfileModal(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', background: 'rgba(59, 130, 246, 0.2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>📝</div>
+                <h3 style={{ color: 'white', fontSize: '1.6rem', fontWeight: '900', margin: 0 }}>{language === 'zh' ? '编辑个人资料' : 'Edit Profile'}</h3>
+              </div>
+              <button 
+                onClick={() => setShowEditProfileModal(false)} 
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              >✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '姓名/店名' : 'Name'}</label>
-                <input 
-                  type="text" 
-                  value={editProfileForm.name}
-                  onChange={(e) => setEditProfileForm({ ...editProfileForm, name: e.target.value })}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-                />
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{language === 'zh' ? '姓名 / 店名' : 'Full Name / Store Name'}</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '12px', fontSize: '1.1rem', opacity: 0.6 }}>👤</span>
+                  <input 
+                    type="text" 
+                    value={editProfileForm.name}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, name: e.target.value })}
+                    style={{ width: '100%', padding: '12px 16px 12px 42px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', fontSize: '1rem', transition: 'all 0.3s' }}
+                    placeholder={language === 'zh' ? "请输入姓名或店名" : "Enter name"}
+                  />
+                </div>
               </div>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '电话' : 'Phone'}</label>
-                <input 
-                  type="text" 
-                  value={editProfileForm.phone}
-                  onChange={(e) => setEditProfileForm({ ...editProfileForm, phone: e.target.value })}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-                />
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{language === 'zh' ? '联系电话' : 'Contact Phone'}</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '12px', fontSize: '1.1rem', opacity: 0.6 }}>📞</span>
+                  <input 
+                    type="text" 
+                    value={editProfileForm.phone}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: '12px 16px 12px 42px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', fontSize: '1rem', transition: 'all 0.3s' }}
+                    placeholder={language === 'zh' ? "请输入联系电话" : "Enter phone"}
+                  />
+                </div>
               </div>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '邮箱' : 'Email'}</label>
-                <input 
-                  type="email" 
-                  value={editProfileForm.email}
-                  onChange={(e) => setEditProfileForm({ ...editProfileForm, email: e.target.value })}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-                />
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{language === 'zh' ? '电子邮箱' : 'Email Address'}</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '12px', fontSize: '1.1rem', opacity: 0.6 }}>📧</span>
+                  <input 
+                    type="email" 
+                    value={editProfileForm.email}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, email: e.target.value })}
+                    style={{ width: '100%', padding: '12px 16px 12px 42px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', fontSize: '1rem', transition: 'all 0.3s' }}
+                    placeholder={language === 'zh' ? "请输入邮箱地址" : "Enter email"}
+                  />
+                </div>
               </div>
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>{language === 'zh' ? '详细地址' : 'Address'}</label>
-                <textarea 
-                  value={editProfileForm.address}
-                  onChange={(e) => setEditProfileForm({ ...editProfileForm, address: e.target.value })}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', minHeight: '80px', resize: 'none' }}
-                />
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{language === 'zh' ? '详细地址' : 'Full Address'}</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '12px', fontSize: '1.1rem', opacity: 0.6 }}>📍</span>
+                  <textarea 
+                    value={editProfileForm.address}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, address: e.target.value })}
+                    style={{ width: '100%', padding: '12px 16px 12px 42px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', minHeight: '100px', resize: 'none', fontSize: '1rem', transition: 'all 0.3s', fontFamily: 'inherit', lineHeight: '1.5' }}
+                    placeholder={language === 'zh' ? "请输入详细联系地址" : "Enter address"}
+                  />
+                </div>
               </div>
             </div>
 
-            <button
-              onClick={handleSaveProfile}
-              disabled={isSavingProfile}
-              style={{ width: '100%', marginTop: '25px', padding: '15px', borderRadius: '15px', background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white', border: 'none', fontWeight: '900', fontSize: '1.1rem', cursor: isSavingProfile ? 'not-allowed' : 'pointer', boxShadow: '0 10px 20px rgba(30, 64, 175, 0.3)', opacity: isSavingProfile ? 0.7 : 1 }}
-            >
-              {isSavingProfile ? (language === 'zh' ? '保存中...' : 'Saving...') : (language === 'zh' ? '保存资料 💾' : 'Save Profile 💾')}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
+              <button
+                onClick={() => setShowEditProfileModal(false)}
+                style={{ flex: 1, padding: '14px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: '800', cursor: 'pointer', transition: 'all 0.3s ease' }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              >
+                {language === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                style={{ flex: 2, padding: '14px', borderRadius: '16px', background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', border: 'none', color: 'white', fontWeight: '900', fontSize: '1.1rem', cursor: isSavingProfile ? 'not-allowed' : 'pointer', boxShadow: '0 8px 20px rgba(30, 64, 175, 0.3)', opacity: isSavingProfile ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                {isSavingProfile ? (
+                  <>
+                    <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
+                    <span>{language === 'zh' ? '正在保存...' : 'Saving...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>💾</span>
+                    <span>{language === 'zh' ? '保存资料' : 'Save Profile'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
