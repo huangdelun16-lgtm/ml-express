@@ -233,6 +233,7 @@ const ProfilePage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
     name: '',
+    description: '',
     price: '',
     discount_percent: '',
     stock: '-1',
@@ -428,6 +429,7 @@ const ProfilePage: React.FC = () => {
     setEditingProduct(null);
     setProductForm({
       name: '',
+      description: '',
       price: '',
       discount_percent: '',
       stock: '-1',
@@ -448,6 +450,7 @@ const ProfilePage: React.FC = () => {
 
     setProductForm({
       name: product.name,
+      description: product.description || '',
       price: product.price.toString(),
       discount_percent: discountPercent,
       stock: product.stock.toString(),
@@ -500,7 +503,7 @@ const ProfilePage: React.FC = () => {
         stock: parseInt(productForm.stock),
         image_url: productForm.image_url,
         is_available: productForm.is_available,
-        description: ''
+        description: productForm.description
       };
 
       let result;
@@ -4301,7 +4304,7 @@ const ProfilePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1500,
+          zIndex: 20000,
           padding: '20px'
         }}>
           <div style={{
@@ -4465,7 +4468,7 @@ const ProfilePage: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 2000,
+          zIndex: 30000,
           padding: '20px'
         }}>
           <div style={{
@@ -4534,7 +4537,17 @@ const ProfilePage: React.FC = () => {
                   value={productForm.name}
                   onChange={(e) => setProductForm({...productForm, name: e.target.value})}
                   placeholder="如：冰镇可乐 330ml"
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{language === 'zh' ? '商品描述 (详细介绍商品细节)' : 'Description'}</label>
+                <textarea 
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+                  placeholder={language === 'zh' ? "请输入商品详细描述信息，例如：规格、口味、保质期、使用方法等..." : "Enter product details..."}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none', minHeight: '100px', resize: 'none', fontFamily: 'inherit' }}
                 />
               </div>
 

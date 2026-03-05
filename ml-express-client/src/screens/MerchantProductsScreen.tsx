@@ -44,6 +44,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [formLoading, setFormLoading] = useState(false);
   const [productForm, setProductForm] = useState({
     name: '',
+    description: '',
     price: '',
     discountPercent: '',
     stock: '-1',
@@ -55,6 +56,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [bulkModalType, setBulkModalType] = useState<'price' | 'discount' | null>(null);
   const [bulkValue, setBulkValue] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // 🚀 新增：产品详情模态框状态
+  const [showDetailModal, setShowEditDetailModal] = useState(false);
+  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -96,6 +101,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       bulkDiscount: '批量折扣',
       bulkCount: '已选',
       bulkValuePlaceholder: '输入数值',
+      productDetail: '商品详情',
+      description: '商品描述',
+      noDescription: '暂无详细描述',
     },
     en: {
       title: 'Products',
@@ -125,6 +133,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       bulkDiscount: 'Bulk Discount',
       bulkCount: 'Selected',
       bulkValuePlaceholder: 'Enter value',
+      productDetail: 'Product Details',
+      description: 'Description',
+      noDescription: 'No description available',
     },
     my: {
       title: 'ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
@@ -154,6 +165,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       bulkDiscount: 'လျှော့စျေးပြောင်း',
       bulkCount: 'ရွေးထား',
       bulkValuePlaceholder: 'တန်ဖိုးထည့်ပါ',
+      productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
+      description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
+      noDescription: 'ဖော်ပြချက်မရှိပါ',
     }
   };
 
@@ -253,6 +267,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     setEditingProduct(null);
     setProductForm({
       name: '',
+      description: '',
       price: '',
       discountPercent: '',
       stock: '-1',
@@ -266,6 +281,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
+      description: product.description || '',
       price: product.price.toString(),
       discountPercent: (product.original_price && product.original_price > product.price)
         ? Math.round((1 - product.price / product.original_price) * 100).toString()
@@ -317,6 +333,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       const productData = {
         store_id: storeId,
         name: productForm.name,
+        description: productForm.description,
         price: parseFloat(productForm.price),
         original_price: productForm.discountPercent
           ? Math.round(parseFloat(productForm.price) / (1 - parseFloat(productForm.discountPercent) / 100))
@@ -480,6 +497,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }));
   };
 
+  const handleOpenProductDetail = (product: Product) => {
+    setSelectedProductDetail(product);
+    setShowEditDetailModal(true);
+  };
+
   const handleBulkAddToCart = () => {
     const selectedItems = getSelectedItems();
     if (selectedItems.length === 0) {
@@ -530,8 +552,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' },
           item.id === highlightProductId && styles.highlightedCard // 🚀 高亮显示
         ]}
-        onPress={() => !isReadOnly && handleOpenEditProduct(item)}
-        activeOpacity={isReadOnly ? 1 : 0.7}
+        onPress={() => isReadOnly ? handleOpenProductDetail(item) : handleOpenEditProduct(item)}
+        activeOpacity={0.7}
       >
         {!isReadOnly && (
           <TouchableOpacity
@@ -841,6 +863,19 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               </View>
 
               <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>{currentT.description} (详细介绍商品细节)</Text>
+                <TextInput
+                  style={[styles.formInput, styles.textArea]}
+                  value={productForm.description}
+                  onChangeText={(text) => setProductForm({ ...productForm, description: text })}
+                  placeholder="请输入商品详细描述信息，例如：规格、口味、保质期、使用方法等..."
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{currentT.price} (MMK) *</Text>
                 <TextInput
                   style={styles.formInput}
@@ -917,6 +952,81 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 商品详情模态框 */}
+      <Modal
+        visible={showDetailModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
+            {selectedProductDetail?.image_url ? (
+              <Image source={{ uri: selectedProductDetail.image_url }} style={styles.detailImage} />
+            ) : (
+              <View style={styles.detailImagePlaceholder}>
+                <Ionicons name="image-outline" size={64} color="#cbd5e1" />
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.detailCloseBtn}
+              onPress={() => setShowEditDetailModal(false)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+
+            <View style={styles.detailInfoContainer}>
+              <View style={styles.detailHeader}>
+                <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
+                <View style={styles.detailPriceRow}>
+                  <Text style={styles.detailPrice}>{selectedProductDetail?.price.toLocaleString()} MMK</Text>
+                  {selectedProductDetail?.original_price && selectedProductDetail.original_price > selectedProductDetail.price && (
+                    <Text style={styles.detailOriginalPrice}>{selectedProductDetail.original_price.toLocaleString()} MMK</Text>
+                  )}
+                </View>
+              </View>
+
+              <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>✨ {currentT.description}</Text>
+                  <View style={styles.descriptionBox}>
+                    <Text style={styles.detailDescription}>
+                      {selectedProductDetail?.description || currentT.noDescription}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={[styles.stockRow, { marginTop: 24, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12 }]}>
+                  <Ionicons name="cube-outline" size={18} color="#3b82f6" />
+                  <Text style={[styles.productStock, { fontSize: 15, fontWeight: '700', color: '#1e293b' }]}>
+                    {currentT.stock}: {selectedProductDetail?.stock === -1 ? currentT.infinite : selectedProductDetail?.stock}
+                  </Text>
+                </View>
+              </ScrollView>
+
+              <View style={styles.detailFooter}>
+                <TouchableOpacity 
+                  style={styles.detailAddBtn}
+                  onPress={() => {
+                    if (selectedProductDetail) {
+                      updateItemQuantity(selectedProductDetail.id, 1);
+                      setShowEditDetailModal(false);
+                      showToast(currentT.addedToCart, 'success');
+                    }
+                  }}
+                >
+                  <LinearGradient colors={['#fbbf24', '#f59e0b']} style={styles.detailAddGradient}>
+                    <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                    <Text style={styles.detailAddText}>{currentT.addToCart}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1297,6 +1407,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1e293b',
   },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
   switchGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1496,6 +1610,106 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#2563eb',
     fontWeight: '800',
+  },
+  // 详情模态框样式
+  detailImage: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#f1f5f9',
+  },
+  detailImagePlaceholder: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailCloseBtn: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  detailInfoContainer: {
+    padding: 24,
+    flex: 1,
+  },
+  detailHeader: {
+    marginBottom: 20,
+  },
+  detailName: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  detailPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 12,
+  },
+  detailPrice: {
+    fontSize: 22,
+    color: '#10b981',
+    fontWeight: '900',
+  },
+  detailOriginalPrice: {
+    fontSize: 16,
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
+  },
+  detailScroll: {
+    flex: 1,
+    marginBottom: 20,
+  },
+  detailSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#475569',
+    marginBottom: 10,
+  },
+  detailSection: {
+    marginBottom: 16,
+  },
+  descriptionBox: {
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  detailDescription: {
+    fontSize: 15,
+    color: '#64748b',
+    lineHeight: 22,
+  },
+  detailFooter: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  detailAddBtn: {
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  detailAddGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailAddText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '900',
   },
 });
 
