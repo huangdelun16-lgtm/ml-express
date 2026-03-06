@@ -725,10 +725,13 @@ const ProfilePage: React.FC = () => {
       });
       
       // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
+      // 🚀 优化：如果是商家账号，不应用注册时间限制，以看到历史所有订单
+      const queryStartDate = isPartnerStore ? undefined : currentUser.created_at;
+      
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone,
-        currentUser.created_at, // 传入注册时间
+        queryStartDate,
         isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined // 🚀 商家账号同时加载关联订单
       );
       
@@ -754,7 +757,7 @@ const ProfilePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isPartnerStore]);
 
   useEffect(() => {
     setIsVisible(true);
