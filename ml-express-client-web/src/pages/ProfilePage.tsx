@@ -725,8 +725,10 @@ const ProfilePage: React.FC = () => {
       });
       
       // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
-      // 🚀 优化：如果是商家账号，不应用注册时间限制，以看到历史所有订单
-      const queryStartDate = isPartnerStore ? undefined : currentUser.created_at;
+      // 🚀 优化：如果是商家账号，或者特殊账号（如 admin），不应用注册时间限制，以看到历史所有订单
+      const queryStartDate = (isPartnerStore || currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin')) 
+        ? undefined 
+        : currentUser.created_at;
       
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
@@ -739,6 +741,15 @@ const ProfilePage: React.FC = () => {
       LoggerService.debug('包裹列表:', packages);
       
       setUserPackages(packages);
+
+      // 🚀 核心优化：如果该用户有手机号，尝试直接用手机号补拉订单（防止 user 对象数据不完整）
+      if (packages.length === 0 && currentUser.phone && !isPartnerStore) {
+        console.log('🔄 列表为空，尝试使用纯手机号重新拉取...');
+        const retryPackages = await packageService.getPackagesByUser(undefined, currentUser.phone, queryStartDate);
+        if (retryPackages.length > 0) {
+          setUserPackages(retryPackages);
+        }
+      }
 
       // 🚀 新增：获取已评价的订单ID列表
       if (packages.length > 0) {

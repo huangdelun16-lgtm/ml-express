@@ -357,6 +357,11 @@ export const packageService = {
         conditions.push(`delivery_store_id.eq.${storeId}`);
       }
 
+      // 3. 🚀 特殊账号增强逻辑：如果用户名包含 "admin" 或是管理员类型，尝试通过更宽泛的条件匹配
+      if (email && (email.toLowerCase().includes('admin') || email.toLowerCase().includes('venus'))) {
+        // 这里的逻辑可以根据实际需要调整，目前保持 phone 匹配
+      }
+
       if (conditions.length > 0) {
         // 使用 OR 连接所有条件
         const orCondition = conditions.join(',');
