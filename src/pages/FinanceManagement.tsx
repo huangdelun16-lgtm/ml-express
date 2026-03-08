@@ -6005,6 +6005,53 @@ const FinanceManagement: React.FC = () => {
                               </div>
                             )}
 
+                            {/* 🚀 新增：COD 结清日显示 */}
+                            <div style={{ 
+                              marginTop: '8px', 
+                              padding: '10px 14px', 
+                              background: 'rgba(59, 130, 246, 0.1)', 
+                              borderRadius: '12px',
+                              border: '1px solid rgba(59, 130, 246, 0.2)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                  {language === 'zh' ? '🗓️ COD 结清周期' : language === 'my' ? '🗓️ COD ရှင်းလင်းရေးကာလ' : '🗓️ COD Settlement Cycle'}
+                                </span>
+                                <span style={{ color: '#60a5fa', fontWeight: '800', fontSize: '0.9rem' }}>
+                                  {store.cod_settlement_day || '7'} {language === 'zh' ? '天' : 'Days'}
+                                </span>
+                              </div>
+                              
+                              {(() => {
+                                const days = parseInt(store.cod_settlement_day || '7');
+                                const baseDate = store.lastSettledAt ? new Date(store.lastSettledAt) : new Date(store.created_at);
+                                const nextDate = new Date(baseDate);
+                                nextDate.setDate(baseDate.getDate() + days);
+                                
+                                const isOverdue = new Date() > nextDate;
+                                
+                                return (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                      {language === 'zh' ? '🔔 下次结清日' : language === 'my' ? '🔔 နောက်တစ်ကြိမ်ရှင်းလင်းရမည့်ရက်' : '🔔 Next Settlement'}
+                                    </span>
+                                    <span style={{ 
+                                      color: isOverdue ? '#ef4444' : '#10b981', 
+                                      fontWeight: '900', 
+                                      fontSize: '1rem',
+                                      textShadow: isOverdue ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none'
+                                    }}>
+                                      {nextDate.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                                      {isOverdue && <span style={{ fontSize: '0.7rem', marginLeft: '4px' }}>({language === 'zh' ? '逾期' : 'Overdue'})</span>}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
                             {store.unclearedAmount > 0 && (
                               <button
                                 onClick={() => !isRegionalUser && handleSettleMerchant(store.id, store.store_name)}
@@ -6174,6 +6221,53 @@ const FinanceManagement: React.FC = () => {
                     {t.lastSettled}: <span style={{ color: 'white', fontWeight: '500' }}>{new Date(store.lastSettledAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 )}
+
+                {/* 🚀 新增：COD 结清日显示 */}
+                <div style={{ 
+                  marginTop: '8px', 
+                  padding: '10px 14px', 
+                  background: 'rgba(59, 130, 246, 0.1)', 
+                  borderRadius: '12px',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                      {language === 'zh' ? '🗓️ COD 结清周期' : language === 'my' ? '🗓️ COD ရှင်းလင်းရေးကာလ' : '🗓️ COD Settlement Cycle'}
+                    </span>
+                    <span style={{ color: '#60a5fa', fontWeight: '800', fontSize: '0.9rem' }}>
+                      {store.cod_settlement_day || '7'} {language === 'zh' ? '天' : 'Days'}
+                    </span>
+                  </div>
+                  
+                  {(() => {
+                    const days = parseInt(store.cod_settlement_day || '7');
+                    const baseDate = store.lastSettledAt ? new Date(store.lastSettledAt) : new Date(store.created_at);
+                    const nextDate = new Date(baseDate);
+                    nextDate.setDate(baseDate.getDate() + days);
+                    
+                    const isOverdue = new Date() > nextDate;
+                    
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          {language === 'zh' ? '🔔 下次结清日' : language === 'my' ? '🔔 နောက်တစ်ကြိမ်ရှင်းလင်းရမည့်ရက်' : '🔔 Next Settlement'}
+                        </span>
+                        <span style={{ 
+                          color: isOverdue ? '#ef4444' : '#10b981', 
+                          fontWeight: '900', 
+                          fontSize: '1rem',
+                          textShadow: isOverdue ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none'
+                        }}>
+                          {nextDate.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                          {isOverdue && <span style={{ fontSize: '0.7rem', marginLeft: '4px' }}>({language === 'zh' ? '逾期' : 'Overdue'})</span>}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 {store.unclearedAmount > 0 && (
                   <button
