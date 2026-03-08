@@ -609,7 +609,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           end={{ x: 0, y: 0.4 }}
           style={StyleSheet.absoluteFill}
         />
-        <BackToHomeButton navigation={navigation} position="topRight" color="white" />
         <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 20 }}>
           <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
           <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
@@ -656,8 +655,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           zIndex: 0
         }} />
 
-        <BackToHomeButton navigation={navigation} position="topRight" color="white" />
-      {/* Toast通知 */}
+        {/* Toast通知 */}
       <Toast
         visible={toastVisible}
         message={toastMessage}

@@ -142,7 +142,6 @@ export default function CartScreen({ navigation }: any) {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <BackToHomeButton navigation={navigation} color="white" />
         <View style={styles.headerContent}>
           <View style={styles.titleRow}>
             <Text style={styles.headerTitle}>{t.title}</Text>

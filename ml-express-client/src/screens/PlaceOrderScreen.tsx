@@ -2125,8 +2125,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <BackToHomeButton navigation={navigation} color="white" />
-          
           <View style={[styles.header, { marginBottom: 10 }]}>
             <Text style={[styles.headerTitle, { color: '#ffffff', fontSize: 32, fontWeight: '800' }]}>{currentT.title}</Text>
             <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />

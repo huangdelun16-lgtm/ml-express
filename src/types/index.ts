@@ -291,6 +291,7 @@ export interface DeliveryStore extends BaseEntity {
   manager_name?: string;
   capacity?: number;
   status: StoreStatus;
+  cod_settlement_day?: '7' | '10' | '15' | '30';
 }
 
 // ==================== 通知相关 ====================

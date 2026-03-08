@@ -202,7 +202,6 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
   );
   return (
     <View style={styles.container}>
-      <BackToHomeButton navigation={navigation} position="topRight" />
       <LinearGradient
         colors={['#2E86AB', '#1c6a8f', '#4CA1CF']}
         style={styles.header}

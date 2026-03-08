@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   Linking,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -607,7 +608,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     return (
       <View style={styles.container}>
         {renderRatingModal()}
-        <BackToHomeButton navigation={navigation} position="topRight" />
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

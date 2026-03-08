@@ -174,6 +174,7 @@ const ProfilePage: React.FC = () => {
   const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({}); // 🚀 新增：商品价格映射
   const [isSavingStatus, setIsSavingStatus] = useState(false); // 🚀 新增：保存状态反馈
+  const [isGuest, setIsGuest] = useState(false); // 🚀 新增：访客状态
   
   // 🚀 新增：评价管理状态
   const [showReviewsModal, setShowReviewsModal] = useState(false);
@@ -650,6 +651,7 @@ const ProfilePage: React.FC = () => {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
         setUserBalance(user.balance || 0); // 🚀 获取余额
+        setIsGuest(false);
 
         // 🚀 实时从数据库同步最新余额和用户信息
         if (user.id) {
@@ -699,9 +701,11 @@ const ProfilePage: React.FC = () => {
         LoggerService.error('加载用户信息失败:', error);
         setCurrentUser(null);
         setIsPartnerStore(false);
+        setIsGuest(true);
       }
     } else {
       // 如果未登录，重定向到首页
+      setIsGuest(true);
       navigate('/');
     }
   }, [navigate, checkIfPartnerStore]);

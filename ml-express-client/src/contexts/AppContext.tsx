@@ -21,6 +21,8 @@ interface AppContextType {
   refreshSession: () => Promise<void>;
   isDarkMode: boolean;
   setIsDarkMode: (isDark: boolean) => void;
+  isGuest: boolean;
+  setIsGuest: (isGuest: boolean) => void;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -32,6 +34,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const [language, setLanguageState] = useState<Language>('zh');
   const [isDarkMode, setIsDarkModeState] = useState(false);
   const [showOrderAlert, setShowOrderAlert] = useState(false);
+  const [isGuest, setIsGuest] = useState(false); // 🚀 新增：全端访客状态
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const subscriptionRef = useRef<any>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null); // 🚀 新增：报警循环引用
@@ -332,7 +335,9 @@ export function AppProvider({ children }: AppProviderProps) {
       refreshPendingOrders: () => loadInitialData(),
       refreshSession,
       isDarkMode,
-      setIsDarkMode
+      setIsDarkMode,
+      isGuest,
+      setIsGuest
     }}>
       {children}
     </AppContext.Provider>

@@ -62,6 +62,7 @@ export interface DeliveryStore {
   created_at?: string;
   updated_at?: string;
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
+  cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
 }
 
 // 包裹接口

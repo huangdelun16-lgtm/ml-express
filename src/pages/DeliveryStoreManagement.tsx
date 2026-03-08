@@ -379,7 +379,8 @@ const DeliveryStoreManagement: React.FC = () => {
     facilities: [] as string[],
     notes: '',
     password: '', // 合伙店铺登录密码
-    region: 'mandalay'
+    region: 'mandalay',
+    cod_settlement_day: '7' as '7' | '10' | '15' | '30'
   });
 
   // 生成店长收件码二维码
@@ -494,7 +495,8 @@ const DeliveryStoreManagement: React.FC = () => {
       facilities: store.facilities || [],
       notes: store.notes || '',
       password: store.password || '',
-      region: store.region || 'mandalay'
+      region: store.region || 'mandalay',
+      cod_settlement_day: store.cod_settlement_day || '7'
     });
     setShowForm(true);
   };
@@ -823,7 +825,8 @@ const DeliveryStoreManagement: React.FC = () => {
       facilities: [],
       notes: '',
       password: '',
-      region: 'mandalay'
+      region: 'mandalay',
+      cod_settlement_day: '7'
     });
   };
 
@@ -1238,6 +1241,21 @@ const DeliveryStoreManagement: React.FC = () => {
                   style={inputStyle}
                   required
                 />
+              </div>
+              <div>
+                <label style={labelStyle}>COD 结清日 *</label>
+                <select
+                  name="cod_settlement_day"
+                  value={formData.cod_settlement_day}
+                  onChange={handleInputChange}
+                  style={inputStyle}
+                  required
+                >
+                  <option value="7" style={{ color: '#000' }}>7天</option>
+                  <option value="10" style={{ color: '#000' }}>10天</option>
+                  <option value="15" style={{ color: '#000' }}>15天</option>
+                  <option value="30" style={{ color: '#000' }}>1个月</option>
+                </select>
               </div>
               {!isEditing && (
               <div>

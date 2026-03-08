@@ -170,6 +170,7 @@ export interface DeliveryStore {
   updated_at?: string;
   balance?: number; // 🚀 新增：账户余额
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
+  cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
 }
 
 export interface Banner {

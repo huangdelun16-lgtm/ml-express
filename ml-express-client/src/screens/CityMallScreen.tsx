@@ -637,12 +637,9 @@ export default function CityMallScreen({ navigation }: any) {
 
   const listData = useMemo(() => {
     if (loading) return [];
-    
     const baseItems = [];
-    
-    // 🚀 第一项：固定 Header (标题 + 搜索) - 虽然它在列表里，但我们想让它滑走
+    // 🚀 第一项：Header (标题 + 搜索) - 它会滑走
     baseItems.push({ type: 'header', id: 'list-header' });
-    
     // 🚀 第二项：Region 地区选择 (配合 stickyHeaderIndices={[1]} 实现吸顶)
     baseItems.push({ type: 'region', id: 'sticky-region' });
 
@@ -922,6 +919,8 @@ export default function CityMallScreen({ navigation }: any) {
           )}
         />
       )}
+
+      {/* 🚀 新增：搜索栏返回图标已在此处永久删除，以保持画面清晰 */}
 
       <Modal
         visible={showReviewModal}

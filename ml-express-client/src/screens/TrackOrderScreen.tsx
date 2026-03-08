@@ -607,8 +607,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         zIndex: 0
       }} />
 
-      <BackToHomeButton navigation={navigation} position="topRight" color="white" />
-      
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}

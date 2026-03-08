@@ -51,7 +51,7 @@ const RECHARGE_QR_IMAGES: Record<number, string> = {
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
-  const { language, setLanguage, isDarkMode, setIsDarkMode } = useApp();
+  const { language, setLanguage, isDarkMode, setIsDarkMode, isGuest, setIsGuest } = useApp();
   const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
   const appVersion = Constants.expoConfig?.version ?? '1.1.0';
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +60,6 @@ export default function ProfileScreen({ navigation }: any) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
   const [accountBalance, setAccountBalance] = useState<number>(0); // 🚀 新增：账户余额
-  const [isGuest, setIsGuest] = useState(false);
   const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
     total: 0,
@@ -587,6 +586,7 @@ export default function ProfileScreen({ navigation }: any) {
         return;
       }
 
+      setIsGuest(false);
       const user = JSON.parse(currentUser);
       setUserId(user.id);
       setUserName(user.name || t.guest);
@@ -1809,8 +1809,6 @@ export default function ProfileScreen({ navigation }: any) {
         zIndex: 0
       }} />
 
-      <BackToHomeButton navigation={navigation} position="topRight" color="white" />
-      
       <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
         <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
         <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
