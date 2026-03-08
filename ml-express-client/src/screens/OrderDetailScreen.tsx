@@ -80,6 +80,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [customerId, setCustomerId] = useState('');
   const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
+  const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
 
   // 评价相关
   const [showRateModal, setShowRateModal] = useState(false);
@@ -365,6 +366,11 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       // 加载追踪历史
       const history = await packageService.getTrackingHistory(orderId);
       setTrackingHistory(history);
+
+      // 🚀 新增：加载配送照片
+      const { deliveryPhotoService } = require('../services/supabase');
+      const photos = await deliveryPhotoService.getPackagePhotos(orderId);
+      setDeliveryPhotos(photos);
     } catch (error: any) {
       LoggerService.error('加载订单详情失败:', error);
       const errorMsg = error?.message || '加载订单详情失败，请稍后重试';
@@ -915,6 +921,32 @@ return (
                 <Text style={styles.contactButtonText}>{t.contactCourier}</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* 🚀 新增：配送凭证图片 */}
+        {deliveryPhotos.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>📸 {language === 'zh' ? '配送凭证' : 'Delivery Proof'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {deliveryPhotos.map((photo, index) => (
+                <TouchableOpacity 
+                  key={index}
+                  onPress={() => {
+                    Alert.alert(language === 'zh' ? '查看照片' : 'View Photo');
+                  }}
+                >
+                  <Image 
+                    source={{ uri: photo.photo_url }} 
+                    style={{ width: 120, height: 120, borderRadius: 12, backgroundColor: '#f1f5f9' }} 
+                    resizeMode="cover"
+                  />
+                  <Text style={{ fontSize: 10, color: '#64748b', marginTop: 4, textAlign: 'center' }}>
+                    {formatDate(photo.upload_time)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 

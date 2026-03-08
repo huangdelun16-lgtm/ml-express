@@ -48,7 +48,7 @@ interface RecentOrder {
 }
 
 export default function HomeScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, isDarkMode } = useApp();
   const { showLoading, hideLoading } = useLoading();
   
   useEffect(() => {
@@ -426,7 +426,7 @@ export default function HomeScreen({ navigation }: any) {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && { backgroundColor: '#0f172a' }]}>
       <Animated.ScrollView 
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -1421,6 +1421,14 @@ const styles = StyleSheet.create({
   recentOrdersContainer: {
     paddingHorizontal: 20,
     marginBottom: 24,
+  },
+  darkText: {
+    color: '#f8fafc',
+  },
+  darkCard: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+    borderWidth: 1,
   },
   sectionHeader: {
     flexDirection: 'row',

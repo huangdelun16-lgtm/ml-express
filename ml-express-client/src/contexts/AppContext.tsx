@@ -19,6 +19,8 @@ interface AppContextType {
   removePendingOrder: (orderId: string) => void;
   refreshPendingOrders: () => void;
   refreshSession: () => Promise<void>;
+  isDarkMode: boolean;
+  setIsDarkMode: (isDark: boolean) => void;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -28,6 +30,7 @@ interface AppProviderProps {
 
 export function AppProvider({ children }: AppProviderProps) {
   const [language, setLanguageState] = useState<Language>('zh');
+  const [isDarkMode, setIsDarkModeState] = useState(false);
   const [showOrderAlert, setShowOrderAlert] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const subscriptionRef = useRef<any>(null);
@@ -133,6 +136,11 @@ export function AppProvider({ children }: AppProviderProps) {
       const savedLang = await AsyncStorage.getItem('ml-express-language');
       if (savedLang && (savedLang === 'zh' || savedLang === 'en' || savedLang === 'my')) {
         setLanguageState(savedLang as Language);
+      }
+
+      const savedDarkMode = await AsyncStorage.getItem('ml-express-dark-mode');
+      if (savedDarkMode) {
+        setIsDarkModeState(savedDarkMode === 'true');
       }
 
       const currentUserStr = await AsyncStorage.getItem('currentUser');
@@ -302,6 +310,15 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   };
 
+  const setIsDarkMode = async (isDark: boolean) => {
+    setIsDarkModeState(isDark);
+    try {
+      await AsyncStorage.setItem('ml-express-dark-mode', isDark.toString());
+    } catch (error) {
+      LoggerService.error('保存主题设置失败:', error);
+    }
+  };
+
   return (
     <AppContext.Provider value={{ 
       language, 
@@ -313,7 +330,9 @@ export function AppProvider({ children }: AppProviderProps) {
       addPendingOrder, 
       removePendingOrder,
       refreshPendingOrders: () => loadInitialData(),
-      refreshSession
+      refreshSession,
+      isDarkMode,
+      setIsDarkMode
     }}>
       {children}
     </AppContext.Provider>

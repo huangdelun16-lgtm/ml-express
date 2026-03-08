@@ -69,6 +69,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null); // 🚀 新增：预计剩余时间（分钟）
+  const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
   
   // 🚀 优化：平滑移动动画
   const riderAnimatedLocation = useRef(new AnimatedRegion({
@@ -84,6 +86,35 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const { isDarkMode } = useApp(); // 🚀 获取主题状态
+
+  // 🚀 新增：配送凭证图片组件
+  const DeliveryProofSection = () => {
+    if (deliveryPhotos.length === 0) return null;
+    return (
+      <View style={[styles.card, isDarkMode && styles.darkCard]}>
+        <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📸 {language === 'zh' ? '配送凭证' : 'Delivery Proof'}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+          {deliveryPhotos.map((photo, index) => (
+            <TouchableOpacity 
+              key={index}
+              onPress={() => {
+                // 这里可以增加查看大图逻辑
+                Alert.alert(language === 'zh' ? '查看照片' : 'View Photo');
+              }}
+            >
+              <Image 
+                source={{ uri: photo.photo_url }} 
+                style={styles.proofImage} 
+                resizeMode="cover"
+              />
+              <Text style={styles.proofTime}>{formatDate(photo.upload_time)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -223,6 +254,14 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         // 获取追踪历史
         const history = await packageService.getTrackingHistory(order.id);
         setTrackingHistory(history);
+
+        // 🚀 新增：如果是已送达，获取配送照片
+        if (order.status === '已送达') {
+          const photos = await deliveryPhotoService.getPackagePhotos(order.id);
+          setDeliveryPhotos(photos);
+        } else {
+          setDeliveryPhotos([]);
+        }
         
         showToast('查询成功！', 'success');
       } else {
@@ -238,6 +277,26 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🚀 计算 ETA (预计到达时间)
+  const calculateETA = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // 地球半径 km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    // 假设城市内平均时速 25km/h，包含红绿灯等因素
+    const avgSpeed = 25; 
+    const timeInHours = distance / avgSpeed;
+    const timeInMinutes = Math.round(timeInHours * 60) + 5; // 额外增加5分钟缓冲
+    
+    return Math.max(2, timeInMinutes); // 最少显示2分钟
   };
 
   // 监听骑手实时位置
@@ -283,6 +342,17 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               longitude: Number(payload.new.longitude)
             };
             setRiderLocation(newLoc);
+
+            // 🚀 计算预计到达时间
+            if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
+              const eta = calculateETA(
+                newLoc.latitude, 
+                newLoc.longitude, 
+                Number(packageData.receiver_latitude), 
+                Number(packageData.receiver_longitude)
+              );
+              setEstimatedTime(eta);
+            }
             
             // 🚀 核心优化：执行平滑移动动画
             riderAnimatedLocation.timing({
@@ -507,10 +577,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && styles.darkContainer]}>
       {/* 优化背景视觉效果 */}
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+        colors={isDarkMode ? ['#0f172a', '#1e293b', '#0f172a'] : ['#1e3a8a', '#2563eb', '#f8fafc']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.4 }}
         style={StyleSheet.absoluteFill}
@@ -565,7 +635,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         {/* 正在配送中的订单列表 (快捷访问) - 始终显示，除非列表为空 */}
         {inTransitOrders.length > 0 && (
           <View style={styles.ongoingContainer}>
-            <Text style={styles.ongoingTitle}>🛵 {t.ongoingOrders} ({inTransitOrders.length})</Text>
+            <Text style={[styles.ongoingTitle, isDarkMode && styles.darkText]}>🛵 {t.ongoingOrders} ({inTransitOrders.length})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10, paddingHorizontal: 4 }}>
               {inTransitOrders.map((order) => {
                 const isSelected = packageData?.id === order.id;
@@ -574,7 +644,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                     key={order.id}
                     style={[
                       styles.ongoingCard, 
-                      isSelected && { borderWidth: 2, borderColor: '#fbbf24', elevation: 8, shadowOpacity: 0.3 }
+                      isSelected && { borderWidth: 2, borderColor: '#fbbf24', elevation: 8, shadowOpacity: 0.3 },
+                      isDarkMode && !isSelected && { backgroundColor: '#1e293b' }
                     ]}
                     onPress={() => {
                       setTrackingCode(order.id);
@@ -583,19 +654,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={isSelected ? ['#eff6ff', '#dbeafe'] : ['#ffffff', '#f1f5f9']}
+                      colors={isSelected 
+                        ? (isDarkMode ? ['#1e3a8a', '#1e40af'] : ['#eff6ff', '#dbeafe']) 
+                        : (isDarkMode ? ['#1e293b', '#0f172a'] : ['#ffffff', '#f1f5f9'])}
                       style={styles.ongoingCardGradient}
                     >
                       <View style={styles.ongoingCardHeader}>
-                        <Text style={[styles.ongoingOrderId, isSelected && { color: '#2563eb' }]}>
+                        <Text style={[styles.ongoingOrderId, (isSelected || isDarkMode) && { color: '#60a5fa' }]}>
                           #{order.id.slice(-6).toUpperCase()}
                         </Text>
                         <View style={[styles.ongoingBadge, isSelected && { backgroundColor: '#3b82f6' }]}>
                           <Text style={styles.ongoingBadgeText}>{order.status}</Text>
                         </View>
                       </View>
-                      <Text style={styles.ongoingAddress} numberOfLines={1}>📍 {order.receiver_address}</Text>
-                      <Text style={[styles.ongoingTap, isSelected && { fontWeight: 'bold' }]}>
+                      <Text style={[styles.ongoingAddress, isDarkMode && { color: '#94a3b8' }]} numberOfLines={1}>📍 {order.receiver_address}</Text>
+                      <Text style={[styles.ongoingTap, isSelected && { fontWeight: 'bold' }, isDarkMode && { color: '#60a5fa' }]}>
                         {isSelected ? '👀 ' + (language === 'zh' ? '正在追踪' : 'Tracking') : t.tapToTrack}
                       </Text>
                     </LinearGradient>
@@ -608,12 +681,12 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
         {/* 搜索框 */}
         <View style={[styles.searchContainer, { marginTop: 0 }]}>
-          <View style={styles.searchInputContainer}>
+          <View style={[styles.searchInputContainer, isDarkMode && styles.darkSearchInput]}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, isDarkMode && { color: '#ffffff' }]}
               placeholder={t.inputPlaceholder}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={isDarkMode ? "#64748b" : "#9ca3af"}
               value={trackingCode}
               onChangeText={setTrackingCode}
               onSubmitEditing={handleTrack}
@@ -670,7 +743,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           <>
             {/* 实时地图追踪 */}
             {(['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status)) && (
-              <View style={styles.mapContainer}>
+              <View style={[styles.mapContainer, isDarkMode && { borderColor: '#1e293b', borderWidth: 1 }]}>
                 {!isOnline || mapError ? (
                   <View style={styles.mapFallback}>
                     <Text style={styles.mapFallbackIcon}>🛰️</Text>
@@ -768,73 +841,86 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.statusGradient}
               >
+                {/* 🚀 新增：预计送达时间显示 */}
+                {estimatedTime !== null && (packageData.status === '配送中' || packageData.status === '已取件') && (
+                  <View style={[styles.etaContainer, isDarkMode && { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                    <Text style={styles.etaLabel}>{language === 'zh' ? '预计送达' : 'Estimated Arrival'}</Text>
+                    <Text style={styles.etaValue}>
+                      {estimatedTime} <Text style={{ fontSize: 16 }}>{language === 'zh' ? '分钟' : 'mins'}</Text>
+                    </Text>
+                  </View>
+                )}
+                
                 <Text style={styles.statusIcon}>📦</Text>
                 <Text style={styles.statusText}>{packageData.status}</Text>
                 <Text style={styles.statusTime}>{formatDate(packageData.created_at)}</Text>
               </LinearGradient>
             </View>
 
+            {/* 🚀 新增：配送凭证 */}
+            <DeliveryProofSection />
+
             {/* 订单信息卡片 */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📋 {t.orderInfo}</Text>
-              <View style={styles.infoRow}>
+            <View style={[styles.card, isDarkMode && styles.darkCard]}>
+              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📋 {t.orderInfo}</Text>
+              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                 <Text style={styles.infoLabel}>{t.orderNumber}:</Text>
-                <Text style={styles.infoValue}>{packageData.id}</Text>
+                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.id}</Text>
               </View>
-              <View style={styles.infoRow}>
+              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                 <Text style={styles.infoLabel}>{t.packageType}:</Text>
-                <Text style={styles.infoValue}>{packageData.package_type}</Text>
+                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.package_type}</Text>
               </View>
-              <View style={styles.infoRow}>
+              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                 <Text style={styles.infoLabel}>{t.weight}:</Text>
-                <Text style={styles.infoValue}>{packageData.weight}</Text>
+                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.weight}</Text>
               </View>
-              <View style={styles.infoRow}>
+              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                 <Text style={styles.infoLabel}>{t.price}:</Text>
                 <Text style={styles.infoPriceValue}>{packageData.price} MMK</Text>
               </View>
               {packageData.courier && (
-                <View style={styles.infoRow}>
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                   <Text style={styles.infoLabel}>{t.courier}:</Text>
-                  <Text style={styles.infoValue}>{packageData.courier}</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.courier}</Text>
                 </View>
               )}
               {packageData.delivery_distance && (
-                <View style={styles.infoRow}>
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
                   <Text style={styles.infoLabel}>{t.distance}:</Text>
-                  <Text style={styles.infoValue}>{packageData.delivery_distance} km</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.delivery_distance} km</Text>
                 </View>
               )}
             </View>
 
             {/* 寄件信息 */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📤 {t.senderInfo}</Text>
-              <View style={styles.addressContainer}>
+            <View style={[styles.card, isDarkMode && styles.darkCard]}>
+              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📤 {t.senderInfo}</Text>
+              <View style={[styles.addressContainer, isDarkMode && styles.darkAddressContainer]}>
                 <View style={styles.addressRow}>
-                  <Text style={styles.addressName}>{packageData.sender_name}</Text>
+                  <Text style={[styles.addressName, isDarkMode && styles.darkText]}>{packageData.sender_name}</Text>
                   <Text style={styles.addressPhone}>📞 {packageData.sender_phone}</Text>
                 </View>
-                <Text style={styles.addressText}>📍 {packageData.sender_address}</Text>
+                <Text style={[styles.addressText, isDarkMode && { color: '#94a3b8' }]}>📍 {packageData.sender_address}</Text>
               </View>
             </View>
 
             {/* 收件信息 */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📥 {t.receiverInfo}</Text>
-              <View style={styles.addressContainer}>
+            <View style={[styles.card, isDarkMode && styles.darkCard]}>
+              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📥 {t.receiverInfo}</Text>
+              <View style={[styles.addressContainer, isDarkMode && styles.darkAddressContainer]}>
                 <View style={styles.addressRow}>
-                  <Text style={styles.addressName}>{packageData.receiver_name}</Text>
+                  <Text style={[styles.addressName, isDarkMode && styles.darkText]}>{packageData.receiver_name}</Text>
                   <Text style={styles.addressPhone}>📞 {packageData.receiver_phone}</Text>
                 </View>
-                <Text style={styles.addressText}>📍 {packageData.receiver_address}</Text>
+                <Text style={[styles.addressText, isDarkMode && { color: '#94a3b8' }]}>📍 {packageData.receiver_address}</Text>
               </View>
             </View>
 
             {/* 追踪历史 */}
             {trackingHistory.length > 0 && (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>📍 {t.trackingHistory}</Text>
+              <View style={[styles.card, isDarkMode && styles.darkCard]}>
+                <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📍 {t.trackingHistory}</Text>
                 {trackingHistory.map((event, index) => (
                   <View key={event.id} style={styles.trackingItem}>
                     <View style={styles.trackingDot}>
@@ -842,16 +928,17 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                         style={[
                           styles.trackingDotInner,
                           index === 0 && styles.trackingDotActive,
+                          isDarkMode && { borderColor: '#1e293b' }
                         ]}
                       />
                       {index !== trackingHistory.length - 1 && (
-                        <View style={styles.trackingLine} />
+                        <View style={[styles.trackingLine, isDarkMode && { backgroundColor: '#1e293b' }]} />
                       )}
                     </View>
                     <View style={styles.trackingContent}>
-                      <Text style={styles.trackingStatus}>{event.status}</Text>
+                      <Text style={[styles.trackingStatus, isDarkMode && styles.darkText]}>{event.status}</Text>
                       {event.note && (
-                        <Text style={styles.trackingNote}>{event.note}</Text>
+                        <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>{event.note}</Text>
                       )}
                       <Text style={styles.trackingTime}>
                         {formatDate(event.event_time)}
@@ -989,6 +1076,28 @@ const styles = StyleSheet.create({
   statusGradient: {
     padding: 30,
     alignItems: 'center',
+  },
+  etaContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 15,
+    marginBottom: 15,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  etaLabel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  etaValue: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '900',
   },
   statusIcon: {
     fontSize: 58,
@@ -1189,6 +1298,38 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  darkContainer: {
+    backgroundColor: '#0f172a',
+  },
+  darkCard: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  darkText: {
+    color: '#f8fafc',
+  },
+  darkInfoRow: {
+    borderBottomColor: '#334155',
+  },
+  darkAddressContainer: {
+    backgroundColor: '#0f172a',
+  },
+  darkSearchInput: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  proofImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  proofTime: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 4,
     textAlign: 'center',
   },
   offlineBanner: {

@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Switch,
   Dimensions,
   Linking,
   FlatList,
@@ -50,7 +51,7 @@ const RECHARGE_QR_IMAGES: Record<number, string> = {
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen({ navigation }: any) {
-  const { language, setLanguage } = useApp();
+  const { language, setLanguage, isDarkMode, setIsDarkMode } = useApp();
   const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
   const appVersion = Constants.expoConfig?.version ?? '1.1.0';
   const [refreshing, setRefreshing] = useState(false);
@@ -126,6 +127,8 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：支付二维码模态框状态
   const [showPaymentQRModal, setShowPaymentQRModal] = useState(false);
   const [rechargeProofUri, setRechargeProofUri] = useState<string | null>(null);
+
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // 通知设置状态
   const [notificationSettings, setNotificationSettings] = useState({
@@ -999,7 +1002,7 @@ export default function ProfileScreen({ navigation }: any) {
     }
 
     try {
-      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      setIsSavingProfile(true);
       const result = await customerService.updateUser(userId, {
         name: editForm.name,
         email: editForm.email,
@@ -1039,7 +1042,7 @@ export default function ProfileScreen({ navigation }: any) {
       LoggerService.error('保存个人资料失败:', error);
       showToast(t.updateFailed, 'error');
     } finally {
-      hideLoading();
+      setIsSavingProfile(false);
     }
   };
 
@@ -1652,12 +1655,13 @@ export default function ProfileScreen({ navigation }: any) {
 
   const renderSettings = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t.settings}</Text>
-      <View style={styles.settingsList}>
-        <TouchableOpacity style={styles.settingItem}>
+      <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>{t.settings}</Text>
+      <View style={[styles.settingsList, isDarkMode && styles.darkSettingsList]}>
+        {/* 语言设置 */}
+        <TouchableOpacity style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}>
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>🌐</Text>
-            <Text style={styles.settingLabel}>{t.language}</Text>
+            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.language}</Text>
           </View>
           <View style={styles.languageButtons}>
             {[
@@ -1684,24 +1688,40 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
 
+        {/* 🚀 深色模式切换 */}
+        <View style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}>
+          <View style={styles.settingLeft}>
+            <Text style={styles.settingIcon}>{isDarkMode ? '🌙' : '☀️'}</Text>
+            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{language === 'zh' ? '深色模式' : 'Dark Mode'}</Text>
+          </View>
+          <Switch
+            value={isDarkMode}
+            onValueChange={setIsDarkMode}
+            trackColor={{ false: '#cbd5e1', true: '#1e3a8a' }}
+            thumbColor={isDarkMode ? '#3b82f6' : '#f4f3f4'}
+          />
+        </View>
+
+        {/* 消息中心 */}
         <TouchableOpacity 
-          style={styles.settingItem}
+          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
           onPress={() => navigation.navigate('NotificationCenter')}
         >
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>📩</Text>
-            <Text style={styles.settingLabel}>{t.title === '账户' ? '消息中心' : t.title === 'Profile' ? 'Notification Center' : 'အသိပေးချက်ဗဟို'}</Text>
+            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.title === '账户' ? '消息中心' : t.title === 'Profile' ? 'Notification Center' : 'အသိပေးချက်ဗဟို'}</Text>
           </View>
-          <Text style={styles.settingArrow}>›</Text>
+          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
         </TouchableOpacity>
 
+        {/* 通知设置 */}
         <TouchableOpacity 
-          style={styles.settingItem}
+          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
           onPress={openNotificationSettings}
         >
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>🔔</Text>
-            <Text style={styles.settingLabel}>{t.notifications}</Text>
+            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.notifications}</Text>
           </View>
           <View style={styles.settingRight}>
             <View style={[
@@ -1712,44 +1732,47 @@ export default function ProfileScreen({ navigation }: any) {
                 {notificationSettings.pushNotifications ? 'ON' : 'OFF'}
               </Text>
             </View>
-            <Text style={styles.settingArrow}>›</Text>
+            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
           </View>
         </TouchableOpacity>
 
+        {/* 关于我们 */}
         <TouchableOpacity 
-          style={styles.settingItem}
+          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
           onPress={() => setShowAboutModal(true)}
         >
           <View style={styles.settingLeft}>
             <Text style={styles.settingIcon}>ℹ️</Text>
-            <Text style={styles.settingLabel}>{t.aboutUs}</Text>
+            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.aboutUs}</Text>
           </View>
-          <Text style={styles.settingArrow}>›</Text>
+          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
         </TouchableOpacity>
 
+        {/* 修改密码 */}
         {!isGuest && (
           <TouchableOpacity 
-            style={styles.settingItem}
+            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
             onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.settingLeft}>
               <Text style={styles.settingIcon}>🔒</Text>
-              <Text style={styles.settingLabel}>{t.changePassword}</Text>
+              <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.changePassword}</Text>
             </View>
-            <Text style={styles.settingArrow}>›</Text>
+            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
           </TouchableOpacity>
         )}
 
+        {/* 注销账号 */}
         {!isGuest && (
           <TouchableOpacity 
-            style={styles.settingItem}
+            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
             onPress={handleDeleteAccount}
           >
             <View style={styles.settingLeft}>
               <Text style={[styles.settingIcon, { color: theme.colors.error.DEFAULT }]}>🗑️</Text>
               <Text style={[styles.settingLabel, { color: theme.colors.error.DEFAULT }]}>{t.deleteAccount}</Text>
             </View>
-            <Text style={styles.settingArrow}>›</Text>
+            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1757,9 +1780,9 @@ export default function ProfileScreen({ navigation }: any) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDarkMode && styles.darkContainer]}>
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb', '#f8fafc']}
+        colors={isDarkMode ? ['#0f172a', '#1e293b', '#0f172a'] : ['#1e3a8a', '#2563eb', '#f8fafc']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.4 }}
         style={StyleSheet.absoluteFill}
@@ -1797,7 +1820,7 @@ export default function ProfileScreen({ navigation }: any) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} tintColor={isDarkMode ? '#ffffff' : '#3b82f6'} />
         }
       >
         {renderUserCard()}
@@ -1888,65 +1911,119 @@ export default function ProfileScreen({ navigation }: any) {
       <Modal
         visible={showEditModal}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t.editProfile}</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder={t.name}
-              placeholderTextColor="#9ca3af"
-              value={editForm.name}
-              onChangeText={(text) => setEditForm({ ...editForm, name: text })}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder={t.email}
-              placeholderTextColor="#9ca3af"
-              value={editForm.email}
-              onChangeText={(text) => setEditForm({ ...editForm, email: text })}
-              keyboardType="email-address"
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder={t.phone}
-              placeholderTextColor="#9ca3af"
-              value={editForm.phone}
-              onChangeText={(text) => setEditForm({ ...editForm, phone: text })}
-              keyboardType="phone-pad"
-            />
-            
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder={t.address}
-              placeholderTextColor="#9ca3af"
-              value={editForm.address}
-              onChangeText={(text) => setEditForm({ ...editForm, address: text })}
-              multiline
-              numberOfLines={3}
-            />
+        <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.7)' }]}>
+          <View style={[styles.modalContent, { borderRadius: 32, padding: 0, overflow: 'hidden', backgroundColor: '#ffffff' }]}>
+            <LinearGradient
+              colors={['#1e3a8a', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="person-outline" size={24} color="white" />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white' }}>{t.editProfile}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </LinearGradient>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowEditModal(false)}
-              >
-                <Text style={styles.modalButtonText}>{t.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
-                onPress={handleSaveProfile}
-              >
-                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                  {t.save}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <ScrollView style={{ padding: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={{ gap: 20, marginBottom: 24 }}>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '姓名 / 店名' : 'Full Name'}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
+                    <Ionicons name="person-outline" size={20} color="#94a3b8" />
+                    <TextInput
+                      style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, fontSize: 16, color: '#1e293b' }}
+                      placeholder={t.name}
+                      placeholderTextColor="#9ca3af"
+                      value={editForm.name}
+                      onChangeText={(text) => setEditForm({ ...editForm, name: text })}
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '电子邮箱' : 'Email Address'}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
+                    <Ionicons name="mail-outline" size={20} color="#94a3b8" />
+                    <TextInput
+                      style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, fontSize: 16, color: '#1e293b' }}
+                      placeholder={t.email}
+                      placeholderTextColor="#9ca3af"
+                      value={editForm.email}
+                      onChangeText={(text) => setEditForm({ ...editForm, email: text })}
+                      keyboardType="email-address"
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '联系电话' : 'Phone Number'}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
+                    <Ionicons name="call-outline" size={20} color="#94a3b8" />
+                    <TextInput
+                      style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, fontSize: 16, color: '#1e293b' }}
+                      placeholder={t.phone}
+                      placeholderTextColor="#9ca3af"
+                      value={editForm.phone}
+                      onChangeText={(text) => setEditForm({ ...editForm, phone: text })}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '详细地址' : 'Address'}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16, paddingTop: 12 }}>
+                    <Ionicons name="location-outline" size={20} color="#94a3b8" style={{ marginTop: 2 }} />
+                    <TextInput
+                      style={{ flex: 1, paddingBottom: 14, paddingHorizontal: 12, fontSize: 16, color: '#1e293b', minHeight: 80, textAlignVertical: 'top' }}
+                      placeholder={t.address}
+                      placeholderTextColor="#9ca3af"
+                      value={editForm.address}
+                      onChangeText={(text) => setEditForm({ ...editForm, address: text })}
+                      multiline
+                      numberOfLines={3}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 40 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, height: 56, borderRadius: 16, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => setShowEditModal(false)}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#64748b' }}>{t.cancel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 2, height: 56, borderRadius: 16, overflow: 'hidden' }}
+                  onPress={handleSaveProfile}
+                  disabled={isSavingProfile}
+                >
+                  <LinearGradient
+                    colors={['#3b82f6', '#2563eb']}
+                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 }}
+                  >
+                    {isSavingProfile ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="save-outline" size={20} color="white" />
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>{t.save}</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2692,6 +2769,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.default,
+  },
+  darkContainer: {
+    backgroundColor: '#0f172a',
+  },
+  darkText: {
+    color: '#f8fafc',
+  },
+  darkSettingsList: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  darkSettingItem: {
+    borderBottomColor: '#334155',
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
