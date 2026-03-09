@@ -316,75 +316,7 @@ const HomePage: React.FC = () => {
     
     return slots;
   }, [tempScheduledDate]);
-  const [tempScheduledDate, setTempSelectedDate] = useState<string>('Today'); // 🚀 新增：定时达临时日期选择
-  const [tempScheduledTime, setTempSelectedTime] = useState<string>(''); // 🚀 新增：定时达临时时间选择
 
-  // 🚀 生成时间槽 (与 App 逻辑一致：每30分钟一个槽)
-  const availableTimeSlots = useMemo(() => {
-    const slots = [];
-    const startHour = 8;
-    const endHour = 22;
-    
-    for (let h = startHour; h < endHour; h++) {
-      const hourStr = h.toString().padStart(2, '0');
-      slots.push(`${hourStr}:00`);
-      slots.push(`${hourStr}:30`);
-    }
-    slots.push('22:00');
-
-    if (tempScheduledDate === 'Today') {
-      // 🚀 如果是今天，过滤掉过去的时间
-      // 缅甸时区处理
-      const now = new Date();
-      const myanmarTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }));
-      const currentHour = myanmarTime.getHours();
-      const currentMinute = myanmarTime.getMinutes();
-      const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-      return slots.filter(slot => {
-        const [sh, sm] = slot.split(':').map(Number);
-        const slotTimeInMinutes = sh * 60 + sm;
-        return slotTimeInMinutes > currentTimeInMinutes + 30; // 🚀 至少提前30分钟预约
-      });
-    }
-    
-    return slots;
-  }, [tempScheduledDate]);
-  const [tempScheduledDate, setTempSelectedDate] = useState<string>('Today'); // 🚀 新增：定时达临时日期选择
-  const [tempScheduledTime, setTempSelectedTime] = useState<string>(''); // 🚀 新增：定时达临时时间选择
-
-  // 🚀 生成时间槽 (与 App 逻辑一致：每30分钟一个槽)
-  const availableTimeSlots = useMemo(() => {
-    const slots = [];
-    const startHour = 8;
-    const endHour = 22;
-    
-    for (let h = startHour; h < endHour; h++) {
-      const hourStr = h.toString().padStart(2, '0');
-      slots.push(`${hourStr}:00`);
-      slots.push(`${hourStr}:30`);
-    }
-    slots.push('22:00');
-
-    if (tempScheduledDate === 'Today') {
-      // 🚀 如果是今天，过滤掉过去的时间
-      // 缅甸时区处理
-      const now = new Date();
-      const myanmarTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }));
-      const currentHour = myanmarTime.getHours();
-      const currentMinute = myanmarTime.getMinutes();
-      const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-      return slots.filter(slot => {
-        const [sh, sm] = slot.split(':').map(Number);
-        const slotTimeInMinutes = sh * 60 + sm;
-        return slotTimeInMinutes > currentTimeInMinutes + 30; // 🚀 至少提前30分钟预约
-      });
-    }
-    
-    return slots;
-  }, [tempScheduledDate]);
-  
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false); // true=登录模式, false=注册模式
