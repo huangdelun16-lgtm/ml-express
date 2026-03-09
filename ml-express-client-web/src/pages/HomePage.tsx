@@ -282,7 +282,108 @@ const HomePage: React.FC = () => {
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash' | 'balance'>('cash'); // 🚀 支付方式：二维码、现金或余额
-  const [tempOrderId, setTempOrderId] = useState<string>(''); // 临时订单ID，用于从数据库获取订单信息
+  const [tempScheduledDate, setTempSelectedDate] = useState<string>('Today'); // 🚀 新增：定时达临时日期选择
+  const [tempScheduledTime, setTempSelectedTime] = useState<string>(''); // 🚀 新增：定时达临时时间选择
+
+  // 🚀 生成时间槽 (与 App 逻辑一致：每30分钟一个槽)
+  const availableTimeSlots = useMemo(() => {
+    const slots = [];
+    const startHour = 8;
+    const endHour = 22;
+    
+    for (let h = startHour; h < endHour; h++) {
+      const hourStr = h.toString().padStart(2, '0');
+      slots.push(`${hourStr}:00`);
+      slots.push(`${hourStr}:30`);
+    }
+    slots.push('22:00');
+
+    if (tempScheduledDate === 'Today') {
+      // 🚀 如果是今天，过滤掉过去的时间
+      // 缅甸时区处理
+      const now = new Date();
+      const myanmarTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }));
+      const currentHour = myanmarTime.getHours();
+      const currentMinute = myanmarTime.getMinutes();
+      const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+      return slots.filter(slot => {
+        const [sh, sm] = slot.split(':').map(Number);
+        const slotTimeInMinutes = sh * 60 + sm;
+        return slotTimeInMinutes > currentTimeInMinutes + 30; // 🚀 至少提前30分钟预约
+      });
+    }
+    
+    return slots;
+  }, [tempScheduledDate]);
+  const [tempScheduledDate, setTempSelectedDate] = useState<string>('Today'); // 🚀 新增：定时达临时日期选择
+  const [tempScheduledTime, setTempSelectedTime] = useState<string>(''); // 🚀 新增：定时达临时时间选择
+
+  // 🚀 生成时间槽 (与 App 逻辑一致：每30分钟一个槽)
+  const availableTimeSlots = useMemo(() => {
+    const slots = [];
+    const startHour = 8;
+    const endHour = 22;
+    
+    for (let h = startHour; h < endHour; h++) {
+      const hourStr = h.toString().padStart(2, '0');
+      slots.push(`${hourStr}:00`);
+      slots.push(`${hourStr}:30`);
+    }
+    slots.push('22:00');
+
+    if (tempScheduledDate === 'Today') {
+      // 🚀 如果是今天，过滤掉过去的时间
+      // 缅甸时区处理
+      const now = new Date();
+      const myanmarTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }));
+      const currentHour = myanmarTime.getHours();
+      const currentMinute = myanmarTime.getMinutes();
+      const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+      return slots.filter(slot => {
+        const [sh, sm] = slot.split(':').map(Number);
+        const slotTimeInMinutes = sh * 60 + sm;
+        return slotTimeInMinutes > currentTimeInMinutes + 30; // 🚀 至少提前30分钟预约
+      });
+    }
+    
+    return slots;
+  }, [tempScheduledDate]);
+  const [tempScheduledDate, setTempSelectedDate] = useState<string>('Today'); // 🚀 新增：定时达临时日期选择
+  const [tempScheduledTime, setTempSelectedTime] = useState<string>(''); // 🚀 新增：定时达临时时间选择
+
+  // 🚀 生成时间槽 (与 App 逻辑一致：每30分钟一个槽)
+  const availableTimeSlots = useMemo(() => {
+    const slots = [];
+    const startHour = 8;
+    const endHour = 22;
+    
+    for (let h = startHour; h < endHour; h++) {
+      const hourStr = h.toString().padStart(2, '0');
+      slots.push(`${hourStr}:00`);
+      slots.push(`${hourStr}:30`);
+    }
+    slots.push('22:00');
+
+    if (tempScheduledDate === 'Today') {
+      // 🚀 如果是今天，过滤掉过去的时间
+      // 缅甸时区处理
+      const now = new Date();
+      const myanmarTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }));
+      const currentHour = myanmarTime.getHours();
+      const currentMinute = myanmarTime.getMinutes();
+      const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+      return slots.filter(slot => {
+        const [sh, sm] = slot.split(':').map(Number);
+        const slotTimeInMinutes = sh * 60 + sm;
+        return slotTimeInMinutes > currentTimeInMinutes + 30; // 🚀 至少提前30分钟预约
+      });
+    }
+    
+    return slots;
+  }, [tempScheduledDate]);
   
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -3649,87 +3750,99 @@ const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 自定义日期时间选择 */}
+            {/* 🕒 时间选择器内容区域 */}
             <div style={{ marginBottom: '2rem' }}>
-              <label style={{ 
-                color: 'white', 
-                display: 'block', 
-                marginBottom: '1rem',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}>
-                📅 自定义时间
-              </label>
-              
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ 
-                  color: 'rgba(255, 255, 255, 0.9)', 
-                  display: 'block', 
-                  marginBottom: '0.5rem',
-                  fontSize: '0.9rem'
-                }}>
-                  {t.ui.selectDate}
-                </label>
-                <input
-                  type="date"
-                  id="delivery-date"
-                  min={new Date().toISOString().split('T')[0]}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    color: '#2c5282',
-                    fontWeight: '500',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                    e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.3)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                <button 
+                  type="button"
+                  onClick={() => setTempSelectedDate('Today')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Today' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
+                >今日 {t.ui.today}</button>
+                <button 
+                  type="button"
+                  onClick={() => setTempSelectedDate('Tomorrow')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Tomorrow' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
+                >明日 {t.ui.tomorrow}</button>
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ 
-                  color: 'rgba(255, 255, 255, 0.9)', 
-                  display: 'block', 
-                  marginBottom: '0.5rem',
-                  fontSize: '0.9rem'
-                }}>
-                  {t.ui.selectTime}
-                </label>
-                <input
-                  type="time"
-                  id="delivery-time"
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    color: '#2c5282',
-                    fontWeight: '500',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                    e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 255, 255, 0.3)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
+              <div style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '8px', marginBottom: '1.5rem' }} className="custom-scrollbar">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {availableTimeSlots.length > 0 ? (
+                    availableTimeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setTempSelectedTime(slot)}
+                        style={{
+                          padding: '12px 5px',
+                          borderRadius: '12px',
+                          border: '2px solid',
+                          borderColor: tempScheduledTime === slot ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                          background: tempScheduledTime === slot ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.02)',
+                          color: tempScheduledTime === slot ? '#fff' : 'rgba(255,255,255,0.5)',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {slot}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
+                      今日配送已截止，请选择明日
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 🕒 时间选择器内容区域 */}
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                <button 
+                  type="button"
+                  onClick={() => setTempSelectedDate('Today')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Today' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
+                >今日 {t.ui.today}</button>
+                <button 
+                  type="button"
+                  onClick={() => setTempSelectedDate('Tomorrow')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Tomorrow' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
+                >明日 {t.ui.tomorrow}</button>
+              </div>
+
+              <div style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '8px', marginBottom: '1.5rem' }} className="custom-scrollbar">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {availableTimeSlots.length > 0 ? (
+                    availableTimeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setTempSelectedTime(slot)}
+                        style={{
+                          padding: '12px 5px',
+                          borderRadius: '12px',
+                          border: '2px solid',
+                          borderColor: tempScheduledTime === slot ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                          background: tempScheduledTime === slot ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.02)',
+                          color: tempScheduledTime === slot ? '#fff' : 'rgba(255,255,255,0.5)',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {slot}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
+                      今日配送已截止，请选择明日
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -3740,68 +3853,64 @@ const HomePage: React.FC = () => {
               justifyContent: 'center'
             }}>
               <button
+                type="button"
                 onClick={() => {
-                  const dateInput = document.getElementById('delivery-date') as HTMLInputElement;
-                  const timeInput = document.getElementById('delivery-time') as HTMLInputElement;
-                  
-                  if (dateInput.value && timeInput.value) {
-                    const formattedDateTime = `${dateInput.value} ${timeInput.value}`;
-                    setScheduledDeliveryTime(formattedDateTime);
+                  if (tempScheduledDate && tempScheduledTime) {
+                    const dateStr = tempScheduledDate === 'Today' ? t.ui.today : t.ui.tomorrow;
+                    setScheduledDeliveryTime(`${dateStr} ${tempScheduledTime}`);
                     setShowTimePickerModal(false);
                   } else {
-                    alert('请选择日期和时间');
+                    alert('请选择时间');
                   }
                 }}
                 style={{
-                  background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '12px',
+                  padding: '1.1rem',
+                  borderRadius: '16px',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
+                  fontWeight: '900',
                   fontSize: '1rem',
                   transition: 'all 0.3s ease',
-                  flex: 1,
-                  boxShadow: '0 4px 15px rgba(56, 161, 105, 0.3)'
+                  flex: 2,
+                  boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)'
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(56, 161, 105, 0.4)';
+                  e.currentTarget.style.boxShadow = '0 12px 25px rgba(59, 130, 246, 0.4)';
                 }}
                 onMouseOut={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(56, 161, 105, 0.3)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)';
                 }}
               >
                 ✅ {t.ui.confirmTime}
               </button>
               
               <button
+                type="button"
                 onClick={() => {
                   setShowTimePickerModal(false);
-                  setSelectedDeliverySpeed('');
+                  if (!scheduledDeliveryTime) setSelectedDeliverySpeed('');
                 }}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.15)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   color: 'white',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  padding: '1rem 2rem',
-                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '1.1rem',
+                  borderRadius: '16px',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
+                  fontWeight: '800',
                   fontSize: '1rem',
                   transition: 'all 0.3s ease',
                   flex: 1,
-                  backdropFilter: 'blur(10px)'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
                 }}
               >
                 ❌ {t.ui.cancel}
