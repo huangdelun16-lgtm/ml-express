@@ -3647,54 +3647,6 @@ const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 🕒 时间选择器内容区域 */}
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '16px', marginBottom: '1.5rem' }}>
-                <button 
-                  type="button"
-                  onClick={() => setTempSelectedDate('Today')}
-                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Today' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
-                >今日 {t.ui.today}</button>
-                <button 
-                  type="button"
-                  onClick={() => setTempSelectedDate('Tomorrow')}
-                  style={{ flex: 1, padding: '10px', borderRadius: '12px', border: 'none', fontWeight: '800', cursor: 'pointer', background: tempScheduledDate === 'Tomorrow' ? '#3b82f6' : 'transparent', color: 'white', transition: 'all 0.3s' }}
-                >明日 {t.ui.tomorrow}</button>
-              </div>
-
-              <div style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '8px', marginBottom: '1.5rem' }} className="custom-scrollbar">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {availableTimeSlots.length > 0 ? (
-                    availableTimeSlots.map(slot => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setTempSelectedTime(slot)}
-                        style={{
-                          padding: '12px 5px',
-                          borderRadius: '12px',
-                          border: '2px solid',
-                          borderColor: tempScheduledTime === slot ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                          background: tempScheduledTime === slot ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.02)',
-                          color: tempScheduledTime === slot ? '#fff' : 'rgba(255,255,255,0.5)',
-                          fontSize: '0.95rem',
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {slot}
-                      </button>
-                    ))
-                  ) : (
-                    <div style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>
-                      今日配送已截止，请选择明日
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
             {/* 按钮组 */}
             <div style={{ 
               display: 'flex', 
