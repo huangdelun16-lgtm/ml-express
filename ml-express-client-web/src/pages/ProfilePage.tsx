@@ -653,23 +653,41 @@ const ProfilePage: React.FC = () => {
         setUserBalance(user.balance || 0); // 🚀 获取余额
         setIsGuest(false);
 
-        // 🚀 实时从数据库同步最新余额和用户信息
-        if (user.id) {
-          try {
-            const { data: latestUser } = await supabase
-              .from('users')
-              .select('balance, user_type')
-              .eq('id', user.id)
-              .maybeSingle();
+      // 🚀 实时从数据库同步最新余额和用户信息
+      if (user.id) {
+        try {
+          const isMerchant = user.user_type === 'merchant' || await checkIfPartnerStore(user);
+          const syncTable = isMerchant ? 'delivery_stores' : 'users';
+          const selectFields = isMerchant 
+            ? 'store_name, phone, email, address' 
+            : 'balance, user_type, name, phone, email, address';
+
+          const { data: latestRaw, error: userError } = await supabase
+            .from(syncTable)
+            .select(selectFields)
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          if (!userError && latestRaw) {
+            console.log('✅ Web端用户信息同步成功:', latestRaw);
+            const rawData = latestRaw as any;
+            const latestUser: any = { ...user, ...rawData };
             
-            if (latestUser) {
-              setUserBalance(latestUser.balance || 0);
-              // 如果需要，这里可以更新 localStorage
+            if (isMerchant) {
+              latestUser.name = rawData.store_name;
+              latestUser.user_type = 'merchant';
+              setUserBalance(0);
+            } else {
+              setUserBalance(rawData.balance || 0);
             }
-          } catch (error) {
-            console.warn('获取最新余额失败');
+
+            setCurrentUser(latestUser);
+            localStorage.setItem('ml-express-customer', JSON.stringify(latestUser));
           }
+        } catch (error) {
+          console.warn('获取最新用户信息失败');
         }
+      }
         
         // 检查是否是合伙店铺账户
         const isPartner = await checkIfPartnerStore(user);
@@ -730,7 +748,7 @@ const ProfilePage: React.FC = () => {
       
       // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
       // 🚀 优化：如果是商家账号，或者特殊账号（如 admin），不应用注册时间限制，以看到历史所有订单
-      const queryStartDate = (isPartnerStore || currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin')) 
+      const queryStartDate = (isPartnerStore || (currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin'))) 
         ? undefined 
         : currentUser.created_at;
       
