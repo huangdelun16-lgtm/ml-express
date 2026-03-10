@@ -748,7 +748,7 @@ const ProfilePage: React.FC = () => {
       
       // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
       // 🚀 优化：如果是商家账号，或者特殊账号（如 admin），不应用注册时间限制，以看到历史所有订单
-      const queryStartDate = (isPartnerStore || (currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin'))) 
+      const queryStartDate = (isPartnerStore || currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin')) 
         ? undefined 
         : currentUser.created_at;
       
