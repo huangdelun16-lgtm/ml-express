@@ -279,7 +279,12 @@ export const OrderAlertModal = ({
     if (!orderData || isProcessing) return;
     
     // 🚀 计算退款金额 (仅限会员订单，商家订单不涉及余额支付)
-    const isMemberOrder = orderData.description?.includes('[下单身份: 会员]') || orderData.description?.includes('[下单身份: VIP]');
+    const isMemberOrder = orderData.description?.includes('[下单身份: 会员]') || 
+                         orderData.description?.includes('[下单身份: VIP]') ||
+                         orderData.description?.includes('[Orderer: VIP]') ||
+                         orderData.description?.includes('[အော်ဒါတင်သူ: VIP]') ||
+                         orderData.description?.includes('[Orderer: Member]') ||
+                         orderData.description?.includes('[အော်ဒါတင်သူ: Member]');
     let refundAmount = 0;
     
     if (isMemberOrder) {

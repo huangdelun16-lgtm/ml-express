@@ -337,3 +337,39 @@ export function getCurrentUser(): { username: string; role: string; name: string
   }
 }
 
+/**
+ * 验证当前用户密码（用于高危操作二次验证）
+ * @param password - 用户输入的明文密码
+ */
+export async function verifyCurrentUserPassword(password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = getCurrentUser();
+    if (!user) {
+      return { success: false, error: '未登录' };
+    }
+
+    // 使用现有的 admin-password Function 的 login 动作进行验证
+    // 因为 login 动作包含了密码验证逻辑，且不会破坏现有会话
+    const response = await fetch('/.netlify/functions/admin-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'login',
+        username: user.username,
+        password
+      })
+    });
+
+    const result = await response.json();
+    return {
+      success: result.success,
+      error: result.error
+    };
+  } catch (error) {
+    logger.error('密码二次验证失败:', error);
+    return { success: false, error: '验证过程出错' };
+  }
+}
+

@@ -32,7 +32,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { customerService, packageService, deliveryStoreService, rechargeService, supabase } from '../services/supabase';
+import { customerService, packageService, deliveryStoreService, rechargeService, reviewService, supabase } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
@@ -152,6 +152,38 @@ export default function ProfileScreen({ navigation }: any) {
   const [pickingTimeType, setPickingTimeType] = useState<'open' | 'close' | null>(null);
   const [tempHour, setTempHour] = useState('09');
   const [tempMinute, setTempMinute] = useState('00');
+
+  // 🚀 新增：中转站管理相关状态
+  const [showAnomalyListModal, setShowAnomalyListModal] = useState(false);
+  const [userPackages, setUserPackages] = useState<any[]>([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
+
+  // 🚀 新增：商家评价相关状态
+  const [reviewStats, setReviewStats] = useState({ average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } });
+  const [storeReviews, setStoreReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+
+  // 🚀 新增：加载店铺评价逻辑
+  const loadStoreReviews = async () => {
+    // 核心优化：确保商家账号使用正确的 store_id 关联评价
+    // userId 在 ProfileScreen 中通常是当前登录账号的 ID
+    if (!userId || userType !== 'merchant') return;
+    
+    try {
+      setLoadingReviews(true);
+      const [reviews, stats] = await Promise.all([
+        reviewService.getStoreReviews(userId),
+        reviewService.getStoreReviewStats(userId)
+      ]);
+      setStoreReviews(reviews);
+      setReviewStats(stats);
+    } catch (error) {
+      LoggerService.error('加载评价失败:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
 
   // 🚀 新增：用于捕获二维码的 Ref
   const qrCodeRef = useRef<any>(null);
@@ -309,6 +341,14 @@ export default function ProfileScreen({ navigation }: any) {
       operatingHoursUpdated: '营业时间设置成功',
       selectTime: '选择时间',
       lastUpdated: '最后更改时间',
+      // 🚀 中转站相关
+      transitHubCenter: '中转站处理中心',
+      anomalyCenterDesc: '管理并重新指派异常转运包裹',
+      pendingAnomaly: '待处理异常件',
+      anomalyListTitle: '待处理异常包裹',
+      reship: '重新发货',
+      reshipConfirm: '确认已处理完异常，并将包裹从当前中转站重新发货吗？',
+      reshipSuccess: '重新发货成功！',
     },
     en: {
       title: 'Profile',
@@ -436,6 +476,14 @@ export default function ProfileScreen({ navigation }: any) {
       operatingHoursUpdated: 'Operating Hours Updated',
       selectTime: 'Select Time',
       lastUpdated: 'Last Updated',
+      // 🚀 Transit hub related
+      transitHubCenter: 'Transit Hub Center',
+      anomalyCenterDesc: 'Manage and re-assign anomaly packages',
+      pendingAnomaly: 'Pending Anomaly',
+      anomalyListTitle: 'Pending Anomaly Packages',
+      reship: 'Re-ship',
+      reshipConfirm: 'Confirm anomaly resolved and re-ship from current station?',
+      reshipSuccess: 'Re-shipped successfully!',
     },
     my: {
       title: 'ကျွန်ုပ်၏',
@@ -563,6 +611,14 @@ export default function ProfileScreen({ navigation }: any) {
       operatingHoursUpdated: 'ဆိုင်ဖွင့်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်',
       selectTime: 'အချိန်ရွေးချယ်ပါ',
       lastUpdated: 'နောက်ဆုံးပြင်ဆင်ချိန်',
+      // 🚀 Transit hub related
+      transitHubCenter: 'အချက်အချာဌာန စီမံခန့်ခွဲမှု',
+      anomalyCenterDesc: 'မူမမှန်သော ပါဆယ်များကို စီမံခန့်ခွဲပြီး ပြန်လည်ပေးပို့ရန်',
+      pendingAnomaly: 'စောင့်ဆိုင်းဆဲ မူမမှန်မှု',
+      anomalyListTitle: 'စောင့်ဆိုင်းဆဲ မူမမှန်သော ပါဆယ်များ',
+      reship: 'ပြန်လည်ပို့ဆောင်ပါ',
+      reshipConfirm: 'မူမမှန်မှုများကို ဖြေရှင်းပြီး လက်ရှိစခန်းမှ ပြန်လည်ပေးပို့ရန် အတည်ပြုပါသလား?',
+      reshipSuccess: 'ပြန်လည်ပို့ဆောင်မှု အောင်မြင်ပါသည်!',
     },
   };
 
@@ -698,6 +754,12 @@ export default function ProfileScreen({ navigation }: any) {
           } catch (error) {
             LoggerService.error('加载代收款统计失败:', error);
           }
+
+          // 🚀 加载包裹列表 (用于中转站异常处理)
+          await loadUserPackages();
+          
+          // 🚀 新增：加载店铺评价
+          await loadStoreReviews();
         }
 
         const stats = await packageService.getOrderStats(
@@ -741,7 +803,9 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：打开时间选择器
   const openTimePicker = (type: 'open' | 'close') => {
-    const currentTime = businessStatus.operating_hours.split(' - ')[type === 'open' ? 0 : 1] || (type === 'open' ? '09:00' : '21:00');
+    const hours = businessStatus.operating_hours || '09:00 - 21:00';
+    const parts = hours.split(' - ');
+    const currentTime = parts[type === 'open' ? 0 : 1] || (type === 'open' ? '09:00' : '21:00');
     const [h, m] = currentTime.split(':');
     setTempHour(h || '09');
     setTempMinute(m || '00');
@@ -752,7 +816,8 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：确认时间选择
   const handleConfirmTime = () => {
     const newTime = `${tempHour}:${tempMinute}`;
-    const times = businessStatus.operating_hours.split(' - ');
+    const hours = businessStatus.operating_hours || '09:00 - 21:00';
+    const times = hours.split(' - ');
     if (pickingTimeType === 'open') {
       setBusinessStatus(prev => ({ ...prev, operating_hours: `${newTime} - ${times[1] || '21:00'}` }));
     } else {
@@ -813,6 +878,131 @@ export default function ProfileScreen({ navigation }: any) {
   const confirmMonthPicker = () => {
     setSelectedMonth(`${tempSelectedYear}-${String(tempSelectedMonth).padStart(2, '0')}`);
     setShowMonthPicker(false);
+  };
+
+  // 🚀 新增：中转站异常包裹列表模态框
+  const renderAnomalyListModal = () => {
+    const anomalyPackages = userPackages.filter(pkg => pkg.status === '已送达' && pkg.description?.includes('[异常转送中转站]'));
+
+    return (
+      <Modal
+        visible={showAnomalyListModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAnomalyListModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: Dimensions.get('window').height * 0.85, maxWidth: 600 }]}>
+            <LinearGradient
+              colors={['#1e3a8a', '#2563eb']}
+              style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 24 }}>📦</Text>
+                <View>
+                  <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>{t.anomalyListTitle}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{storeInfo?.store_name}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAnomalyListModal(false)} style={{ padding: 5 }}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+              {isLoadingPackages ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#3b82f6" />
+                </View>
+              ) : anomalyPackages.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                  <Text style={{ fontSize: 60, marginBottom: 20 }}>✨</Text>
+                  <Text style={{ color: '#64748b', fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>
+                    {language === 'zh' ? '目前没有待处理的异常包裹' : 'No anomaly packages pending'}
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={anomalyPackages}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={{ padding: 15 }}
+                  renderItem={({ item }) => (
+                    <View style={{
+                      backgroundColor: 'white',
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 15,
+                      ...theme.shadows.small,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0'
+                    }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ color: '#fbbf24', fontSize: 16, fontWeight: '900', fontFamily: 'System' }}>#{item.id}</Text>
+                        <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: 'bold' }}>异常入库件</Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                        <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12 }}>
+                          <Text style={{ color: '#64748b', fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>从:</Text>
+                          <Text style={{ color: '#1e293b', fontWeight: 'bold', fontSize: 12 }}>{item.sender_name}</Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 10, borderRadius: 12 }}>
+                          <Text style={{ color: '#64748b', fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>到:</Text>
+                          <Text style={{ color: '#1e293b', fontWeight: 'bold', fontSize: 12 }}>{item.receiver_name}</Text>
+                        </View>
+                      </View>
+
+                      <View style={{ backgroundColor: '#fef2f2', padding: 10, borderRadius: 12, marginBottom: 15, borderLeftWidth: 3, borderLeftColor: '#ef4444' }}>
+                        <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>异常备注:</Text>
+                        <Text style={{ color: '#1e293b', fontSize: 12 }}>{item.description}</Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity
+                          onPress={() => handleReshipOrder(item)}
+                          style={{
+                            flex: 2,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: '#f59e0b',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            flexDirection: 'row',
+                            gap: 6
+                          }}
+                        >
+                          <Text style={{ color: 'white', fontWeight: 'bold' }}>🚀 {t.reship}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowAnomalyListModal(false);
+                            navigation.navigate('OrderDetail', { packageId: item.id });
+                          }}
+                          style={{
+                            flex: 1,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: '#eff6ff',
+                            borderWidth: 1,
+                            borderColor: '#3b82f6',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>详情</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                />
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   // 查看代收款订单
@@ -918,6 +1108,81 @@ export default function ProfileScreen({ navigation }: any) {
     } finally {
       setCodOrdersLoadingMore(false);
     }
+  };
+
+  // 🚀 新增：加载用户的包裹列表 (中转站使用)
+  const loadUserPackages = async () => {
+    if (!userId || !isMerchantStore) return;
+    
+    setIsLoadingPackages(true);
+    try {
+      // 🚀 参考 Admin Web 逻辑：获取所有送达该站点的包裹
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('delivery_store_id', userId)
+        .eq('status', '已送达')
+        .order('delivery_time', { ascending: false });
+
+      if (error) throw error;
+      setUserPackages(data || []);
+    } catch (error) {
+      LoggerService.error('加载包裹列表失败:', error);
+    } finally {
+      setIsLoadingPackages(false);
+    }
+  };
+
+  // 🚀 新增：中转站重新发货逻辑
+  const handleReshipOrder = async (pkg: any) => {
+    if (!isMerchantStore || storeInfo?.store_type !== 'transit_station') {
+      Alert.alert('错误', '仅限中转站账号操作');
+      return;
+    }
+
+    Alert.alert(
+      t.confirm,
+      t.reshipConfirm,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.confirm,
+          onPress: async () => {
+            try {
+              showLoading(t.loading);
+              
+              // 1. 状态恢复为“待取件”
+              // 2. 寄件人改为当前中转站
+              // 3. 清除旧骑手
+              const { error } = await supabase
+                .from('packages')
+                .update({
+                  status: '待取件',
+                  courier: '待分配',
+                  sender_name: storeInfo.store_name,
+                  sender_phone: storeInfo.phone || storeInfo.manager_phone,
+                  sender_address: storeInfo.address,
+                  sender_latitude: storeInfo.latitude,
+                  sender_longitude: storeInfo.longitude,
+                  description: (pkg.description || '').replace('[异常转送中转站]', `[中转站已处理 - 从${storeInfo.store_name}重新发货]`),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', pkg.id);
+
+              if (error) throw error;
+
+              hideLoading();
+              Alert.alert('成功', t.reshipSuccess);
+              await loadUserPackages();
+            } catch (error) {
+              hideLoading();
+              LoggerService.error('重新发货失败:', error);
+              Alert.alert('错误', '操作失败，请重试');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleLogin = () => {
@@ -1410,7 +1675,7 @@ export default function ProfileScreen({ navigation }: any) {
               colors={[stat.color, `${stat.color}dd`]}
               style={styles.statGradient}
             >
-              <Text style={styles.statIcon}>{stat.icon}</Text>
+              <Text style={stat.icon === '📦' ? styles.statIcon : styles.statIconSmall}>{stat.icon}</Text>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </LinearGradient>
@@ -1419,6 +1684,117 @@ export default function ProfileScreen({ navigation }: any) {
       </View>
     </View>
   );
+
+  // 🚀 新增：店铺评价仪表板 (商家专用)
+  const renderMerchantReviewCard = () => {
+    if (!isMerchantStore) return null;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{language === 'zh' ? '店铺评价' : (language === 'en' ? 'Store Reviews' : 'ဆိုင်၏သုံးသပ်ချက်များ')}</Text>
+          <TouchableOpacity onPress={() => setShowReviewsModal(true)}>
+            <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>
+              {language === 'zh' ? '查看详情' : 'View All'} ➔
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.reviewSummaryCard}
+          onPress={() => setShowReviewsModal(true)}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['rgba(251, 191, 36, 0.15)', 'rgba(245, 158, 11, 0.05)']}
+            style={styles.reviewSummaryGradient}
+          >
+            <View style={styles.ratingMainRow}>
+              <View style={styles.ratingAverageContainer}>
+                <Text style={styles.starLarge}>⭐</Text>
+                <Text style={styles.ratingBigValue}>{reviewStats.average || '0.0'}</Text>
+                <Text style={styles.reviewCountSub}>
+                  {language === 'zh' ? `${reviewStats.count} 条评价` : `${reviewStats.count} Reviews`}
+                </Text>
+              </View>
+              
+              <View style={styles.ratingBarsContainer}>
+                {[5, 4, 3, 2, 1].map((star) => (
+                  <View key={star} style={styles.ratingBarRow}>
+                    <Text style={styles.starSmall}>{star}★</Text>
+                    <View style={styles.barBackground}>
+                      <View 
+                        style={[
+                          styles.barFill, 
+                          { width: `${reviewStats.count > 0 ? (reviewStats.distribution[star as keyof typeof reviewStats.distribution] / reviewStats.count) * 100 : 0}%` }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // 🚀 新增：中转站专用仪表板
+  const renderTransitHubDashboard = () => {
+    if (!isMerchantStore || storeInfo?.store_type !== 'transit_station') return null;
+
+    const anomalyCount = userPackages.filter(p => p.status === '已送达' && p.description?.includes('[异常转送中转站]')).length;
+
+    return (
+      <FadeInView delay={200}>
+        <View style={styles.section}>
+          <LinearGradient
+            colors={['rgba(59, 130, 246, 0.2)', 'rgba(37, 99, 235, 0.1)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              padding: 20,
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: 'rgba(59, 130, 246, 0.3)',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              ...theme.shadows.medium,
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 15 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20 }}>🚛</Text>
+                </View>
+                <Text style={{ color: 'white', fontSize: 18, fontWeight: '900' }}>{t.transitHubCenter}</Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{t.anomalyCenterDesc}</Text>
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setShowAnomalyListModal(true)}
+              style={{ 
+                backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+                padding: 12, 
+                borderRadius: 16, 
+                alignItems: 'center',
+                minWidth: 100,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)'
+              }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>{t.pendingAnomaly}</Text>
+              <Text style={{ color: '#fbbf24', fontSize: 24, fontWeight: '900' }}>{anomalyCount}</Text>
+              <Text style={{ color: '#3b82f6', fontSize: 10, fontWeight: 'bold', marginTop: 4 }}>点击查看详情 ➔</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      </FadeInView>
+    );
+  };
 
   const renderMerchantCODStats = () => (
     <View style={styles.section}>
@@ -1593,7 +1969,7 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <Text style={styles.timeLabel}>{t.openingTime}</Text>
               <View style={styles.timeDisplayBox}>
-                <Text style={styles.timeDisplayText}>{businessStatus.operating_hours.split(' - ')[0]}</Text>
+                <Text style={styles.timeDisplayText}>{(businessStatus.operating_hours || '09:00 - 21:00').split(' - ')[0] || '09:00'}</Text>
                 <Ionicons name="time-outline" size={18} color="#3b82f6" />
               </View>
             </TouchableOpacity>
@@ -1604,7 +1980,7 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <Text style={styles.timeLabel}>{t.closingTime}</Text>
               <View style={styles.timeDisplayBox}>
-                <Text style={styles.timeDisplayText}>{businessStatus.operating_hours.split(' - ')[1] || '21:00'}</Text>
+                <Text style={styles.timeDisplayText}>{(businessStatus.operating_hours || '09:00 - 21:00').split(' - ')[1] || '21:00'}</Text>
                 <Ionicons name="time-outline" size={18} color="#3b82f6" />
               </View>
             </TouchableOpacity>
@@ -1823,8 +2199,12 @@ export default function ProfileScreen({ navigation }: any) {
       >
         {renderUserCard()}
         {!isGuest && renderOrderStats()}
+        
+        {/* 🚀 新增：商家评价卡片 */}
+        {isMerchantStore && renderMerchantReviewCard()}
         {!isGuest && userType === 'merchant' && renderMerchantCODStats()}
         {!isGuest && userType === 'merchant' && renderBusinessManagement()}
+        {!isGuest && userType === 'merchant' && renderTransitHubDashboard()}
         {!isGuest && userType === 'merchant' && renderMerchantServices()}
         {renderQuickActions()}
         {renderSettings()}
@@ -1843,6 +2223,8 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.footerVersion}>v{appVersion}</Text>
         </View>
       </ScrollView>
+
+      {renderAnomalyListModal()}
 
       {/* 🚀 新增：自定义时间选择器模态框 */}
       <Modal
@@ -2187,7 +2569,100 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* 月份选择器模态框 */}
+      {/* 🚀 新增：商家评价详情模态框 */}
+      <Modal
+        visible={showReviewsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReviewsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%', padding: 0 }]}>
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: '#f1f5f9'
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b' }}>
+                {language === 'zh' ? '评价详情' : 'Review Details'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowReviewsModal(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={{ flex: 1, padding: 16 }}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {loadingReviews ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator color={theme.colors.primary.DEFAULT} />
+                </View>
+              ) : storeReviews.length === 0 ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <Text style={{ color: '#94a3b8' }}>
+                    {language === 'zh' ? '暂无评价' : 'No reviews yet'}
+                  </Text>
+                </View>
+              ) : (
+                storeReviews.map((review) => (
+                  <View key={review.id} style={styles.reviewItem}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewUser}>
+                        {review.is_anonymous ? (language === 'zh' ? '匿名用户' : 'Anonymous') : (review.user_name || 'User')}
+                      </Text>
+                      <Text style={styles.reviewDate}>
+                        {review.created_at ? new Date(review.created_at).toLocaleDateString() : ''}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.reviewRating}>
+                      {'⭐'.repeat(review.rating).split('').map((s, i) => (
+                        <Text key={i} style={{ fontSize: 14 }}>{s}</Text>
+                      ))}
+                    </View>
+
+                    <Text style={styles.reviewComment}>{review.comment}</Text>
+
+                    {review.images && review.images.length > 0 && (
+                      <View style={styles.reviewImages}>
+                        {review.images.map((img: string, idx: number) => (
+                          <TouchableOpacity 
+                            key={idx} 
+                            onPress={() => Linking.openURL(img)}
+                          >
+                            <Image source={{ uri: img }} style={styles.reviewImage} />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {review.reply_text && (
+                      <View style={{ 
+                        marginTop: 12, 
+                        padding: 12, 
+                        backgroundColor: '#f8fafc', 
+                        borderRadius: 12,
+                        borderLeftWidth: 4,
+                        borderLeftColor: theme.colors.primary.DEFAULT
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.primary.DEFAULT, marginBottom: 4 }}>
+                          {language === 'zh' ? '商家回复：' : 'Merchant Reply:'}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#475569' }}>{review.reply_text}</Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={showMonthPicker}
         transparent
@@ -3447,6 +3922,118 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // 🚀 新增：评价相关样式
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reviewSummaryCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+  },
+  reviewSummaryGradient: {
+    padding: 20,
+  },
+  ratingMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ratingAverageContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  starLarge: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  ratingBigValue: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#b45309',
+  },
+  reviewCountSub: {
+    fontSize: 12,
+    color: '#92400e',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  ratingBarsContainer: {
+    flex: 1.5,
+    paddingLeft: 20,
+  },
+  ratingBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  starSmall: {
+    fontSize: 10,
+    width: 25,
+    color: '#92400e',
+    fontWeight: 'bold',
+  },
+  barBackground: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: '#fbbf24',
+    borderRadius: 3,
+  },
+  // 评价详情列表样式
+  reviewItem: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    ...theme.shadows.small,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  reviewUser: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#1e293b',
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  reviewRating: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  reviewImages: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reviewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
   },
 });
 

@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useResponsive } from '../hooks/useResponsive';
+import SecurityVerificationModal from '../components/SecurityVerificationModal';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
@@ -74,6 +75,7 @@ const CityPackages: React.FC = () => {
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false); // 🚀 新增：安全验证弹窗
   
   // 分页功能状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -325,6 +327,12 @@ const CityPackages: React.FC = () => {
       return;
     }
 
+    // 🚀 安全优化：批量删除时需要二次验证
+    setShowVerificationModal(true);
+  };
+
+  // 触发删除确认（验证成功后调用）
+  const triggerDeleteConfirm = () => {
     setShowDeleteConfirm(true);
   };
 
@@ -514,10 +522,18 @@ const CityPackages: React.FC = () => {
 
   // 🚀 获取下单人身份 (识别 商家/VIP/普通会员)
   const getOrdererType = (description: string = '') => {
-    if (description.includes('[下单身份: 商家]') || description.includes('[Orderer: MERCHANTS]')) {
+    if (
+      description.includes('[下单身份: 商家]') || 
+      description.includes('[Orderer: MERCHANTS]') ||
+      description.includes('[အော်ဒါတင်သူ: MERCHANTS]')
+    ) {
       return 'MERCHANTS';
     }
-    if (description.includes('[下单身份: VIP]') || description.includes('[Orderer: VIP]')) {
+    if (
+      description.includes('[下单身份: VIP]') || 
+      description.includes('[Orderer: VIP]') ||
+      description.includes('[အော်ဒါတင်သူ: VIP]')
+    ) {
       return 'VIP';
     }
     return 'Member';
@@ -3346,6 +3362,15 @@ const CityPackages: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 🚀 安全验证弹窗 */}
+      <SecurityVerificationModal 
+        visible={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onVerifySuccess={triggerDeleteConfirm}
+        title="敏感操作验证"
+        description={`您正在尝试批量删除 ${selectedPackages.size} 个订单，此操作不可撤销并会影响财务对账。请验证管理员密码以继续。`}
+      />
     </div>
   );
 };

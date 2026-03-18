@@ -145,39 +145,43 @@ const PriceCalculation = memo<PriceCalculationProps>(({
                 <Text style={styles.priceLabel}>{currentT.basePrice}:</Text>
                 <Text style={styles.priceValue}>{pricingSettings.base_fee} MMK</Text>
               </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
-                <Text style={styles.priceValue}>{distanceFee} MMK</Text>
-              </View>
-              {overweightFee > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>超重附加费:</Text>
-                  <Text style={styles.priceValue}>{overweightFee} MMK</Text>
-                </View>
-              )}
-              {deliverySpeed !== '准时达' && speedExtra > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
-                  <Text style={styles.priceValue}>{speedExtra} MMK</Text>
-                </View>
-              )}
-              {oversizeFee > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>超规附加费:</Text>
-                  <Text style={styles.priceValue}>{oversizeFee} MMK</Text>
-                </View>
-              )}
-              {fragileFee > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>易碎品附加费:</Text>
-                  <Text style={styles.priceValue}>{fragileFee} MMK</Text>
-                </View>
-              )}
-              {foodFee > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>食品附加费:</Text>
-                  <Text style={styles.priceValue}>{foodFee} MMK</Text>
-                </View>
+              {packageType !== '顺路递' && (
+                <>
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>{currentT.distancePrice}:</Text>
+                    <Text style={styles.priceValue}>{distanceFee} MMK</Text>
+                  </View>
+                  {overweightFee > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>超重附加费:</Text>
+                      <Text style={styles.priceValue}>{overweightFee} MMK</Text>
+                    </View>
+                  )}
+                  {deliverySpeed !== '准时达' && speedExtra > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>{currentT.speedPrice}:</Text>
+                      <Text style={styles.priceValue}>{speedExtra} MMK</Text>
+                    </View>
+                  )}
+                  {oversizeFee > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>超规附加费:</Text>
+                      <Text style={styles.priceValue}>{oversizeFee} MMK</Text>
+                    </View>
+                  )}
+                  {fragileFee > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>易碎品附加费:</Text>
+                      <Text style={styles.priceValue}>{fragileFee} MMK</Text>
+                    </View>
+                  )}
+                  {foodFee > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>食品附加费:</Text>
+                      <Text style={styles.priceValue}>{foodFee} MMK</Text>
+                    </View>
+                  )}
+                </>
               )}
               <View style={styles.priceDivider} />
               

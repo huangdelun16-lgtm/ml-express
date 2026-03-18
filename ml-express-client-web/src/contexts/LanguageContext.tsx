@@ -105,12 +105,14 @@ const translations: any = {
     contact: {
       title: '联系我们',
       subtitle: '我们随时为您提供专业的快递服务支持',
-      phone: '电话联系',
+      phone: '联系电话',
       email: '邮箱联系',
       address: '公司地址',
       businessHours: '营业时间',
       businessCooperation: '商务合作',
       phoneValue: '(+95) 09788848928',
+      phoneValue2: '(+95) 09941118588',
+      phoneValue3: '(+95) 09941118688',
       emailValue: 'marketlink982@gmail.com',
       addressValue: 'ChanMyaThaZi Mandalay',
       businessHoursValue: '周一至周日 8:00 - 20:00',
@@ -479,8 +481,10 @@ const translations: any = {
         oversized: '适用于尺寸超过标准（45x60x15cm）的大型包裹。',
         fragile: '适用于易损坏物品，如玻璃、陶瓷、精密电子产品等. 需加收特殊处理费。',
         foodDrinks: '适用于熟食、饮料等. 为了保证新鲜，建议选择加急配送。',
-        document: '适用于信件、护照、合同等纸质文件。'
-      }
+        document: '适用于信件、护照、合同等纸质文件。',
+        waySide: '24小时顺路送达。'
+      },
+      waySide: '顺路递'
     }
   },
   en: {
@@ -578,13 +582,15 @@ const translations: any = {
     contact: {
       title: 'Contact Us',
       subtitle: 'We are here to provide professional express service support',
-      phone: 'Phone Contact',
+      phone: 'Contact Phone',
       email: 'Email Contact',
       address: 'Company Address',
       businessHours: 'Business Hours',
       businessCooperation: 'Business Cooperation',
       businessHoursValue: 'Monday to Sunday 8:00 - 20:00',
       phoneValue: '(+95) 09788848928',
+      phoneValue2: '(+95) 09941118588',
+      phoneValue3: '(+95) 09941118688',
       emailValue: 'marketlink982@gmail.com',
       addressValue: 'ChanMyaThaZi Mandalay',
       wechatId: 'WeChat ID',
@@ -952,8 +958,10 @@ const translations: any = {
         oversized: 'Large packages exceeding standard dimensions (45x60x15cm).',
         fragile: 'Easily damaged items such as glass, ceramics, etc. Special handling fee applies.',
         foodDrinks: 'Foods and drinks. For freshness, express delivery is recommended.',
-        document: 'Paper documents like letters, passports, contracts, etc.'
-      }
+        document: 'Paper documents like letters, passports, contracts, etc.',
+        waySide: 'Eco Way: Delivery within 24 hours.'
+      },
+      waySide: 'Eco Way'
     }
   },
   my: {
@@ -1051,13 +1059,15 @@ const translations: any = {
     contact: {
       title: 'ဆက်သွယ်ရန်',
       subtitle: 'ကျွန်ုပ်တို့သည် ပရော်ဖက်ရှင်နယ် ပို့ဆောင်မှု ဝန်ဆောင်မှုကို ပေးဆောင်ရန် ဤနေရာတွင် ရှိပါသည်',
-      phone: 'ဖုန်းဆက်သွယ်ရန်',
+      phone: 'ဆက်သွယ်ရန်ဖုန်းနံပါတ်',
       email: 'အီးမေးလ်ဆက်သွယ်ရန်',
       address: 'ကုမ္ပဏီလိပ်စာ',
       businessHours: 'အလုပ်ချိန်',
       businessCooperation: 'စီးပွားရေးပူးပေါင်းဆောင်ရွက်မှု',
       businessHoursValue: 'တနင်္လာမှ တနင်္ဂနွေ 8:00 - 20:00',
       phoneValue: '(+95) 09788848928',
+      phoneValue2: '(+95) 09941118588',
+      phoneValue3: '(+95) 09941118688',
       emailValue: 'marketlink982@gmail.com',
       addressValue: 'ChanMyaThaZi Mandalay',
       wechatId: 'WeChat ID',
@@ -1425,8 +1435,10 @@ const translations: any = {
         oversized: 'စံအရွယ်အစားထက် ကျော်လွန်သော ထုပ်ပိုးမှုများ။',
         fragile: 'ပျက်စီးလွယ်သော ပစ္စည်းများ (ဥပမာ- ဖန်၊ ကြွေထည်)။',
         foodDrinks: 'အစားအသောက်နှင့် ဖျော်ရည်များ။',
-        document: 'စာရွက်စာတမ်းများ (ဥပမာ- စာများ၊ နိုင်ငံကူးလက်မှတ်)။'
-      }
+        document: 'စာရွက်စာတမ်းများ (ဥပမာ- စာများ၊ နိုင်ငံကူးလက်မှတ်)။',
+        waySide: '၂၄ နာရီအတွင်း တန်တန်လေး ပို့ဆောင်ပေးပါသည်။'
+      },
+      waySide: 'တန်တန်လေးပို့'
     }
   }
 };

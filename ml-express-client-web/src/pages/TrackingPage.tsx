@@ -47,11 +47,50 @@ const TrackingPage: React.FC = () => {
 
   const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
   const [selectedMarker, setSelectedMarker] = useState<'package' | 'courier' | null>(null);
+  const [activeOrders, setActiveOrders] = useState<any[]>([]); // 🚀 新增：进行中的订单列表
+  const [loadingActiveOrders, setLoadingActiveOrders] = useState(false); // 🚀 新增：加载状态
 
   useEffect(() => {
     setIsVisible(true);
     loadUserFromStorage();
   }, []);
+
+  // 🚀 新增：当用户信息加载后，拉取进行中的订单
+  useEffect(() => {
+    if (currentUser) {
+      loadActiveOrders();
+    }
+  }, [currentUser]);
+
+  // 🚀 新增：加载进行中的订单列表
+  const loadActiveOrders = async () => {
+    if (!currentUser) return;
+    setLoadingActiveOrders(true);
+    try {
+      // 这里的逻辑参考 ProfilePage 的拉取逻辑，确保数据一致
+      const packages = await packageService.getPackagesByUser(
+        currentUser.email,
+        currentUser.phone,
+        undefined,
+        currentUser.user_type === 'merchant' ? (currentUser.store_id || currentUser.id) : undefined,
+        currentUser.id,
+        currentUser.user_type === 'merchant' ? currentUser.name : undefined
+      );
+      
+      // 过滤出进行中的订单（非已送达、非已取消，且排除“顺路递”）
+      const excludedStatuses = ['已送达', '已取消', 'Delivered', 'Cancelled'];
+      const active = packages.filter(pkg => {
+        const isExcludedStatus = excludedStatuses.includes(pkg.status);
+        const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
+        return !isExcludedStatus && !isWaySide;
+      });
+      setActiveOrders(active);
+    } catch (error) {
+      LoggerService.error('加载进行中的订单失败:', error);
+    } finally {
+      setLoadingActiveOrders(false);
+    }
+  };
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
@@ -98,45 +137,68 @@ const TrackingPage: React.FC = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    const activeStatuses = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
-    if (trackingResult && activeStatuses.includes(trackingResult.status) && trackingResult.courier) {
+    const activeStatuses = ['待确认', '待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
+    if (trackingResult && activeStatuses.includes(trackingResult.status) && trackingResult.courier && trackingResult.courier !== '待分配') {
       console.log('📡 启动 Web 实时追踪:', trackingResult.courier);
       
-      // 1. 获取骑手 ID
-      supabase
-        .from('couriers')
-        .select('id, phone, vehicle_type')
-        .eq('name', trackingResult.courier)
-        .single()
-        .then(({ data }) => {
+      // 1. 获取骑手 ID (增加对不同语言环境下名称的兼容性处理)
+      const fetchCourierAndSubscribe = async () => {
+        try {
+          const courierName = trackingResult.courier.trim();
+          
+          // 🚀 核心优化：先尝试精确匹配，如果失败再尝试不区分大小写的匹配
+          let { data, error } = await supabase
+            .from('couriers')
+            .select('id, phone, vehicle_type')
+            .eq('name', courierName)
+            .maybeSingle();
+
+          if (!data && !error) {
+            // 如果精确匹配没找到，尝试 ilike (不区分大小写)
+            const { data: ilikeData, error: ilikeError } = await supabase
+              .from('couriers')
+              .select('id, phone, vehicle_type')
+              .ilike('name', courierName)
+              .maybeSingle();
+            data = ilikeData;
+            error = ilikeError;
+          }
+
+          if (error) throw error;
+          
           if (data) {
             const courierId = data.id;
+            const courierPhone = data.phone;
+            const courierVehicleType = data.vehicle_type;
+            console.log('✅ 找到骑手 ID:', courierId);
             
             // 获取初始位置
-            supabase
+            const { data: locData } = await supabase
               .from('courier_locations')
-              .select('latitude, longitude, last_active')
+              .select('latitude, longitude, last_update, updated_at')
               .eq('courier_id', courierId)
-              .single()
-              .then(({ data: locData }) => {
-                if (locData) {
-                  const initialLoc = { 
-                    lat: locData.latitude, 
-                    lng: locData.longitude,
-                    name: trackingResult.courier,
-                    phone: data.phone,
-                    vehicle: data.vehicle_type === 'car' ? '汽车' : '摩托车',
-                    last_active: locData.last_active
-                  };
-                  targetLocationRef.current = initialLoc;
-                  setAnimatedCourierLocation(initialLoc);
-                  setCourierLocation(initialLoc);
-                  setMapCenter({ lat: locData.latitude, lng: locData.longitude });
-                  
-                  // 启动动画循环
-                  animationFrameRef.current = requestAnimationFrame(animate);
-                }
-              });
+              .maybeSingle();
+
+            if (locData) {
+              const initialLoc = { 
+                lat: locData.latitude, 
+                lng: locData.longitude,
+                name: trackingResult.courier,
+                phone: courierPhone,
+                vehicle: courierVehicleType === 'car' ? (language === 'zh' ? '汽车' : 'Car') : (language === 'zh' ? '摩托车' : 'Motorcycle'),
+                last_active: locData.last_update || locData.updated_at
+              };
+              targetLocationRef.current = initialLoc;
+              setAnimatedCourierLocation(initialLoc);
+              setCourierLocation(initialLoc);
+              // 自动调整地图中心到骑手位置
+              setMapCenter({ lat: locData.latitude, lng: locData.longitude });
+              
+              // 启动动画循环
+              if (!animationFrameRef.current) {
+                animationFrameRef.current = requestAnimationFrame(animate);
+              }
+            }
 
             // 订阅实时更新
             channel = supabase
@@ -149,23 +211,30 @@ const TrackingPage: React.FC = () => {
                   table: 'courier_locations',
                   filter: `courier_id=eq.${courierId}`
                 },
-                (payload) => {
+                (payload: any) => {
                   console.log('📍 Web 收到位置更新:', payload.new);
-                  const newLoc = {
+                  const updatedLoc = {
                     lat: payload.new.latitude,
                     lng: payload.new.longitude,
                     name: trackingResult.courier,
-                    phone: data.phone,
-                    vehicle: data.vehicle_type === 'car' ? '汽车' : '摩托车',
-                    last_active: payload.new.last_active
+                    phone: courierPhone,
+                    vehicle: courierVehicleType === 'car' ? (language === 'zh' ? '汽车' : 'Car') : (language === 'zh' ? '摩托车' : 'Motorcycle'),
+                    last_active: payload.new.last_update || payload.new.updated_at || new Date().toISOString()
                   };
-                  targetLocationRef.current = newLoc;
-                  setCourierLocation(newLoc);
+                  targetLocationRef.current = updatedLoc;
+                  setCourierLocation(updatedLoc);
                 }
               )
               .subscribe();
+          } else {
+            console.warn('⚠️ 未找到对应的骑手信息:', trackingResult.courier);
           }
-        });
+        } catch (err) {
+          console.error('❌ 骑手实时追踪初始化失败:', err);
+        }
+      };
+
+      fetchCourierAndSubscribe();
     }
 
     return () => {
@@ -197,25 +266,50 @@ const TrackingPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
+  const onRefresh = () => {
+    loadActiveOrders();
+    if (trackingNumber) {
+      handleTrackingInternal(trackingNumber);
+    }
+  };
+
   const handleTracking = async () => {
-    if (!trackingNumber.trim()) {
+    handleTrackingInternal(trackingNumber);
+  };
+
+  const handleTrackingInternal = async (number: string) => {
+    if (!number.trim()) {
       alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
       return;
     }
     setLoading(true);
     try {
-      // 从数据库查询包裹信息
-      const packages = await packageService.getAllPackages();
-      const foundPackage = packages.find(pkg => pkg.id === trackingNumber);
-      if (foundPackage) {
-        setTrackingResult(foundPackage);
+      // 从数据库直接按ID查询，不再使用 getAllPackages
+      const { data: pkg, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('id', number.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (pkg) {
+        // 🚀 核心优化：如果该订单是“顺路递”，则不显示在包裹跟踪中
+        const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
+        if (isWaySide) {
+          alert(language === 'zh' ? '该订单类型暂不支持实时跟踪' : 'Live tracking is not available for this package type');
+          setLoading(false);
+          return;
+        }
+
+        setTrackingResult(pkg);
         
         // 解析收件地址的坐标（如果有）
         // 这里使用 Geocoding API 获取地址坐标
-        if (foundPackage.receiver_address && isMapLoaded) {
+        if (pkg.receiver_address && isMapLoaded) {
           try {
             const geocoder = new window.google.maps.Geocoder();
-            const response = await geocoder.geocode({ address: foundPackage.receiver_address });
+            const response = await geocoder.geocode({ address: pkg.receiver_address });
             
             if (response.results && response.results[0]) {
               const location = response.results[0].geometry.location;
@@ -226,7 +320,7 @@ const TrackingPage: React.FC = () => {
           }
         }
         // 加载快递员位置
-        if (foundPackage.courier) {
+        if (pkg.courier) {
           // 由于已改为实时订阅，这里可以保持逻辑
         }
       } else {
@@ -340,6 +434,84 @@ const TrackingPage: React.FC = () => {
             {t.tracking.realTimeTracking}
           </p>
         </div>
+
+        {/* 正在配送中的订单列表 (快捷访问) */}
+        {currentUser && (
+          <div style={{ maxWidth: '1400px', margin: '0 auto 2rem auto', padding: '0 1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🛵 {language === 'zh' ? '未完成订单' : language === 'en' ? 'Ongoing Orders' : 'မပြီးသေးသော အော်ဒါများ'} 
+                <span style={{ fontSize: '0.9rem', opacity: 0.7, fontWeight: '400' }}>({activeOrders.length})</span>
+              </h2>
+              <button 
+                onClick={loadActiveOrders}
+                disabled={loadingActiveOrders}
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                {loadingActiveOrders ? '...' : (language === 'zh' ? '刷新' : 'Refresh')}
+              </button>
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '1rem', 
+              overflowX: 'auto', 
+              paddingBottom: '1rem',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }} className="hide-scrollbar">
+              {loadingActiveOrders ? (
+                Array(3).fill(0).map((_, i) => (
+                  <div key={i} style={{ minWidth: '280px', height: '100px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                ))
+              ) : activeOrders.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.2)' }}>
+                  <span style={{ opacity: 0.6 }}>{language === 'zh' ? '暂无进行中的订单' : 'No ongoing orders'}</span>
+                </div>
+              ) : (
+                activeOrders.map((order) => {
+                  const isSelected = trackingResult?.id === order.id;
+                  return (
+                    <div
+                      key={order.id}
+                      onClick={() => {
+                        setTrackingNumber(order.id);
+                        handleTrackingInternal(order.id);
+                      }}
+                      style={{
+                        minWidth: '280px',
+                        background: isSelected 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)' 
+                          : 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '20px',
+                        padding: '1.25rem',
+                        border: isSelected ? '2px solid #fbbf24' : '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: isSelected ? '0 10px 25px rgba(251, 191, 36, 0.2)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ color: isSelected ? '#fbbf24' : 'white', fontWeight: '800', fontFamily: 'monospace' }}>
+                          #{order.id.slice(-8).toUpperCase()}
+                        </span>
+                        <div style={{ background: getStatusColor(order.status), color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          {order.status}
+                        </div>
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
+                        📍 {order.receiver_address}
+                      </div>
+                      <div style={{ color: isSelected ? '#60a5fa' : 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700' }}>
+                        {isSelected ? '👀 ' + (language === 'zh' ? '正在追踪' : 'Tracking') : (language === 'zh' ? '点击立即追踪 ➔' : 'Tap to track ➔')}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 跟踪查询区域 */}
         <div style={{
@@ -721,6 +893,13 @@ const TrackingPage: React.FC = () => {
       {/* 添加CSS动画 */}
       <style>
         {`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
           @keyframes fadeInUp {
             from {
               opacity: 0;

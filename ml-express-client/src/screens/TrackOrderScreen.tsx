@@ -13,10 +13,11 @@ import {
   FlatList,
   RefreshControl,
   Animated,
+  Alert,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
-import { packageService, supabase } from '../services/supabase';
+import { packageService, supabase, deliveryPhotoService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
@@ -174,7 +175,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       setInTransitOrders(activeOrders);
       
       // 如果当前正在追踪的订单状态变了（不再是配送中），清除追踪详情
-      if (packageData && !transit.find(o => o.id === packageData.id) && packageData.status !== '已送达') {
+      if (packageData && !activeOrders.find((o: any) => o.id === packageData.id) && packageData.status !== '已送达') {
         // 只有当订单还在“配送中”列表里才维持实时追踪，否则只保留静态详情
         // 这里可以根据需求决定是否清除
       }
@@ -231,21 +232,24 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         
         // 🚀 新增：获取骑手ID以进行实时追踪 (优先匹配姓名，失败则匹配订单中的courier字段作为ID尝试)
         if (order.courier && order.courier !== '待分配') {
-          supabase
-            .from('couriers')
-            .select('id')
-            .eq('name', order.courier)
-            .single()
-            .then(({ data }) => {
+          const fetchCourier = async () => {
+            try {
+              const { data } = await supabase
+                .from('couriers')
+                .select('id')
+                .eq('name', order.courier)
+                .single();
+              
               if (data) {
                 setCourierId(data.id);
               } else {
                 setCourierId(order.courier);
               }
-            })
-            .catch(() => {
+            } catch (e) {
               setCourierId(order.courier);
-            });
+            }
+          };
+          fetchCourier();
         } else {
           setCourierId(null);
           setRiderLocation(null);
@@ -320,7 +324,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           if (data) {
             const initialLoc = { latitude: Number(data.latitude), longitude: Number(data.longitude) };
             setRiderLocation(initialLoc);
-            riderAnimatedLocation.setValue(initialLoc);
+            (riderAnimatedLocation as any).setValue({ ...initialLoc, latitudeDelta: 0, longitudeDelta: 0 });
           }
         });
 
@@ -355,8 +359,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             }
             
             // 🚀 核心优化：执行平滑移动动画
-            riderAnimatedLocation.timing({
+            (riderAnimatedLocation as any).timing({
               ...newLoc,
+              latitudeDelta: 0,
+              longitudeDelta: 0,
               duration: 2000, // 2秒平滑过渡
               useNativeDriver: false
             }).start();
@@ -624,7 +630,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
         }
       >
-        <View style={[styles.headerStyle, { marginBottom: 30, paddingHorizontal: 20 }]}>
+        <View style={[styles.header, { marginBottom: 30, paddingHorizontal: 20 }]}>
           <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
           <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
           <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }}>{t.subtitle}</Text>
@@ -758,7 +764,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                       ref={mapRef}
                       provider={PROVIDER_GOOGLE}
                       style={styles.map}
-                      onMapError={() => setMapError(true)}
                       onMapReady={() => setMapError(false)}
                       initialRegion={{
                         latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
@@ -768,7 +773,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                       }}
                     >
                       {/* 起点标记 */}
-                      {packageData.sender_latitude && packageData.sender_longitude && (
+                      {!!packageData.sender_latitude && !!packageData.sender_longitude ? (
                         <Marker
                           coordinate={{
                             latitude: packageData.sender_latitude,
@@ -777,10 +782,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                           title="发货点"
                           pinColor="#3b82f6"
                         />
-                      )}
+                      ) : null}
 
                       {/* 终点标记 */}
-                      {packageData.receiver_latitude && packageData.receiver_longitude && (
+                      {!!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
                         <Marker
                           coordinate={{
                             latitude: packageData.receiver_latitude,
@@ -789,10 +794,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                           title="我的位置"
                           pinColor="#ef4444"
                         />
-                      )}
+                      ) : null}
 
                       {/* 骑手标记 - 使用动画标记实现平滑移动 */}
-                      {riderLocation && (
+                      {!!riderLocation ? (
                         <Marker.Animated
                           coordinate={riderAnimatedLocation as any}
                           title={language === 'zh' ? '骑手位置' : 'Rider Location'}
@@ -802,10 +807,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                             <Text style={{ fontSize: 24 }}>🛵</Text>
                           </View>
                         </Marker.Animated>
-                      )}
+                      ) : null}
 
                       {/* 路线预览 */}
-                      {riderLocation && packageData.receiver_latitude && packageData.receiver_longitude && (
+                      {!!riderLocation && !!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
                         <Polyline
                           coordinates={[
                             riderLocation,
@@ -818,7 +823,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                           strokeWidth={3}
                           lineDashPattern={[5, 5]}
                         />
-                      )}
+                      ) : null}
                     </MapView>
                     
                     <View style={styles.mapOverlay}>
@@ -1290,7 +1295,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backdropFilter: 'blur(5px)',
   },
   mapOverlayText: {
     color: 'white',

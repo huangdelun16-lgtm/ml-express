@@ -328,14 +328,16 @@ export const packageService = {
   // 根据用户邮箱或手机号获取该用户的所有包裹
   // startDate: 可选，如果有值，只查询该时间之后的订单
   // storeId: 可选，如果是商家账号，同时查询该商家关联的订单
-  async getPackagesByUser(email?: string, phone?: string, startDate?: string, storeId?: string): Promise<Package[]> {
+  // userId: 可选，如果有值，通过 customer_id 匹配
+  // storeName: 可选，如果是商家账号，通过 sender_name 匹配
+  async getPackagesByUser(email?: string, phone?: string, startDate?: string, storeId?: string, userId?: string, storeName?: string): Promise<Package[]> {
     try {
-      if (!email && !phone && !storeId) {
+      if (!email && !phone && !storeId && !userId && !storeName) {
         LoggerService.debug('getPackagesByUser: 没有查询标识，返回空数组');
         return [];
       }
 
-      LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate, 'storeId:', storeId);
+      LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate, 'storeId:', storeId, 'userId:', userId, 'storeName:', storeName);
 
       // 构建查询条件
       let query = supabase.from('packages').select('*');
@@ -353,14 +355,23 @@ export const packageService = {
         conditions.push(`receiver_phone.eq.${phone}`);
       }
 
-      // 2. 如果是商家账号，根据 delivery_store_id 查询
+      // 2. 商家账号匹配逻辑
       if (storeId) {
         conditions.push(`delivery_store_id.eq.${storeId}`);
       }
+      if (storeName) {
+        conditions.push(`sender_name.eq.${storeName}`);
+      }
 
-      // 3. 🚀 特殊账号增强逻辑：如果用户名包含 "admin" 或是管理员类型，尝试通过更宽泛的条件匹配
-      if (email && (email.toLowerCase().includes('admin') || email.toLowerCase().includes('venus'))) {
-        // 这里的逻辑可以根据实际需要调整，目前保持 phone 匹配
+      // 3. 用户账号匹配逻辑
+      if (userId) {
+        conditions.push(`customer_id.eq.${userId}`);
+        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
+      }
+
+      // 4. 根据 email 匹配
+      if (email) {
+        conditions.push(`customer_email.eq.${email}`);
       }
 
       if (conditions.length > 0) {
@@ -592,6 +603,24 @@ export const packageService = {
     } catch (err) {
       LoggerService.error('更新包裹状态失败:', err);
       return false;
+    }
+  },
+
+  // 获取特定店铺的入库包裹（已送达的）
+  async getPackagesByStore(storeId: string): Promise<Package[]> {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('delivery_store_id', storeId)
+        .eq('status', '已送达')
+        .order('delivery_time', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      LoggerService.error(`获取店铺 ${storeId} 包裹失败:`, err);
+      return [];
     }
   }
 };

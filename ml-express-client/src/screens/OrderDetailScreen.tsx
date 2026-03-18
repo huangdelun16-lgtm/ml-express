@@ -651,9 +651,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📋 {t.orderInfo}</Text>
           
-          {/* 🚀 新增：从描述中解析下单身份并显示 */}
           {(() => {
-            const identityMatch = order.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+            const identityMatch = order.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
             if (identityMatch && identityMatch[1]) {
               let identity = identityMatch[1];
               // 🚀 核心优化：如果是商家身份，统一显示为 MERCHANTS

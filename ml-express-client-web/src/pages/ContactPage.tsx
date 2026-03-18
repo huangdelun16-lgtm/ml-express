@@ -161,7 +161,13 @@ const ContactPage: React.FC = () => {
               {
                 icon: '📞',
                 title: t.contact.phone,
-                value: t.contact.phoneValue,
+                value: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                    <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600' }}>{t.contact.phoneValue}</div>
+                    <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600' }}>{t.contact.phoneValue2}</div>
+                    <div style={{ fontSize: '1.15rem', color: '#2d3748', fontWeight: '600' }}>{t.contact.phoneValue3}</div>
+                  </div>
+                ),
                 color: '#ff6b6b',
                 bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'

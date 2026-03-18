@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK EXPRESS",
     "slug": "ml-express-client",
-    "version": "2.3.0", 
+    "version": "2.3.1", 
     "scheme": "ml-express-client",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.client",
-      "buildNumber": "51",
+      "buildNumber": "53",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS需要访问您的位置信息以提供准确的配送服务和包裹追踪功能。",
@@ -61,7 +61,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.client",
-      "versionCode": 51,
+      "versionCode": 53,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -82,7 +82,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
+          "locationWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
       ]
     ],

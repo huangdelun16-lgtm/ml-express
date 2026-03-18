@@ -184,6 +184,7 @@ export interface CourierWithLocation extends Courier {
   currentPackages?: number;
   todayDeliveries?: number;
   batteryLevel?: number;
+  signal_strength?: number; // 🚀 新增：网络信号强度
 }
 
 // ==================== 账户管理相关 ====================

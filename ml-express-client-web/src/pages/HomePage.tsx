@@ -1414,6 +1414,11 @@ const HomePage: React.FC = () => {
     // 🚀 按照要求：给客户计费的距离向上取整（例如 6.1km = 7km）
     const billingDistance = Math.max(1, Math.ceil(distance));
     
+    // 🚀 核心优化：如果是“顺路递”，只计算基础费用，不加任何附加费
+    if (packageType === t.ui.waySide) {
+      return pricingSettings.baseFee;
+    }
+    
     // 1. 基础起步价
     let totalPrice = pricingSettings.baseFee;
     
@@ -1497,19 +1502,35 @@ const HomePage: React.FC = () => {
       // 检查坐标信息（优先使用地图选择的精确坐标）
       let distance = 0;
       
-      if (selectedSenderLocation && selectedReceiverLocation) {
-        console.log('📍 使用精确坐标计算距离:', { sender: selectedSenderLocation, receiver: selectedReceiverLocation });
-        distance = calculateDistanceKm(
-          selectedSenderLocation.lat,
-          selectedSenderLocation.lng,
-          selectedReceiverLocation.lat,
-          selectedReceiverLocation.lng
-        );
+      // 🚀 优化：从地址文本中尝试提取坐标（如果 state 为空但文本里有）
+      let senderLat = selectedSenderLocation?.lat;
+      let senderLng = selectedSenderLocation?.lng;
+      let receiverLat = selectedReceiverLocation?.lat;
+      let receiverLng = selectedReceiverLocation?.lng;
+
+      const senderAddressTextValue = formData.get('senderName') ? senderAddressText : (formData.get('senderAddress') as string);
+      const receiverAddressTextValue = formData.get('receiverAddress') as string;
+
+      if (!senderLat || !senderLng) {
+        const match = senderAddressTextValue?.match(/📍 坐标: (-?\d+\.\d+), (-?\d+\.\d+)/);
+        if (match) {
+          senderLat = parseFloat(match[1]);
+          senderLng = parseFloat(match[2]);
+        }
+      }
+      if (!receiverLat || !receiverLng) {
+        const match = receiverAddressTextValue?.match(/📍 坐标: (-?\d+\.\d+), (-?\d+\.\d+)/);
+        if (match) {
+          receiverLat = parseFloat(match[1]);
+          receiverLng = parseFloat(match[2]);
+        }
+      }
+
+      if (senderLat && senderLng && receiverLat && receiverLng) {
+        console.log('📍 使用精确坐标计算距离:', { sender: { lat: senderLat, lng: senderLng }, receiver: { lat: receiverLat, lng: receiverLng } });
+        distance = calculateDistanceKm(senderLat, senderLng, receiverLat, receiverLng);
       } else {
         // 如果没有坐标，尝试使用地址字符串计算（备用方案）
-        const senderAddressTextValue = formData.get('senderAddress') as string;
-        const receiverAddressTextValue = formData.get('receiverAddress') as string;
-
         if (!senderAddressTextValue || !receiverAddressTextValue) {
           alert(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' : 
                 language === 'en' ? 'Please select sender and receiver addresses (Map selection recommended for accurate pricing)' : 
@@ -1517,17 +1538,22 @@ const HomePage: React.FC = () => {
           return;
         }
 
-        console.log('📝 无坐标，尝试使用地址文本计算距离...');
-        distance = await calculateDistance(senderAddressTextValue, receiverAddressTextValue);
+        // 清理地址文本中的坐标信息，防止 Google API 识别失败
+        const cleanSenderAddr = senderAddressTextValue.split('\n').filter(l => !l.includes('📍 坐标:')).join(' ').trim();
+        const cleanReceiverAddr = receiverAddressTextValue.split('\n').filter(l => !l.includes('📍 坐标:')).join(' ').trim();
+
+        console.log('📝 无坐标，尝试使用清理后的地址文本计算距离:', { cleanSenderAddr, cleanReceiverAddr });
+        distance = await calculateDistance(cleanSenderAddr, cleanReceiverAddr);
       }
       
       // 按照要求：用于给客户计费的距离向上取整（例如 6.1km = 7km）
       const roundedDistanceForBilling = Math.max(1, Math.ceil(distance));
       
-      // 🚀 核心修改：设置显示给客户看的距离为取整后的整数
-      setCalculatedDistanceDetail(roundedDistanceForBilling);
+      // 🚀 核心修改：如果是“顺路递”，强制将显示距离设为 0 (或保持原样但说明不计费)
+      const isWaySide = orderInfo.packageType === t.ui.waySide;
+      setCalculatedDistanceDetail(isWaySide ? 0 : roundedDistanceForBilling);
       
-      // 计算价格（计费仍按取整后的距离）
+      // 计算价格
       const priceValue = calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
@@ -1539,12 +1565,22 @@ const HomePage: React.FC = () => {
       setIsCalculated(true);
       
       // 显示计算结果
-      alert(language === 'zh' ? 
-        `计算完成！\n配送距离: ${roundedDistanceForBilling}km\n总费用: ${priceValue} MMK` :
-        language === 'en' ? 
-        `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
-        'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK'
-      );
+      let resultMsg = '';
+      if (isWaySide) {
+        resultMsg = language === 'zh' ? 
+          `计算完成！\n配送类型: 顺路递 (24小时内送达)\n总费用: ${priceValue} MMK` :
+          language === 'en' ? 
+          `Calculation Complete!\nType: Eco Way (24h Delivery)\nTotal Cost: ${priceValue} MMK` :
+          'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nအမျိုးအစား: တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
+      } else {
+        resultMsg = language === 'zh' ? 
+          `计算完成！\n配送距离: ${roundedDistanceForBilling}km\n总费用: ${priceValue} MMK` :
+          language === 'en' ? 
+          `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
+          'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
+      }
+      
+      alert(resultMsg);
       
     } catch (error) {
       console.error('计算费用失败:', error);
@@ -1674,8 +1710,31 @@ const HomePage: React.FC = () => {
       }
       
       // 2. 计算距离和价格
-      const distance = await calculateDistance(orderInfo.senderAddress, orderInfo.receiverAddress);
-      const finalDistance = distance || 5; 
+      // 🚀 核心优化：如果之前已经点击过“计算”按键获得了精准距离，则直接复用
+      let finalDistance = 0;
+      
+      if (isCalculated && calculatedDistanceDetail > 0) {
+        finalDistance = calculatedDistanceDetail;
+        console.log('✅ 复用之前的计算结果:', finalDistance, 'km');
+      } else {
+        // 如果没有点击过计算，或者计算结果为0，尝试重新计算
+        // 优先使用坐标计算
+        let sLat = selectedSenderLocation?.lat;
+        let sLng = selectedSenderLocation?.lng;
+        let rLat = selectedReceiverLocation?.lat;
+        let rLng = selectedReceiverLocation?.lng;
+
+        if (sLat && sLng && rLat && rLng) {
+          finalDistance = calculateDistanceKm(sLat, sLng, rLat, rLng);
+          console.log('📍 使用提交时的坐标重新计算距离:', finalDistance, 'km');
+        } else {
+          // 备用：使用地址文本计算
+          const distance = await calculateDistance(orderInfo.senderAddress, orderInfo.receiverAddress);
+          finalDistance = distance || 5; 
+          console.log('📝 使用提交时的地址文本计算距离:', finalDistance, 'km');
+        }
+      }
+      
       setDeliveryDistance(finalDistance);
 
       const finalPrice = isCalculated ? calculatedPriceDetail : calculatePrice(
@@ -2414,6 +2473,7 @@ const HomePage: React.FC = () => {
         setDescription={setDescription}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
+        merchantStore={merchantStore}
       />
 
       {/* 订单成功模态框 */}

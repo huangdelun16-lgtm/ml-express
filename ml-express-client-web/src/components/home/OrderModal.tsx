@@ -50,6 +50,7 @@ interface OrderModalProps {
   setDescription?: (val: string) => void; // 🚀 新增：设置描述
   paymentMethod?: 'qr' | 'cash' | 'balance'; // 🚀 新增：支付方式
   setPaymentMethod?: (val: 'qr' | 'cash' | 'balance') => void; // 🚀 新增：设置支付方式
+  merchantStore?: any; // 🚀 新增：商家店铺信息
 }
 
 const OrderModal: React.FC<OrderModalProps> = ({
@@ -98,7 +99,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
   description = '',
   setDescription = () => {},
   paymentMethod = 'cash',
-  setPaymentMethod = () => {}
+  setPaymentMethod = () => {},
+  merchantStore = null
 }) => {
   const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
@@ -108,6 +110,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   if (!showOrderForm) return null;
 
   const packageTypes = [
+    { value: t.ui.waySide, label: t.ui.waySide, icon: '🌿', description: t.ui.packageTypeInfo.waySide },
     { value: t.ui.document, label: t.ui.document, icon: '📄', description: t.ui.packageTypeInfo.document },
     { value: t.ui.standardPackageDetail, label: t.ui.standardPackage, icon: '📦', description: t.ui.packageTypeInfo.standard },
     { value: t.ui.overweightPackageDetail, label: t.ui.overweightPackage, icon: '⚖️', description: t.ui.packageTypeInfo.overweight },
@@ -691,9 +694,20 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       onClick={() => {
                         setSelectedPackageType(type.value);
                         setShowPackageDropdown(false);
+                        
+                        // 🚀 新增：如果是顺路递，清除速度选择并设置为默认
+                        if (type.value === t.ui.waySide) {
+                          setSelectedDeliverySpeed('Eco Way');
+                        } else if (selectedDeliverySpeed === 'Eco Way') {
+                          // 如果从顺路递切换回其他类型，重置速度
+                          setSelectedDeliverySpeed('');
+                        }
+
                         const isOversized = type.value === t.ui.oversizedPackageDetail || type.value === '超规件（45x60x15cm）以上';
                         const isOverweight = type.value === t.ui.overweightPackageDetail || type.value === '超重件（5KG）以上';
-                        if (isOversized || isOverweight) {
+                        const isTransit = type.value === '中转包裹';
+                        
+                        if (isOversized || isOverweight || isTransit) {
                           setShowWeightInput(true);
                         } else {
                           setShowWeightInput(false);
@@ -871,33 +885,40 @@ const OrderModal: React.FC<OrderModalProps> = ({
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
               <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} required />
               <div
-                onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
+                onClick={() => {
+                  if (selectedPackageType === t.ui.waySide) return;
+                  setShowSpeedDropdown(!showSpeedDropdown);
+                }}
                 style={{
                   width: '100%',
                   padding: 'var(--spacing-3) var(--spacing-4)',
                   border: '2px solid var(--color-border-dark)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--font-size-base)',
-                  background: 'rgba(255, 255, 255, 0.9)',
+                  background: selectedPackageType === t.ui.waySide ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)',
                   backdropFilter: 'blur(5px)',
-                  cursor: 'pointer',
+                  cursor: selectedPackageType === t.ui.waySide ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  color: selectedDeliverySpeed ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)',
+                  color: selectedPackageType === t.ui.waySide ? 'rgba(0,0,0,0.3)' : (selectedDeliverySpeed ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)'),
                   fontWeight: 'var(--font-weight-medium)',
                   transition: 'all 0.3s'
                 }}
               >
                 <span>
-                  {selectedDeliverySpeed 
-                    ? deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.icon + ' ' + deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.label
-                    : t.ui.selectDeliverySpeed}
+                  {selectedPackageType === t.ui.waySide 
+                    ? (language === 'zh' ? '顺路送达 (不可选)' : language === 'en' ? 'Eco Way (Disabled)' : 'တန်တန်လေးပို့ (မရနိုင်ပါ)')
+                    : (selectedDeliverySpeed 
+                        ? deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.icon + ' ' + deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.label
+                        : t.ui.selectDeliverySpeed)}
                 </span>
-                <span style={{ 
-                  transform: showSpeedDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.3s'
-                }}>▼</span>
+                {selectedPackageType !== t.ui.waySide && (
+                  <span style={{ 
+                    transform: showSpeedDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s'
+                  }}>▼</span>
+                )}
               </div>
 
               {showSpeedDropdown && (
@@ -1130,6 +1151,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {Math.ceil(calculatedDistanceDetail)} {language === 'zh' ? '公里' : language === 'en' ? 'km' : 'ကီလိုမီတာ'}
                     </span>
                   </div>
+                  {/* 基础费用始终显示 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
                       {language === 'zh' ? '基础费用' : language === 'en' ? 'Base Fee' : 'အခြေခံအခကြေး'}:
@@ -1138,80 +1160,86 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {pricingSettings.baseFee} MMK
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                      {language === 'zh' ? '距离费用' : language === 'en' ? 'Distance Fee' : 'အကွာအဝေးအခ'}:
-                    </span>
-                    <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
-                      {Math.round(Math.max(0, Math.ceil(calculatedDistanceDetail) - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee)} MMK
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                      {language === 'zh' ? '超重费' : language === 'en' ? 'Overweight Fee' : 'အလေးချိန်ပိုအခ'}:
-                    </span>
-                    <span style={{ color: '#ef4444', fontWeight: '600' }}>
-                      {(() => {
-                        const form = document.querySelector('form') as HTMLFormElement;
-                        const weight = form ? (new FormData(form).get('weight') as string) : '0';
-                        const weightNum = parseFloat(weight) || 0;
-                        const weightThreshold = 5;
-                        const isOverweight = selectedPackageType === t.ui.overweightPackageDetail || selectedPackageType === '超重件（5KG）以上';
-                        return Math.round((isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0);
-                      })()} MMK
-                    </span>
-                  </div>
-                  {/* 超规费 - 仅超规件显示 */}
-                  {(selectedPackageType === t.ui.oversizedPackageDetail || selectedPackageType === '超规件（45x60x15cm）以上') && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                        {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
-                      </span>
-                      <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.oversizeSurcharge)} MMK
-                      </span>
-                    </div>
+
+                  {/* 如果不是顺路递，显示其他费用明细 */}
+                  {selectedPackageType !== t.ui.waySide && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '距离费用' : language === 'en' ? 'Distance Fee' : 'အကွာအဝေးအခ'}:
+                        </span>
+                        <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
+                          {Math.round(Math.max(0, Math.ceil(calculatedDistanceDetail) - pricingSettings.freeKmThreshold) * pricingSettings.perKmFee)} MMK
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '超重费' : language === 'en' ? 'Overweight Fee' : 'အလေးချိန်ပိုအခ'}:
+                        </span>
+                        <span style={{ color: '#ef4444', fontWeight: '600' }}>
+                          {(() => {
+                            const form = document.querySelector('form') as HTMLFormElement;
+                            const weight = form ? (new FormData(form).get('weight') as string) : '0';
+                            const weightNum = parseFloat(weight) || 0;
+                            const weightThreshold = 5;
+                            const isOverweight = selectedPackageType === t.ui.overweightPackageDetail || selectedPackageType === '超重件（5KG）以上';
+                            return Math.round((isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0);
+                          })()} MMK
+                        </span>
+                      </div>
+                      {/* 超规费 - 仅超规件显示 */}
+                      {(selectedPackageType === t.ui.oversizedPackageDetail || selectedPackageType === '超规件（45x60x15cm）以上') && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                            {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
+                          </span>
+                          <span style={{ color: '#f97316', fontWeight: '600' }}>
+                            {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.oversizeSurcharge)} MMK
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* 易碎品费 - 仅易碎品显示 */}
+                      {(selectedPackageType === t.ui.fragile || selectedPackageType === '易碎品') && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                            {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
+                          </span>
+                          <span style={{ color: '#f97316', fontWeight: '600' }}>
+                            {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.fragileSurcharge)} MMK
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* 食品饮料费 - 仅食品饮料显示 */}
+                      {(selectedPackageType === t.ui.foodDrinks || selectedPackageType === '食品和饮料') && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                            {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
+                          </span>
+                          <span style={{ color: '#f97316', fontWeight: '600' }}>
+                            {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.foodBeverageSurcharge)} MMK
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {language === 'zh' ? '配送速度费用' : language === 'en' ? 'Delivery Speed Fee' : 'ပို့ဆောင်မြန်နှုန်းအခ'}:
+                        </span>
+                        <span style={{ color: '#06b6d4', fontWeight: '600' }}>
+                          {(() => {
+                            let speedFee = 0;
+                            if (selectedDeliverySpeed === t.ui.urgentDelivery || selectedDeliverySpeed === '加急配送' || selectedDeliverySpeed === '急送达') {
+                              speedFee = pricingSettings.urgentSurcharge;
+                            } else if (selectedDeliverySpeed === t.ui.scheduledDelivery || selectedDeliverySpeed === '定时达' || selectedDeliverySpeed === '预约配送') {
+                              speedFee = pricingSettings.scheduledSurcharge;
+                            }
+                            return Math.round(speedFee);
+                          })()} MMK
+                        </span>
+                      </div>
+                    </>
                   )}
-                  
-                  {/* 易碎品费 - 仅易碎品显示 */}
-                  {(selectedPackageType === t.ui.fragile || selectedPackageType === '易碎品') && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                        {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
-                      </span>
-                      <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.fragileSurcharge)} MMK
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* 食品饮料费 - 仅食品饮料显示 */}
-                  {(selectedPackageType === t.ui.foodDrinks || selectedPackageType === '食品和饮料') && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                        {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
-                      </span>
-                      <span style={{ color: '#f97316', fontWeight: '600' }}>
-                        {Math.round(Math.ceil(calculatedDistanceDetail) * pricingSettings.foodBeverageSurcharge)} MMK
-                      </span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                      {language === 'zh' ? '配送速度费用' : language === 'en' ? 'Delivery Speed Fee' : 'ပို့ဆောင်မြန်နှုန်းအခ'}:
-                    </span>
-                    <span style={{ color: '#06b6d4', fontWeight: '600' }}>
-                      {(() => {
-                        let speedFee = 0;
-                        if (selectedDeliverySpeed === t.ui.urgentDelivery || selectedDeliverySpeed === '加急配送' || selectedDeliverySpeed === '急送达') {
-                          speedFee = pricingSettings.urgentSurcharge;
-                        } else if (selectedDeliverySpeed === t.ui.scheduledDelivery || selectedDeliverySpeed === '定时达' || selectedDeliverySpeed === '预约配送') {
-                          speedFee = pricingSettings.scheduledSurcharge;
-                        }
-                        return Math.round(speedFee);
-                      })()} MMK
-                    </span>
-                  </div>
                   <div style={{ 
                     borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
                     paddingTop: '0.5rem', 

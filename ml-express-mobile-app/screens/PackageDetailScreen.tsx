@@ -304,8 +304,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      // 2. 🚀 距离检查 (如果是送达操作)
-      if (pkg?.status !== '待取件') {
+      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
+      const isStoreCode = data.startsWith('STORE_');
+      if (pkg?.status !== '待取件' && !isStoreCode) {
         const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (currentLoc && pkg.receiver_latitude && pkg.receiver_longitude) {
           // ... 距离计算 ...
@@ -327,11 +328,26 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
       if (data.startsWith('STORE_')) {
         const storeId = data.replace('STORE_', '').split('_')[0];
+        
+        // 🚀 核心逻辑：如果是异常上报状态送达中转站，增加备注说明
+        const isAnomalyResolution = pkg?.status === '异常上报';
+        const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
+        const alertMsg = isAnomalyResolution ? '包裹已作为异常件送达至中转站' : '包裹已送达至代收点';
+
         const success = await packageService.updatePackageStatus(
-            pkg.id, '已送达', undefined, new Date().toISOString(), pkg.courier, undefined, { storeId, storeName: '代收点', receiveCode: data }
+            pkg.id, '已送达', undefined, new Date().toISOString(), pkg.courier, undefined, { storeId, storeName: '中转站', receiveCode: data }
         );
         if (success) {
-            Alert.alert('✅ 已送达', `包裹已送达至代收点`, [{ text: '确定', onPress: () => loadPackageDetails(pkg.id) }]);
+            // 如果是异常上报，额外更新一条描述
+            if (isAnomalyResolution) {
+              try {
+                await supabase.from('packages').update({ 
+                  description: (pkg.description || '') + ' [异常转送中转站]'
+                }).eq('id', pkg.id);
+              } catch (e) {}
+            }
+            
+            Alert.alert('✅ ' + statusMsg, alertMsg, [{ text: '确定', onPress: () => loadPackageDetails(pkg.id) }]);
         }
       } else {
         Alert.alert('扫码成功', `扫描结果: ${data}`);
@@ -378,7 +394,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           
           {/* 🚀 新增：展示下单身份 */}
           {(() => {
-            const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+            const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
             if (identityMatch && identityMatch[1]) {
               const identity = identityMatch[1];
               return (

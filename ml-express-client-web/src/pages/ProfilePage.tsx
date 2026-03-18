@@ -299,11 +299,18 @@ const ProfilePage: React.FC = () => {
 
   // 🚀 新增：临时延时/早关逻辑
   const handleExtendHour = async () => {
-    const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
-    const [h, m] = end.split(':').map(Number);
+    const hours = businessStatus.operating_hours || '09:00 - 21:00';
+    const parts = hours.split(' - ');
+    const start = parts[0] || '09:00';
+    const end = parts[1] || '21:00';
+    
+    const endParts = end.split(':');
+    const h = parseInt(endParts[0] || '21');
+    const m = parseInt(endParts[1] || '00');
+    
     const newH = (h + 1) % 24;
     const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    const newHours = `${businessStatus.operating_hours.split(' - ')[0]} - ${newTime}`;
+    const newHours = `${start} - ${newTime}`;
     
     setBusinessStatus(prev => ({
       ...prev,
@@ -406,7 +413,7 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：店铺商品管理逻辑
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (!currentUser?.id) return;
     try {
       setLoadingProducts(true);
@@ -424,7 +431,7 @@ const ProfilePage: React.FC = () => {
     } finally {
       setLoadingProducts(false);
     }
-  };
+  }, [currentUser?.id]);
 
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
@@ -588,6 +595,48 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 🚀 新增：中转站重新发货逻辑
+  const handleReshipOrder = async (pkg: any) => {
+    if (!storeInfo || storeInfo.store_type !== 'transit_station') {
+      alert(language === 'zh' ? '仅限中转站账号操作' : 'Transit stations only');
+      return;
+    }
+
+    if (!window.confirm(language === 'zh' ? '确认已处理完异常，并将包裹从当前中转站重新发货吗？' : 'Confirm anomaly resolved and re-ship from current station?')) return;
+
+    try {
+      setLoading(true);
+      
+      // 1. 状态恢复为“待取件”
+      // 2. 寄件人改为当前中转站（确保骑手去正确地点取货）
+      // 3. 清除旧骑手，重新进入分配队列
+      const { error } = await supabase
+        .from('packages')
+        .update({
+          status: '待取件',
+          courier: '待分配',
+          sender_name: storeInfo.store_name,
+          sender_phone: storeInfo.phone || storeInfo.manager_phone,
+          sender_address: storeInfo.address,
+          sender_latitude: storeInfo.latitude,
+          sender_longitude: storeInfo.longitude,
+          description: (pkg.description || '').replace('[异常转送中转站]', `[中转站已处理 - 从${storeInfo.store_name}重新发货]`),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pkg.id);
+
+      if (error) throw error;
+
+      alert(language === 'zh' ? '重新发货成功！包裹已回到待分配队列。' : 'Re-shipped successfully!');
+      await loadUserPackages();
+    } catch (error) {
+      LoggerService.error('重新发货失败:', error);
+      alert(language === 'zh' ? '操作失败，请重试' : 'Action failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 检查用户是否是合伙店铺账户
   // 注意：合伙店铺账号只能在admin web中注册，客户端web注册的账号都是普通客户账号
   // 判断逻辑：
@@ -730,48 +779,26 @@ const ProfilePage: React.FC = () => {
 
   // 加载用户的包裹列表
   const loadUserPackages = useCallback(async () => {
-    if (!currentUser) {
+    if (!currentUser?.id) {
       setLoading(false);
       return;
     }
     
     setLoading(true);
     try {
-      LoggerService.debug('开始加载用户包裹，用户信息:', {
-        email: currentUser.email,
-        phone: currentUser.phone,
-        name: currentUser.name,
-        created_at: currentUser.created_at,
-        isPartner: isPartnerStore,
-        storeId: currentUser.store_id || currentUser.id
-      });
-      
-      // 传入用户的注册时间作为查询起始时间，避免新用户看到旧手机号的历史订单
-      // 🚀 优化：如果是商家账号，或者特殊账号（如 admin），不应用注册时间限制，以看到历史所有订单
-      const queryStartDate = (isPartnerStore || currentUser.user_type === 'admin' || currentUser.name?.toLowerCase().includes('admin')) 
-        ? undefined 
-        : currentUser.created_at;
+      // 🚀 核心优化：移除所有账号的注册时间限制，确保 Web 端与 App 端数据完全同步一致
+      const queryStartDate = undefined;
       
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone,
         queryStartDate,
-        isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined // 🚀 商家账号同时加载关联订单
+        isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined,
+        currentUser.id,
+        isPartnerStore ? currentUser.name : undefined
       );
       
-      LoggerService.debug('查询到的包裹数量:', packages.length);
-      LoggerService.debug('包裹列表:', packages);
-      
       setUserPackages(packages);
-
-      // 🚀 核心优化：如果该用户有手机号，尝试直接用手机号补拉订单（防止 user 对象数据不完整）
-      if (packages.length === 0 && currentUser.phone && !isPartnerStore) {
-        console.log('🔄 列表为空，尝试使用纯手机号重新拉取...');
-        const retryPackages = await packageService.getPackagesByUser(undefined, currentUser.phone, queryStartDate);
-        if (retryPackages.length > 0) {
-          setUserPackages(retryPackages);
-        }
-      }
 
       // 🚀 新增：获取已评价的订单ID列表
       if (packages.length > 0) {
@@ -790,7 +817,7 @@ const ProfilePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, isPartnerStore]);
+  }, [currentUser?.id, currentUser?.email, currentUser?.phone, currentUser?.name, currentUser?.store_id, isPartnerStore]);
 
   useEffect(() => {
     setIsVisible(true);
@@ -799,40 +826,50 @@ const ProfilePage: React.FC = () => {
 
   // 加载合伙店铺代收款统计
   const loadPartnerCODStats = useCallback(async () => {
-    if (!currentUser || !isPartnerStore) {
+    const userId = currentUser?.id || storeInfo?.id;
+    const storeName = currentUser?.name || storeInfo?.store_name;
+
+    if (!userId || !isPartnerStore) {
       return;
     }
 
     try {
-      const storeName = currentUser.name || storeInfo?.store_name;
-      const userId = currentUser.id || storeInfo?.id;
-      
-      if (userId) {
-        const stats = await packageService.getPartnerStats(userId, storeName, selectedMonth);
-        setMerchantCODStats(stats);
-      }
+      const stats = await packageService.getPartnerStats(userId, storeName, selectedMonth);
+      setMerchantCODStats(stats);
     } catch (error) {
       LoggerService.error('加载代收款统计失败:', error);
     }
-  }, [currentUser, isPartnerStore, storeInfo, selectedMonth]);
+  }, [currentUser?.id, currentUser?.name, isPartnerStore, storeInfo?.id, storeInfo?.store_name, selectedMonth]);
 
   // 🚀 新增：加载店铺评价逻辑
   const loadStoreReviews = useCallback(async () => {
-    if (!currentUser?.id || !isPartnerStore) return;
+    // 🚀 核心优化：确保商家账号使用正确的 store_id 关联评价
+    const storeId = storeInfo?.id || currentUser?.store_id || currentUser?.id;
+    
+    if (!storeId || !isPartnerStore) {
+      return;
+    }
+    
     try {
       setLoadingReviews(true);
-      const [reviews, stats] = await Promise.all([
-        reviewService.getStoreReviews(currentUser.id),
-        reviewService.getStoreReviewStats(currentUser.id)
-      ]);
-      setStoreReviews(reviews);
+      const { data: rawReviews, error: reviewsError } = await supabase
+        .from('store_reviews')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (reviewsError) throw reviewsError;
+
+      const stats = await reviewService.getStoreReviewStats(storeId);
+
+      setStoreReviews(rawReviews || []);
       setReviewStats(stats);
     } catch (error) {
       LoggerService.error('加载评价失败:', error);
     } finally {
       setLoadingReviews(false);
     }
-  }, [currentUser, isPartnerStore]);
+  }, [currentUser?.id, currentUser?.store_id, isPartnerStore, storeInfo?.id]);
 
   // 🚀 新增：商家回复评价逻辑
   const handleReplyReview = async (reviewId: string) => {
@@ -850,14 +887,29 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // 1. 加载用户包裹列表
   useEffect(() => {
     loadUserPackages();
+  }, [loadUserPackages]);
+
+  // 2. 如果是商家，加载相关统计、商品和评价
+  useEffect(() => {
     if (isPartnerStore) {
       loadPartnerCODStats();
-      loadProducts(); // 🚀 新增：加载店铺商品
-      loadStoreReviews(); // 🚀 新增：加载评价
     }
-  }, [loadUserPackages, isPartnerStore, loadPartnerCODStats, loadStoreReviews]);
+  }, [isPartnerStore, loadPartnerCODStats]);
+
+  useEffect(() => {
+    if (isPartnerStore) {
+      loadProducts();
+    }
+  }, [isPartnerStore, loadProducts]);
+
+  useEffect(() => {
+    if (isPartnerStore) {
+      loadStoreReviews();
+    }
+  }, [isPartnerStore, loadStoreReviews]);
 
   // 🚀 新增：商家订单实时监控逻辑
   useEffect(() => {
@@ -916,7 +968,7 @@ const ProfilePage: React.FC = () => {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [isPartnerStore, currentUser, isVoiceEnabled, language]);
+  }, [isPartnerStore, currentUser?.id, isVoiceEnabled, language, loadUserPackages]);
 
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
@@ -2061,6 +2113,7 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
+
           {/* 订单统计卡片 */}
           <div style={{
             display: 'grid',
@@ -2715,9 +2768,10 @@ const ProfilePage: React.FC = () => {
                           <TimeWheelPicker 
                             label="OPEN TIME"
                             icon="🌅"
-                            value={businessStatus.operating_hours.split(' - ')[0]}
+                            value={(businessStatus.operating_hours || '09:00 - 21:00').split(' - ')[0] || '09:00'}
                             onChange={(val) => {
-                              const end = businessStatus.operating_hours.split(' - ')[1] || '21:00';
+                              const parts = (businessStatus.operating_hours || '09:00 - 21:00').split(' - ');
+                              const end = parts[1] || '21:00';
                               setBusinessStatus(prev => ({ ...prev, operating_hours: `${val} - ${end}` }));
                             }}
                           />
@@ -2727,19 +2781,31 @@ const ProfilePage: React.FC = () => {
                           <TimeWheelPicker 
                             label="CLOSED TIME"
                             icon="🌙"
-                            value={businessStatus.operating_hours.split(' - ')[1] || '21:00'}
+                            value={(businessStatus.operating_hours || '09:00 - 21:00').split(' - ')[1] || '21:00'}
                             onChange={(val) => {
-                              const start = businessStatus.operating_hours.split(' - ')[0] || '09:00';
+                              const parts = (businessStatus.operating_hours || '09:00 - 21:00').split(' - ');
+                              const start = parts[0] || '09:00';
                               setBusinessStatus(prev => ({ ...prev, operating_hours: `${start} - ${val}` }));
                             }}
                           />
 
                           {/* 营业时长预览 */}
                           {(() => {
-                            const start = businessStatus.operating_hours.split(' - ')[0];
-                            const end = businessStatus.operating_hours.split(' - ')[1];
-                            const [sH, sM] = start.split(':').map(Number);
-                            const [eH, eM] = end.split(':').map(Number);
+                            const hours = businessStatus.operating_hours || '09:00 - 21:00';
+                            const parts = hours.split(' - ');
+                            const start = parts[0] || '09:00';
+                            const end = parts[1] || '21:00';
+                            
+                            const startParts = start.split(':');
+                            const endParts = end.split(':');
+                            
+                            if (startParts.length < 2 || endParts.length < 2) return null;
+
+                            const [sH, sM] = startParts.map(Number);
+                            const [eH, eM] = endParts.map(Number);
+                            
+                            if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return null;
+
                             let duration = (eH * 60 + eM) - (sH * 60 + sM);
                             if (duration < 0) duration += 24 * 60; // 跨天
                             const h = Math.floor(duration / 60);
@@ -3245,6 +3311,37 @@ const ProfilePage: React.FC = () => {
                         📦 {language === 'zh' ? '开始打包' : language === 'en' ? 'Start Packing' : 'ထုပ်ပိုးရန်စတင်ပါ'}
                       </button>
                     )}
+
+                    {/* 🚀 新增：中转站重新发货按钮 */}
+                    {isPartnerStore && storeInfo?.store_type === 'transit_station' && pkg.status === '已送达' && pkg.description?.includes('[异常转送中转站]') && (
+                      <button
+                        onClick={() => handleReshipOrder(pkg)}
+                        style={{
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1.5rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '900',
+                          transition: 'all 0.3s ease',
+                          flex: 1,
+                          maxWidth: '150px',
+                          boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(217, 119, 6, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.3)';
+                        }}
+                      >
+                        🚀 {language === 'zh' ? '重新发货' : language === 'en' ? 'Re-ship' : 'ပြန်လည်ပို့ဆောင်ပါ'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -3504,7 +3601,9 @@ const ProfilePage: React.FC = () => {
                     {t.sender}
                   </h3>
                   {/* 🚀 新增：寄件人卡片中的身份标识 */}
-                  {selectedPackage.description?.includes('[下单身份: 商家]') && (
+                  {(selectedPackage.description?.includes('[下单身份: 商家]') || 
+                    selectedPackage.description?.includes('[Orderer: MERCHANTS]') ||
+                    selectedPackage.description?.includes('[အော်ဒါတင်သူ: MERCHANTS]')) && (
                     <div style={{ 
                       background: 'rgba(59, 130, 246, 0.2)', 
                       color: '#93c5fd', 
@@ -3514,7 +3613,7 @@ const ProfilePage: React.FC = () => {
                       fontWeight: '800',
                       border: '1px solid rgba(59, 130, 246, 0.3)'
                     }}>
-                      {language === 'zh' ? '下单账号：MERCHANTS' : 'Order Account: MERCHANTS'}
+                      {language === 'zh' ? '下单账号：MERCHANTS' : language === 'en' ? 'Order Account: MERCHANTS' : 'အော်ဒါအကောင့်: MERCHANTS'}
                     </div>
                   )}
                 </div>
@@ -3562,7 +3661,9 @@ const ProfilePage: React.FC = () => {
                     {t.receiver}
                   </h3>
                   {/* 🚀 新增：收件人卡片中的身份标识 */}
-                  {selectedPackage.description?.includes('[下单身份: VIP]') && (
+                  {(selectedPackage.description?.includes('[下单身份: VIP]') || 
+                    selectedPackage.description?.includes('[Orderer: VIP]') ||
+                    selectedPackage.description?.includes('[အော်ဒါတင်သူ: VIP]')) && (
                     <div style={{ 
                       background: 'rgba(251, 191, 36, 0.2)', 
                       color: '#fbbf24', 
@@ -3572,7 +3673,7 @@ const ProfilePage: React.FC = () => {
                       fontWeight: '800',
                       border: '1px solid rgba(251, 191, 36, 0.3)'
                     }}>
-                      {language === 'zh' ? '下单账号：VIP' : 'Order Account: VIP'}
+                      {language === 'zh' ? '下单账号：VIP' : language === 'en' ? 'Order Account: VIP' : 'အော်ဒါအကောင့်: VIP'}
                     </div>
                   )}
                 </div>
@@ -5619,15 +5720,19 @@ const ProfilePage: React.FC = () => {
                     </div>
 
                     {/* 图片预览 */}
-                    {review.images && review.images.length > 0 && (
+                    {review.images && Array.isArray(review.images) && review.images.length > 0 && (
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
                         {review.images.map((img, idx) => (
                           <img 
-                            key={idx} 
+                            key={`${review.id}-img-${idx}`} 
                             src={img} 
-                            alt="Review" 
+                            alt={`Review ${idx + 1}`} 
                             style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)' }} 
                             onClick={() => window.open(img, '_blank')}
+                            onError={(e) => {
+                              console.error('图片加载失败:', img);
+                              e.currentTarget.style.display = 'none'; // 隐藏加载失败的图片
+                            }}
                           />
                         ))}
                       </div>

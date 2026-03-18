@@ -84,6 +84,7 @@ const RealTimeTracking: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [abnormalPackages, setAbnormalPackages] = useState<Package[]>([]); // 🚨 新增：异常包裹状态
   const [abnormalCouriers, setAbnormalCouriers] = useState<CourierWithLocation[]>([]); // 🚨 新增：异常骑手状态
+  const [lowBatteryRiders, setLowBatteryRiders] = useState<CourierWithLocation[]>([]); // 🔋 新增：低电量预警骑手
   const [showAbnormalAlert, setShowAbnormalAlert] = useState(false); // 🚨 新增：异常警报弹窗显示状态
   
   type CityKey = 'mandalay' | 'pyinoolwin' | 'yangon' | 'naypyidaw' | 'taunggyi' | 'lashio' | 'muse';
@@ -276,16 +277,30 @@ const RealTimeTracking: React.FC = () => {
         return lastLocUpdate && lastLocUpdate < thirtyMinsAgo;
       });
 
-      // 如果发现了新的异常（包裹或骑手），触发警报
-      if (abnormalPkgs.length > abnormalPackages.length || abnormalRiders.length > abnormalCouriers.length) {
+      // 3. 🔋 检测低电量且有任务的骑手 (电量 < 10%)
+      const lowBatteryRidersList = couriers.filter(c => {
+        return (c.batteryLevel !== undefined && c.batteryLevel < 10) && (c.currentPackages || 0) > 0 && c.status !== 'offline';
+      });
+
+      // 如果发现了新的异常（包裹、骑手或低电量），触发警报
+      if (
+        abnormalPkgs.length > abnormalPackages.length || 
+        abnormalRiders.length > abnormalCouriers.length ||
+        lowBatteryRidersList.length > lowBatteryRiders.length
+      ) {
         if (soundEnabledRef.current && audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(e => console.error('播放警报音失败:', e));
         }
 
+        const alertBody = [];
+        if (abnormalPkgs.length > 0) alertBody.push(`${abnormalPkgs.length} 个异常包裹`);
+        if (abnormalRiders.length > 0) alertBody.push(`${abnormalRiders.length} 个异常停留骑手`);
+        if (lowBatteryRidersList.length > 0) alertBody.push(`${lowBatteryRidersList.length} 个骑手电量不足`);
+
         if (Notification.permission === 'granted') {
-          new Notification('⚠️ 实时监控异常警报', {
-            body: `发现 ${abnormalPkgs.length} 个异常包裹和 ${abnormalRiders.length} 个异常停留骑手！`,
+          new Notification('⚠️ 实时监控预警', {
+            body: `发现: ${alertBody.join(', ')}！`,
             icon: '/favicon.ico',
             tag: 'abnormal-alert'
           });
@@ -295,6 +310,7 @@ const RealTimeTracking: React.FC = () => {
 
       setAbnormalPackages(abnormalPkgs);
       setAbnormalCouriers(abnormalRiders as any);
+      setLowBatteryRiders(lowBatteryRidersList);
     };
 
     // 初始执行一次
@@ -473,14 +489,19 @@ const RealTimeTracking: React.FC = () => {
 
             const rtActiveTime = parseDate(courierRt?.last_active);
             const loginActiveTime = parseDate(acc.last_login);
-            const mostRecentActiveTime = Math.max(rtActiveTime, loginActiveTime);
+            const locationUpdateTime = parseDate(location?.updated_at || location?.last_update); // 🚀 新增：包含位置更新时间
+            
+            const mostRecentActiveTime = Math.max(rtActiveTime, loginActiveTime, locationUpdateTime);
 
-            if (mostRecentActiveTime > 0) {
-              const now = Date.now();
-              const diffMinutes = (now - mostRecentActiveTime) / (1000 * 60);
-              
-              // 🚀 优化：将在线判定阈值从 30 分钟缩短为 10 分钟，使上线显示更及时
-              if (diffMinutes < 10) {
+            const now = Date.now();
+            const diffMinutes = (now - mostRecentActiveTime) / (1000 * 60);
+            
+            // 🚀 核心优化：即便显式状态是离线，如果 10 分钟内有位置更新，也强制显示为在线
+            const hasRecentLocation = locationUpdateTime > 0 && (now - locationUpdateTime) / (1000 * 60) < 10;
+
+            if (hasRecentLocation || !isExplicitlyOffline) {
+              // 🚀 优化：将在线判定阈值延长为 30 分钟，确保位置更新稍慢的骑手不会被显示为离线
+              if (hasRecentLocation || diffMinutes < 30) {
                 displayStatus = (currentPackages >= 5 ? 'busy' : 'online') as Courier['status'];
               }
             }
@@ -498,6 +519,7 @@ const RealTimeTracking: React.FC = () => {
             currentPackages: currentPackages,
             todayDeliveries: courierRt?.total_deliveries || 0,
             batteryLevel: location?.battery_level || 100,
+            signal_strength: location?.signal_strength || 100, // 🚀 映射信号强度
             vehicle_type: acc.position === '骑手队长' ? 'car' : 'motorcycle',
             location_updated_at: location?.updated_at || courierRt?.last_active || acc.last_login
           } as any;
@@ -1189,6 +1211,14 @@ const RealTimeTracking: React.FC = () => {
                           <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
                             <strong>🔋 电量:</strong> <span style={{ color: selectedCourier.batteryLevel && selectedCourier.batteryLevel < 30 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{selectedCourier.batteryLevel || 0}%</span>
                           </p>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem' }}>
+                            <strong>📶 信号:</strong> <span style={{ 
+                              color: !selectedCourier.signal_strength || selectedCourier.signal_strength < 30 ? '#ef4444' : (selectedCourier.signal_strength < 60 ? '#f59e0b' : '#10b981'), 
+                              fontWeight: 'bold' 
+                            }}>
+                              {selectedCourier.signal_strength || 0}%
+                            </span>
+                          </p>
                         </div>
                         <div style={{ 
                           marginTop: '0.8rem',
@@ -1377,7 +1407,7 @@ const RealTimeTracking: React.FC = () => {
                     <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
                     {/* 下单身份标识 */}
                     {(() => {
-                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                       const identity = identityMatch ? identityMatch[1] : '';
                       const isMerchant = identity === '商家' || identity === 'MERCHANTS';
                       const isVIP = identity === 'VIP';
@@ -1687,7 +1717,7 @@ const RealTimeTracking: React.FC = () => {
                     }}>
                       <strong style={{ color: '#166534' }}>{pkg.id}</strong>
                       {(() => {
-                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                         const identity = identityMatch ? identityMatch[1] : '';
                         const isMerchant = identity === '商家' || identity === 'MERCHANTS';
                         const isVIP = identity === 'VIP';
@@ -2128,7 +2158,7 @@ const RealTimeTracking: React.FC = () => {
       )}
 
       {/* 🚨 新增：异常监控警报浮窗 */}
-      {showAbnormalAlert && (abnormalPackages.length > 0 || abnormalCouriers.length > 0) && (
+      {showAbnormalAlert && (abnormalPackages.length > 0 || abnormalCouriers.length > 0 || lowBatteryRiders.length > 0) && (
         <div style={{
           position: 'fixed',
           bottom: '20px',
@@ -2141,11 +2171,12 @@ const RealTimeTracking: React.FC = () => {
           zIndex: 2000,
           padding: '20px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderLeft: '6px solid #f97316', // 🚀 橙色警报
           animation: 'slideUp 0.5s ease-out'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
-              🚨 异常状态预警
+              🚨 实时监控异常预警
             </h3>
             <button 
               onClick={() => setShowAbnormalAlert(false)}
@@ -2154,6 +2185,43 @@ const RealTimeTracking: React.FC = () => {
           </div>
           
           <div style={{ maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* 🔋 骑手电量监控 */}
+            {lowBatteryRiders.length > 0 && (
+              <div>
+                <div style={{ color: '#f97316', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  🔋 骑手电量不足 (低于 10%)
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {lowBatteryRiders.map(courier => (
+                    <div key={courier.id} style={{ 
+                      background: 'rgba(249, 115, 22, 0.1)', 
+                      padding: '12px', 
+                      borderRadius: '10px',
+                      border: '1px solid rgba(249, 115, 22, 0.2)',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      if (courier.latitude && courier.longitude) {
+                        setMapCenter({ lat: courier.latitude, lng: courier.longitude });
+                        setSelectedCourier(courier);
+                      }
+                    }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                        <span style={{ fontWeight: 'bold', color: '#f97316' }}>{courier.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'white', background: '#f97316', padding: '1px 6px', borderRadius: '4px' }}>
+                          电量: {courier.batteryLevel}%
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                        📦 正在配送: {courier.currentPackages} 件 | 📱 {courier.phone}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 异常停留骑手 */}
             {abnormalCouriers.length > 0 && (
               <div>

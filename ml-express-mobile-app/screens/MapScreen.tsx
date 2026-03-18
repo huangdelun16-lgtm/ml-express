@@ -1388,7 +1388,7 @@ export default function MapScreen({ navigation }: any) {
               
               {/* 🚀 新增：在顶部显示下单身份 */}
               {(() => {
-                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                 if (identityMatch && identityMatch[1]) {
                   const identity = identityMatch[1];
                   const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
@@ -1415,7 +1415,7 @@ export default function MapScreen({ navigation }: any) {
           
           <View style={styles.cardBody}>
             {(() => {
-              const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+              const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
               const identity = identityMatch ? identityMatch[1] : 'Member';
               const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
               const isVIP = identity === 'VIP' || identity === 'VIP MEMBER' || identity === 'VIP အဖွဲ့ဝင်';

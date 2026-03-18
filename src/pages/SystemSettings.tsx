@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SystemSetting, systemSettingsService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
+import SecurityVerificationModal from '../components/SecurityVerificationModal';
 
 type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | 'tracking' | 'security';
 
@@ -346,7 +347,7 @@ const REGIONS = [
 
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<SettingCategory>('general');
   const [selectedRegion, setSelectedRegion] = useState<string>('mandalay');
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
@@ -358,6 +359,7 @@ const SystemSettings: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [settingsMetadata, setSettingsMetadata] = useState<Record<string, { updated_at?: string | null; updated_by?: string | null }>>({});
+  const [showVerificationModal, setShowVerificationModal] = useState(false); // 🚀 新增：安全验证弹窗
 
   const definitionMap = useMemo(() => {
     const map: Record<string, SettingDefinition> = {};
@@ -483,6 +485,20 @@ const SystemSettings: React.FC = () => {
   };
 
   const handleSave = async () => {
+    // 🚀 安全优化：修改计费规则时需要二次验证
+    if (activeTab === 'pricing') {
+      setShowVerificationModal(true);
+      return;
+    }
+    
+    // 执行实际保存
+    await executeSave();
+  };
+
+  /**
+   * 实际执行保存逻辑
+   */
+  const executeSave = async () => {
     setSaving(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -940,43 +956,50 @@ const SystemSettings: React.FC = () => {
 
             {/* 计费规则专属：领区选择器 */}
             {activeTab === 'pricing' && (
-              <div style={{ 
-                background: 'rgba(255, 255, 255, 0.08)', 
-                padding: '12px 20px', 
-                borderRadius: '16px', 
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-              }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  领区中心
-                </label>
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => {
-                    setSelectedRegion(e.target.value);
-                    setHasChanges(false); 
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(15, 32, 60, 0.8)',
-                    color: 'white',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  {REGIONS.map(r => (
-                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
-                      {r.name} ({r.prefix})
-                    </option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                {lastSavedAt && (
+                  <div style={{ fontSize: '0.85rem', opacity: 0.6, fontWeight: 600 }}>
+                    最后修改时间：{formatTimestamp(lastSavedAt)}
+                  </div>
+                )}
+                <div style={{ 
+                  background: 'rgba(255, 255, 255, 0.08)', 
+                  padding: '12px 20px', 
+                  borderRadius: '16px', 
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                }}>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    领区中心
+                  </label>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => {
+                      setSelectedRegion(e.target.value);
+                      setHasChanges(false); 
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(15, 32, 60, 0.8)',
+                      color: 'white',
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    {REGIONS.map(r => (
+                      <option key={r.id} value={r.id} style={{ color: '#000' }}>
+                        {r.name} ({r.prefix})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>
@@ -989,11 +1012,16 @@ const SystemSettings: React.FC = () => {
           ) : (
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
               gap: '24px' 
             }}>
               {currentDefinitions.map(def => {
                 const metadata = settingsMetadata[def.key];
+                
+                // 支持多语言覆盖
+                let displayLabel = def.label;
+                let displayDesc = def.description;
+
                 return (
                   <div
                     key={def.key}
@@ -1022,8 +1050,8 @@ const SystemSettings: React.FC = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{def.label}</h3>
-                        <p style={{ margin: '4px 0 0 0', opacity: 0.5, fontSize: '0.88rem', lineHeight: 1.5 }}>{def.description}</p>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{displayLabel}</h3>
+                        <p style={{ margin: '4px 0 0 0', opacity: 0.5, fontSize: '0.88rem', lineHeight: 1.5 }}>{displayDesc}</p>
                       </div>
                       {def.suffix && def.type !== 'switch' && (
                         <div style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6' }}>
@@ -1036,7 +1064,7 @@ const SystemSettings: React.FC = () => {
                       {renderInput(def)}
                     </div>
 
-                    {(def.helpText || metadata) && (
+                    {(def.helpText) && (
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                         {def.helpText ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', fontSize: '0.8rem', fontWeight: 600 }}>
@@ -1044,11 +1072,6 @@ const SystemSettings: React.FC = () => {
                             <span>{def.helpText}</span>
                           </div>
                         ) : <div />}
-                        {metadata && (
-                          <span style={{ opacity: 0.3, fontSize: '0.7rem', color: 'white' }}>
-                            {formatTimestamp(metadata.updated_at)}
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1058,6 +1081,15 @@ const SystemSettings: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 🚀 安全验证弹窗 */}
+      <SecurityVerificationModal 
+        visible={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onVerifySuccess={executeSave}
+        title="修改计费规则验证"
+        description="修改计费规则将直接影响全平台的运费计算，请验证您的管理员密码以确认此操作。"
+      />
     </div>
   );
 };

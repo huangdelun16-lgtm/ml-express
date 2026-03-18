@@ -116,7 +116,7 @@ export default function DeliveryHistoryScreen({ navigation }: any) {
               
               {/* 🚀 新增：在顶部显示下单身份 */}
               {(() => {
-                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                 if (identityMatch && identityMatch[1]) {
                   const identity = identityMatch[1];
                   const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';

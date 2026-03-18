@@ -104,6 +104,7 @@ export interface CourierLocation {
   battery_level?: number;
   status: string;
   created_at?: string;
+  signal_strength?: number; // 🚀 新增：网络信号强度 (0-100)
 }
 
 export interface SystemSetting {

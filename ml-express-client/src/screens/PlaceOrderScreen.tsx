@@ -13,6 +13,8 @@ import {
   Modal,
   Dimensions,
   Image,
+  ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -490,11 +492,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         oversized: '超规件',
         fragile: '易碎品',
         foodDrinks: '食品和饮料',
+        waySide: '顺路递',
       },
       packageTypeDetails: {
         standard: '标准件（45x60x15cm）和（5KG）以内',
         overweight: '超重件（5KG）以上',
         oversized: '超规件（45x60x15cm）以上',
+        waySide: '顺路递 (24小时内送达)',
       },
       packageTypeInfo: {
         title: '包裹类型说明',
@@ -506,6 +510,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         standardDescription: '适用于常规大小的包裹，如衣物、文件、小型物品等。',
         overweightDescription: '适用于重量超过5公斤的包裹。重物品需要额外运费，请确保包装牢固。',
         oversizedDescription: '适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。',
+        waySideDescription: '24小时顺路送达。最实惠的配送方式，不计距离和重量费。',
         understood: '我知道了',
       },
       timePicker: {
@@ -606,11 +611,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         oversized: 'Oversized',
         fragile: 'Fragile',
         foodDrinks: 'Food & Drinks',
+        waySide: 'Eco Way',
       },
       packageTypeDetails: {
         standard: 'Standard Package (45x60x15cm) and (5KG) or less',
         overweight: 'Overweight (over 5KG)',
         oversized: 'Oversized (over 45x60x15cm)',
+        waySide: 'Eco Way (Within 24 Hours)',
       },
       packageTypeInfo: {
         title: 'Package Type Description',
@@ -622,6 +629,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         standardDescription: 'Suitable for regular-sized packages such as clothing, documents, small items, etc.',
         overweightDescription: 'Suitable for packages weighing over 5KG. Heavy items require additional shipping fees. Please ensure secure packaging.',
         oversizedDescription: 'Suitable for large packages exceeding standard dimensions. Large items require additional shipping fees. Please contact in advance to confirm transportability.',
+        waySideDescription: 'Delivery within 24 hours. Most affordable way, no distance or weight surcharge.',
         understood: 'I Understand',
       },
       timePicker: {
@@ -720,11 +728,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         oversized: 'အရွယ်အစားကြီးပါဆယ်',
         fragile: 'ကျိုးပဲ့လွယ်သောပစ္စည်း',
         foodDrinks: 'အစားအသောက်',
+        waySide: 'တန်တန်လေးပို့',
       },
       packageTypeDetails: {
         standard: 'ပုံမှန်ပါဆယ် (45x60x15cm) နှင့် (5KG) အောက်',
         overweight: 'အလေးချိန်ပိုပါဆယ် (5KG အထက်)',
         oversized: 'အရွယ်အစားကြီးပါဆယ် (45x60x15cm အထက်)',
+        waySide: 'တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)',
       },
       packageTypeInfo: {
         title: 'ပါဆယ်အမျိုးအစားရှင်းလင်းချက်',
@@ -736,6 +746,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         standardDescription: 'ပုံမှန်အရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ဥပမာ: အဝတ်အစား၊ စာရွက်စာတမ်း၊ သေးငယ်သောပစ္စည်းများ။',
         overweightDescription: '၅ကီလိုဂရမ်ထက်ပိုလေးသောပါဆယ်များအတွက်သင့်လျော်သည်။ လေးသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ထုပ်ပိုးမှုခိုင်မာစွာပြုလုပ်ပါ။',
         oversizedDescription: 'စံချိန်ထက်ကြီးသောအရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ကြီးမားသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ပို့ဆောင်နိုင်မနိုင်ကို ကြိုတင်ဆက်သွယ်ပါ။',
+        waySideDescription: '၂၄ နာရီအတွင်း တန်တန်လေး ပို့ဆောင်ပေးပါသည်။ စျေးအသက်သာဆုံး ပို့ဆောင်မှုဖြစ်ပြီး အကွာအဝေးနှင့် အလေးချိန်ကြေး မကောက်ခံပါ။',
         understood: 'နားလည်ပါပြီ',
       },
       timePicker: {
@@ -810,14 +821,19 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   }, [showTimePicker]);
 
   // 包裹类型选项（与Web端一致）- 使用 useMemo 优化
-  const packageTypes = useMemo(() => [
-    { value: '文件', label: currentT.packageTypes.document },
-    { value: '标准件（45x60x15cm）和（5KG）以内', label: currentT.packageTypes.standard },
-    { value: '超重件（5KG）以上', label: currentT.packageTypes.overweight },
-    { value: '超规件（45x60x15cm）以上', label: currentT.packageTypes.oversized },
-    { value: '易碎品', label: currentT.packageTypes.fragile },
-    { value: '食品和饮料', label: currentT.packageTypes.foodDrinks },
-  ], [currentT.packageTypes]);
+  const packageTypes = useMemo(() => {
+    const types = [
+      { value: '顺路递', label: currentT.packageTypes.waySide },
+      { value: '文件', label: currentT.packageTypes.document },
+      { value: '标准件（45x60x15cm）和（5KG）以内', label: currentT.packageTypes.standard },
+      { value: '超重件（5KG）以上', label: currentT.packageTypes.overweight },
+      { value: '超规件（45x60x15cm）以上', label: currentT.packageTypes.oversized },
+      { value: '易碎品', label: currentT.packageTypes.fragile },
+      { value: '食品和饮料', label: currentT.packageTypes.foodDrinks },
+    ];
+
+    return types;
+  }, [currentT.packageTypes]);
 
   // 配送速度选项（从计费规则获取）- 使用 useMemo 优化
   const deliverySpeeds = useMemo(() => [
@@ -1331,6 +1347,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       
       // 存储原始精确距离，用于给骑手算 KM 费
       setCalculatedDistance(exactDistance);
+
+      // 🚀 核心逻辑：如果是“顺路递”，只计算基础费用，且不计距离费和其他附加费
+      if (packageType === '顺路递') {
+        const basePrice = pricingSettings.base_fee;
+        setCalculatedPrice(Math.round(basePrice).toString());
+        setIsCalculated(true);
+        hideLoading();
+        Alert.alert(currentT.calculateSuccess, `配送类型: 顺路递 (24小时内送达)\n总费用: ${Math.round(basePrice)} MMK`);
+        return;
+      }
 
       // 计算各项费用（计费仍按取整后的距离）
       let totalPrice = pricingSettings.base_fee; // 基础费用
@@ -2284,7 +2310,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             description={description}
             showWeightInput={showWeightInput}
             packageTypes={packageTypes}
-            onPackageTypeChange={setPackageType}
+            onPackageTypeChange={(value) => {
+              setPackageType(value);
+              // 🚀 核心逻辑：如果是顺路递，速度设为 Eco Way 且不可选
+              if (value === '顺路递') {
+                setDeliverySpeed('Eco Way');
+              } else if (deliverySpeed === 'Eco Way') {
+                setDeliverySpeed('准时达');
+              }
+            }}
             onWeightChange={setWeight}
             onDescriptionChange={setDescription}
             onPackageTypeInfoClick={(type) => {
@@ -2345,6 +2379,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             deliverySpeeds={deliverySpeeds}
             onDeliverySpeedChange={setDeliverySpeed}
             onScheduleTimeClick={() => setShowTimePicker(true)}
+            isDisabled={packageType === '顺路递'} // 🚀 顺路递时禁用
           />
 
           {/* 价格计算 */}
@@ -2394,7 +2429,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* 模态框 */}
       <MapModal
         visible={showMapModal}
         language={language as any}
@@ -2432,6 +2466,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                 {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' ? currentT.packageTypeDetails.standard :
                  selectedPackageTypeInfo === '超重件（5KG）以上' ? currentT.packageTypeDetails.overweight :
                  selectedPackageTypeInfo === '超规件（45x60x15cm）以上' ? currentT.packageTypeDetails.oversized :
+                 selectedPackageTypeInfo === '顺路递' ? currentT.packageTypeDetails.waySide :
                  selectedPackageTypeInfo}
               </Text>
             </ScrollView>

@@ -617,8 +617,9 @@ const MyTasksScreen: React.FC = () => {
         return;
       }
 
-      // 2. 🚀 距离检查 (如果是送达操作)
-      if (selectedPackage && selectedPackage.status !== '待取件') {
+      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
+      const isStoreCode = data.startsWith('STORE_');
+      if (selectedPackage && selectedPackage.status !== '待取件' && !isStoreCode) {
         const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
         
@@ -642,11 +643,23 @@ const MyTasksScreen: React.FC = () => {
       setShowScanModal(false);
       
       if (data.startsWith('STORE_')) {
-        const storeId = data.replace('STORE_', '').split('_')[0];
-        const storeDetails = await deliveryStoreService.getStoreById(storeId);
-        const storeName = storeDetails ? storeDetails.store_name : `店铺${storeId}`;
+        const parts = data.split('_');
+        const storeId = parts.length > 1 ? parts[1] : '';
+        if (!storeId) {
+          Alert.alert('错误', '无效的店铺收件码');
+          resetScanState();
+          return;
+        }
         
-        Alert.alert('✅ 已送达', `包裹已送达至：${storeName}`, [{
+        const storeDetails = await deliveryStoreService.getStoreById(storeId);
+        const storeName = storeDetails ? storeDetails.store_name : `中转站`;
+        
+        // 🚀 核心逻辑：支持异常上报状态送达中转站
+        const isAnomalyResolution = selectedPackage?.status === '异常上报';
+        const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
+        const alertMsg = isAnomalyResolution ? `包裹已作为异常件送达至：${storeName}` : `包裹已送达至：${storeName}`;
+
+        Alert.alert('✅ ' + statusMsg, alertMsg, [{
           text: '确定',
           onPress: async () => {
             if (selectedPackage) {
@@ -654,7 +667,18 @@ const MyTasksScreen: React.FC = () => {
                 selectedPackage.id, '已送达', undefined, new Date().toISOString(), currentCourierName,
                 undefined, { storeId, storeName, receiveCode: data }
               );
-              if (success) await loadMyPackages();
+              
+              if (success) {
+                // 如果是异常上报，额外更新一条描述
+                if (isAnomalyResolution) {
+                  try {
+                    await supabase.from('packages').update({ 
+                      description: (selectedPackage.description || '') + ' [异常转送中转站]'
+                    }).eq('id', selectedPackage.id);
+                  } catch (e) {}
+                }
+                await loadMyPackages();
+              }
             }
           }
         }]);
@@ -695,7 +719,7 @@ const MyTasksScreen: React.FC = () => {
                   
                   {/* 🚀 新增：展示下单身份 */}
                   {(() => {
-                    const identityMatch = selectedPackage.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                    const identityMatch = selectedPackage.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                     if (identityMatch && identityMatch[1]) {
                       const identity = identityMatch[1];
                       return (
@@ -815,7 +839,7 @@ const MyTasksScreen: React.FC = () => {
                       
                       {/* 🚀 新增：在顶部显示下单身份 */}
                       {(() => {
-                        const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|အော်ဒါတင်သူ အမျိုးအစား): (.*?)\]/);
+                        const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
                         if (identityMatch && identityMatch[1]) {
                           const identity = identityMatch[1];
                           const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
