@@ -175,7 +175,7 @@ const TrackingPage: React.FC = () => {
             // 获取初始位置
             const { data: locData } = await supabase
               .from('courier_locations')
-              .select('latitude, longitude, last_update, updated_at')
+              .select('latitude, longitude, last_update')
               .eq('courier_id', courierId)
               .maybeSingle();
 
@@ -186,7 +186,7 @@ const TrackingPage: React.FC = () => {
                 name: trackingResult.courier,
                 phone: courierPhone,
                 vehicle: courierVehicleType === 'car' ? (language === 'zh' ? '汽车' : 'Car') : (language === 'zh' ? '摩托车' : 'Motorcycle'),
-                last_active: locData.last_update || locData.updated_at
+                last_active: locData.last_update
               };
               targetLocationRef.current = initialLoc;
               setAnimatedCourierLocation(initialLoc);
@@ -219,7 +219,7 @@ const TrackingPage: React.FC = () => {
                     name: trackingResult.courier,
                     phone: courierPhone,
                     vehicle: courierVehicleType === 'car' ? (language === 'zh' ? '汽车' : 'Car') : (language === 'zh' ? '摩托车' : 'Motorcycle'),
-                    last_active: payload.new.last_update || payload.new.updated_at || new Date().toISOString()
+                    last_active: payload.new.last_update || new Date().toISOString()
                   };
                   targetLocationRef.current = updatedLoc;
                   setCourierLocation(updatedLoc);

@@ -1,18 +1,7 @@
 import React, { useState } from 'react';
 import LoggerService from './../services/LoggerService';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Image,
-  Platform,
-  KeyboardAvoidingView,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { customerService, supabase } from '../services/supabase';

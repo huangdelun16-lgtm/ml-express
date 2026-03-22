@@ -125,7 +125,7 @@ const translations: any = {
       lightning: {
         title: '闪电配送',
         subtitle: 'LIGHTNING DELIVERY',
-        desc: '30分钟内上门取件，极速送达',
+        desc: '30分钟内急速送达',
         features: ['实时定位', '智能路线', '即时通知']
       },
       secure: {
@@ -143,8 +143,32 @@ const translations: any = {
       transparent: {
         title: '透明定价',
         subtitle: 'TRANSPARENT PRICING',
-        desc: '价格 transparent, 无隐藏费用, 物超所值',
+        desc: '价格透明, 无隐藏费用, 物超所值',
         features: ['透明定价', '无隐藏费', '优惠活动']
+      },
+      sameday: {
+        title: '顺路递',
+        subtitle: 'WAY SIDE DELIVERY',
+        desc: '同城顺路24小时内送达，价格全城最实惠',
+        features: ['24小时送达', '全城最实惠', '顺路配送']
+      },
+      mall: {
+        title: '同城商场',
+        subtitle: 'CITY MALL SHOPPING',
+        desc: '代购同城商场好货，足不出户逛遍全城',
+        features: ['优质商户', '一键代购', '极速配送']
+      },
+      cod: {
+        title: '代收货款',
+        subtitle: 'COD SERVICE',
+        desc: '安全可靠的代收货款服务，资金结算更快速',
+        features: ['安全结算', '实时到账', '专业流程']
+      },
+      vip: {
+        title: '会员特权',
+        subtitle: 'VIP MEMBERSHIP',
+        desc: '尊享最优惠的商品价格',
+        features: ['优先派单', '专属优惠', '信用支付']
       }
     },
     profile: {
@@ -622,6 +646,30 @@ const translations: any = {
         subtitle: 'TRANSPARENT PRICING',
         desc: 'Transparent pricing, no hidden fees, great value',
         features: ['Transparent Pricing', 'No Hidden Fees', 'Special Offers']
+      },
+      sameday: {
+        title: 'Same Day Delivery',
+        subtitle: 'SAME DAY DELIVERY',
+        desc: 'Focus on Mandalay and surrounding areas, delivered on time today',
+        features: ['Same Day', 'On Time', 'City-wide']
+      },
+      mall: {
+        title: 'City Mall Shopping',
+        subtitle: 'CITY MALL SHOPPING',
+        desc: 'Shop from local malls without leaving home',
+        features: ['Quality Stores', 'Personal Shopper', 'Fast Delivery']
+      },
+      cod: {
+        title: 'COD Service',
+        subtitle: 'COD SERVICE',
+        desc: 'Secure and reliable cash on delivery, faster settlement',
+        features: ['Secure Settlement', 'Real-time Credits', 'Professional']
+      },
+      vip: {
+        title: 'VIP Membership',
+        subtitle: 'VIP MEMBERSHIP',
+        desc: 'Enjoy priority delivery and recharge bonuses',
+        features: ['Priority Dispatch', 'Exclusive Offers', 'Credit Payment']
       }
     },
     profile: {
@@ -983,7 +1031,7 @@ const translations: any = {
       cart: 'စျေးဝယ်လှည်း'
     },
     features: {
-      title: 'ဝန်ဆောင်မှုအထူးခြားမှု',
+      title: 'ထူခြားသော၀န်ဆောင်မှုများ',
       subtitle: 'ပရော်ဖက်ရှင်နယ်၊ ထိရောက်သော၊ ယုံကြည်စိတ်ချရသော ပို့ဆောင်မှု အတွေ့အကြုံ',
       fast: 'မြန်ဆန်သောပို့ဆောင်မှု',
       safe: 'လုံခြုံသော',
@@ -1079,8 +1127,8 @@ const translations: any = {
       lightning: {
         title: 'မြန်ဆန်သော ပို့ဆောင်မှု',
         subtitle: 'LIGHTNING DELIVERY',
-        desc: 'မိနစ် ၃၀ အတွင်း အိမ်တွင်းလာယူ၊ အလျင်အမြန် ပို့ဆောင်ခြင်း',
-        features: ['လက်ရှိတည်နေရာ', 'ဉာဏ်ရည်တု လမ်းကြောင်း', 'ချက်ချင်း အကြောင်းကြားခြင်း']
+        desc: 'မိနစ် ၃၀ အတွင်း အလျင်အမြန် ပို့ဆောင်ပေးခြင်း',
+        features: ['အချိန်နှင့်တပြေးညီခြေရာခံခြင်း', 'ဉာဏ်ရည်တု လမ်းကြောင်း', 'ချက်ချင်း အကြောင်းကြားခြင်း']
       },
       secure: {
         title: 'လုံခြုံသော စောင့်ရှောက်မှု',
@@ -1092,13 +1140,37 @@ const translations: any = {
         title: 'ဉာဏ်ရည်တု ဝန်ဆောင်မှု',
         subtitle: 'SMART SERVICE',
         desc: 'အွန်လိုင်း အမှာတင်ခြင်း၊ လက်ရှိ စောင့်ကြည့်ခြင်း၊ ဉာဏ်ရည်တု ဖောက်သည်ဝန်ဆောင်မှု',
-        features: ['အွန်လိုင်း အမှာတင်ခြင်း', 'လက်ရှိ စောင့်ကြည့်ခြင်း', 'AI ဖောက်သည်ဝန်ဆောင်မှု']
+        features: ['အွန်လိုင်း အမှာတင်ခြင်း', 'အချိန်နှင့်တပြေးညီခြေရာခံခြင်း', 'AI ဖောက်သည်ဝန်ဆောင်မှု']
       },
       transparent: {
         title: 'ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း',
         subtitle: 'TRANSPARENT PRICING',
-        desc: 'စျေးနှုန်း ပွင့်လင်းမြင်သာမှု၊ ဖုံးကွယ်ထားသော ကုန်ကျစရိတ်မရှိ၊ တန်ဖိုးရှိသော',
+        desc: 'စျေးနှုန်း ပွင့်လင်းမြင်သာမှု၊ ဖုံးကွယ်ထားသော ကုန်ကျစရိတ်မရှိ၊ ချိုသာသောစျေးနှုန်း',
         features: ['ပွင့်လင်းသော စျေးနှုန်းသတ်မှတ်ခြင်း', 'ဖုံးကွယ်ထားသော ကုန်ကျစရိတ်မရှိ', 'အထူးလျော့စျေးများ']
+      },
+      sameday: {
+        title: 'တန်တန်လေးပို့',
+        subtitle: 'WAY SIDE DELIVERY',
+        desc: 'မြို့တွင်းအဆင်ပြေရာမှတစ်ဆင့် ၂၄ နာရီအတွင်း ပို့ဆောင်ပေးခြင်း၊ စျေးနှုန်းအသက်သာဆုံး',
+        features: ['၂၄ နာရီအတွင်း', 'စျေးနှုန်းအသက်သာဆုံး', 'အဆင်ပြေစွာပို့ဆောင်မှု']
+      },
+      mall: {
+        title: 'စျေးဝယ်စင်တာ ဝန်ဆောင်မှု',
+        subtitle: 'CITY MALL SHOPPING',
+        desc: 'မြို့တွင်းရှိ ဆိုင်များမှ ပစ္စည်းများကို အိမ်တိုင်ရာရောက် ဝယ်ယူပို့ဆောင်ပေးခြင်း',
+        features: ['အရည်အသွေးမြင့်ဆိုင်များ', 'ဝယ်ယူပေးခြင်း', 'မြန်ဆန်သောပို့ဆောင်မှု']
+      },
+      cod: {
+        title: 'ပစ္စည်းရောက်ငွေချေစနစ်',
+        subtitle: 'COD SERVICE',
+        desc: 'လုံခြုံစိတ်ချရသော ပစ္စည်းရောက်ငွေချေစနစ်နှင့် မြန်ဆန်သော ငွေရှင်းလင်းမှု',
+        features: ['လုံခြုံသောငွေရှင်းမှု', 'အချိန်နှင့်တပြေးညီ', 'ပရော်ဖက်ရှင်နယ်']
+      },
+      vip: {
+        title: 'VIP အဖွဲ့ဝင်အခွင့်အရေး',
+        subtitle: 'VIP MEMBERSHIP',
+        desc: 'အကောင်းဆုံးသော ကုန်ပစ္စည်းစျေးနှုန်းများကို ရရှိနိုင်ခြင်း',
+        features: ['ဦးစားပေးပို့ဆောင်မှု', 'အထူးလျော့စျေးများ', 'အကြွေးစနစ်']
       }
     },
     profile: {

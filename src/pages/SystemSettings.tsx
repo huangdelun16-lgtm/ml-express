@@ -40,8 +40,8 @@ const settingDefinitions: SettingDefinition[] = [
     description: '接收客户咨询和紧急联系的电话号码。',
     category: 'general',
     type: 'text',
-    defaultValue: '(+95) 09788848928',
-    placeholder: '(+95) 09788848928'
+    defaultValue: '(+95) 09788848928 / (+95) 09941118588 / (+95) 09941118688',
+    placeholder: '(+95) 09788848928 / (+95) 09941118588 / (+95) 09941118688'
   },
   {
     key: 'company.contact_email',

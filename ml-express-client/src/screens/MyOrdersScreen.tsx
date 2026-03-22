@@ -1,23 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Dimensions,
-  Alert,
-  ActivityIndicator,
-  DeviceEventEmitter,
-  Platform,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Animated, Modal, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { packageService, supabase, reviewService } from '../services/supabase';
+import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -26,7 +14,6 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
-import { Modal, TextInput } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -93,6 +80,33 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // 🚀 新增：聊天未读数状态
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const chatSubscriptionRef = useRef<any>(null);
+
+  // 🚀 新增：呼吸灯动画状态
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  // 🚀 启动呼吸灯动画
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, []);
 
   // 翻译
   const translations: any = {
@@ -263,6 +277,63 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   }, [route?.params?.filterStatus, selectedStatus]);
 
+  // 🚀 新增：实时监听所有订单的消息
+  useEffect(() => {
+    if (!customerId) return;
+
+    // 订阅聊天消息表
+    chatSubscriptionRef.current = supabase
+      .channel('global-unread-counts')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages'
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          // 如果消息不是我发的，且属于我的某个订单
+          if (newMsg.sender_id !== customerId) {
+            setUnreadCounts(prev => ({
+              ...prev,
+              [newMsg.order_id]: (prev[newMsg.order_id] || 0) + 1
+            }));
+            // 轻微震动提示
+            Vibration.vibrate(100);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages'
+        },
+        (payload) => {
+          const updatedMsg = payload.new as any;
+          // 如果消息被标记为已读
+          if (updatedMsg.is_read) {
+            setUnreadCounts(prev => {
+              const currentCount = prev[updatedMsg.order_id] || 0;
+              return {
+                ...prev,
+                [updatedMsg.order_id]: Math.max(0, currentCount - 1)
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (chatSubscriptionRef.current) {
+        supabase.removeChannel(chatSubscriptionRef.current);
+      }
+    };
+  }, [customerId]);
+
   const loadCustomerId = async () => {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
@@ -329,6 +400,25 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       });
       setOrders(data);
       filterOrders(data, selectedStatus);
+
+      // 🚀 新增：获取所有订单的未读消息数
+      if (data.length > 0) {
+        const orderIds = data.map(o => o.id);
+        const { data: unreadData, error: unreadError } = await supabase
+          .from('chat_messages')
+          .select('order_id, is_read')
+          .in('order_id', orderIds)
+          .eq('is_read', false)
+          .neq('sender_id', userId);
+        
+        if (!unreadError && unreadData) {
+          const counts: Record<string, number> = {};
+          unreadData.forEach(msg => {
+            counts[msg.order_id] = (counts[msg.order_id] || 0) + 1;
+          });
+          setUnreadCounts(counts);
+        }
+      }
 
       // 🚀 新增：获取已评价的订单ID列表
       if (data.length > 0) {
@@ -680,58 +770,95 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersContent}
         >
-          {statusFilters.map((filter) => (
-            <TouchableOpacity
-              key={filter.key}
-              style={[
-                styles.filterChip,
-                selectedStatus === filter.key && styles.filterChipActive,
-              ]}
-              onPress={() => handleStatusChange(filter.key)}
-              onLayout={(event) => {
-                const { x } = event.nativeEvent.layout;
-                filterCardPositions.current[filter.key] = x;
-              }}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={
-                  selectedStatus === filter.key
-                    ? [filter.color, filter.color + 'dd']
-                    : ['#ffffff', '#ffffff']
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.filterChipGradient}
+          {statusFilters.map((filter) => {
+            const categoryUnreadTotal = filter.key === 'all' ? 0 : orders
+              .filter(o => o.status === filter.key)
+              .reduce((sum, o) => sum + (unreadCounts[o.id] || 0), 0);
+            const hasUnread = categoryUnreadTotal > 0;
+
+            return (
+              <TouchableOpacity
+                key={filter.key}
+                style={[
+                  styles.filterChip,
+                  selectedStatus === filter.key && styles.filterChipActive,
+                  hasUnread && styles.filterChipWithUnread,
+                ]}
+                onPress={() => handleStatusChange(filter.key)}
+                onLayout={(event) => {
+                  const { x } = event.nativeEvent.layout;
+                  filterCardPositions.current[filter.key] = x;
+                }}
+                activeOpacity={0.7}
               >
-                <Text
+                {/* 🚀 呼吸灯光晕背景 */}
+                {hasUnread && (
+                  <Animated.View 
+                    style={[
+                      styles.pulseGlow, 
+                      { 
+                        opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.4] }),
+                        transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }]
+                      }
+                    ]} 
+                  />
+                )}
+
+                <LinearGradient
+                  colors={
+                    selectedStatus === filter.key
+                      ? [filter.color, filter.color + 'dd']
+                      : ['#ffffff', '#ffffff']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={[
-                    styles.filterChipText,
-                    selectedStatus === filter.key && styles.filterChipTextActive,
+                    styles.filterChipGradient,
+                    hasUnread && { borderWidth: 2, borderColor: '#3b82f6' }
                   ]}
                 >
-                  {filter.label}
-                </Text>
-                {filter.key !== 'all' && (
-                  <View
+                  <Text
                     style={[
-                      styles.filterBadge,
-                      { backgroundColor: selectedStatus === filter.key ? '#ffffff33' : filter.color + '33' },
+                      styles.filterChipText,
+                      selectedStatus === filter.key && styles.filterChipTextActive,
+                      hasUnread && selectedStatus !== filter.key && { color: '#2563eb', fontWeight: '900' }
                     ]}
                   >
-                    <Text
+                    {filter.label}
+                  </Text>
+                  {filter.key !== 'all' && (
+                    <View
                       style={[
-                        styles.filterBadgeText,
-                        { color: selectedStatus === filter.key ? '#ffffff' : filter.color },
+                        styles.filterBadge,
+                        { backgroundColor: selectedStatus === filter.key ? '#ffffff33' : filter.color + '33' },
                       ]}
                     >
-                      {orders.filter(o => o.status === filter.key).length}
-                    </Text>
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
+                      <Text
+                        style={[
+                          styles.filterBadgeText,
+                          { color: selectedStatus === filter.key ? '#ffffff' : filter.color },
+                        ]}
+                      >
+                        {orders.filter(o => o.status === filter.key).length}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* 🚀 显著的蓝色消息徽章 */}
+                  {hasUnread && (
+                    <Animated.View style={[
+                      styles.filterUnreadBadge,
+                      {
+                        transform: [{ translateY: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }]
+                      }
+                    ]}>
+                      <Text style={styles.filterUnreadBadgeText}>💬 {categoryUnreadTotal}</Text>
+                    </Animated.View>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -769,10 +896,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           filteredOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
-              style={styles.orderCard}
+              style={[
+                styles.orderCard,
+                unreadCounts[order.id] > 0 && styles.unreadOrderCard
+              ]}
               onPress={() => handleViewDetail(order.id)}
               activeOpacity={0.7}
             >
+              {/* 🚀 新增：卡片右上角消息提醒 */}
+              {unreadCounts[order.id] > 0 && (
+                <View style={styles.cardUnreadBadge}>
+                  <Text style={styles.cardUnreadBadgeText}>💬 {unreadCounts[order.id]}</Text>
+                </View>
+              )}
               {/* 订单头部 */}
               <View style={styles.orderHeader}>
                 <View style={styles.orderHeaderLeft}>
@@ -830,10 +966,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               {/* 配送员信息（如有） */}
               {order.courier && (
                 <View style={styles.orderCourier}>
-                  <Text style={styles.orderCourierIcon}>🏍️</Text>
-                  <Text style={styles.orderCourierText}>
-                    {t.courier}: {order.courier}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Text style={styles.orderCourierIcon}>🏍️</Text>
+                    <Text style={styles.orderCourierText}>
+                      {t.courier}: {order.courier}
+                    </Text>
+                  </View>
+                  {/* 🚀 新增：配送员小框里的消息提示 */}
+                  {unreadCounts[order.id] > 0 && (
+                    <View style={styles.courierUnreadContainer}>
+                      <Ionicons name="chatbubble-ellipses" size={14} color="#3b82f6" />
+                      <Text style={styles.courierUnreadText}>{language === 'zh' ? '新消息' : 'New Msg'}</Text>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -928,6 +1073,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         visible={showPackingModal}
         orderData={packingOrderData}
         language={language}
+        onClose={() => {
+          setShowPackingModal(false);
+          setPackingOrderData(null);
+        }}
         onComplete={async () => {
           if (!packingOrderData) return;
           try {
@@ -1153,6 +1302,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  filterUnreadBadge: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#3b82f6', // 蓝色背景，与卡片一致
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    elevation: 4,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  filterUnreadBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  // 🚀 新增：呼吸灯光晕样式
+  pulseGlow: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 24,
+    backgroundColor: '#3b82f6',
+    zIndex: -1,
+  },
+  filterChipWithUnread: {
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
+  },
   scrollView: {
     flex: 1,
   },
@@ -1210,6 +1401,33 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.8)',
+    position: 'relative',
+  },
+  // 🚀 新增：有未读消息的订单卡片样式
+  unreadOrderCard: {
+    borderColor: '#3b82f6',
+    borderWidth: 2,
+    backgroundColor: '#f0f7ff',
+  },
+  cardUnreadBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 16,
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+    elevation: 5,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  cardUnreadBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '900',
   },
   orderHeader: {
     flexDirection: 'row',
@@ -1309,6 +1527,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0f2fe',
+  },
+  courierUnreadContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+  },
+  courierUnreadText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#3b82f6',
   },
   orderCourierIcon: {
     fontSize: 16,

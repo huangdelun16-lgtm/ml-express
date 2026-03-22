@@ -27,6 +27,8 @@ const { width, height } = Dimensions.get('window');
 const HOTLINE_NUMBERS = [
   { display: '(+95) 09788848928', tel: '+959788848928' },
   { display: '(+95) 09259369349', tel: '+959259369349' },
+  { display: '(+95) 09941118588', tel: '+959941118588' },
+  { display: '(+95) 09941118688', tel: '+959941118688' },
 ];
 
 export default function SettingsScreen({ navigation }: any) {

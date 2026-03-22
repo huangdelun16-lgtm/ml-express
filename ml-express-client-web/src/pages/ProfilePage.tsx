@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview, userService } from '../services/supabase';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
@@ -175,6 +178,20 @@ const ProfilePage: React.FC = () => {
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({}); // 🚀 新增：商品价格映射
   const [isSavingStatus, setIsSavingStatus] = useState(false); // 🚀 新增：保存状态反馈
   const [isGuest, setIsGuest] = useState(false); // 🚀 新增：访客状态
+
+  // 🚀 新增：导出对账单状态
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; // 本月第一天
+  });
+  const [exportEndDate, setExportEndDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0]; // 今天
+  });
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
+  const [exportMethod, setExportMethod] = useState<'download' | 'email'>('download');
   
   // 🚀 新增：评价管理状态
   const [showReviewsModal, setShowReviewsModal] = useState(false);
@@ -1087,6 +1104,166 @@ const ProfilePage: React.FC = () => {
       alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
             language === 'en' ? 'Failed to update password, please try again later' : 
             'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
+    }
+  };
+
+  // 🚀 新增：导出对账单逻辑
+  const handleExportStatement = async () => {
+    if (!currentUser?.id || !isPartnerStore) return;
+    
+    try {
+      setIsExporting(true);
+      
+      console.log('📡 开始查询订单数据...', {
+        store_id: currentUser.store_id || currentUser.id,
+        start: exportStartDate,
+        end: exportEndDate
+      });
+
+      // 1. 获取该日期范围内的订单数据
+      const { data: orders, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('delivery_store_id', currentUser.store_id || currentUser.id)
+        .gte('created_at', `${exportStartDate}T00:00:00.000Z`)
+        .lte('created_at', `${exportEndDate}T23:59:59.999Z`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ 数据库查询失败:', error);
+        throw error;
+      }
+
+      console.log(`✅ 获取到 ${orders?.length || 0} 条订单`);
+
+      if (!orders || orders.length === 0) {
+        alert(language === 'zh' ? '所选日期范围内没有订单数据' : 'No orders found in the selected date range');
+        setIsExporting(false);
+        return;
+      }
+
+      // 2. 准备导出数据
+      const fileName = `Statement_${storeInfo?.store_name || 'Merchant'}_${exportStartDate}_to_${exportEndDate}`;
+      
+      if (exportFormat === 'excel') {
+        // 生成 Excel
+        console.log('📄 正在生成 Excel...');
+        const worksheetData = orders.map(pkg => ({
+          '订单号': pkg.id,
+          '下单时间': new Date(pkg.created_at).toLocaleString(),
+          '寄件人': pkg.sender_name,
+          '收件人': pkg.receiver_name,
+          '状态': pkg.status,
+          '跑腿费': pkg.price,
+          '代收金额': pkg.cod_amount || 0,
+          '支付方式': pkg.payment_method === 'cash' ? '现金' : '余额',
+          '结算状态': pkg.cod_settled ? '已结算' : '待结算'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(worksheetData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Orders");
+        
+        if (exportMethod === 'download') {
+          console.log('⬇️ 正在下载 Excel...');
+          XLSX.writeFile(wb, `${fileName}.xlsx`);
+          setIsExporting(false);
+          setShowExportModal(false);
+        } else {
+          // 发送邮件需要 Base64
+          console.log('📧 正在准备邮件发送 (Excel)...');
+          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+          const base64Data = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
+          await sendStatementByEmail(base64Data, `${fileName}.xlsx`);
+        }
+      } else {
+        // 生成 PDF
+        console.log('📄 正在尝试生成 PDF...');
+        try {
+          const doc = new jsPDF();
+          
+          // 添加标题
+          doc.setFontSize(18);
+          // 🚀 核心修复：jsPDF 默认不支持中文/缅文。如果 store_name 包含这些字符，doc.text 可能会报错。
+          // 我们尝试使用拼音或占位符，并强烈建议用户使用 Excel 格式。
+          const displayStoreName = (storeInfo?.store_name || 'Merchant').replace(/[^\x00-\x7F]/g, '*');
+          doc.text(`Statement: ${displayStoreName}`, 14, 20);
+          
+          doc.setFontSize(12);
+          doc.text(`Period: ${exportStartDate} to ${exportEndDate}`, 14, 30);
+          
+          // 准备表格数据 - 全部转为 ASCII 兼容字符
+          const tableColumn = ["ID", "Date", "Receiver", "Status", "Price", "COD", "Settled"];
+          const tableRows = orders.map(pkg => [
+            pkg.id.slice(-8), 
+            new Date(pkg.created_at).toLocaleDateString(),
+            (pkg.receiver_name || '').replace(/[^\x00-\x7F]/g, '*'),
+            (pkg.status || '').replace(/[^\x00-\x7F]/g, '*'),
+            pkg.price,
+            pkg.cod_amount || 0,
+            pkg.cod_settled ? "Yes" : "No"
+          ]);
+
+          console.log('📊 正在调用 autoTable...');
+          (doc as any).autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 40,
+            theme: 'grid',
+            styles: { fontSize: 8, font: 'helvetica' }
+          });
+
+          if (exportMethod === 'download') {
+            console.log('⬇️ 正在执行 PDF 下载保存...');
+            doc.save(`${fileName}.pdf`);
+            setIsExporting(false);
+            setShowExportModal(false);
+          } else {
+            console.log('📧 正在准备 PDF 邮件数据...');
+            const pdfBase64 = doc.output('datauristring');
+            await sendStatementByEmail(pdfBase64, `${fileName}.pdf`);
+          }
+        } catch (pdfErr) {
+          console.error('❌ PDF 生成过程崩溃:', pdfErr);
+          alert(language === 'zh' ? 'PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。' : 'PDF format currently does not support Unicode. Please use Excel (XLSX) instead.');
+          setIsExporting(false);
+        }
+      }
+    } catch (error) {
+      LoggerService.error('导出对账单失败:', error);
+      alert('导出失败，请检查网络重试');
+      setIsExporting(false);
+    }
+  };
+
+  const sendStatementByEmail = async (fileData: string, fileName: string) => {
+    try {
+      const response = await fetch('/.netlify/functions/send-statement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: storeInfo?.email || currentUser?.email,
+          storeName: storeInfo?.store_name,
+          startDate: exportStartDate,
+          endDate: exportEndDate,
+          fileData,
+          fileName,
+          format: exportFormat,
+          language
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(language === 'zh' ? '✅ 对账单已成功发送到您的邮箱' : '✅ Statement has been sent to your email');
+        setShowExportModal(false);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      alert(`发送失败: ${error.message}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -2119,7 +2296,11 @@ const ProfilePage: React.FC = () => {
             display: 'grid',
             gridTemplateColumns: window.innerWidth < 768 
               ? 'repeat(2, 1fr)' 
-              : (orderStats.pendingConfirmation > 0 ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)'),
+              : `repeat(${
+                  4 + 
+                  (isPartnerStore && orderStats.pendingConfirmation > 0 ? 1 : 0) + 
+                  (isPartnerStore ? 2 : 0)
+                }, 1fr)`,
             gap: '1.5rem',
             marginBottom: '3rem'
           }}>
@@ -2152,8 +2333,8 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 待接单 (仅当有待接单订单时显示) */}
-            {orderStats.pendingConfirmation > 0 && (
+            {/* 待接单 (仅当是合伙店铺且有待接单订单时显示) */}
+            {isPartnerStore && orderStats.pendingConfirmation > 0 && (
               <div style={{
                 background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(217, 119, 6, 0.1) 100%)',
                 borderRadius: '24px',
@@ -2515,6 +2696,36 @@ const ProfilePage: React.FC = () => {
                       onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
                     >›</button>
                   </div>
+
+                  {/* 🚀 新增：导出对账单按钮 */}
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 24px',
+                      borderRadius: '18px',
+                      fontWeight: '900',
+                      fontSize: '1.1rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      boxShadow: '0 10px 20px rgba(79, 70, 229, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 15px 30px rgba(79, 70, 229, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(79, 70, 229, 0.3)';
+                    }}
+                  >
+                    📊 {language === 'zh' ? '导出对账单' : 'Export Statement'}
+                  </button>
                 </div>
                 
                 <div style={{
@@ -3198,7 +3409,7 @@ const ProfilePage: React.FC = () => {
                     })()}
 
                     {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
-                    {isPartnerStore && (pkg.cod_amount && pkg.cod_amount > 0) && (
+                    {isPartnerStore && pkg.cod_amount > 0 ? (
                       <div style={{
                         background: 'rgba(239, 68, 68, 0.2)',
                         color: '#fca5a5',
@@ -3211,7 +3422,7 @@ const ProfilePage: React.FC = () => {
                       }}>
                         💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   <div style={{
@@ -5170,7 +5381,7 @@ const ProfilePage: React.FC = () => {
       )}
 
       {/* 🚀 新增：待接单订单列表模态框 */}
-      {showPendingAcceptListModal && (
+      {isPartnerStore && showPendingAcceptListModal && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -6177,6 +6388,155 @@ const ProfilePage: React.FC = () => {
                   <>
                     <span>💾</span>
                     <span>{language === 'zh' ? '保存资料' : 'Save Profile'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：导出对账单模态框 (ExportStatementModal) */}
+      {showExportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 30000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}
+        onClick={() => !isExporting && setShowExportModal(false)}
+        >
+          <div style={{
+            background: '#1e293b',
+            borderRadius: '35px',
+            width: '100%',
+            maxWidth: '500px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            position: 'relative'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* 页眉 */}
+            <div style={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              padding: '2rem',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📊</div>
+              <h2 style={{ color: 'white', fontSize: '1.75rem', fontWeight: '950', margin: 0 }}>
+                {language === 'zh' ? '导出结算对账单' : 'Export Statement'}
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                {language === 'zh' ? '选择日期范围和导出方式' : 'Select date range and method'}
+              </p>
+            </div>
+
+            <div style={{ padding: '2rem' }}>
+              {/* 日期选择 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.5rem' }}>
+                    {language === 'zh' ? '开始日期' : 'Start Date'}
+                  </label>
+                  <input 
+                    type="date" 
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.5rem' }}>
+                    {language === 'zh' ? '结束日期' : 'End Date'}
+                  </label>
+                  <input 
+                    type="date" 
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              {/* 格式选择 */}
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '1rem' }}>
+                  {language === 'zh' ? '文件格式' : 'File Format'}
+                </label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    onClick={() => setExportFormat('pdf')}
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', background: exportFormat === 'pdf' ? '#6366f1' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s' }}
+                  >PDF</button>
+                  <button 
+                    onClick={() => setExportFormat('excel')}
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', background: exportFormat === 'excel' ? '#6366f1' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s' }}
+                  >Excel (XLSX)</button>
+                </div>
+              </div>
+
+              {/* 导出方式 */}
+              <div style={{ marginBottom: '2.5rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '1rem' }}>
+                  {language === 'zh' ? '导出方式' : 'Export Method'}
+                </label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    onClick={() => setExportMethod('download')}
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', background: exportMethod === 'download' ? '#10b981' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s' }}
+                  >⬇️ {language === 'zh' ? '直接下载' : 'Download'}</button>
+                  <button 
+                    onClick={() => setExportMethod('email')}
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', background: exportMethod === 'email' ? '#10b981' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s' }}
+                  >📧 {language === 'zh' ? '发送至邮箱' : 'Send to Email'}</button>
+                </div>
+                {exportMethod === 'email' && (
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', marginTop: '0.8rem', textAlign: 'center' }}>
+                    {language === 'zh' ? `将发送至: ${storeInfo?.email || currentUser?.email}` : `Will send to: ${storeInfo?.email || currentUser?.email}`}
+                  </p>
+                )}
+              </div>
+
+              {/* 提交按钮 */}
+              <button
+                onClick={handleExportStatement}
+                disabled={isExporting}
+                style={{
+                  width: '100%',
+                  padding: '1.25rem',
+                  borderRadius: '18px',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  color: 'white',
+                  border: 'none',
+                  fontSize: '1.1rem',
+                  fontWeight: '900',
+                  cursor: isExporting ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                {isExporting ? (
+                  <>
+                    <div className="spinner" style={{ width: '24px', height: '24px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                    <span>{language === 'zh' ? '正在生成...' : 'Generating...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span>
+                    <span>{language === 'zh' ? '立即执行导出' : 'Generate & Export Now'}</span>
                   </>
                 )}
               </button>

@@ -19,9 +19,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { supabase, merchantService } from '../services/supabase';
+import { printerService } from '../services/PrinterService';
 import { theme } from '../config/theme';
-import * as Print from 'expo-print';
-import QRCodeGenerator from 'qrcode';
 
 const { width } = Dimensions.get('window');
 const FOOTER_SPACE = 120;
@@ -164,8 +163,8 @@ export const OrderAlertModal = ({
   };
 
   const handlePrintOrder = async () => {
-    const qrDataUrl = orderData?.id
-      ? await QRCodeGenerator.toDataURL(orderData.id, { margin: 1, width: 180 })
+    const qrUrl = orderData?.id
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${orderData.id}`
       : '';
     const items = getPrintableItems();
     const itemPayMatch = orderData?.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
@@ -183,42 +182,43 @@ export const OrderAlertModal = ({
           <style>
             * { box-sizing: border-box; }
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #111827; }
-            .ticket { width: 100%; max-width: 420px; margin: 0 auto; padding: 16px; }
-            .title { text-align: center; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
-            .subtitle { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 12px; }
-            .section { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
-            .row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; margin: 4px 0; }
-            .label { color: #6b7280; }
-            .value { font-weight: 600; text-align: right; }
+            .ticket { width: 100%; max-width: 420px; margin: 0 auto; padding: 8px; }
+            .title { text-align: center; font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+            .subtitle { text-align: center; font-size: 14px; color: #374151; margin-bottom: 8px; }
+            .section { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #9ca3af; }
+            .row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; margin: 4px 0; }
+            .label { color: #4b5563; }
+            .value { font-weight: 700; text-align: right; }
             .items { margin-top: 6px; }
-            .item { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
-            .total { font-size: 14px; font-weight: 700; }
-            .note { font-size: 11px; color: #6b7280; margin-top: 8px; text-align: center; }
-            .qr { display: flex; flex-direction: column; align-items: center; margin-top: 8px; }
-            .qr img { width: 160px; height: 160px; }
-            .qr-code { font-size: 12px; font-weight: 700; margin-top: 6px; }
+            .item { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; }
+            .total { font-size: 18px; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; }
+            .note-box { background: #f3f4f6; padding: 8px; border-radius: 4px; margin-top: 8px; border: 1px solid #d1d5db; }
+            .note-label { font-size: 12px; font-weight: 700; color: #1f2937; margin-bottom: 4px; display: block; }
+            .note-text { font-size: 14px; color: #dc2626; font-weight: 900; }
+            .qr { display: flex; flex-direction: column; align-items: center; margin-top: 12px; }
+            .qr img { width: 140px; height: 140px; }
+            .qr-code { font-size: 12px; font-weight: 700; margin-top: 4px; }
+            .footer-msg { text-align: center; font-size: 12px; color: #6b7280; margin-top: 16px; border-top: 1px solid #eee; padding-top: 8px; }
           </style>
         </head>
         <body>
           <div class="ticket">
             <div class="title">MARKET LINK EXPRESS</div>
-            <div class="subtitle">订单号 ${orderIdShort}</div>
+            <div class="subtitle">*** 商家存根 / Merchant Copy ***</div>
+            <div style="text-align: center; font-size: 24px; font-weight: 900; margin: 10px 0;">#${orderData?.id?.slice(-5)}</div>
 
-            ${qrDataUrl ? `
-              <div class="qr">
-                <img src="${qrDataUrl}" />
-                <div class="qr-code">取件码: ${orderData?.id || '-'}</div>
-              </div>
-            ` : ''}
+            <div class="section">
+              <div class="row"><div class="label">下单时间</div><div class="value">${new Date(orderData?.created_at).toLocaleString()}</div></div>
+              <div class="row"><div class="label">订单编号</div><div class="value">${orderData?.id}</div></div>
+            </div>
 
             <div class="section">
               <div class="row"><div class="label">商家</div><div class="value">${orderData?.sender_name || '-'}</div></div>
               <div class="row"><div class="label">电话</div><div class="value">${orderData?.sender_phone || '-'}</div></div>
-              <div class="row"><div class="label">地址</div><div class="value">${orderData?.sender_address || '-'}</div></div>
             </div>
 
             <div class="section">
-              <div class="row"><div class="label">客户</div><div class="value">${orderData?.receiver_name || '-'}</div></div>
+              <div class="row"><div class="label">收件人</div><div class="value">${orderData?.receiver_name || '-'}</div></div>
               <div class="row"><div class="label">电话</div><div class="value">${orderData?.receiver_phone || '-'}</div></div>
               <div class="row"><div class="label">地址</div><div class="value">${orderData?.receiver_address || '-'}</div></div>
             </div>
@@ -236,15 +236,31 @@ export const OrderAlertModal = ({
                     `).join('')}
               </div>
               <div class="row"><div class="label">跑腿费</div><div class="value">${deliveryFee.toLocaleString()} MMK</div></div>
-              <div class="row total"><div class="label">合计</div><div class="value">${totalFee.toLocaleString()} MMK</div></div>
+              <div class="row total"><div class="label">合计金额</div><div class="value">${totalFee.toLocaleString()} MMK</div></div>
             </div>
 
-            <div class="note">请保留此票据用于对账</div>
+            ${orderData?.notes ? `
+              <div class="note-box">
+                <span class="note-label">备注:</span>
+                <div class="note-text">${orderData.notes}</div>
+              </div>
+            ` : ''}
+
+            ${qrUrl ? `
+              <div class="qr">
+                <img src="${qrUrl}" />
+                <div class="qr-code">扫描取件 / Scan to Pickup</div>
+              </div>
+            ` : ''}
+
+            <div class="footer-msg">感谢您的配合，祝生意兴隆！</div>
           </div>
         </body>
       </html>
     `;
-    await Print.printAsync({ html });
+    
+    // 🚀 使用新服务进行打印
+    await printerService.printOrder(html, orderData?.id);
   };
 
   const handleAccept = async () => {

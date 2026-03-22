@@ -87,7 +87,7 @@ export const notificationService = {
   /**
    * 发送通知给特定用户 (通过保存的 Push Token)
    */
-  async sendPushNotificationToUser(userId: string, title: string, body: string, data?: any): Promise<boolean> {
+  async sendPushNotificationToUser(userId: string, title: string, body: string, data?: any, imageUrl?: string): Promise<boolean> {
     try {
       // 1. 获取用户的推送令牌
       const { data: userData, error } = await supabase
@@ -102,14 +102,22 @@ export const notificationService = {
       }
 
       // 2. 调用 Expo 推送服务 (通常通过后端转发，这里模拟或直接调用)
-      // 注意：直接从客户端调用需要 projectId，最好是通过 Netlify Function
-      const message = {
+      const message: any = {
         to: userData.push_token,
         sound: 'default',
         title: title,
         body: body,
         data: data || {},
       };
+
+      // 🚀 新增：富媒体推送支持 (图片附件)
+      if (imageUrl) {
+        // 对于 iOS，需要 mutableContent 和 attachments
+        message.mutableContent = true;
+        message.attachments = [{ url: imageUrl }];
+        // 对于 Android，某些厂商支持在 data 中传图片，或者使用 BigPicture 样式
+        message.data = { ...message.data, image: imageUrl };
+      }
 
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
@@ -165,9 +173,26 @@ export const notificationService = {
     const title = '📦 订单已送达';
     const content = `您的订单 ${packageId} 已成功送达收件人手中。感谢使用 ML Express！`;
     
+    // 🚀 新增：尝试获取送达照片 URL
+    let deliveryPhotoUrl = undefined;
+    try {
+      const { data: photos } = await supabase
+        .from('delivery_photos')
+        .select('photo_url')
+        .eq('package_id', packageId)
+        .order('upload_time', { ascending: false })
+        .limit(1);
+      
+      if (photos && photos.length > 0) {
+        deliveryPhotoUrl = photos[0].photo_url;
+      }
+    } catch (err) {
+      console.warn('获取送达照片用于推送失败:', err);
+    }
+
     // 同时发送推送和站内通知
     await Promise.all([
-      this.sendPushNotificationToUser(customerId, title, content, { packageId }),
+      this.sendPushNotificationToUser(customerId, title, content, { packageId, type: 'delivery_success' }, deliveryPhotoUrl),
       this.saveInAppNotification(customerId, title, content, 'order', packageId)
     ]);
   },

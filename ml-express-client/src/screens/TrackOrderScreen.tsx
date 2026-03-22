@@ -1,23 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import LoggerService from './../services/LoggerService';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Dimensions,
-  ActivityIndicator,
-  Image,
-  FlatList,
-  RefreshControl,
-  Animated,
-  Alert,
-} from 'react-native';
+import LoggerService from '../services/LoggerService';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Alert, Modal, Vibration, Platform } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { packageService, supabase, deliveryPhotoService } from '../services/supabase';
+import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
@@ -88,6 +76,105 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const mapRef = useRef<MapView>(null);
   const { isDarkMode } = useApp(); // 🚀 获取主题状态
+
+  // 🚀 聊天相关状态
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const chatSubscriptionRef = useRef<any>(null);
+  const flatListRef = useRef<FlatList>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // 🚀 获取当前用户 ID 用于聊天
+  useEffect(() => {
+    AsyncStorage.getItem('userId').then(id => setCurrentUserId(id));
+  }, []);
+
+  // 🚀 加载聊天记录并订阅实时更新
+  const loadChatMessages = async (orderId: string) => {
+    if (!orderId) return;
+    const chatMsgs = await chatService.getOrderMessages(orderId);
+    setMessages(chatMsgs);
+    
+    // 订阅新消息
+    if (chatSubscriptionRef.current) {
+      chatSubscriptionRef.current.unsubscribe();
+    }
+    
+    chatSubscriptionRef.current = chatService.subscribeToMessages(orderId, (newMsg) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+      
+      // 如果聊天框没打开，且是对方发的消息，增加未读数
+      if (!showChatModal && newMsg.sender_id !== currentUserId) {
+        setUnreadCount(prev => prev + 1);
+        Vibration.vibrate(100);
+      }
+    });
+  };
+
+  // 🚀 发送消息逻辑
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !currentUserId || !packageData?.id) return;
+    
+    const messageText = inputText.trim();
+    
+    // 🚀 乐观更新
+    const optimisticMsg = {
+      id: 'temp-' + Date.now(),
+      order_id: packageData.id,
+      sender_id: currentUserId,
+      sender_type: 'customer',
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setInputText('');
+    
+    const result = await chatService.sendMessage({
+      order_id: packageData.id,
+      sender_id: currentUserId,
+      sender_type: 'customer',
+      message: messageText
+    });
+    
+    if (!result.success) {
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setInputText(messageText);
+      Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '消息发送失败' : 'Failed to send message');
+    }
+  };
+
+  // 🚀 自动检查未读消息
+  useEffect(() => {
+    if (!packageData?.id || !currentUserId) return;
+    
+    const checkUnread = async () => {
+      const count = await chatService.getUnreadCount(currentUserId);
+      setUnreadCount(count);
+    };
+    
+    checkUnread();
+    const timer = setInterval(checkUnread, 10000);
+    return () => clearInterval(timer);
+  }, [packageData?.id, currentUserId]);
+
+  // 🚀 当页面切换订单时重新加载聊天
+  useEffect(() => {
+    if (packageData?.id) {
+      loadChatMessages(packageData.id);
+    }
+    return () => {
+      if (chatSubscriptionRef.current) {
+        chatSubscriptionRef.current.unsubscribe();
+      }
+    };
+  }, [packageData?.id]);
 
   // 🚀 新增：配送凭证图片组件
   const DeliveryProofSection = () => {
@@ -455,6 +542,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapOfflineDesc: '已为您保留订单详情，联网后可查看实时地图',
       mapErrorTitle: '地图加载失败',
       mapErrorDesc: '请稍后重试或检查网络与定位权限',
+      chatWithCourier: '联系骑手',
+      inputMessage: '输入消息...',
+      sendMessage: '发送',
+      noMessages: '暂无消息',
     },
     en: {
       title: 'Track Order',
@@ -496,6 +587,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapOfflineDesc: 'Order details are available; live map will resume when online.',
       mapErrorTitle: 'Map failed to load',
       mapErrorDesc: 'Please try again later or check network and location permissions.',
+      chatWithCourier: 'Chat with Courier',
+      inputMessage: 'Type a message...',
+      sendMessage: 'Send',
+      noMessages: 'No messages yet',
     },
     my: {
       title: 'အော်ဒါခြေရာခံ',
@@ -537,6 +632,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapOfflineDesc: 'အော်ဒါအသေးစိတ်ပြန်လည်ကြည့်နိုင်ပြီး အင်တာနက်ရသောအခါ မြေပုံမြင်နိုင်သည်',
       mapErrorTitle: 'မြေပုံမရပါ',
       mapErrorDesc: 'ခဏနေရင် ထပ်ကြိုးစားပါ သို့မဟုတ် အင်တာနက်/တည်နေရာခွင့်ပြုမှုစစ်ဆေးပါ',
+      chatWithCourier: 'ပို့ဆောင်သူနှင့် စကားပြောရန်',
+      inputMessage: 'မက်ဆေ့ခ်ျရိုက်ပါ...',
+      sendMessage: 'ပို့မည်',
+      noMessages: 'မက်ဆေ့ခ်ျမရှိပါ',
     },
   };
 
@@ -883,9 +982,29 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                 <Text style={styles.infoPriceValue}>{packageData.price} MMK</Text>
               </View>
               {packageData.courier && (
-                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow, { alignItems: 'center' }]}>
                   <Text style={styles.infoLabel}>{t.courier}:</Text>
-                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.courier}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end', gap: 10 }}>
+                    <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.courier}</Text>
+                    {/* 🚀 聊天入口按钮 */}
+                    <TouchableOpacity 
+                      style={styles.miniChatBtn}
+                      onPress={() => {
+                        setShowChatModal(true);
+                        setUnreadCount(0);
+                        if (packageData.id && currentUserId) {
+                          chatService.markAsRead(packageData.id, currentUserId);
+                        }
+                      }}
+                    >
+                      <Ionicons name="chatbubble-ellipses" size={18} color="#3b82f6" />
+                      {unreadCount > 0 && (
+                        <View style={styles.miniUnreadBadge}>
+                          <Text style={styles.miniUnreadBadgeText}>{unreadCount}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
               {packageData.delivery_distance && (
@@ -956,6 +1075,98 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* 🚀 新增：聊天模态框 (In-App Chat) */}
+      <Modal
+        visible={showChatModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.chatModalContent, isDarkMode && styles.darkChatModal]}>
+            {/* 聊天页眉 */}
+            <View style={[styles.chatHeader, isDarkMode && styles.darkChatHeader]}>
+              <View>
+                <Text style={[styles.chatTitle, isDarkMode && styles.darkText]}>
+                  {t.chatWithCourier}
+                </Text>
+                <Text style={styles.chatSubtitle}>{packageData?.courier}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.chatCloseBtn}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#fff" : "#1e293b"} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 消息列表 */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={[styles.messageList, isDarkMode && styles.darkMessageList]}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              ListEmptyComponent={(
+                <View style={styles.emptyChat}>
+                  <Text style={styles.emptyChatText}>{t.noMessages}</Text>
+                </View>
+              )}
+              renderItem={({ item }) => {
+                const isMine = item.sender_id === currentUserId;
+                return (
+                  <View style={[
+                    styles.messageWrapper,
+                    isMine ? styles.myMessageWrapper : styles.otherMessageWrapper
+                  ]}>
+                    <View style={[
+                      styles.messageBubble,
+                      isMine ? styles.myBubble : styles.otherBubble,
+                      isDarkMode && !isMine && styles.darkOtherBubble
+                    ]}>
+                      <Text style={[
+                        styles.messageText,
+                        isMine ? styles.myMessageText : (isDarkMode ? styles.darkText : styles.otherMessageText)
+                      ]}>
+                        {item.message}
+                      </Text>
+                    </View>
+                    <Text style={styles.messageTime}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                );
+              }}
+            />
+
+            {/* 输入区域 */}
+            <View style={[styles.chatInputContainer, isDarkMode && styles.darkChatHeader]}>
+              <TextInput
+                style={[styles.chatInput, isDarkMode && styles.darkChatInput]}
+                placeholder={t.inputMessage}
+                placeholderTextColor={isDarkMode ? "#94a3b8" : "#9ca3af"}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+              />
+              <TouchableOpacity 
+                disabled={!inputText.trim() || sendingMessage}
+                onPress={handleSendMessage}
+                style={[
+                  styles.sendBtn,
+                  !inputText.trim() && styles.sendBtnDisabled
+                ]}
+              >
+                {sendingMessage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1333,6 +1544,175 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 4,
     textAlign: 'center',
+  },
+  // 🚀 聊天相关样式
+  miniChatBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  miniUnreadBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  miniUnreadBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  chatModalContent: {
+    height: '80%',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  darkChatModal: {
+    backgroundColor: '#0f172a',
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#fff',
+  },
+  darkChatHeader: {
+    backgroundColor: '#1e293b',
+    borderBottomColor: '#334155',
+  },
+  chatTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  chatSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  chatCloseBtn: {
+    padding: 4,
+  },
+  messageList: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f8fafc',
+  },
+  darkMessageList: {
+    backgroundColor: '#0f172a',
+  },
+  emptyChat: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyChatText: {
+    color: '#94a3b8',
+    fontSize: 14,
+  },
+  messageWrapper: {
+    marginBottom: 16,
+    maxWidth: '80%',
+  },
+  myMessageWrapper: {
+    alignSelf: 'flex-end',
+  },
+  otherMessageWrapper: {
+    alignSelf: 'flex-start',
+  },
+  messageBubble: {
+    padding: 12,
+    borderRadius: 16,
+  },
+  myBubble: {
+    backgroundColor: '#3b82f6',
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  darkOtherBubble: {
+    backgroundColor: '#1e293b',
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 24, // 🚀 增加行高
+    paddingVertical: 2, // 🚀 增加垂直边距
+  },
+  myMessageText: {
+    color: '#fff',
+  },
+  otherMessageText: {
+    color: '#1e293b',
+  },
+  messageTime: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 4,
+    textAlign: 'right',
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 12,
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    maxHeight: 100,
+    fontSize: 15,
+    color: '#1e293b',
+  },
+  darkChatInput: {
+    backgroundColor: '#0f172a',
+    color: '#f8fafc',
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#3b82f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendBtnDisabled: {
+    backgroundColor: '#e2e8f0',
   },
   offlineBanner: {
     backgroundColor: 'rgba(15, 23, 42, 0.9)',

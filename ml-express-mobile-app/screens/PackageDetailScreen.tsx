@@ -13,11 +13,15 @@ import {
   StatusBar,
   ActivityIndicator,
   Modal,
-  TextInput
+  TextInput,
+  Vibration,
+  FlatList
 } from 'react-native';
+import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { chatService } from '../services/chatService';
 import { packageService, deliveryStoreService, supabase } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
@@ -48,11 +52,157 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const [anomalyDescription, setAnomalyDescription] = useState('');
   const [reporting, setReporting] = useState(false);
 
+  // 🚀 快捷回复模板
+  const QUICK_REPLIES = [
+    { zh: '你好，我是配送员，我现在出发去取件。', en: 'Hi, I am your courier. I am on my way to pick up.', my: 'ပစ္စည်းသွားယူပါပြီ' },
+    { zh: '你好，我已经取到您的包裹，正在为您配送中。', en: 'Hi, I have picked up your package and it is on the way.', my: 'ပစ္စည်းယူပြီးလာပို့နေပါပြီ' },
+    { zh: '我已到达您的收件地址附近，请保持电话畅通。', en: 'I am near your delivery address. Please keep your phone active.', my: 'သင့်ထံမကြာမှီရောက်ရှိပါတော့မည်' },
+    { zh: '您的包裹已经成功送达，感谢您的使用！', en: 'Your package has been delivered. Thank you for using our service!', my: 'လက်ခံသူမှပစ္စည်းလက်ခံရရှိပြီးပါပြီ' },
+    { zh: '抱歉，暂时无法联系到收件人，我会稍后重试。', en: 'Sorry, I cannot reach the receiver. I will try again later.', my: 'လက်ခံသူအား ဆက်သွယ်၍မရပါ' },
+  ];
+
+  // 聊天相关
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const chatSubscriptionRef = React.useRef<any>(null);
+  const flatListRef = React.useRef<FlatList>(null);
+
+  // 自动检查未读消息
+  useEffect(() => {
+    if (!pkg?.id || !courierId) return;
+    
+    const checkUnread = async () => {
+      const count = await chatService.getUnreadCount(courierId);
+      setUnreadCount(count);
+    };
+    
+    checkUnread();
+    const timer = setInterval(checkUnread, 10000); // 10秒检查一次
+    return () => clearInterval(timer);
+  }, [pkg?.id, courierId]);
+
   useEffect(() => {
     if (!initialPackage && (packageId || route.params?.id)) {
       loadPackageDetails(packageId || route.params?.id);
     }
+    loadCourierInfo();
+
+    return () => {
+      if (chatSubscriptionRef.current) {
+        chatSubscriptionRef.current.unsubscribe();
+      }
+    };
   }, [packageId, route.params?.id, initialPackage]);
+
+  const loadCourierInfo = async () => {
+    const id = await AsyncStorage.getItem('currentCourierId');
+    console.log('👤 当前骑手 ID:', id);
+    setCourierId(id);
+  };
+
+  const loadChatMessages = async () => {
+    const id = pkg?.id || packageId || route.params?.id;
+    if (!id) return;
+    
+    const chatMsgs = await chatService.getOrderMessages(id);
+    setMessages(chatMsgs);
+    
+    // 订阅新消息
+    if (!chatSubscriptionRef.current) {
+      chatSubscriptionRef.current = chatService.subscribeToMessages(id, (newMsg) => {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+        
+        // 如果聊天框没打开，且是对方发的消息，增加未读数
+        if (!showChatModal && newMsg.sender_id !== courierId) {
+          setUnreadCount(prev => prev + 1);
+          Vibration.vibrate(100);
+          // 语音播报新消息
+          Speech.speak('您有新的客户消息', { language: 'zh-CN' });
+        }
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const id = pkg?.id || packageId || route.params?.id;
+    console.log('💬 准备手动发送消息, orderId:', id, 'courierId:', courierId);
+    if (!inputText.trim() || !courierId || !id) {
+      console.warn('⚠️ 发送条件不满足:', { text: !!inputText.trim(), courierId: !!courierId, id: !!id });
+      return;
+    }
+    
+    const messageText = inputText.trim();
+    
+    // 🚀 乐观更新：先将消息显示在界面上
+    const optimisticMsg = {
+      id: 'temp-' + Date.now(),
+      order_id: id,
+      sender_id: courierId,
+      sender_type: 'rider',
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setInputText('');
+    
+    const result = await chatService.sendMessage({
+      order_id: id,
+      sender_id: courierId,
+      sender_type: 'rider',
+      message: messageText
+    });
+    
+    if (!result.success) {
+      console.error('❌ 发送失败详情:', result.error);
+      // 如果发送失败，移除乐观消息并还原输入框（可选，或者显示失败红点）
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setInputText(messageText);
+      Alert.alert('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
+    }
+  };
+
+  // 🚀 发送快捷回复
+  const handleQuickReply = async (text: string) => {
+    const id = pkg?.id || packageId || route.params?.id;
+    console.log('⚡ 准备发送快捷回复:', text, 'orderId:', id);
+    if (!courierId || !id) {
+      console.warn('⚠️ 发送条件不满足:', { courierId: !!courierId, id: !!id });
+      return;
+    }
+    
+    // 🚀 乐观更新
+    const optimisticMsg = {
+      id: 'temp-' + Date.now(),
+      order_id: id,
+      sender_id: courierId,
+      sender_type: 'rider',
+      message: text,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    
+    const result = await chatService.sendMessage({
+      order_id: id,
+      sender_id: courierId,
+      sender_type: 'rider',
+      message: text
+    });
+    
+    if (!result.success) {
+      console.error('❌ 快捷回复发送失败:', result.error);
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      Alert.alert('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
+    }
+  };
 
   const loadPackageDetails = async (id: string) => {
     try {
@@ -465,7 +615,30 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           <View style={styles.contactItem}>
             <Text style={styles.contactRole}>{language === 'zh' ? '收件地址' : 'Address'}</Text>
             <Text style={styles.addressText}>{pkg.receiver_address}</Text>
-        </View>
+          </View>
+
+          {/* 🚀 新增：聊天入口按钮 */}
+          <TouchableOpacity 
+            style={[styles.chatEntryBtn, { marginTop: 20 }]} 
+            onPress={() => {
+              setShowChatModal(true);
+              loadChatMessages();
+              chatService.markAsRead(pkg.id, courierId || '');
+              setUnreadCount(0);
+            }}
+          >
+            <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.chatEntryGradient}>
+              <Ionicons name="chatbubble-ellipses" size={22} color="white" />
+              <Text style={styles.chatEntryText}>
+                {language === 'zh' ? '在线联系客户' : 'Chat with Customer'}
+              </Text>
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.actionGrid}>
@@ -727,6 +900,155 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* 🚀 新增：聊天模态框 (In-App Chat) */}
+      <Modal
+        visible={showChatModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.glassModal, { height: '85%', padding: 0 }]}>
+            {/* 聊天页眉 */}
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: '#1e293b'
+            }}>
+              <View>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#fff' }}>
+                  {language === 'zh' ? '联系客户' : 'Chat with Customer'}
+                </Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{pkg?.receiver_name}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowChatModal(false)}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 消息列表 */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={{ flex: 1, padding: 16, backgroundColor: '#0f172a' }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              renderItem={({ item }) => {
+                const isMine = item.sender_id === courierId;
+                return (
+                  <View style={{
+                    alignSelf: isMine ? 'flex-end' : 'flex-start',
+                    maxWidth: '80%',
+                    marginBottom: 12,
+                  }}>
+                    <View style={{
+                      backgroundColor: isMine ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                      padding: 12,
+                      borderRadius: 16,
+                      borderBottomRightRadius: isMine ? 4 : 16,
+                      borderBottomLeftRadius: isMine ? 16 : 4,
+                    }}>
+                      <Text style={{ 
+                        color: '#fff',
+                        fontSize: 15,
+                        lineHeight: 24, // 🚀 增加行高，适配缅语字体
+                        paddingVertical: 2, // 🚀 增加垂直边距，防止上下切断
+                      }}>
+                        {item.message}
+                      </Text>
+                    </View>
+                    <Text style={{ 
+                      fontSize: 10, 
+                      color: 'rgba(255,255,255,0.4)', 
+                      marginTop: 4,
+                      textAlign: isMine ? 'right' : 'left'
+                    }}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                );
+              }}
+            />
+
+            {/* 🚀 快捷回复区域 */}
+            <View style={{ backgroundColor: '#0f172a', paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                {QUICK_REPLIES.map((reply, idx) => (
+                  <TouchableOpacity 
+                    key={idx} 
+                    onPress={() => handleQuickReply(reply[language as keyof typeof reply] || reply.zh)}
+                    style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: 'rgba(59, 130, 246, 0.3)',
+                    }}
+                  >
+                    <Text style={{ color: '#60a5fa', fontSize: 13, fontWeight: '600' }}>
+                      {reply[language as keyof typeof reply] || reply.zh}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 输入区域 */}
+            <View style={{ 
+              padding: 16, 
+              paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+              backgroundColor: '#1e293b',
+              borderTopWidth: 1,
+              borderTopColor: 'rgba(255,255,255,0.1)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <TextInput
+                style={{ 
+                  flex: 1, 
+                  backgroundColor: 'rgba(255,255,255,0.05)', 
+                  borderRadius: 20, 
+                  paddingHorizontal: 16, 
+                  paddingVertical: 10,
+                  maxHeight: 100,
+                  color: '#fff'
+                }}
+                placeholder={language === 'zh' ? '输入消息...' : 'Type a message...'}
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+              />
+              <TouchableOpacity 
+                disabled={!inputText.trim() || sendingMessage}
+                onPress={handleSendMessage}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: inputText.trim() ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                {sendingMessage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -894,5 +1216,45 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  // 🚀 聊天入口样式
+  chatEntryBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  chatEntryGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 10,
+  },
+  chatEntryText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 20,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

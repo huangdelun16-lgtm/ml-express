@@ -18,6 +18,7 @@ interface PackingModalProps {
   orderData: any;
   language: 'zh' | 'en' | 'my';
   onComplete: () => void;
+  onClose: () => void; // 🚀 新增：关闭回调
 }
 
 const getLabels = (lang: 'zh' | 'en' | 'my') => {
@@ -73,7 +74,7 @@ const parseItems = (description?: string) => {
   return itemsMatch[1].split(', ').map((item: string) => item.trim()).filter(Boolean);
 };
 
-export default function PackingModal({ visible, orderData, language, onComplete }: PackingModalProps) {
+export default function PackingModal({ visible, orderData, language, onComplete, onClose }: PackingModalProps) {
   const t = getLabels(language);
   const items = parseItems(orderData?.description);
   const orderId = orderData?.id ? `#${orderData.id.slice(-5)}` : '-';
@@ -116,6 +117,14 @@ export default function PackingModal({ visible, orderData, language, onComplete 
         <View style={styles.card}>
           {/* 顶部票头区域 */}
           <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
+            <TouchableOpacity 
+              style={styles.closeBtn} 
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+            
             <View style={styles.headerIcon}>
               <Ionicons name="cube" size={26} color="#fbbf24" />
             </View>
@@ -243,6 +252,14 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     paddingBottom: 24,
+    position: 'relative', // 🚀 必须设置，用于子元素绝对定位
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    zIndex: 10,
+    padding: 5,
   },
   headerIcon: {
     width: 56,

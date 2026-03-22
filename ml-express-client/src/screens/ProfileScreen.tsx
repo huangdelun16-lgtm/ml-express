@@ -1,25 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoggerService from './../services/LoggerService';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  RefreshControl,
-  Alert,
-  Modal,
-  TextInput,
-  Switch,
-  Dimensions,
-  Linking,
-  FlatList,
-  ActivityIndicator,
-  Platform,
-  Image,
-  Animated,
-  PanResponder
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, FlatList, ActivityIndicator, Image, Animated, PanResponder } from 'react-native';
+import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -36,6 +18,8 @@ import { customerService, packageService, deliveryStoreService, rechargeService,
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
+import Skeleton, { StatsCardSkeleton } from '../components/Skeleton';
+import { printerService, PrinterSettings } from '../services/PrinterService';
 
 // 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
 const RECHARGE_QR_BASE_URL = 'https://market-link-express.com';
@@ -67,6 +51,7 @@ export default function ProfileScreen({ navigation }: any) {
     inTransit: 0,
     delivered: 0,
   });
+  const [loadingStats, setLoadingStats] = useState(true);
   const [merchantCODStats, setMerchantCODStats] = useState({
     totalCOD: 0,
     settledCOD: 0,
@@ -163,6 +148,21 @@ export default function ProfileScreen({ navigation }: any) {
   const [storeReviews, setStoreReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
+
+  // 🚀 新增：打印机设置状态
+  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>({
+    enabled: false,
+    type: 'system',
+    address: '',
+    autoPrint: true,
+    copies: 1,
+  });
+  // 🚀 新增：打开打印机设置
+  const handleOpenPrinterSettings = async () => {
+    const settings = await printerService.getSettings();
+    setPrinterSettings(settings);
+    setShowPrinterModal(true);
+  };
 
   // 🚀 新增：加载店铺评价逻辑
   const loadStoreReviews = async () => {
@@ -762,6 +762,7 @@ export default function ProfileScreen({ navigation }: any) {
           await loadStoreReviews();
         }
 
+        setLoadingStats(true);
         const stats = await packageService.getOrderStats(
           user.id, 
           user.email, 
@@ -770,6 +771,7 @@ export default function ProfileScreen({ navigation }: any) {
           storeName
         );
         setOrderStats(stats);
+        setLoadingStats(false);
       }
     } catch (error) {
       LoggerService.error('加载用户数据失败:', error);
@@ -1541,6 +1543,10 @@ export default function ProfileScreen({ navigation }: any) {
       if (settings) {
         setNotificationSettings(JSON.parse(settings));
       }
+      
+      // 🚀 同时加载打印机设置
+      const printer = await printerService.getSettings();
+      setPrinterSettings(printer);
     } catch (error) {
       LoggerService.error('加载通知设置失败:', error);
     }
@@ -1555,6 +1561,17 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (error) {
       LoggerService.error('保存通知设置失败:', error);
       showToast(t.settingsSaveFailed, 'error');
+    }
+  };
+
+  // 🚀 新增：保存打印机设置
+  const handleSavePrinterSettings = async () => {
+    try {
+      await printerService.saveSettings(printerSettings);
+      setShowPrinterModal(false);
+      showToast(language === 'zh' ? '打印机设置已保存' : 'Printer settings saved', 'success');
+    } catch (error) {
+      showToast(language === 'zh' ? '保存失败' : 'Save failed', 'error');
     }
   };
 
@@ -1660,27 +1677,41 @@ export default function ProfileScreen({ navigation }: any) {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t.orderStats}</Text>
       <View style={styles.statsGrid}>
-        {[
-          { label: t.totalOrders, value: orderStats.total, color: '#3b82f6', icon: '📦' },
-          { label: t.pendingOrders, value: orderStats.pending, color: '#f59e0b', icon: '⏳' },
-          { label: t.inTransitOrders, value: orderStats.inTransit, color: '#8b5cf6', icon: '🚚' },
-          { label: t.deliveredOrders, value: orderStats.delivered, color: '#10b981', icon: '✅' },
-        ].map((stat, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.statCard}
-            onPress={() => navigation.navigate('MyOrders')}
-          >
-            <LinearGradient
-              colors={[stat.color, `${stat.color}dd`]}
-              style={styles.statGradient}
+        {loadingStats ? (
+          <>
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+          </>
+        ) : (
+          [
+            { label: t.totalOrders, value: orderStats.total, color: '#3b82f6', icon: '📦' },
+            { label: t.pendingOrders, value: orderStats.pending, color: '#f59e0b', icon: '⏳' },
+            { label: t.inTransitOrders, value: orderStats.inTransit, color: '#8b5cf6', icon: '🚚' },
+            { label: t.deliveredOrders, value: orderStats.delivered, color: '#10b981', icon: '✅' },
+          ].map((stat, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.statCard}
+              onPress={() => navigation.navigate('MyOrders')}
+              activeOpacity={0.8}
             >
-              <Text style={stat.icon === '📦' ? styles.statIcon : styles.statIconSmall}>{stat.icon}</Text>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        ))}
+              <LinearGradient
+                colors={[stat.color, `${stat.color}dd`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.statGradient}
+              >
+                <View style={styles.statContent}>
+                  <Text style={stat.icon === '📦' ? styles.statIcon : styles.statIconSmall}>{stat.icon}</Text>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     </View>
   );
@@ -2112,6 +2143,32 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
 
+        {/* 🚀 新增：打印机设置入口 (仅限商家) */}
+        {userType === 'merchant' && (
+          <TouchableOpacity 
+            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
+            onPress={handleOpenPrinterSettings}
+          >
+            <View style={styles.settingLeft}>
+              <Text style={styles.settingIcon}>🖨️</Text>
+              <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>
+                {language === 'zh' ? '小票打印机设置' : language === 'en' ? 'Printer Settings' : 'ပရင်တာဆက်တင်များ'}
+              </Text>
+            </View>
+            <View style={styles.settingRight}>
+              <View style={[
+                styles.notificationToggle,
+                { backgroundColor: printerSettings.enabled ? '#3b82f6' : '#d1d5db' }
+              ]}>
+                <Text style={styles.notificationToggleText}>
+                  {printerSettings.enabled ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+              <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* 关于我们 */}
         <TouchableOpacity 
           style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
@@ -2223,6 +2280,149 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.footerVersion}>v{appVersion}</Text>
         </View>
       </ScrollView>
+
+      {renderAnomalyListModal()}
+
+      {/* 🚀 新增：打印机设置模态框 */}
+      <Modal
+        visible={showPrinterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPrinterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode && styles.darkCard]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>
+                {language === 'zh' ? '小票打印机设置' : language === 'en' ? 'Printer Settings' : 'ပရင်တာဆက်တင်များ'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowPrinterModal(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#fff" : "#334155"} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+              {/* 启用打印机 */}
+              <View style={styles.printerSettingRow}>
+                <View>
+                  <Text style={[styles.printerSettingLabel, isDarkMode && styles.darkText]}>
+                    {language === 'zh' ? '启用打印功能' : 'Enable Printing'}
+                  </Text>
+                  <Text style={styles.printerSettingDesc}>
+                    {language === 'zh' ? '接单后是否自动执行打印' : 'Print automatically after accepting'}
+                  </Text>
+                </View>
+                <Switch
+                  value={printerSettings.enabled}
+                  onValueChange={(val) => setPrinterSettings({ ...printerSettings, enabled: val })}
+                  trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
+                />
+              </View>
+
+              {/* 打印机类型 */}
+              <View style={styles.printerSettingSection}>
+                <Text style={styles.printerSectionTitle}>{language === 'zh' ? '连接方式' : 'Connection'}</Text>
+                <View style={styles.printerTypeGrid}>
+                  {[
+                    { id: 'system', label: language === 'zh' ? '系统打印' : 'System', icon: 'apps-outline' },
+                    { id: 'wifi', label: language === 'zh' ? 'WiFi/网络' : 'WiFi', icon: 'wifi-outline' },
+                    { id: 'bluetooth', label: language === 'zh' ? '蓝牙' : 'Bluetooth', icon: 'bluetooth-outline' },
+                  ].map((type) => (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={[
+                        styles.printerTypeCard,
+                        printerSettings.type === type.id && styles.printerTypeCardActive,
+                      ]}
+                      onPress={() => setPrinterSettings({ ...printerSettings, type: type.id as any })}
+                    >
+                      <Ionicons 
+                        name={type.icon as any} 
+                        size={24} 
+                        color={printerSettings.type === type.id ? '#3b82f6' : '#64748b'} 
+                      />
+                      <Text style={[
+                        styles.printerTypeLabel,
+                        printerSettings.type === type.id && styles.printerTypeLabelActive
+                      ]}>
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* 地址输入 (针对 WiFi 或 蓝牙) */}
+              {(printerSettings.type === 'wifi' || printerSettings.type === 'bluetooth') && (
+                <View style={styles.printerSettingSection}>
+                  <Text style={styles.printerSectionTitle}>
+                    {printerSettings.type === 'wifi' 
+                      ? (language === 'zh' ? '打印机 IP 地址' : 'Printer IP Address')
+                      : (language === 'zh' ? '打印机 MAC 地址' : 'Printer MAC Address')}
+                  </Text>
+                  <TextInput
+                    style={[styles.printerInput, isDarkMode && styles.darkSearchInput]}
+                    placeholder={printerSettings.type === 'wifi' ? "例如: 192.168.1.100" : "例如: 00:11:22:33:44:55"}
+                    placeholderTextColor="#94a3b8"
+                    value={printerSettings.address}
+                    onChangeText={(val) => setPrinterSettings({ ...printerSettings, address: val })}
+                    autoCapitalize={printerSettings.type === 'bluetooth' ? 'characters' : 'none'}
+                  />
+                  <Text style={styles.printerHint}>
+                    {printerSettings.type === 'wifi'
+                      ? (language === 'zh' ? '提示：请确保手机和打印机在同一个 WiFi 下' : 'Note: Ensure phone and printer are on the same WiFi.')
+                      : (language === 'zh' ? '提示：请先在手机设置中完成蓝牙配对' : 'Note: Pair the printer in phone settings first.')}
+                  </Text>
+                </View>
+              )}
+
+              {/* 打印份数 */}
+              <View style={styles.printerSettingRow}>
+                <Text style={[styles.printerSettingLabel, isDarkMode && styles.darkText]}>
+                  {language === 'zh' ? '打印份数' : 'Number of Copies'}
+                </Text>
+                <View style={styles.quantityContainer}>
+                  <TouchableOpacity 
+                    onPress={() => setPrinterSettings({ ...printerSettings, copies: Math.max(1, printerSettings.copies - 1) })}
+                    style={styles.qtyBtn}
+                  >
+                    <Text style={styles.qtyBtnText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.qtyText, isDarkMode && styles.darkText]}>{printerSettings.copies}</Text>
+                  <TouchableOpacity 
+                    onPress={() => setPrinterSettings({ ...printerSettings, copies: Math.min(5, printerSettings.copies + 1) })}
+                    style={styles.qtyBtn}
+                  >
+                    <Text style={styles.qtyBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowPrinterModal(false)}
+              >
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, { flex: 2 }]}
+                onPress={handleSavePrinterSettings}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.modalButtonGradient}
+                >
+                  <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                    {language === 'zh' ? '立即保存设置' : 'Save Settings Now'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {renderAnomalyListModal()}
 
@@ -2495,9 +2695,27 @@ export default function ProfileScreen({ navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.aboutLink}
-                  onPress={() => Linking.openURL('tel:+9509788848928')}
+                  onPress={() => {
+                    const numbers = [
+                      { display: '(+95) 09788848928', tel: '+959788848928' },
+                      { display: '(+95) 09941118588', tel: '+959941118588' },
+                      { display: '(+95) 09941118688', tel: '+959941118688' }
+                    ];
+                    Alert.alert(
+                      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ',
+                      '',
+                      [
+                        ...numbers.map(n => ({
+                          text: n.display,
+                          onPress: () => Linking.openURL(`tel:${n.tel}`)
+                        })),
+                        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' }
+                      ]
+                    );
+                  }}
                 >
-                  <Text style={styles.aboutLinkText}>📞 {t.contactPhone}: (+95) 09788848928</Text>
+                  <Text style={styles.aboutLinkText}>📞 {t.contactPhone}</Text>
+                  <Text style={[styles.aboutLinkText, { fontSize: 12, opacity: 0.8 }]}>多线拨打 ➔</Text>
                 </TouchableOpacity>
                 <View style={styles.aboutLink}>
                   <Text style={styles.aboutLinkText}>💬 {t.wechat}: AMT349</Text>
@@ -3257,7 +3475,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#334155',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
@@ -3425,36 +3643,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingHorizontal: 2,
   },
   statCard: {
-    width: (width - 60) / 2,
-    marginBottom: 12,
-    borderRadius: 20,
+    width: (width - 56) / 2,
+    marginBottom: 16,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    ...theme.shadows.medium,
     overflow: 'hidden',
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 4,
   },
   statGradient: {
-    padding: theme.spacing.l,
+    flex: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+  },
+  statContent: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   statIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  statIconSmall: {
     fontSize: 28,
-    marginBottom: theme.spacing.s,
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '900',
     color: theme.colors.white,
-    marginBottom: 4,
+    marginBottom: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   statLabel: {
-    fontSize: theme.typography.sizes.xs,
+    fontSize: 13,
+    fontWeight: 'bold',
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   actionGrid: {
     flexDirection: 'row',
@@ -3838,6 +4068,106 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     marginBottom: 4,
   },
+  // 🚀 打印机设置样式
+  printerSettingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  printerSettingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  printerSettingDesc: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  printerSettingSection: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  printerSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#64748b',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  printerTypeGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  printerTypeCard: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  printerTypeCardActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  printerTypeLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  printerTypeLabelActive: {
+    color: '#3b82f6',
+    fontWeight: 'bold',
+  },
+  printerInput: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  printerHint: {
+    fontSize: 11,
+    color: '#f59e0b',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    padding: 4,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  qtyBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 15,
+    minWidth: 20,
+    textAlign: 'center',
+  },
   businessDesc: {
     fontSize: 12,
     color: theme.colors.text.tertiary,
@@ -3922,6 +4252,146 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // 🚀 打印机设置样式
+  printerSettingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  printerSettingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  printerSettingDesc: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  printerSettingSection: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  printerSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#64748b',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  printerTypeGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  printerTypeCard: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  printerTypeCardActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  printerTypeLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  printerTypeLabelActive: {
+    color: '#3b82f6',
+    fontWeight: 'bold',
+  },
+  printerInput: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  printerHint: {
+    fontSize: 11,
+    color: '#f59e0b',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    padding: 4,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  qtyBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 15,
+    minWidth: 20,
+    textAlign: 'center',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: 'transparent',
+  },
+  modalButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  modalButtonCancel: {
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    flex: 1,
+  },
+  modalButtonConfirm: {
+    flex: 1,
+  },
+  modalButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  modalButtonTextConfirm: {
+    color: '#ffffff',
   },
   // 🚀 新增：评价相关样式
   sectionHeaderRow: {

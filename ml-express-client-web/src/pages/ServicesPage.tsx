@@ -71,24 +71,22 @@ const ServicesPage: React.FC = () => {
       {/* 背景装饰 */}
       <div style={{
         position: 'absolute',
-        top: '5%',
-        right: '5%',
-        width: '200px',
-        height: '200px',
-        background: 'rgba(255, 255, 255, 0.1)',
+        top: '-10%',
+        right: '-10%',
+        width: '500px',
+        height: '500px',
+        background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)',
         borderRadius: '50%',
-        filter: 'blur(40px)',
         zIndex: 1
       }}></div>
       <div style={{
         position: 'absolute',
-        bottom: '5%',
-        left: '5%',
-        width: '150px',
-        height: '150px',
-        background: 'rgba(255, 255, 255, 0.1)',
+        bottom: '-10%',
+        left: '-10%',
+        width: '400px',
+        height: '400px',
+        background: 'radial-gradient(circle, rgba(66,153,225,0.2) 0%, transparent 70%)',
         borderRadius: '50%',
-        filter: 'blur(30px)',
         zIndex: 1
       }}></div>
 
@@ -114,24 +112,38 @@ const ServicesPage: React.FC = () => {
         color: 'white'
       }}>
         {/* 页面标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: '5rem',
+          marginTop: '2rem'
+        }}>
           <h1 style={{
-            fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem',
+            fontSize: window.innerWidth < 768 ? '2.8rem' : '4.5rem',
             color: 'white',
-            marginBottom: '1rem',
-            fontWeight: '800',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
-            letterSpacing: '-1px'
+            marginBottom: '1.5rem',
+            fontWeight: '900',
+            textShadow: '0 10px 20px rgba(0,0,0,0.2)',
+            letterSpacing: '-2px',
+            lineHeight: '1.1'
           }}>
             {t.features.title}
           </h1>
+          <div style={{
+            width: '80px',
+            height: '6px',
+            background: 'white',
+            margin: '0 auto 2rem',
+            borderRadius: '3px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+          }}></div>
           <p style={{
-            fontSize: '1.2rem',
-            color: 'rgba(255,255,255,0.9)',
-            maxWidth: '600px',
+            fontSize: window.innerWidth < 768 ? '1.1rem' : '1.4rem',
+            color: 'rgba(255,255,255,0.95)',
+            maxWidth: '700px',
             margin: '0 auto',
             lineHeight: '1.6',
-            fontWeight: '300'
+            fontWeight: '500',
+            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
             {t.features.subtitle}
           </p>
@@ -140,12 +152,12 @@ const ServicesPage: React.FC = () => {
         {/* 服务特色卡片 */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 'var(--spacing-8)',
+          gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
+          gap: '2rem',
           maxWidth: '1200px',
-          margin: '0 auto'
+          margin: '0 auto',
+          padding: '0 1rem'
         }}
-        className="grid grid-2"
         >
           {[
             { 
@@ -187,75 +199,119 @@ const ServicesPage: React.FC = () => {
               color: '#f093fb',
               bgGradient: 'linear-gradient(135deg, #f093fb, #f5576c)',
               iconBg: 'rgba(240, 147, 251, 0.2)'
+            },
+            {
+              icon: '🏙️', 
+              title: t.services.sameday.title, 
+              subtitle: t.services.sameday.subtitle,
+              desc: t.services.sameday.desc,
+              features: t.services.sameday.features,
+              color: '#667eea',
+              bgGradient: 'linear-gradient(135deg, #667eea, #764ba2)',
+              iconBg: 'rgba(102, 126, 234, 0.2)'
+            },
+            {
+              icon: '🛍️', 
+              title: t.services.mall.title, 
+              subtitle: t.services.mall.subtitle,
+              desc: t.services.mall.desc,
+              features: t.services.mall.features,
+              color: '#f6ad55',
+              bgGradient: 'linear-gradient(135deg, #f6ad55, #ed8936)',
+              iconBg: 'rgba(246, 173, 85, 0.2)'
+            },
+            {
+              icon: '💵', 
+              title: t.services.cod.title, 
+              subtitle: t.services.cod.subtitle,
+              desc: t.services.cod.desc,
+              features: t.services.cod.features,
+              color: '#48bb78',
+              bgGradient: 'linear-gradient(135deg, #48bb78, #38a169)',
+              iconBg: 'rgba(72, 187, 120, 0.2)'
+            },
+            {
+              icon: '👑', 
+              title: t.services.vip.title, 
+              subtitle: t.services.vip.subtitle,
+              desc: t.services.vip.desc,
+              features: t.services.vip.features,
+              color: '#ecc94b',
+              bgGradient: 'linear-gradient(135deg, #ecc94b, #d69e2e)',
+              iconBg: 'rgba(236, 201, 75, 0.2)'
             }
           ].map((service: any, index: number) => (
             <div key={index} style={{
-              background: 'var(--card-bg)',
-              backdropFilter: 'var(--card-backdrop)',
-              borderRadius: 'var(--card-radius-lg)',
-              padding: 'var(--card-padding-lg)',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '24px',
+              padding: '2rem',
               position: 'relative',
               overflow: 'hidden',
-              border: 'var(--card-border)',
-              boxShadow: 'var(--shadow-card)',
-              transition: 'all var(--transition-base)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+              transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               cursor: 'pointer',
               opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`,
-              transitionDelay: `${index * 0.1}s`
+              transform: isVisible ? 'translateY(0)' : `translateY(50px)`,
+              transitionDelay: `${index * 0.05}s`
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)';
+              e.currentTarget.style.transform = 'translateY(-15px) scale(1.03)';
+              e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.2)';
+              e.currentTarget.style.background = 'white';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.transform = isVisible ? 'translateY(0)' : `translateY(${30 + index * 10}px)`;
-              e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.1)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
             }}
             >
               {/* 装饰性背景 */}
               <div style={{
                 position: 'absolute',
-                top: '-50px',
-                right: '-50px',
-                width: '120px',
-                height: '120px',
+                top: '-20px',
+                right: '-20px',
+                width: '100px',
+                height: '100px',
                 background: service.iconBg,
                 borderRadius: '50%',
-                opacity: '0.6'
+                filter: 'blur(20px)',
+                opacity: '0.5'
               }}></div>
 
               {/* 图标区域 */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div style={{
-                  width: '60px',
-                  height: '60px',
+                  width: '56px',
+                  height: '56px',
                   background: service.bgGradient,
-                  borderRadius: '16px',
+                  borderRadius: '18px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: '1rem',
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                  marginRight: '1.25rem',
+                  boxShadow: `0 8px 15px ${service.color}44`
                 }}>
-                  <span style={{ fontSize: '28px' }}>{service.icon}</span>
+                  <span style={{ fontSize: '26px' }}>{service.icon}</span>
                 </div>
                 <div>
                   <h3 style={{ 
-                    fontSize: '1.5rem', 
-                    fontWeight: '700',
-                    color: '#2d3748',
-                    margin: '0 0 4px 0',
+                    fontSize: '1.4rem', 
+                    fontWeight: '800',
+                    color: '#1a202c',
+                    margin: '0 0 2px 0',
                     letterSpacing: '-0.5px'
                   }}>
                     {service.title}
                   </h3>
                   <p style={{ 
-                    fontSize: '0.8rem', 
-                    color: '#718096',
+                    fontSize: '0.75rem', 
+                    color: service.color,
                     margin: 0,
-                    fontWeight: '500',
-                    letterSpacing: '1px'
+                    fontWeight: '700',
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase'
                   }}>
                     {service.subtitle}
                   </p>
@@ -264,45 +320,58 @@ const ServicesPage: React.FC = () => {
 
               {/* 描述 */}
               <p style={{ 
-                fontSize: '1rem', 
+                fontSize: '0.95rem', 
                 color: '#4a5568',
                 marginBottom: '1.5rem',
                 lineHeight: '1.6',
-                fontWeight: '400'
+                fontWeight: '500',
+                minHeight: '3rem'
               }}>
                 {service.desc}
               </p>
 
-              {/* 特色功能列表 */}
-              <div style={{ marginBottom: '1.5rem' }}>
+              {/* 特色功能标签 */}
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '0.5rem',
+                marginBottom: '1rem' 
+              }}>
                 {service.features.map((feature: string, idx: number) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.9rem',
-                    color: '#4a5568'
+                  <span key={idx} style={{
+                    padding: '4px 12px',
+                    background: `${service.color}11`,
+                    color: service.color,
+                    borderRadius: '100px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    border: `1px solid ${service.color}22`
                   }}>
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      background: service.color,
-                      borderRadius: '50%',
-                      marginRight: '0.75rem'
-                    }}></div>
-                    <span style={{ fontWeight: '500' }}>{feature}</span>
-                  </div>
+                    {feature}
+                  </span>
                 ))}
               </div>
 
               {/* 底部装饰线 */}
               <div style={{
-                width: '40px',
-                height: '3px',
-                background: service.bgGradient,
+                width: '100%',
+                height: '4px',
+                background: '#f7fafc',
                 borderRadius: '2px',
-                marginTop: '1rem'
-              }}></div>
+                marginTop: '1.5rem',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  height: '100%',
+                  width: '30%',
+                  background: service.bgGradient,
+                  borderRadius: '2px'
+                }}></div>
+              </div>
             </div>
           ))}
         </div>

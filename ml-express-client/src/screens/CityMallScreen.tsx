@@ -1,23 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  RefreshControl,
-  Dimensions,
-  TextInput,
-  ScrollView,
-  Vibration,
-  Platform,
-  Alert,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl, Dimensions, TextInput, ScrollView, Vibration, Alert, Modal } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import Skeleton, { GridSkeleton, ListItemSkeleton } from '../components/Skeleton';
 import { Ionicons } from '@expo/vector-icons';
 import { deliveryStoreService, merchantService, reviewService, bannerService, Banner } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -666,7 +652,7 @@ export default function CityMallScreen({ navigation }: any) {
     switch (item.type) {
       case 'header':
         return (
-          <View style={styles.header}>
+          <View style={[styles.header, { marginTop: 60 }]}>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>{t.title}</Text>
               <View style={styles.searchContainer}>
@@ -881,12 +867,20 @@ export default function CityMallScreen({ navigation }: any) {
         zIndex: 0
       }} />
 
-      <View style={{ height: 0 }} />
+      {/* 顶部返回按钮 - 固定定位，不随列表滚动 */}
+      <View style={styles.fixedHeader}>
+        <BackToHomeButton navigation={navigation} />
+      </View>
 
       {loading && listData.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-        </View>
+        <ScrollView style={styles.loadingContainer} contentContainerStyle={styles.loadingContent}>
+          <ListItemSkeleton />
+          <GridSkeleton columns={2} itemHeight={100} />
+          <ListItemSkeleton />
+          <ListItemSkeleton />
+          <ListItemSkeleton />
+          <ListItemSkeleton />
+        </ScrollView>
       ) : (
         <FlatList
           data={listData}
@@ -982,7 +976,7 @@ export default function CityMallScreen({ navigation }: any) {
               </View>
             )}
 
-            <ScrollView style={styles.reviewsList}>
+            <ScrollView contentContainerStyle={styles.reviewsList}>
               {loadingReviews ? (
                 <View style={{ padding: 40 }}>
                   <ActivityIndicator color="#3b82f6" />
@@ -1008,7 +1002,7 @@ export default function CityMallScreen({ navigation }: any) {
                     <Text style={styles.reviewComment}>{review.comment}</Text>
                     
                     {review.images && review.images.length > 0 && (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewImagesScroll}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reviewImagesScroll}>
                         {review.images.map((img: string, idx: number) => (
                           <Image key={idx} source={{ uri: img }} style={styles.reviewImageThumb} />
                         ))}
@@ -1718,11 +1712,25 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#0f172a',
+  },
+  loadingContent: {
+    paddingTop: 100,
+    paddingHorizontal: 20,
+  },
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    height: 100,
+    paddingTop: 40,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 80,

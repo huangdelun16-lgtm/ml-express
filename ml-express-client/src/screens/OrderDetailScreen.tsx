@@ -1,21 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import LoggerService from './../services/LoggerService';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Dimensions,
-  Modal,
-  TextInput,
-  Linking,
-  Image,
-} from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Dimensions, Modal, TextInput, Linking, Image, Vibration, FlatList, Platform } from 'react-native';
+import { theme } from '../config/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { chatService } from '../services/chatService';
+import LoggerService from '../services/LoggerService';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
@@ -26,7 +15,6 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
-import { theme } from '../config/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -83,6 +71,29 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
   const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
 
+  // 聊天相关
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const chatSubscriptionRef = useRef<any>(null);
+  const flatListRef = useRef<FlatList>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // 自动检查未读消息
+  useEffect(() => {
+    if (!orderId || !customerId) return;
+    
+    const checkUnread = async () => {
+      const count = await chatService.getUnreadCount(customerId);
+      setUnreadCount(count);
+    };
+    
+    checkUnread();
+    const timer = setInterval(checkUnread, 10000); // 10秒检查一次
+    return () => clearInterval(timer);
+  }, [orderId, customerId]);
+
   // 评价相关
   const [showRateModal, setShowRateModal] = useState(false);
   const [rating, setRating] = useState(5);
@@ -90,7 +101,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
-  const viewShotRef = React.useRef<any>(null);
+  const viewShotRef = useRef<any>(null);
 
   // 保存二维码到相册
   const handleSaveQRCode = async () => {
@@ -341,7 +352,72 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   useEffect(() => {
     loadData();
+    
+    // 清理聊天订阅
+    return () => {
+      if (chatSubscriptionRef.current) {
+        chatSubscriptionRef.current.unsubscribe();
+      }
+    };
   }, [orderId]);
+
+  const loadChatMessages = async () => {
+    const chatMsgs = await chatService.getOrderMessages(orderId);
+    setMessages(chatMsgs);
+    
+    // 订阅新消息
+    if (!chatSubscriptionRef.current) {
+      chatSubscriptionRef.current = chatService.subscribeToMessages(orderId, (newMsg) => {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+        
+        // 如果聊天框没打开，且是对方发的消息，增加未读数
+        if (!showChatModal && newMsg.sender_id !== customerId) {
+          setUnreadCount(prev => prev + 1);
+          // 可以在这里加一个震动或小提示
+          Vibration.vibrate(100);
+        }
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !customerId) return;
+    
+    // 获取订单 ID (如果是从 route.params 获取的)
+    const id = order?.id || orderId;
+    if (!id) return;
+
+    const messageText = inputText.trim();
+    
+    // 🚀 乐观更新
+    const optimisticMsg = {
+      id: 'temp-' + Date.now(),
+      order_id: id,
+      sender_id: customerId,
+      sender_type: userType === 'merchant' ? 'merchant' : 'customer',
+      message: messageText,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setInputText('');
+
+    const result = await chatService.sendMessage({
+      order_id: id,
+      sender_id: customerId,
+      sender_type: userType === 'merchant' ? 'merchant' : 'customer',
+      message: messageText
+    });
+    
+    if (!result.success) {
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setInputText(messageText);
+      Alert.alert('错误', '消息发送失败');
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -358,6 +434,20 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         setUserType(detectedUserType === 'merchant' ? 'merchant' : 'customer');
       }
 
+      // 同时加载订单详情和聊天记录
+      await Promise.all([
+        loadOrderDetails(),
+        loadChatMessages()
+      ]);
+    } catch (error: any) {
+      LoggerService.error('加载订单数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOrderDetails = async () => {
+    try {
       // 加载订单详情
       const orderData = await packageService.getOrderById(orderId);
       if (orderData) {
@@ -372,12 +462,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       const { deliveryPhotoService } = require('../services/supabase');
       const photos = await deliveryPhotoService.getPackagePhotos(orderId);
       setDeliveryPhotos(photos);
-    } catch (error: any) {
-      LoggerService.error('加载订单详情失败:', error);
-      const errorMsg = error?.message || '加载订单详情失败，请稍后重试';
-      showToast(errorMsg, 'error');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      LoggerService.error('加载订单详情内部失败:', error);
     }
   };
 
@@ -907,18 +993,51 @@ return (
         </View>
 
         {/* 配送员信息 */}
-        {order.courier && (
+        {order.courier && order.courier !== '待分配' && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>🏍️ {t.courierInfo}</Text>
             <View style={styles.courierContainer}>
-              <Text style={styles.courierName}>{order.courier}</Text>
-              <TouchableOpacity
-                style={styles.contactButton}
-                onPress={handleContactCourier}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.contactButtonText}>{t.contactCourier}</Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.courierName}>{order.courier}</Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>正在为您派送中</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity 
+                  style={styles.chatButton}
+                  onPress={() => {
+                    setShowChatModal(true);
+                    loadChatMessages();
+                    chatService.markAsRead(orderId, customerId);
+                    setUnreadCount(0);
+                  }}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color={theme.colors.primary.DEFAULT} />
+                  {unreadCount > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -5,
+                      backgroundColor: '#ef4444',
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 2,
+                      borderColor: '#fff'
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={handleContactCourier}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="call-outline" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -997,6 +1116,133 @@ return (
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* 🚀 新增：聊天模态框 (In-App Chat) */}
+      <Modal
+        visible={showChatModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '85%', padding: 0 }]}>
+            {/* 聊天页眉 */}
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: '#f1f5f9',
+              backgroundColor: '#fff',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20
+            }}>
+              <View>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b' }}>
+                  {language === 'zh' ? '联系配送员' : 'Chat with Courier'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748b' }}>{order?.courier}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowChatModal(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 消息列表 */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={{ flex: 1, padding: 16, backgroundColor: '#f8fafc' }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              renderItem={({ item }) => {
+                const isMine = item.sender_id === customerId;
+                return (
+                  <View style={{
+                    alignSelf: isMine ? 'flex-end' : 'flex-start',
+                    maxWidth: '80%',
+                    marginBottom: 12,
+                  }}>
+                    <View style={{
+                      backgroundColor: isMine ? theme.colors.primary.DEFAULT : '#fff',
+                      padding: 12,
+                      borderRadius: 16,
+                      borderBottomRightRadius: isMine ? 4 : 16,
+                      borderBottomLeftRadius: isMine ? 16 : 4,
+                      ...theme.shadows.small,
+                    }}>
+                      <Text style={{ 
+                        color: isMine ? '#fff' : '#1e293b',
+                        fontSize: 15,
+                        lineHeight: 24, // 🚀 增加行高
+                        paddingVertical: 2, // 🚀 增加垂直内边距
+                      }}>
+                        {item.message}
+                      </Text>
+                    </View>
+                    <Text style={{ 
+                      fontSize: 10, 
+                      color: '#94a3b8', 
+                      marginTop: 4,
+                      textAlign: isMine ? 'right' : 'left'
+                    }}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                );
+              }}
+            />
+
+            {/* 输入区域 */}
+            <View style={{ 
+              padding: 16, 
+              paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+              backgroundColor: '#fff',
+              borderTopWidth: 1,
+              borderTopColor: '#f1f5f9',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <TextInput
+                style={{ 
+                  flex: 1, 
+                  backgroundColor: '#f1f5f9', 
+                  borderRadius: 20, 
+                  paddingHorizontal: 16, 
+                  paddingVertical: 10,
+                  maxHeight: 100,
+                  color: '#1e293b'
+                }}
+                placeholder={language === 'zh' ? '输入消息...' : 'Type a message...'}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+              />
+              <TouchableOpacity 
+                disabled={!inputText.trim() || sendingMessage}
+                onPress={handleSendMessage}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: inputText.trim() ? theme.colors.primary.DEFAULT : '#e2e8f0',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                {sendingMessage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 底部操作按钮 */}
       <View style={styles.bottomActions}>
@@ -1742,5 +1988,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  chatButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactButton: {
+    backgroundColor: '#10b981',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

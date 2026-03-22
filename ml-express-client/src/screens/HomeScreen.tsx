@@ -1,23 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Linking,
-  Image,
-  Dimensions,
-  Platform,
-  Animated,
-  RefreshControl,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image, Dimensions, Animated, RefreshControl, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import Skeleton, { StatsCardSkeleton, OrderCardSkeleton } from '../components/Skeleton';
 import { packageService, bannerService, Banner } from '../services/supabase';
 import { errorService } from '../services/ErrorService';
 import { theme } from '../config/theme';
@@ -28,6 +17,8 @@ const { width } = Dimensions.get('window');
 
 const HOTLINE_NUMBERS = [
   { display: APP_CONFIG.CONTACT.PHONE_DISPLAY, tel: APP_CONFIG.CONTACT.PHONE },
+  { display: '(+95) 09941118588', tel: '+959941118588' },
+  { display: '(+95) 09941118688', tel: '+959941118688' },
 ];
 
 interface OrderStats {
@@ -103,6 +94,8 @@ export default function HomeScreen({ navigation }: any) {
     delivered: 0,
     cancelled: 0,
   });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingRecentOrders, setLoadingRecentOrders] = useState(true);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const scrollY = new Animated.Value(0);
   const bannerScrollRef = useRef<ScrollView>(null);
@@ -150,6 +143,12 @@ export default function HomeScreen({ navigation }: any) {
       pendingOrders: '待取件',
       inTransitOrders: '配送中',
       deliveredOrders: '已送达',
+  chatWithCourier: '联系配送员',
+  chatWithCustomer: '联系客户',
+  inputMessage: '输入消息...',
+  sendMessage: '发送',
+  noMessages: '暂无消息',
+  newChatMessage: '您有新的消息',
       services: '核心服务',
       service1Title: '快速配送',
       service1Desc: '准时达1小时内送达\n急送达30分钟内送达',
@@ -202,6 +201,12 @@ export default function HomeScreen({ navigation }: any) {
       pendingOrders: 'Pending',
       inTransitOrders: 'In Transit',
       deliveredOrders: 'Delivered',
+  chatWithCourier: 'Chat with Courier',
+  chatWithCustomer: 'Chat with Customer',
+  inputMessage: 'Type a message...',
+  sendMessage: 'Send',
+  noMessages: 'No messages',
+  newChatMessage: 'You have a new message',
       services: 'Core Services',
       service1Title: 'Fast Delivery',
       service1Desc: 'On-Time: within 1 hour\nExpress: within 30 mins',
@@ -254,6 +259,12 @@ export default function HomeScreen({ navigation }: any) {
       pendingOrders: 'ဆိုင်းငံ့',
       inTransitOrders: 'ပို့ဆောင်နေဆဲ',
       deliveredOrders: 'ပို့ဆောင်ပြီး',
+  chatWithCourier: 'ပို့ဆောင်သူနှင့် စကားပြောရန်',
+  chatWithCustomer: 'ဖောက်သည်နှင့် စကားပြောရန်',
+  inputMessage: 'မက်ဆေ့ခ်ျရိုက်ပါ...',
+  sendMessage: 'ပို့မည်',
+  noMessages: 'မက်ဆေ့ခ်ျမရှိပါ',
+  newChatMessage: 'သင့်တွင် မက်ဆေ့ခ်ျအသစ်ရှိသည်',
       services: 'အဓိကဝန်ဆောင်မှုများ',
       service1Title: 'မြန်ဆန်သောပို့ဆောင်ရေး',
       service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့',
@@ -354,14 +365,21 @@ export default function HomeScreen({ navigation }: any) {
 
   const loadOrderData = async (customerId: string, email?: string, phone?: string, userType?: string) => {
     try {
+      setLoadingStats(true);
+      setLoadingRecentOrders(true);
+      
       // 获取订单统计
       const stats = await packageService.getOrderStats(customerId, email, phone, userType);
       setOrderStats(stats);
+      setLoadingStats(false);
 
       // 获取最近的订单
       const orders = await packageService.getRecentOrders(customerId, 3, email, phone, userType);
       setRecentOrders(orders as RecentOrder[]);
+      setLoadingRecentOrders(false);
     } catch (error) {
+      setLoadingStats(false);
+      setLoadingRecentOrders(false);
       errorService.handleError(error, { context: 'HomeScreen.loadOrderData', silent: true });
     }
   };
@@ -889,7 +907,12 @@ export default function HomeScreen({ navigation }: any) {
               )}
             </View>
 
-            {recentOrders.length === 0 ? (
+            {loadingRecentOrders ? (
+              <>
+                <OrderCardSkeleton />
+                <OrderCardSkeleton />
+              </>
+            ) : recentOrders.length === 0 ? (
               <View style={styles.noOrdersCard}>
                 <Text style={styles.noOrdersIcon}>📭</Text>
                 <Text style={styles.noOrdersText}>{currentT.noOrders}</Text>
@@ -1129,7 +1152,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerBackground: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingTop: 50,
     paddingBottom: 30,
     paddingHorizontal: 20,
     alignItems: 'center',
