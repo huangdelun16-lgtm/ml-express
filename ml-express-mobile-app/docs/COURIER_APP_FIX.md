@@ -6,9 +6,9 @@
 已在 `ml-express-mobile-app` 目录下创建 `.env` 文件，包含以下环境变量：
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=https://cabtgyzmokewrgkxjgvg.supabase.co
+EXPO_PUBLIC_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY_HERE
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc
 ```
 
 ### 2. 更新环境变量读取逻辑

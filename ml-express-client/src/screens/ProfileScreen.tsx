@@ -150,6 +150,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [showReviewsModal, setShowReviewsModal] = useState(false);
 
   // 🚀 新增：打印机设置状态
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>({
     enabled: false,
     type: 'system',
@@ -2657,9 +2658,16 @@ export default function ProfileScreen({ navigation }: any) {
                 style={[styles.modalButton, styles.modalButtonConfirm]}
                 onPress={handleChangePassword}
               >
-                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                  {t.save}
-                </Text>
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalButtonGradient}
+                >
+                  <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                    {t.save}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -3300,9 +3308,16 @@ export default function ProfileScreen({ navigation }: any) {
                     disabled={!selectedRechargeAmount || refreshing}
                     onPress={handleOpenPaymentQR}
                   >
-                    <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                      {t.confirm}
-                    </Text>
+                    <LinearGradient
+                      colors={['#3b82f6', '#2563eb']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.modalButtonGradient}
+                    >
+                      <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                        {t.confirm}
+                      </Text>
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -3431,13 +3446,20 @@ export default function ProfileScreen({ navigation }: any) {
                   disabled={!rechargeProofUri || refreshing}
                   onPress={handleConfirmRecharge}
                 >
-                  {refreshing ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                      {t.confirmRecharge}
-                    </Text>
-                  )}
+                  <LinearGradient
+                    colors={['#10b981', '#059669']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.modalButtonGradient}
+                  >
+                    {refreshing ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                        {t.confirmRecharge}
+                      </Text>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3859,27 +3881,50 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: theme.spacing.s,
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
-    padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
-    alignItems: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   modalButtonCancel: {
-    backgroundColor: theme.colors.background.subtle,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
   },
   modalButtonConfirm: {
     backgroundColor: theme.colors.primary.DEFAULT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   modalButtonText: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: '600',
-    color: theme.colors.text.secondary,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#64748b',
   },
   modalButtonTextConfirm: {
-    color: theme.colors.white,
+    color: '#ffffff',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: 'transparent',
   },
   aboutScrollView: {
     maxHeight: 400,
@@ -4352,46 +4397,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
     minWidth: 20,
     textAlign: 'center',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    backgroundColor: 'transparent',
-  },
-  modalButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 16,
-    flex: 1,
-  },
-  modalButtonConfirm: {
-    flex: 1,
-  },
-  modalButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#64748b',
-  },
-  modalButtonTextConfirm: {
-    color: '#ffffff',
   },
   // 🚀 新增：评价相关样式
   sectionHeaderRow: {

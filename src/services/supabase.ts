@@ -61,6 +61,21 @@ export interface Package {
   rider_settled_at?: string; // 骑手结清时间
 }
 
+export interface Tutorial {
+  id?: string;
+  title_zh: string;
+  title_en?: string;
+  title_my?: string;
+  content_zh: string;
+  content_en?: string;
+  content_my?: string;
+  image_url?: string;
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface FinanceRecord {
   id: string;
   record_type: 'income' | 'expense';
@@ -221,6 +236,60 @@ export interface AuditLog {
   action_time?: string;
   created_at?: string;
 }
+
+// 🚀 新增：使用教学服务
+export const tutorialService = {
+  async getAllTutorials(): Promise<Tutorial[]> {
+    try {
+      const { data, error } = await supabase
+        .from('tutorials')
+        .select('*')
+        .order('display_order', { ascending: true });
+      
+      if (error) {
+        console.error('获取教学列表失败:', error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.error('获取教学列表异常:', err);
+      return [];
+    }
+  },
+
+  async createTutorial(tutorial: Omit<Tutorial, 'id' | 'created_at' | 'updated_at'>): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('tutorials').insert([tutorial]);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('创建教学失败:', err);
+      return false;
+    }
+  },
+
+  async updateTutorial(id: string, tutorial: Partial<Tutorial>): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('tutorials').update(tutorial).eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('更新教学失败:', err);
+      return false;
+    }
+  },
+
+  async deleteTutorial(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('tutorials').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('删除教学失败:', err);
+      return false;
+    }
+  }
+};
 
 // 测试数据库连接
 export const testConnection = async () => {

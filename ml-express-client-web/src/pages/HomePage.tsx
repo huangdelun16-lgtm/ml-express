@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService, merchantService } from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService, merchantService, tutorialService, Tutorial } from '../services/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
@@ -90,6 +90,8 @@ const HomePage: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showTutorialModal, setShowTutorialModal] = useState(false); // 🚀 新增：使用教学模态框状态
+  const [tutorials, setTutorials] = useState<Tutorial[]>([]); // 🚀 新增：从数据库获取的教学步骤
   const [trackingNumber] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trackingResult, setTrackingResult] = useState<any>(null);
@@ -356,7 +358,20 @@ const HomePage: React.FC = () => {
     setIsVisible(true);
     loadPricingSettings();
     loadUserFromStorage();
+    loadTutorials(); // 🚀 新增：组件加载时获取教学内容
   }, []);
+
+  // 🚀 新增：从数据库获取教学内容
+  const loadTutorials = async () => {
+    try {
+      const data = await tutorialService.getAllTutorials();
+      if (data && data.length > 0) {
+        setTutorials(data.filter(t => t.is_active));
+      }
+    } catch (error) {
+      console.error('获取教学内容失败:', error);
+    }
+  };
 
   // 🚀 新增：当商家打开下单窗口时，自动加载其商品
   useEffect(() => {
@@ -1173,7 +1188,7 @@ const HomePage: React.FC = () => {
       setQrCodeDataUrl(qrCodeUrl);
       return qrCodeUrl;
     } catch (error) {
-      console.error(t.errors.qrGenerationFailed, error);
+      console.error(t.errors?.qrGenerationFailed, error);
       return null;
     }
   };
@@ -1192,10 +1207,10 @@ const HomePage: React.FC = () => {
       document.body.removeChild(link);
       
       // 模拟发送给客户
-      alert(t.errors.qrDownloaded);
+      alert(t.errors?.qrDownloaded);
     } catch (error) {
-      console.error(t.errors.downloadFailed, error);
-      alert(t.errors.downloadFailed);
+      console.error(t.errors?.downloadFailed, error);
+      alert(t.errors?.downloadFailed);
     } finally {
       setDownloading(false);
     }
@@ -1207,10 +1222,10 @@ const HomePage: React.FC = () => {
       try {
         const isConnected = await testConnection();
         if (!isConnected) {
-          console.warn(t.errors.dbConnectionFailed);
+          console.warn(t.errors?.dbConnectionFailed);
         }
       } catch (error) {
-        console.error(t.errors.connectionTestError, error);
+        console.error(t.errors?.connectionTestError, error);
       }
     };
     
@@ -1245,7 +1260,7 @@ const HomePage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error(t.errors.saveCustomerFailed, error);
+      console.error(t.errors?.saveCustomerFailed, error);
     }
   };
 
@@ -1340,7 +1355,7 @@ const HomePage: React.FC = () => {
     try {
       if (!window.google || !window.google.maps) {
         console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
-        alert(`${t.errors.distanceCalculationFailed}\n使用默认距离: 5 km`);
+        alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n使用默认距离: 5 km`);
         return 5;
       }
 
@@ -1404,7 +1419,7 @@ const HomePage: React.FC = () => {
     } catch (error) {
       console.error('❌ 距离计算异常:', error);
       const errorMsg = error instanceof Error ? error.message : '未知错误';
-      alert(`${t.errors.distanceCalculationFailed}\n${errorMsg}\n使用默认距离: 5 km`);
+      alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n${errorMsg}\n使用默认距离: 5 km`);
       return 5;
     }
   };
@@ -1651,7 +1666,7 @@ const HomePage: React.FC = () => {
     
     // 验证必填字段
     if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
-      alert(t.errors.addressRequired || '请填写完整的寄件和收件地址');
+      alert(t.errors?.addressRequired || '请填写完整的寄件和收件地址');
       return;
     }
 
@@ -2345,6 +2360,36 @@ const HomePage: React.FC = () => {
                   }}
                 >
                   🛒 {t.hero.cart}
+                </button>
+
+                <button
+                  onClick={() => setShowTutorialModal(true)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '2px solid rgba(255, 255, 255, 0.4)',
+                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
+                    borderRadius: '60px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                  }}
+                >
+                  📖 {t.tutorial?.button || (language === 'zh' ? '使用教学' : 'Tutorial')}
                 </button>
               </>
             ) : null}
@@ -3777,6 +3822,128 @@ const HomePage: React.FC = () => {
                 ❌ {t.ui.cancel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：使用教学模态窗口 */}
+      {showTutorialModal && (
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999999,
+            padding: '1rem'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowTutorialModal(false);
+          }}
+        >
+          <div style={{
+            background: 'white',
+            padding: window.innerWidth < 768 ? '2rem 1.5rem' : '3rem',
+            borderRadius: '30px',
+            width: window.innerWidth < 768 ? '100%' : '600px',
+            maxWidth: '95vw',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            position: 'relative',
+            color: '#1e293b'
+          }}>
+            <button
+              onClick={() => setShowTutorialModal(false)}
+              style={{
+                position: 'absolute', top: '1.5rem', right: '1.5rem',
+                background: '#f1f5f9', border: 'none',
+                width: '40px', height: '40px', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#64748b'
+              }}
+            >✕</button>
+
+            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📖</div>
+              <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0, color: '#0f172a' }}>
+                {t.tutorial?.title || 'Tutorial'}
+              </h2>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {(tutorials.length > 0 ? tutorials : t.tutorial?.steps || []).map((step: any, index: number) => (
+                <div key={index} style={{
+                  display: 'flex',
+                  gap: '1.25rem',
+                  alignItems: 'flex-start',
+                  padding: '1.25rem',
+                  background: '#f8fafc',
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0',
+                  flexDirection: 'column'
+                }}>
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', width: '100%' }}>
+                    <div style={{
+                      width: '32px', height: '32px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'white', fontWeight: 'bold', flexShrink: 0
+                    }}>
+                      {index + 1}
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: '#0f172a' }}>
+                      {tutorials.length > 0 
+                        ? (language === 'zh' ? step.title_zh : language === 'en' ? (step.title_en || step.title_zh) : (step.title_my || step.title_zh))
+                        : step.title}
+                    </h3>
+                  </div>
+                  
+                  <div style={{ width: '100%' }}>
+                    <p style={{ fontSize: '0.95rem', color: '#64748b', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
+                      {tutorials.length > 0 
+                        ? (language === 'zh' ? step.content_zh : language === 'en' ? (step.content_en || step.content_zh) : (step.content_my || step.content_zh))
+                        : step.content}
+                    </p>
+                    
+                    {step.image_url && (
+                      <div style={{ 
+                        width: '100%', 
+                        borderRadius: '12px', 
+                        overflow: 'hidden',
+                        border: '1px solid #eee',
+                        background: '#f1f5f9'
+                      }}>
+                        <img 
+                          src={step.image_url} 
+                          alt={step.title_zh || 'tutorial'} 
+                          style={{ width: '100%', display: 'block' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowTutorialModal(false)}
+              style={{
+                width: '100%',
+                marginTop: '2.5rem',
+                padding: '1.25rem',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '1.1rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)'
+              }}
+            >
+              {language === 'zh' ? '我知道了' : language === 'en' ? 'Got it' : 'နားလည်ပါပြီ'}
+            </button>
           </div>
         </div>
       )}

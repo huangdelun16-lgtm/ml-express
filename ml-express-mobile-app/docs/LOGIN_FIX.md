@@ -101,7 +101,7 @@ npx expo start --clear
 
 ### EXPO_PUBLIC_SUPABASE_URL
 - **用途**: Supabase 项目 URL
-- **值**: `https://cabtgyzmokewrgkxjgvg.supabase.co`
+- **值**: `https://uopkyuluxnrewvlmutam.supabase.co`
 - **必需**: ✅ 是
 
 ### EXPO_PUBLIC_SUPABASE_ANON_KEY

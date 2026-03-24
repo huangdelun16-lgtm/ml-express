@@ -1,7 +1,7 @@
 // 简单测试Supabase连接
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://cabtgyzmokewrgkxjgvg.supabase.co';
+const supabaseUrl = 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
 
 const supabase = createClient(supabaseUrl, supabaseKey);

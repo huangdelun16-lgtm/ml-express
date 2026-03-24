@@ -18,70 +18,61 @@ exports.handler = async (event) => {
     allowedHeaders: ['Content-Type', 'Authorization']
   });
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: '方法不允许' })
-    };
-  }
+    if (event.httpMethod !== 'POST') {
+      return { statusCode: 405, headers, body: JSON.stringify({ error: '方法不允许' }) };
+    }
 
-  try {
     if (!supabaseUrl || !serviceKey) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: '上传服务未配置（缺少 Service Role Key）' })
+        body: JSON.stringify({ error: '服务器配置错误：请检查环境变量。' })
       };
     }
 
-    const { fileName, contentType, base64 } = JSON.parse(event.body || '{}');
-    if (!fileName || !contentType || !base64) {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      
+      // 🚀 核心优化：自动修复 URL
+      let finalSupabaseUrl = supabaseUrl.trim();
+      if (finalSupabaseUrl.startsWith('//')) finalSupabaseUrl = 'https:' + finalSupabaseUrl;
+      else if (finalSupabaseUrl.startsWith('://')) finalSupabaseUrl = 'https' + finalSupabaseUrl;
+      else if (!finalSupabaseUrl.startsWith('http')) finalSupabaseUrl = 'https://' + finalSupabaseUrl;
+      
+      const normalizedUrl = finalSupabaseUrl.replace(/\/+$/, '');
+      const supabase = createClient(normalizedUrl, serviceKey);
+      
+      const { fileName, contentType, base64 } = JSON.parse(event.body || '{}');
+      if (!base64) throw new Error('未接收到文件数据');
+
+      const fileExt = fileName.includes('.') ? fileName.split('.').pop() : 'png';
+      const filePath = `app-banners/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${fileExt}`;
+      const buffer = Buffer.from(base64, 'base64');
+
+      const { data, error } = await supabase.storage
+        .from('banners')
+        .upload(filePath, buffer, {
+          contentType: contentType,
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('banners')
+        .getPublicUrl(filePath);
+
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers,
-        body: JSON.stringify({ error: '缺少文件参数' })
+        body: JSON.stringify({ url: publicUrl })
       };
-    }
-
-    const fileExt = fileName.includes('.') ? fileName.split('.').pop() : 'png';
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
-    const filePath = `app-banners/${uniqueName}`;
-    const buffer = Buffer.from(base64, 'base64');
-
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/banners/${filePath}`;
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': contentType,
-        'Authorization': `Bearer ${serviceKey}`,
-        'apikey': serviceKey,
-        'x-upsert': 'false'
-      },
-      body: buffer
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
+    } catch (error) {
+      console.error('上传失败详情:', error);
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: `上传失败: ${errorText || response.statusText}` })
+        body: JSON.stringify({ error: error.message || '上传过程中发生服务器错误' })
       };
     }
-
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/banners/${filePath}`;
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ url: publicUrl })
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error?.message || '上传失败' })
-    };
-  }
 };

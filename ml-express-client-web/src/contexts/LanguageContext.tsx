@@ -21,6 +21,17 @@ const translations: any = {
       admin: '管理后台',
       profile: '我的账户'
     },
+    tutorial: {
+      button: '使用教学',
+      title: '如何使用 MARKET LINK EXPRESS',
+      steps: [
+        { title: '注册与登录', content: '首先，注册一个新账号或登录您已有的账号。' },
+        { title: '填写订单', content: '点击“立即下单”，填写准确的寄件人和收件人信息。' },
+        { title: '选择服务', content: '根据您的需求选择包裹类型和配送速度。' },
+        { title: '提交订单', content: '确认价格后提交订单，系统将为您匹配最近的骑手。' },
+        { title: '实时追踪', content: '通过“包裹跟踪”实时查看骑手位置和配送进度。' }
+      ]
+    },
     hero: {
       title: '缅甸同城快递',
       subtitle: '快速、安全、可靠的同城快递服务',
@@ -509,6 +520,16 @@ const translations: any = {
         waySide: '24小时顺路送达。'
       },
       waySide: '顺路递'
+    },
+    errors: {
+      qrGenerationFailed: '二维码生成失败',
+      qrDownloaded: '二维码已保存到本地',
+      downloadFailed: '下载失败',
+      dbConnectionFailed: '数据库连接失败',
+      connectionTestError: '连接测试异常',
+      saveCustomerFailed: '保存客户信息失败',
+      distanceCalculationFailed: '距离计算失败',
+      addressRequired: '请填写完整的寄件和收件地址'
     }
   },
   en: {
@@ -521,6 +542,17 @@ const translations: any = {
       cart: 'Cart',
       admin: 'Admin',
       profile: 'My Account'
+    },
+    tutorial: {
+      button: 'Tutorial',
+      title: 'How to use MARKET LINK EXPRESS',
+      steps: [
+        { title: 'Register & Login', content: 'First, register a new account or login to your existing account.' },
+        { title: 'Fill Order', content: 'Click "Order Now" and fill in accurate sender and receiver information.' },
+        { title: 'Select Service', content: 'Choose package type and delivery speed according to your needs.' },
+        { title: 'Submit Order', content: 'Confirm the price and submit. The system will match the nearest rider.' },
+        { title: 'Live Tracking', content: 'Track rider location and delivery progress in real-time via "Tracking".' }
+      ]
     },
     hero: {
       title: 'Myanmar Same-Day Delivery',
@@ -1010,6 +1042,16 @@ const translations: any = {
         waySide: 'Eco Way: Delivery within 24 hours.'
       },
       waySide: 'Eco Way'
+    },
+    errors: {
+      qrGenerationFailed: 'QR code generation failed',
+      qrDownloaded: 'QR code saved locally',
+      downloadFailed: 'Download failed',
+      dbConnectionFailed: 'Database connection failed',
+      connectionTestError: 'Connection test error',
+      saveCustomerFailed: 'Save customer failed',
+      distanceCalculationFailed: 'Distance calculation failed',
+      addressRequired: 'Please fill in complete sender and receiver addresses'
     }
   },
   my: {
@@ -1022,6 +1064,17 @@ const translations: any = {
       cart: 'စျေးဝယ်လှည်း',
       admin: 'စီမံခန့်ခွဲမှု',
       profile: 'ကျွန်ုပ်၏အကောင့်'
+    },
+    tutorial: {
+      button: 'အသုံးပြုနည်းလမ်းညွှန်',
+      title: 'MARKET LINK EXPRESS ကို အသုံးပြုနည်း',
+      steps: [
+        { title: 'အကောင့်ဖွင့်ပါ သို့မဟုတ် လော့ဂ်အင်ဝင်ပါ', content: 'ပထမဦးစွာ အကောင့်အသစ်ဖွင့်ပါ သို့မဟုတ် ရှိပြီးသားအကောင့်ဖြင့် လော့ဂ်အင်ဝင်ပါ။' },
+        { title: 'အော်ဒါဖြည့်ပါ', content: '"အော်ဒါတင်မည်" ကိုနှိပ်ပြီး ပို့သူနှင့် လက်ခံသူ အချက်အလက်များကို မှန်ကန်စွာ ဖြည့်သွင်းပါ။' },
+        { title: 'ဝန်ဆောင်မှုရွေးချယ်ပါ', content: 'သင့်လိုအပ်ချက်အရ ပါဆယ်အမျိုးအစားနှင့် ပို့ဆောင်မှုမြန်နှုန်းကို ရွေးချယ်ပါ။' },
+        { title: 'အော်ဒါတင်ပါ', content: 'ဈေးနှုန်းကို အတည်ပြုပြီး အော်ဒါတင်ပါ။ စနစ်မှ အနီးဆုံးကူရီယာကို ရှာဖွေပေးပါမည်။' },
+        { title: 'တိုက်ရိုက်ခြေရာခံပါ', content: '"အော်ဒါခြေရာခံ" မှတဆင့် ကူရီယာ၏တည်နေရာနှင့် ပို့ဆောင်မှုအခြေအနေကို အချိန်နှင့်တပြေးညီ ကြည့်ရှုပါ။' }
+      ]
     },
     hero: {
       title: 'မြန်မာမြို့တွင်းပို့ဆောင်ရေး',
@@ -1511,6 +1564,16 @@ const translations: any = {
         waySide: '၂၄ နာရီအတွင်း တန်တန်လေး ပို့ဆောင်ပေးပါသည်။'
       },
       waySide: 'တန်တန်လေးပို့'
+    },
+    errors: {
+      qrGenerationFailed: 'QR Code ထုတ်ရန် မအောင်မြင်ပါ',
+      qrDownloaded: 'QR Code ကို သိမ်းဆည်းပြီးပါပြီ',
+      downloadFailed: 'ဒေါင်းလုဒ်လုပ်ရန် မအောင်မြင်ပါ',
+      dbConnectionFailed: 'ဒေတာဘေ့စ် ချိတ်ဆက်မှု မအောင်မြင်ပါ',
+      connectionTestError: 'ချိတ်ဆက်မှု စမ်းသပ်မှု မှားယွင်းနေပါသည်',
+      saveCustomerFailed: 'ဖောက်သည် အချက်အလက် သိမ်းဆည်းရန် မအောင်မြင်ပါ',
+      distanceCalculationFailed: 'အကွာအဝေး တွက်ချက်မှု မအောင်မြင်ပါ',
+      addressRequired: 'ပို့သူနှင့် လက်ခံသူ လိပ်စာအပြည့်အစုံကို ဖြည့်စွက်ပါ'
     }
   }
 };
