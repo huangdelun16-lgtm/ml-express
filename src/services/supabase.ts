@@ -70,6 +70,7 @@ export interface Tutorial {
   content_en?: string;
   content_my?: string;
   image_url?: string;
+  image_urls?: string[]; // 🚀 新增：支持多张图片
   display_order?: number;
   is_active?: boolean;
   created_at?: string;

@@ -3906,12 +3906,32 @@ const HomePage: React.FC = () => {
                         : step.content}
                     </p>
                     
-                    {step.image_url && (
+                    {/* 图片展示区域：支持多图 */}
+                    {step.image_urls && step.image_urls.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+                        {step.image_urls.map((url: string, imgIdx: number) => (
+                          <div key={imgIdx} style={{ 
+                            width: '100%', 
+                            borderRadius: '16px', 
+                            overflow: 'hidden',
+                            border: '1px solid #e2e8f0',
+                            background: '#f1f5f9',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            <img 
+                              src={url} 
+                              alt={`${step.title_zh || 'tutorial'}-${imgIdx}`} 
+                              style={{ width: '100%', display: 'block', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : step.image_url ? (
                       <div style={{ 
                         width: '100%', 
-                        borderRadius: '12px', 
+                        borderRadius: '16px', 
                         overflow: 'hidden',
-                        border: '1px solid #eee',
+                        border: '1px solid #e2e8f0',
                         background: '#f1f5f9'
                       }}>
                         <img 
@@ -3920,7 +3940,7 @@ const HomePage: React.FC = () => {
                           style={{ width: '100%', display: 'block' }}
                         />
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))}

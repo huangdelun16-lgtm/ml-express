@@ -39,6 +39,7 @@ const BannerManagement: React.FC = () => {
     content_en: '',
     content_my: '',
     image_url: '',
+    image_urls: [] as string[], // 🚀 新增：多图数组
     display_order: 0,
     is_active: true
   });
@@ -85,9 +86,8 @@ const BannerManagement: React.FC = () => {
     setTutorials(data);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log('📂 文件选择触发:', file?.name, file?.type);
     if (!file) return;
 
     try {
@@ -96,35 +96,71 @@ const BannerManagement: React.FC = () => {
       const response = await fetch('/.netlify/functions/upload-banner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          base64
-        })
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
       });
 
       const result = await response.json();
-      if (!response.ok || !result?.url) {
-        // 🚀 核心优化：如果后端返回了具体的错误原因，直接显示出来
-        console.error('上传接口返回错误:', result);
-        throw new Error(result?.error || result?.message || '上传失败，服务器未返回图片地址');
-      }
+      if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
 
-      setFormData(prev => ({
-        ...prev,
-        image_url: result.url
-      }));
-      setTutorialFormData(prev => ({
-        ...prev,
-        image_url: result.url
-      }));
+      setFormData(prev => ({ ...prev, image_url: result.url }));
     } catch (error) {
       console.error('上传图片异常:', error);
-      alert(error instanceof Error ? error.message : '上传异常，请检查网络连接');
+      alert(error instanceof Error ? error.message : '上传失败');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleTutorialFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setUploading(true);
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await readFileAsBase64(file);
+        const response = await fetch('/.netlify/functions/upload-banner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
+        });
+
+        const result = await response.json();
+        if (response.ok && result?.url) {
+          uploadedUrls.push(result.url);
+        }
+      }
+
+      setTutorialFormData(prev => {
+        const nextImageUrls = [...prev.image_urls, ...uploadedUrls];
+        return {
+          ...prev,
+          image_urls: nextImageUrls,
+          image_url: nextImageUrls.length > 0 ? nextImageUrls[0] : prev.image_url
+        };
+      });
+    } catch (error) {
+      console.error('上传教学图片异常:', error);
+      alert('部分图片上传失败，请重试');
+    } finally {
+      setUploading(false);
+      if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
+    }
+  };
+
+  const removeTutorialImage = (indexToRemove: number) => {
+    setTutorialFormData(prev => {
+      const nextImageUrls = prev.image_urls.filter((_, index) => index !== indexToRemove);
+      return {
+        ...prev,
+        image_urls: nextImageUrls,
+        image_url: nextImageUrls.length > 0 ? nextImageUrls[0] : ''
+      };
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -230,6 +266,7 @@ const BannerManagement: React.FC = () => {
       content_en: tutorial.content_en || '',
       content_my: tutorial.content_my || '',
       image_url: tutorial.image_url || '',
+      image_urls: tutorial.image_urls || (tutorial.image_url ? [tutorial.image_url] : []),
       display_order: tutorial.display_order || 0,
       is_active: tutorial.is_active ?? true
     });
@@ -345,6 +382,7 @@ const BannerManagement: React.FC = () => {
                   content_en: '',
                   content_my: '',
                   image_url: '',
+                  image_urls: [],
                   display_order: 0,
                   is_active: true
                 });
@@ -415,7 +453,7 @@ const BannerManagement: React.FC = () => {
 
                 {/* 上传区域 */}
                 <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '12px', fontWeight: 700 }}>教学展示图片</label>
+                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '12px', fontWeight: 700 }}>教学展示图片 (支持多张)</label>
                   <button 
                     type="button" 
                     onClick={() => tutorialFileInputRef.current?.click()} 
@@ -433,19 +471,29 @@ const BannerManagement: React.FC = () => {
                       transition: 'all 0.2s'
                     }}
                   >
-                    {uploading ? '⌛ 正在上传中...' : '📸 点击选择图片并上传'}
+                    {uploading ? '⌛ 正在上传中...' : '📸 点击选择图片并上传 (可多选)'}
                   </button>
                   <input 
                     type="file" 
                     ref={tutorialFileInputRef} 
-                    onChange={handleFileChange} 
+                    onChange={handleTutorialFileChange} 
                     accept="image/*" 
+                    multiple
                     style={{ display: 'none' }} 
                   />
-                  {tutorialFormData.image_url && (
-                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', fontWeight: 700 }}>
-                      <span>✅ 图片已就绪</span>
-                      <img src={tutorialFormData.image_url} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                  
+                  {tutorialFormData.image_urls.length > 0 && (
+                    <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '12px' }}>
+                      {tutorialFormData.image_urls.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                          <img src={url} alt={`preview-${idx}`} style={{ width: '100%', height: '100%', borderRadius: '10px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                          <button 
+                            type="button"
+                            onClick={() => removeTutorialImage(idx)}
+                            style={{ position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', borderRadius: '50%', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}
+                          >✕</button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -556,7 +604,7 @@ const BannerManagement: React.FC = () => {
                     <input 
                       type="file" 
                       ref={fileInputRef} 
-                      onChange={handleFileChange} 
+                      onChange={handleBannerFileChange} 
                       accept="image/*" 
                       style={{ display: 'none' }} 
                     />
@@ -656,7 +704,16 @@ const BannerManagement: React.FC = () => {
             {tutorials.map(tutorial => (
               <div key={tutorial.id} style={{ ...cardStyle, padding: '0', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '160px', background: '#1e293b', position: 'relative', overflow: 'hidden' }}>
-                  {tutorial.image_url ? (
+                  {tutorial.image_urls && tutorial.image_urls.length > 0 ? (
+                    <>
+                      <img src={tutorial.image_urls[0]} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {tutorial.image_urls.length > 1 && (
+                        <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', color: 'white', fontWeight: 700 }}>
+                          +{tutorial.image_urls.length - 1} 张图片
+                        </div>
+                      )}
+                    </>
+                  ) : tutorial.image_url ? (
                     <img src={tutorial.image_url} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)', fontSize: '3rem' }}>📖</div>

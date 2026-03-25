@@ -160,6 +160,7 @@ export interface Tutorial {
   content_en?: string;
   content_my?: string;
   image_url?: string;
+  image_urls?: string[]; // 🚀 新增：多图支持
   display_order?: number;
   is_active?: boolean;
   created_at?: string;
