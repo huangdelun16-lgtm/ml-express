@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image, Dimensions, Animated, RefreshControl, Alert } from 'react-native';
-import { Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image, Dimensions, Animated, RefreshControl, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
