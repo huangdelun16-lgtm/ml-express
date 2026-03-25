@@ -159,6 +159,23 @@ export interface UserNotification {
   created_at: string;
 }
 
+// 教学步骤接口
+export interface Tutorial {
+  id?: string;
+  title_zh: string;
+  title_en?: string;
+  title_my?: string;
+  content_zh: string;
+  content_en?: string;
+  content_my?: string;
+  image_url?: string;
+  image_urls?: string[]; // 🚀 支持多图
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 商品接口
 export interface Product {
   id: string;
@@ -1997,7 +2014,28 @@ export const reviewService = {
   }
 };
 
-// 🚀 新增：配送照片服务
+// 🚀 新增：使用教学服务
+export const tutorialService = {
+  async getAllTutorials(): Promise<Tutorial[]> {
+    try {
+      const { data, error } = await supabase
+        .from('tutorials')
+        .select('*')
+        .order('display_order', { ascending: true });
+      
+      if (error) {
+        LoggerService.error('获取教学列表失败:', error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      LoggerService.error('获取教学列表异常:', err);
+      return [];
+    }
+  }
+};
+
+// 配送照片服务
 export const deliveryPhotoService = {
   // 获取包裹的配送照片
   async getPackagePhotos(packageId: string): Promise<any[]> {
