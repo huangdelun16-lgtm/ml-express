@@ -512,24 +512,40 @@ export default function HomeScreen({ navigation }: any) {
               </View>
             </View>
             
-            {/* 用户欢迎信息 */}
-            <View style={styles.welcomeRow}>
+            {/* 用户欢迎信息与使用教学 */}
+            <View style={styles.welcomeSection}>
               <View style={styles.welcomeContainer} accessibilityRole="header">
                 <Text style={styles.welcomeText}>
                   {userName ? `${currentT.welcomeBack}, ${userName}!` : 
                    isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
                 </Text>
               </View>
+              
               <TouchableOpacity 
-                style={styles.tutorialTrigger}
+                style={styles.tutorialFullWidth}
                 onPress={() => setShowTutorialModal(true)}
+                activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#ffffff', '#f1f5f9']}
-                  style={styles.tutorialTriggerGradient}
+                  colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tutorialGradient}
                 >
-                  <Text style={styles.tutorialTriggerIcon}>📖</Text>
-                  <Text style={styles.tutorialTriggerText}>{currentT.howToUse}</Text>
+                  <View style={styles.tutorialLeft}>
+                    <View style={styles.tutorialIconBg}>
+                      <Text style={{fontSize: 18}}>📖</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.tutorialMainText}>{currentT.howToUse}</Text>
+                      <Text style={styles.tutorialSubText}>
+                        {language === 'zh' ? '新手上路 · 图文详解' : 
+                         language === 'en' ? 'Quick Start Guide' : 
+                         'အသုံးပြုပုံ အဆင့်ဆင့်လမ်းညွှန်'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1226,37 +1242,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  welcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  welcomeSection: {
     width: '100%',
-    marginTop: 8,
+    alignItems: 'center',
     gap: 12,
+    marginTop: 10,
   },
-  tutorialTrigger: {
-    borderRadius: 14,
+  tutorialFullWidth: {
+    width: '100%',
+    borderRadius: 18,
     overflow: 'hidden',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
   },
-  tutorialTriggerGradient: {
+  tutorialGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  tutorialTriggerIcon: {
-    fontSize: 16,
+  tutorialLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  tutorialTriggerText: {
-    fontSize: 13,
+  tutorialIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tutorialMainText: {
+    fontSize: 15,
     fontWeight: '800',
-    color: '#3b82f6',
+    color: '#1e3a8a',
+  },
+  tutorialSubText: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
   },
   bannerContainer: {
     paddingHorizontal: 16,
