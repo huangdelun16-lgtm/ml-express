@@ -91,6 +91,7 @@ const HomePage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showTutorialModal, setShowTutorialModal] = useState(false); // 🚀 新增：使用教学模态框状态
+  const [activeTutorialStep, setActiveTutorialStep] = useState<number | null>(null); // 🚀 优化：当前选中的教学步骤
   const [tutorials, setTutorials] = useState<Tutorial[]>([]); // 🚀 新增：从数据库获取的教学步骤
   const [trackingNumber] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -3842,128 +3843,196 @@ const HomePage: React.FC = () => {
         >
           <div style={{
             background: 'white',
-            padding: window.innerWidth < 768 ? '2rem 1.5rem' : '3rem',
-            borderRadius: '30px',
-            width: window.innerWidth < 768 ? '100%' : '600px',
+            padding: window.innerWidth < 768 ? '2rem 1.5rem' : '2.5rem',
+            borderRadius: '32px',
+            width: window.innerWidth < 768 ? '100%' : '650px',
             maxWidth: '95vw',
-            maxHeight: '90vh',
+            maxHeight: '85vh',
             overflowY: 'auto',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             position: 'relative',
-            color: '#1e293b'
+            color: '#1e293b',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <button
-              onClick={() => setShowTutorialModal(false)}
+              onClick={() => {
+                setShowTutorialModal(false);
+                setActiveTutorialStep(null);
+              }}
               style={{
                 position: 'absolute', top: '1.5rem', right: '1.5rem',
                 background: '#f1f5f9', border: 'none',
                 width: '40px', height: '40px', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#64748b'
+                cursor: 'pointer', color: '#64748b', zIndex: 10
               }}
             >✕</button>
 
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📖</div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0, color: '#0f172a' }}>
-                {t.tutorial?.title || 'Tutorial'}
-              </h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {(tutorials.length > 0 ? tutorials : t.tutorial?.steps || []).map((step: any, index: number) => (
-                <div key={index} style={{
-                  display: 'flex',
-                  gap: '1.25rem',
-                  alignItems: 'flex-start',
-                  padding: '1.25rem',
-                  background: '#f8fafc',
-                  borderRadius: '20px',
-                  border: '1px solid #e2e8f0',
-                  flexDirection: 'column'
-                }}>
-                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', width: '100%' }}>
-                    <div style={{
-                      width: '32px', height: '32px',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      borderRadius: '50%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'white', fontWeight: 'bold', flexShrink: 0
-                    }}>
-                      {index + 1}
-                    </div>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', margin: 0, color: '#0f172a' }}>
-                      {tutorials.length > 0 
-                        ? (language === 'zh' ? step.title_zh : language === 'en' ? (step.title_en || step.title_zh) : (step.title_my || step.title_zh))
-                        : step.title}
-                    </h3>
-                  </div>
-                  
-                  <div style={{ width: '100%' }}>
-                    <p style={{ fontSize: '0.95rem', color: '#64748b', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
-                      {tutorials.length > 0 
-                        ? (language === 'zh' ? step.content_zh : language === 'en' ? (step.content_en || step.content_zh) : (step.content_my || step.content_zh))
-                        : step.content}
-                    </p>
-                    
-                    {/* 图片展示区域：支持多图 */}
-                    {step.image_urls && step.image_urls.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-                        {step.image_urls.map((url: string, imgIdx: number) => (
-                          <div key={imgIdx} style={{ 
-                            width: '100%', 
-                            borderRadius: '16px', 
-                            overflow: 'hidden',
-                            border: '1px solid #e2e8f0',
-                            background: '#f1f5f9',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                          }}>
-                            <img 
-                              src={url} 
-                              alt={`${step.title_zh || 'tutorial'}-${imgIdx}`} 
-                              style={{ width: '100%', display: 'block', objectFit: 'contain' }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : step.image_url ? (
-                      <div style={{ 
-                        width: '100%', 
-                        borderRadius: '16px', 
-                        overflow: 'hidden',
-                        border: '1px solid #e2e8f0',
-                        background: '#f1f5f9'
-                      }}>
-                        <img 
-                          src={step.image_url} 
-                          alt={step.title_zh || 'tutorial'} 
-                          style={{ width: '100%', display: 'block' }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+            {activeTutorialStep === null ? (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📖</div>
+                  <h2 style={{ fontSize: '1.8rem', fontWeight: '850', margin: 0, color: '#0f172a', letterSpacing: '-0.5px' }}>
+                    {t.tutorial?.title || '如何使用'}
+                  </h2>
+                  <p style={{ color: '#64748b', marginTop: '0.5rem', fontWeight: '500' }}>点击下方步骤查看详细图解</p>
                 </div>
-              ))}
-            </div>
 
-            <button
-              onClick={() => setShowTutorialModal(false)}
-              style={{
-                width: '100%',
-                marginTop: '2.5rem',
-                padding: '1.25rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '16px',
-                fontSize: '1.1rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)'
-              }}
-            >
-              {language === 'zh' ? '我知道了' : language === 'en' ? 'Got it' : 'နားလည်ပါပြီ'}
-            </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {(tutorials.length > 0 ? tutorials : t.tutorial?.steps || []).map((step: any, index: number) => (
+                    <div 
+                      key={index} 
+                      onClick={() => setActiveTutorialStep(index)}
+                      style={{
+                        display: 'flex',
+                        gap: '1.25rem',
+                        alignItems: 'center',
+                        padding: '1.5rem',
+                        background: '#f8fafc',
+                        borderRadius: '24px',
+                        border: '1px solid #e2e8f0',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(59, 130, 246, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div style={{
+                        width: '40px', height: '40px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        borderRadius: '14px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontWeight: '800', flexShrink: 0,
+                        boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)'
+                      }}>
+                        {index + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: '750', margin: '0 0 4px 0', color: '#0f172a' }}>
+                          {tutorials.length > 0 
+                            ? (language === 'zh' ? step.title_zh : language === 'en' ? (step.title_en || step.title_zh) : (step.title_my || step.title_zh))
+                            : step.title}
+                        </h3>
+                        <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
+                          {tutorials.length > 0 
+                            ? (language === 'zh' ? step.content_zh : language === 'en' ? (step.content_en || step.content_zh) : (step.content_my || step.content_zh))
+                            : step.content}
+                        </p>
+                      </div>
+                      <div style={{ color: '#cbd5e1', fontSize: '1.2rem' }}>❯</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <button 
+                  onClick={() => setActiveTutorialStep(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '8px 16px', borderRadius: '12px',
+                    background: '#f1f5f9', border: 'none',
+                    color: '#64748b', fontWeight: '700',
+                    cursor: 'pointer', marginBottom: '1.5rem',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                >
+                  ← {language === 'zh' ? '返回列表' : language === 'en' ? 'Back' : 'နောက်သို့'}
+                </button>
+
+                {(() => {
+                  const step = (tutorials.length > 0 ? tutorials : t.tutorial?.steps || [])[activeTutorialStep];
+                  return (
+                    <>
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <div style={{
+                          width: '32px', height: '32px',
+                          background: '#3b82f6', borderRadius: '10px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'white', fontWeight: 'bold'
+                        }}>
+                          {activeTutorialStep + 1}
+                        </div>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: '#0f172a' }}>
+                          {tutorials.length > 0 
+                            ? (language === 'zh' ? step.title_zh : language === 'en' ? (step.title_en || step.title_zh) : (step.title_my || step.title_zh))
+                            : step.title}
+                        </h2>
+                      </div>
+
+                      <div style={{ 
+                        background: '#f8fafc', padding: '1.5rem', 
+                        borderRadius: '24px', border: '1px solid #e2e8f0',
+                        marginBottom: '2rem'
+                      }}>
+                        <p style={{ fontSize: '1.05rem', color: '#334155', lineHeight: '1.6', margin: 0, fontWeight: '500' }}>
+                          {tutorials.length > 0 
+                            ? (language === 'zh' ? step.content_zh : language === 'en' ? (step.content_en || step.content_zh) : (step.content_my || step.content_zh))
+                            : step.content}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        {step.image_urls && step.image_urls.length > 0 ? (
+                          step.image_urls.map((url: string, imgIdx: number) => (
+                            <div key={imgIdx} style={{ 
+                              width: '100%', borderRadius: '20px', overflow: 'hidden',
+                              border: '1px solid #e2e8f0', background: '#f1f5f9',
+                              boxShadow: '0 15px 30px -10px rgba(0, 0, 0, 0.1)'
+                            }}>
+                              <img src={url} alt="step" style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
+                            </div>
+                          ))
+                        ) : step.image_url ? (
+                          <div style={{ 
+                            width: '100%', borderRadius: '20px', overflow: 'hidden',
+                            border: '1px solid #e2e8f0', background: '#f1f5f9',
+                            boxShadow: '0 15px 30px -10px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            <img src={step.image_url} alt="step" style={{ width: '100%', display: 'block' }} />
+                          </div>
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: '3rem', color: '#cbd5e1', fontSize: '1.2rem' }}>暂无说明图片</div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {activeTutorialStep === null && (
+              <button
+                onClick={() => setShowTutorialModal(false)}
+                style={{
+                  width: '100%', marginTop: '2rem', padding: '1.25rem',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white', border: 'none', borderRadius: '18px',
+                  fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer',
+                  boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.3)',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                {language === 'zh' ? '我知道了' : language === 'en' ? 'Got it' : 'နားလည်ပါပြီ'}
+              </button>
+            )}
           </div>
         </div>
       )}
