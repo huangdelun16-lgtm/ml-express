@@ -7,6 +7,7 @@ import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Skeleton, { StatsCardSkeleton, OrderCardSkeleton } from '../components/Skeleton';
 import TutorialModal from '../components/TutorialModal';
+import { Ionicons } from '@expo/vector-icons';
 import { packageService, bannerService, Banner } from '../services/supabase';
 import { errorService } from '../services/ErrorService';
 import { theme } from '../config/theme';
