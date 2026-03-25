@@ -7,6 +7,7 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Skeleton, { StatsCardSkeleton, OrderCardSkeleton } from '../components/Skeleton';
+import TutorialModal from '../components/TutorialModal';
 import { packageService, bannerService, Banner } from '../services/supabase';
 import { errorService } from '../services/ErrorService';
 import { theme } from '../config/theme';
@@ -103,6 +104,7 @@ export default function HomeScreen({ navigation }: any) {
   const [isBannerPaused, setIsBannerPaused] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loadingBanners, setLoadingBanners] = useState(true);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
   const TOTAL_BANNERS = banners.length > 0 ? banners.length : 3;
 
   // 自动轮播逻辑
@@ -184,6 +186,7 @@ export default function HomeScreen({ navigation }: any) {
       loginNow: '立即登录',
       cityMall: '同城商场',
       shoppingCart: '购物车',
+      howToUse: '使用教学',
       comingSoon: '敬请期待',
     },
     en: {
@@ -242,6 +245,7 @@ export default function HomeScreen({ navigation }: any) {
       loginNow: 'Login Now',
       cityMall: 'City Mall',
       shoppingCart: 'Cart',
+      howToUse: 'Usage Guide',
       comingSoon: 'Coming Soon',
     },
     my: {
@@ -300,6 +304,7 @@ export default function HomeScreen({ navigation }: any) {
       loginNow: 'ယခုဝင်ရောက်',
       cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
       shoppingCart: 'ဈေးဝယ်လှည်း',
+      howToUse: 'အသုံးပြုနည်းလမ်းညွှန်',
       comingSoon: 'မကြာမီလာမည်',
     },
   };
@@ -509,11 +514,25 @@ export default function HomeScreen({ navigation }: any) {
             </View>
             
             {/* 用户欢迎信息 */}
-            <View style={styles.welcomeContainer} accessibilityRole="header">
-              <Text style={styles.welcomeText}>
-                {userName ? `${currentT.welcomeBack}, ${userName}!` : 
-                 isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
-              </Text>
+            <View style={styles.welcomeRow}>
+              <View style={styles.welcomeContainer} accessibilityRole="header">
+                <Text style={styles.welcomeText}>
+                  {userName ? `${currentT.welcomeBack}, ${userName}!` : 
+                   isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.tutorialTrigger}
+                onPress={() => setShowTutorialModal(true)}
+              >
+                <LinearGradient
+                  colors={['#ffffff', '#f1f5f9']}
+                  style={styles.tutorialTriggerGradient}
+                >
+                  <Text style={styles.tutorialTriggerIcon}>📖</Text>
+                  <Text style={styles.tutorialTriggerText}>{currentT.howToUse}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -1139,6 +1158,11 @@ export default function HomeScreen({ navigation }: any) {
         {/* Bottom Spacing */}
         <View style={{ height: 60 }} />
       </Animated.ScrollView>
+
+      <TutorialModal 
+        isVisible={showTutorialModal}
+        onClose={() => setShowTutorialModal(false)}
+      />
     </View>
   );
 }
@@ -1202,6 +1226,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  welcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 8,
+    gap: 12,
+  },
+  tutorialTrigger: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  tutorialTriggerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  tutorialTriggerIcon: {
+    fontSize: 16,
+  },
+  tutorialTriggerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#3b82f6',
   },
   bannerContainer: {
     paddingHorizontal: 16,

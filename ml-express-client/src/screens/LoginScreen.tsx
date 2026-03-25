@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import LoggerService from './../services/LoggerService';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { customerService, supabase } from '../services/supabase';
@@ -16,6 +17,7 @@ export default function LoginScreen({ navigation }: any) {
   const [loginType, setLoginType] = useState<'customer' | 'merchant'>('customer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const t = {
@@ -346,14 +348,26 @@ export default function LoginScreen({ navigation }: any) {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{currentT.password}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={currentT.passwordPlaceholder}
-                placeholderTextColor="#A0AEC0"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder={currentT.passwordPlaceholder}
+                  placeholderTextColor="#A0AEC0"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity
+                  style={styles.passwordIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={24}
+                    color="#A0AEC0"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -531,6 +545,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#2D3748',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#2D3748',
+  },
+  passwordIcon: {
+    padding: 10,
   },
   loginButton: {
     backgroundColor: '#2563EB',

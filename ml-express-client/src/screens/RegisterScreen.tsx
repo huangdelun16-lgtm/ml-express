@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { customerService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -18,6 +19,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -366,26 +369,50 @@ export default function RegisterScreen({ navigation }: any) {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{currentT.password} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={currentT.passwordPlaceholder}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholderTextColor="#9ca3af"
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder={currentT.passwordPlaceholder}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  placeholderTextColor="#9ca3af"
+                />
+                <TouchableOpacity
+                  style={styles.passwordIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color="#9ca3af"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{currentT.confirmPassword} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={currentT.confirmPasswordPlaceholder}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholderTextColor="#9ca3af"
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder={currentT.confirmPasswordPlaceholder}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholderTextColor="#9ca3af"
+                />
+                <TouchableOpacity
+                  style={styles.passwordIcon}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color="#9ca3af"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -561,6 +588,23 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 15,
     color: '#1e293b',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 15,
+    color: '#1e293b',
+  },
+  passwordIcon: {
+    padding: 10,
   },
   textArea: {
     minHeight: 70,
