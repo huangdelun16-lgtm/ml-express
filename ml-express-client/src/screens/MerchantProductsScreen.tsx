@@ -1035,6 +1035,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         message={toastMessage}
         type={toastType}
         visible={toastVisible}
+        duration={1500}
         onHide={() => setToastVisible(false)}
       />
     </View>
