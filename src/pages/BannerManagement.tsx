@@ -713,7 +713,7 @@ const BannerManagement: React.FC = () => {
                 </div>
 
                 {/* 设置部分 */}
-                <div style={{ display: 'flex', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                   <input type="checkbox" id="welcome_is_active" name="is_active" checked={welcomeFormData.is_active} onChange={handleWelcomeInputChange} style={{ width: '20px', height: '20px' }} />
                   <label htmlFor="welcome_is_active" style={{ fontSize: '0.9rem', fontWeight: 600 }}>立即启用该欢迎页 (注意：只能有一个活跃欢迎页)</label>
                 </div>
